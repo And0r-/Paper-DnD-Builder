@@ -1,0 +1,60 @@
+# Production stack: web app + PostgreSQL.
+#
+#   cp .env.example .env   # then fill in the values
+#   docker compose up -d --build
+#
+# Content packages are read from ./packages-mount (read-only). Swapping a
+# package means replacing files there and restarting `web`; no rebuild.
+
+name: builder
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-builder}
+      POSTGRES_USER: ${POSTGRES_USER:-builder}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", 'pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    # No published port: only the web service talks to the database.
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: builder-web:local
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      # POSTGRES_PASSWORD is embedded in a URL: use URL-safe characters only.
+      DATABASE_URL: postgres://${POSTGRES_USER:-builder}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@postgres:5432/${POSTGRES_DB:-builder}
+      PACKAGES_DIR: /packages
+      BASE_URL: ${BASE_URL:-}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-}
+      SMTP_SECURE: ${SMTP_SECURE:-}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      MAIL_FROM: ${MAIL_FROM:-}
+    ports:
+      - "${WEB_PORT:-3000}:3000"
+    volumes:
+      - ./packages-mount:/packages:ro
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:3000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
+
+volumes:
+  postgres-data:
