@@ -12,3 +12,4 @@ packages-mount/*
 !packages-mount/.gitkeep
 # Local agent tooling
 .claude/
+next-env.d.ts
