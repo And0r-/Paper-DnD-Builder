@@ -1,12 +1,20 @@
 /**
  * Content package format.
  *
- * Reserved for the content/format role: the Zod schema for packages
- * (things, choices, rules, texts per language, unit conversion tables)
- * lives here. The builder only ever reads packages through this schema.
- *
- * Placeholder until the format v0 task lands.
+ * Zod schemas, types and the validator for content packages. The builder
+ * only ever reads packages through this module. SPEC.md in this package is
+ * the human-readable specification.
  */
 
-/** Package format version the builder understands. `0` means "not defined yet". */
-export const PACKAGE_FORMAT_VERSION = 0;
+export { PACKAGE_FORMAT_VERSION, formatVersionMismatch, parseFormatVersion } from "./version.ts";
+export * from "./schema.ts";
+export { parseExpr, collectRefs, ExprSyntaxError, FUNCTIONS, BUILTIN_REFS } from "./expr.ts";
+export type { Expr, BinaryOp, FunctionName, ExprRefs } from "./expr.ts";
+export { parseTemplate, TemplateSyntaxError } from "./template.ts";
+export type { TemplatePart } from "./template.ts";
+export { convertAmount, dimensionOf } from "./units.ts";
+export { readPackageDir, ROOT_FILES } from "./read.ts";
+export type { PackageFiles, ReadResult } from "./read.ts";
+export { validatePackageDir, validatePackageFiles, RESERVED_PREFIXES } from "./validate.ts";
+export type { Issue, ContentPackage, ValidationResult, TextOrigin } from "./validate.ts";
+export { formatIssue, formatReport } from "./report.ts";

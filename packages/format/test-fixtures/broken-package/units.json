@@ -1,0 +1,5 @@
+{
+  "dimensions": { "length": { "source": "ft", "units": ["ft", "m"] } },
+  "languageDefaults": { "de": { "length": "m" }, "en": { "length": "ft" } },
+  "conversions": [{ "from": "ft", "to": "m", "table": [[5, 1.5]] }]
+}

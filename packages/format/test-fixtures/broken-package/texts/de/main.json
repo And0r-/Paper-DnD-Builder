@@ -1,0 +1,30 @@
+{
+  "source": "lab",
+  "entries": {
+    "package.name": "Kaputt",
+    "package.short": "Ein absichtlich kaputtes Paket.",
+    "level.name": "Stufe",
+    "level.intro": "Stufe.",
+    "level.hint": "Nimm 1.",
+    "summary.line": "Test",
+    "sheet.attribution": "Test",
+    "kind.gadget.name": "Gerät",
+    "gadget.whistle.name": "Pfeife",
+    "gadget.whistle.short": "Sie pfeift.",
+    "gadget.whistle.explain.what": "Eine Pfeife.",
+    "gadget.whistle.explain.table": "Du pfeifst.",
+    "choice.pick.title": "Wahl",
+    "choice.pick.question": "Was nimmst du?",
+    "choice.pick.intro": "Nimm etwas.",
+    "choice.name.title": "Name",
+    "choice.name.question": "Wie heisst du?",
+    "choice.name.intro": "Gib einen Namen ein.",
+    "value.speed.name": "Tempo",
+    "value.power.name": "Kraft",
+    "stat.reach.name": "Reichweite",
+    "unit.ft.short": "Fuss",
+    "unit.ft.long": "Fuss",
+    "unit.m.short": "m",
+    "unit.m.long": "Meter"
+  }
+}

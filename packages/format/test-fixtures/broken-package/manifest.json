@@ -1,0 +1,9 @@
+{
+  "formatVersion": "0.1",
+  "id": "broken",
+  "version": "0.0.1",
+  "languages": ["de", "en"],
+  "kinds": ["gadget"],
+  "sources": { "lab": { "title": "Test lab", "license": "mit" } },
+  "licenses": { "cc0": { "name": "Creative Commons Zero 1.0", "publishable": true } }
+}

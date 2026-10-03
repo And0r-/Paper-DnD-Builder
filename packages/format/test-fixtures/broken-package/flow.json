@@ -1,0 +1,13 @@
+{
+  "level": { "min": 1, "max": 1, "default": 1 },
+  "steps": [
+    { "id": "pick", "choices": ["pick"] },
+    { "id": "name", "choices": ["name"] }
+  ],
+  "choices": [
+    { "id": "pick", "kind": "pickOne", "source": "lab", "options": { "kind": "gadget" } },
+    { "id": "name", "kind": "text", "source": "lab", "maxLength": 20 }
+  ],
+  "characterName": "name",
+  "summary": { "fields": [], "line": {} }
+}
