@@ -1,0 +1,10 @@
+{
+  "source": "mistland-community",
+  "entries": {
+    "item.fishing-net.name": "Fischernetz",
+    "item.fishing-net.short": "Ein Netz, mit dem du Fische und flinke Gegner fängst.",
+    "item.fishing-net.goodIf": "Gut, wenn du gern am Wasser bist.",
+    "item.fishing-net.explain.what": "Ein geknüpftes Netz mit Gewichten am Rand.",
+    "item.fishing-net.explain.table": "Wirfst du es auf einen Gegner, kann er sich 1 Minute lang kaum bewegen. Am Abend fängst du damit dein Essen."
+  }
+}

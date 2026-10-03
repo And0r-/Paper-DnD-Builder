@@ -1,0 +1,10 @@
+{
+  "source": "mistland-community",
+  "entries": {
+    "item.fishing-net.name": "Fishing Net",
+    "item.fishing-net.short": "A net for catching fish and quick enemies.",
+    "item.fishing-net.goodIf": "Good if you like being by the water.",
+    "item.fishing-net.explain.what": "A knotted net with weights along the edge.",
+    "item.fishing-net.explain.table": "Throw it over an enemy, and they can barely move for 1 minute. In the evening, you catch your dinner with it."
+  }
+}

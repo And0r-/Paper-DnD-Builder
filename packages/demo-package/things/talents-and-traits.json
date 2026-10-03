@@ -1,0 +1,55 @@
+[
+  {
+    "id": "talent.climbing",
+    "kind": "talent",
+    "source": "mistland",
+    "tags": ["for-lantern-bearer", "for-river-runner"]
+  },
+  { "id": "talent.haggling", "kind": "talent", "source": "mistland", "tags": ["for-lantern-bearer"] },
+  {
+    "id": "talent.tracking",
+    "kind": "talent",
+    "source": "mistland",
+    "tags": ["for-river-runner", "for-herbalist"]
+  },
+  {
+    "id": "talent.mending",
+    "kind": "talent",
+    "source": "mistland",
+    "tags": ["for-lantern-bearer", "for-herbalist"]
+  },
+  { "id": "talent.listening", "kind": "talent", "source": "mistland", "tags": ["for-river-runner"] },
+  {
+    "id": "talent.legends",
+    "kind": "talent",
+    "source": "mistland",
+    "tags": ["for-lantern-bearer", "for-herbalist"]
+  },
+  { "id": "talent.sneaking", "kind": "talent", "source": "mistland", "tags": ["for-river-runner"] },
+  {
+    "id": "talent.weather-sense",
+    "kind": "talent",
+    "source": "mistland",
+    "tags": ["for-river-runner", "for-herbalist"]
+  },
+
+  { "id": "trait.mist-sight", "kind": "trait", "source": "mistland" },
+  { "id": "trait.stone-steady", "kind": "trait", "source": "mistland" },
+  { "id": "trait.salt-blood", "kind": "trait", "source": "mistland" },
+  { "id": "trait.steady-flame", "kind": "trait", "source": "mistland" },
+  {
+    "id": "trait.quick-feet",
+    "kind": "trait",
+    "source": "mistland",
+    "grants": [{ "value": "pace", "add": 5 }]
+  },
+  { "id": "trait.green-thumb", "kind": "trait", "source": "mistland" },
+  {
+    "id": "trait.warding-glow",
+    "kind": "trait",
+    "source": "mistland",
+    "grants": [{ "value": "guard", "add": 1 }]
+  },
+  { "id": "trait.ferry-sense", "kind": "trait", "source": "mistland" },
+  { "id": "trait.spore-friend", "kind": "trait", "source": "mistland" }
+]

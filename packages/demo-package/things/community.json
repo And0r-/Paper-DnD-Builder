@@ -1,0 +1,15 @@
+[
+  {
+    "id": "item.fishing-net",
+    "kind": "item",
+    "source": "mistland-community",
+    "tags": ["gear-choice"],
+    "requires": "has('calling.river-runner')",
+    "stats": {
+      "weight": {
+        "amount": 5,
+        "unit": "lb"
+      }
+    }
+  }
+]
