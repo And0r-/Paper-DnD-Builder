@@ -1,0 +1,14 @@
+node_modules/
+.next/
+out/
+dist/
+coverage/
+*.tsbuildinfo
+.env
+.env.*
+!.env.example
+# Mounted content packages are never committed to this repository.
+packages-mount/*
+!packages-mount/.gitkeep
+# Local agent tooling
+.claude/

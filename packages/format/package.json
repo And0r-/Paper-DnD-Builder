@@ -1,0 +1,14 @@
+{
+  "name": "@builder/format",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Content package format (Zod schema). Owned by the content/format role.",
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p ."
+  }
+}

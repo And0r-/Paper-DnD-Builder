@@ -1,0 +1,14 @@
+{
+  "name": "@builder/core",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Rule-system-neutral rule core: evaluates formulas and dependencies declared by content packages.",
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p ."
+  }
+}

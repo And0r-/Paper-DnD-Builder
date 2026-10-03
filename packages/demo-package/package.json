@@ -1,0 +1,14 @@
+{
+  "name": "@builder/demo-package",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Demo content package with invented content. Used for development and tests.",
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p ."
+  }
+}

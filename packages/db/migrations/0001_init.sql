@@ -1,0 +1,5 @@
+-- Initial migration.
+--
+-- Intentionally empty: it proves the migration pipeline runs forward on an
+-- empty database. Tables for accounts, sessions, settings and character
+-- drafts arrive with the features that need them.
