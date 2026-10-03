@@ -1,0 +1,165 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="210mm" height="297mm" viewBox="0 0 210 297">
+<rect x="0" y="0" width="210" height="297" fill="#fff"/>
+<text x="12" y="20" font-family="Helvetica, Arial, sans-serif" font-size="7.7616" font-weight="bold" fill="#000" text-anchor="start">Mira Nebelfeld</text>
+<text x="12" y="26.5" font-family="Helvetica, Arial, sans-serif" font-size="3.8808" font-weight="normal" fill="#000" text-anchor="start">Laternenträgerin · Wegfinderin · Moorvolk · Stufe 3</text>
+<text x="198" y="16" font-family="Helvetica, Arial, sans-serif" font-size="2.646" font-weight="normal" fill="#444" text-anchor="end">Nebelland (Demo-Regelwerk)</text>
+<text x="138" y="24" font-family="Helvetica, Arial, sans-serif" font-size="2.646" font-weight="normal" fill="#444" text-anchor="start">Gespielt von</text>
+<line x1="138" y1="27" x2="198" y2="27" stroke="#777" stroke-width="0.14112"/>
+<line x1="12" y1="30.5" x2="198" y2="30.5" stroke="#000" stroke-width="0.3528"/>
+<rect x="12" y="35" width="34" height="28" fill="none" stroke="#000" stroke-width="0.28224" rx="1.5"/>
+<text x="29" y="40" font-family="Helvetica, Arial, sans-serif" font-size="2.8224" font-weight="bold" fill="#000" text-anchor="middle" letter-spacing="0.169344">AUSDAUER</text>
+<rect x="17" y="43" width="24" height="12" fill="none" stroke="#777" stroke-width="0.14112" rx="1"/>
+<text x="29" y="50.5" font-family="Helvetica, Arial, sans-serif" font-size="2.4696" font-weight="normal" fill="#999" text-anchor="middle">Bleistift</text>
+<text x="29" y="60" font-family="Helvetica, Arial, sans-serif" font-size="2.4696" font-weight="normal" fill="#333" text-anchor="middle">höchstens 22</text>
+<rect x="50" y="35" width="34" height="28" fill="none" stroke="#000" stroke-width="0.28224" rx="1.5"/>
+<text x="67" y="40" font-family="Helvetica, Arial, sans-serif" font-size="2.8224" font-weight="bold" fill="#000" text-anchor="middle" letter-spacing="0.169344">SCHUTZ</text>
+<text x="67" y="53" font-family="Helvetica, Arial, sans-serif" font-size="7.7616" font-weight="bold" fill="#000" text-anchor="middle">14</text>
+<text x="67" y="60" font-family="Helvetica, Arial, sans-serif" font-size="2.4696" font-weight="normal" fill="#333" text-anchor="middle">schwer zu treffen</text>
+<rect x="88" y="35" width="34" height="28" fill="none" stroke="#000" stroke-width="0.28224" rx="1.5"/>
+<text x="105" y="40" font-family="Helvetica, Arial, sans-serif" font-size="2.8224" font-weight="bold" fill="#000" text-anchor="middle" letter-spacing="0.169344">TEMPO</text>
+<text x="105" y="53" font-family="Helvetica, Arial, sans-serif" font-size="7.7616" font-weight="bold" fill="#000" text-anchor="middle">9 m</text>
+<text x="105" y="60" font-family="Helvetica, Arial, sans-serif" font-size="2.4696" font-weight="normal" fill="#333" text-anchor="middle">pro Zug laufen</text>
+<rect x="126" y="35" width="34" height="28" fill="none" stroke="#000" stroke-width="0.28224" rx="1.5"/>
+<text x="143" y="40" font-family="Helvetica, Arial, sans-serif" font-size="2.8224" font-weight="bold" fill="#000" text-anchor="middle" letter-spacing="0.169344">GLÜCKSMARKEN</text>
+<circle cx="135" cy="49" r="2.8" fill="none" stroke="#000" stroke-width="0.24695999999999999"/>
+<circle cx="143" cy="49" r="2.8" fill="none" stroke="#000" stroke-width="0.24695999999999999"/>
+<circle cx="151" cy="49" r="2.8" fill="none" stroke="#000" stroke-width="0.24695999999999999"/>
+<text x="143" y="60" font-family="Helvetica, Arial, sans-serif" font-size="2.4696" font-weight="normal" fill="#333" text-anchor="middle">höchstens 3</text>
+<rect x="164" y="35" width="34" height="28" fill="none" stroke="#000" stroke-width="0.28224" rx="1.5"/>
+<text x="181" y="40" font-family="Helvetica, Arial, sans-serif" font-size="2.8224" font-weight="bold" fill="#000" text-anchor="middle" letter-spacing="0.169344">MUT-BONUS</text>
+<text x="181" y="53" font-family="Helvetica, Arial, sans-serif" font-size="7.7616" font-weight="bold" fill="#000" text-anchor="middle">+2</text>
+<text x="181" y="60" font-family="Helvetica, Arial, sans-serif" font-size="2.4696" font-weight="normal" fill="#333" text-anchor="middle">auf Würfe mit Übung</text>
+<rect x="12" y="68" width="52" height="5" fill="#EDEDED" stroke="none" stroke-width="0.21168"/>
+<text x="14" y="71.6" font-family="Helvetica, Arial, sans-serif" font-size="2.8224" font-weight="bold" fill="#000" text-anchor="start" letter-spacing="0.169344">GRUNDWERTE</text>
+<rect x="12" y="76" width="52" height="19" fill="none" stroke="#000" stroke-width="0.24695999999999999" rx="1.5"/>
+<text x="15" y="81" font-family="Helvetica, Arial, sans-serif" font-size="3.1752000000000002" font-weight="bold" fill="#000" text-anchor="start">Kraft</text>
+<text x="15" y="91.5" font-family="Helvetica, Arial, sans-serif" font-size="7.056" font-weight="bold" fill="#000" text-anchor="start">10</text>
+<circle cx="53" cy="87" r="6.5" fill="none" stroke="#000" stroke-width="0.24695999999999999"/>
+<text x="53" y="89.2" font-family="Helvetica, Arial, sans-serif" font-size="4.2336" font-weight="bold" fill="#000" text-anchor="middle">+0</text>
+<text x="53" y="79.6" font-family="Helvetica, Arial, sans-serif" font-size="2.2932" font-weight="normal" fill="#333" text-anchor="middle">zum Wurf</text>
+<rect x="12" y="98" width="52" height="19" fill="none" stroke="#000" stroke-width="0.24695999999999999" rx="1.5"/>
+<text x="15" y="103" font-family="Helvetica, Arial, sans-serif" font-size="3.1752000000000002" font-weight="bold" fill="#000" text-anchor="start">Geschick</text>
+<text x="15" y="113.5" font-family="Helvetica, Arial, sans-serif" font-size="7.056" font-weight="bold" fill="#000" text-anchor="start">14</text>
+<circle cx="53" cy="109" r="6.5" fill="none" stroke="#000" stroke-width="0.24695999999999999"/>
+<text x="53" y="111.2" font-family="Helvetica, Arial, sans-serif" font-size="4.2336" font-weight="bold" fill="#000" text-anchor="middle">+2</text>
+<text x="53" y="101.6" font-family="Helvetica, Arial, sans-serif" font-size="2.2932" font-weight="normal" fill="#333" text-anchor="middle">zum Wurf</text>
+<rect x="12" y="120" width="52" height="19" fill="none" stroke="#000" stroke-width="0.24695999999999999" rx="1.5"/>
+<text x="15" y="125" font-family="Helvetica, Arial, sans-serif" font-size="3.1752000000000002" font-weight="bold" fill="#000" text-anchor="start">Klugheit</text>
+<text x="15" y="135.5" font-family="Helvetica, Arial, sans-serif" font-size="7.056" font-weight="bold" fill="#000" text-anchor="start">12</text>
+<circle cx="53" cy="131" r="6.5" fill="none" stroke="#000" stroke-width="0.24695999999999999"/>
+<text x="53" y="133.2" font-family="Helvetica, Arial, sans-serif" font-size="4.2336" font-weight="bold" fill="#000" text-anchor="middle">+1</text>
+<text x="53" y="123.6" font-family="Helvetica, Arial, sans-serif" font-size="2.2932" font-weight="normal" fill="#333" text-anchor="middle">zum Wurf</text>
+<rect x="12" y="142" width="52" height="19" fill="none" stroke="#000" stroke-width="0.24695999999999999" rx="1.5"/>
+<text x="15" y="147" font-family="Helvetica, Arial, sans-serif" font-size="3.1752000000000002" font-weight="bold" fill="#000" text-anchor="start">Herz</text>
+<text x="15" y="157.5" font-family="Helvetica, Arial, sans-serif" font-size="7.056" font-weight="bold" fill="#000" text-anchor="start">16</text>
+<circle cx="53" cy="153" r="6.5" fill="none" stroke="#000" stroke-width="0.24695999999999999"/>
+<text x="53" y="155.2" font-family="Helvetica, Arial, sans-serif" font-size="4.2336" font-weight="bold" fill="#000" text-anchor="middle">+3</text>
+<text x="53" y="145.6" font-family="Helvetica, Arial, sans-serif" font-size="2.2932" font-weight="normal" fill="#333" text-anchor="middle">zum Wurf</text>
+<text x="12" y="166" font-family="Helvetica, Arial, sans-serif" font-size="2.646" font-weight="normal" fill="#333" text-anchor="start">Die Zahl im Kreis zählst du zu</text>
+<text x="12" y="169.4398" font-family="Helvetica, Arial, sans-serif" font-size="2.646" font-weight="normal" fill="#333" text-anchor="start">deinem Wurf dazu.</text>
+<rect x="70" y="68" width="128" height="5" fill="#EDEDED" stroke="none" stroke-width="0.21168"/>
+<text x="72" y="71.6" font-family="Helvetica, Arial, sans-serif" font-size="2.8224" font-weight="bold" fill="#000" text-anchor="start" letter-spacing="0.169344">FERTIGKEITEN</text>
+<text x="198" y="71.6" font-family="Helvetica, Arial, sans-serif" font-size="2.646" font-weight="normal" fill="#000" text-anchor="end">● = geübt: zähl +2 extra dazu</text>
+<circle cx="72.5" cy="77.8" r="1.6" fill="none" stroke="#000" stroke-width="0.21168"/>
+<text x="76" y="79" font-family="Helvetica, Arial, sans-serif" font-size="3.1752000000000002" font-weight="normal" fill="#000" text-anchor="start">Klettern</text>
+<text x="122" y="79" font-family="Helvetica, Arial, sans-serif" font-size="2.646" font-weight="normal" fill="#444" text-anchor="end">Kraft</text>
+<rect x="124" y="75" width="7" height="5.5" fill="none" stroke="#000" stroke-width="0.1764" rx="0.8"/>
+<circle cx="136.5" cy="77.8" r="1.6" fill="#000" stroke="#000" stroke-width="0.21168"/>
+<text x="140" y="79" font-family="Helvetica, Arial, sans-serif" font-size="3.1752000000000002" font-weight="normal" fill="#000" text-anchor="start">Schleichen</text>
+<text x="186" y="79" font-family="Helvetica, Arial, sans-serif" font-size="2.646" font-weight="normal" fill="#444" text-anchor="end">Geschick</text>
+<rect x="188" y="75" width="7" height="5.5" fill="none" stroke="#000" stroke-width="0.1764" rx="0.8"/>
+<circle cx="72.5" cy="85.3" r="1.6" fill="#000" stroke="#000" stroke-width="0.21168"/>
+<text x="76" y="86.5" font-family="Helvetica, Arial, sans-serif" font-size="3.1752000000000002" font-weight="normal" fill="#000" text-anchor="start">Spuren lesen</text>
+<text x="122" y="86.5" font-family="Helvetica, Arial, sans-serif" font-size="2.646" font-weight="normal" fill="#444" text-anchor="end">Klugheit</text>
+<rect x="124" y="82.5" width="7" height="5.5" fill="none" stroke="#000" stroke-width="0.1764" rx="0.8"/>
+<circle cx="136.5" cy="85.3" r="1.6" fill="#000" stroke="#000" stroke-width="0.21168"/>
+<text x="140" y="86.5" font-family="Helvetica, Arial, sans-serif" font-size="3.1752000000000002" font-weight="normal" fill="#000" text-anchor="start">Heilen</text>
+<text x="186" y="86.5" font-family="Helvetica, Arial, sans-serif" font-size="2.646" font-weight="normal" fill="#444" text-anchor="end">Herz</text>
+<rect x="188" y="82.5" width="7" height="5.5" fill="none" stroke="#000" stroke-width="0.1764" rx="0.8"/>
+<circle cx="72.5" cy="92.8" r="1.6" fill="none" stroke="#000" stroke-width="0.21168"/>
+<text x="76" y="94" font-family="Helvetica, Arial, sans-serif" font-size="3.1752000000000002" font-weight="normal" fill="#000" text-anchor="start">Überreden</text>
+<text x="122" y="94" font-family="Helvetica, Arial, sans-serif" font-size="2.646" font-weight="normal" fill="#444" text-anchor="end">Herz</text>
+<rect x="124" y="90" width="7" height="5.5" fill="none" stroke="#000" stroke-width="0.1764" rx="0.8"/>
+<circle cx="136.5" cy="92.8" r="1.6" fill="none" stroke="#000" stroke-width="0.21168"/>
+<text x="140" y="94" font-family="Helvetica, Arial, sans-serif" font-size="3.1752000000000002" font-weight="normal" fill="#000" text-anchor="start">Wissen über Nebel</text>
+<text x="186" y="94" font-family="Helvetica, Arial, sans-serif" font-size="2.646" font-weight="normal" fill="#444" text-anchor="end">Klugheit</text>
+<rect x="188" y="90" width="7" height="5.5" fill="none" stroke="#000" stroke-width="0.1764" rx="0.8"/>
+<circle cx="72.5" cy="100.3" r="1.6" fill="none" stroke="#000" stroke-width="0.21168"/>
+<text x="76" y="101.5" font-family="Helvetica, Arial, sans-serif" font-size="3.1752000000000002" font-weight="normal" fill="#000" text-anchor="start">Fingerfertigkeit</text>
+<text x="122" y="101.5" font-family="Helvetica, Arial, sans-serif" font-size="2.646" font-weight="normal" fill="#444" text-anchor="end">Geschick</text>
+<rect x="124" y="97.5" width="7" height="5.5" fill="none" stroke="#000" stroke-width="0.1764" rx="0.8"/>
+<circle cx="136.5" cy="100.3" r="1.6" fill="#000" stroke="#000" stroke-width="0.21168"/>
+<text x="140" y="101.5" font-family="Helvetica, Arial, sans-serif" font-size="3.1752000000000002" font-weight="normal" fill="#000" text-anchor="start">Wache halten</text>
+<text x="186" y="101.5" font-family="Helvetica, Arial, sans-serif" font-size="2.646" font-weight="normal" fill="#444" text-anchor="end">Klugheit</text>
+<rect x="188" y="97.5" width="7" height="5.5" fill="none" stroke="#000" stroke-width="0.1764" rx="0.8"/>
+<rect x="70" y="112" width="128" height="5" fill="#EDEDED" stroke="none" stroke-width="0.21168"/>
+<text x="72" y="115.6" font-family="Helvetica, Arial, sans-serif" font-size="2.8224" font-weight="bold" fill="#000" text-anchor="start" letter-spacing="0.169344">KNIFFE — DETAILS AUF DEN KARTEN</text>
+<text x="70" y="122" font-family="Helvetica, Arial, sans-serif" font-size="3.1752000000000002" font-weight="bold" fill="#000" text-anchor="start">Nebelschritt</text>
+<text x="104" y="122" font-family="Helvetica, Arial, sans-serif" font-size="2.8224" font-weight="normal" fill="#000" text-anchor="start">Du tauchst bis 9 m weiter wieder auf.</text>
+<rect x="193" y="118.6" width="4" height="4" fill="none" stroke="#000" stroke-width="0.21168"/>
+<line x1="70" y1="124" x2="198" y2="124" stroke="#BBB" stroke-width="0.10584"/>
+<text x="70" y="128.5" font-family="Helvetica, Arial, sans-serif" font-size="3.1752000000000002" font-weight="bold" fill="#000" text-anchor="start">Licht der Laterne</text>
+<text x="104" y="128.5" font-family="Helvetica, Arial, sans-serif" font-size="2.8224" font-weight="normal" fill="#000" text-anchor="start">Heilt 1W8 + 3 Ausdauer bei jemandem neben dir.</text>
+<rect x="193" y="125.1" width="4" height="4" fill="none" stroke="#000" stroke-width="0.21168"/>
+<rect x="187.5" y="125.1" width="4" height="4" fill="none" stroke="#000" stroke-width="0.21168"/>
+<line x1="70" y1="130.5" x2="198" y2="130.5" stroke="#BBB" stroke-width="0.10584"/>
+<text x="70" y="135" font-family="Helvetica, Arial, sans-serif" font-size="3.1752000000000002" font-weight="bold" fill="#000" text-anchor="start">Funkenregen</text>
+<text x="104" y="135" font-family="Helvetica, Arial, sans-serif" font-size="2.8224" font-weight="normal" fill="#000" text-anchor="start">Funken treffen alle in 3 m um einen Punkt.</text>
+<rect x="193" y="131.6" width="4" height="4" fill="none" stroke="#000" stroke-width="0.21168"/>
+<line x1="70" y1="137" x2="198" y2="137" stroke="#BBB" stroke-width="0.10584"/>
+<text x="70" y="141.5" font-family="Helvetica, Arial, sans-serif" font-size="3.1752000000000002" font-weight="bold" fill="#000" text-anchor="start">Stilles Wort</text>
+<text x="104" y="141.5" font-family="Helvetica, Arial, sans-serif" font-size="2.8224" font-weight="normal" fill="#000" text-anchor="start">Ein Geräusch in 18 m Umkreis verstummt.</text>
+<text x="198" y="141.5" font-family="Helvetica, Arial, sans-serif" font-size="2.646" font-weight="normal" fill="#444" text-anchor="end">immer</text>
+<line x1="70" y1="143.5" x2="198" y2="143.5" stroke="#BBB" stroke-width="0.10584"/>
+<text x="70" y="148" font-family="Helvetica, Arial, sans-serif" font-size="3.1752000000000002" font-weight="bold" fill="#000" text-anchor="start">Weg im Nebel</text>
+<text x="104" y="148" font-family="Helvetica, Arial, sans-serif" font-size="2.8224" font-weight="normal" fill="#000" text-anchor="start">Deine Gruppe verläuft sich nicht.</text>
+<text x="198" y="148" font-family="Helvetica, Arial, sans-serif" font-size="2.646" font-weight="normal" fill="#444" text-anchor="end">immer</text>
+<line x1="70" y1="150" x2="198" y2="150" stroke="#BBB" stroke-width="0.10584"/>
+<text x="198" y="155.5" font-family="Helvetica, Arial, sans-serif" font-size="2.4696" font-weight="normal" fill="#333" text-anchor="end">□ = einmal benutzt: ankreuzen. Nach einer Rast wegradieren.</text>
+<rect x="12" y="176" width="59.333333333333336" height="5" fill="#EDEDED" stroke="none" stroke-width="0.21168"/>
+<text x="14" y="179.6" font-family="Helvetica, Arial, sans-serif" font-size="2.8224" font-weight="bold" fill="#000" text-anchor="start" letter-spacing="0.169344">AUSRÜSTUNG</text>
+<text x="13" y="187" font-family="Helvetica, Arial, sans-serif" font-size="3.1752000000000002" font-weight="normal" fill="#000" text-anchor="start">Laternenstab (1W6)</text>
+<line x1="12" y1="189" x2="71.33333333333334" y2="189" stroke="#BBB" stroke-width="0.10584"/>
+<text x="13" y="193" font-family="Helvetica, Arial, sans-serif" font-size="3.1752000000000002" font-weight="normal" fill="#000" text-anchor="start">Reiseumhang</text>
+<line x1="12" y1="195" x2="71.33333333333334" y2="195" stroke="#BBB" stroke-width="0.10584"/>
+<text x="13" y="199" font-family="Helvetica, Arial, sans-serif" font-size="3.1752000000000002" font-weight="normal" fill="#000" text-anchor="start">Seil, 15 m</text>
+<line x1="12" y1="201" x2="71.33333333333334" y2="201" stroke="#BBB" stroke-width="0.10584"/>
+<text x="13" y="205" font-family="Helvetica, Arial, sans-serif" font-size="3.1752000000000002" font-weight="normal" fill="#000" text-anchor="start">Kräuterbeutel (3)</text>
+<line x1="12" y1="207" x2="71.33333333333334" y2="207" stroke="#BBB" stroke-width="0.10584"/>
+<text x="13" y="211" font-family="Helvetica, Arial, sans-serif" font-size="3.1752000000000002" font-weight="normal" fill="#000" text-anchor="start">Laternenöl (2)</text>
+<line x1="12" y1="213" x2="71.33333333333334" y2="213" stroke="#BBB" stroke-width="0.10584"/>
+<text x="13" y="217" font-family="Helvetica, Arial, sans-serif" font-size="3.1752000000000002" font-weight="normal" fill="#000" text-anchor="start">12 Silberlinge</text>
+<line x1="12" y1="219" x2="71.33333333333334" y2="219" stroke="#BBB" stroke-width="0.10584"/>
+<line x1="12" y1="225" x2="71.33333333333334" y2="225" stroke="#999" stroke-width="0.14112"/>
+<line x1="12" y1="231" x2="71.33333333333334" y2="231" stroke="#999" stroke-width="0.14112"/>
+<line x1="12" y1="237" x2="71.33333333333334" y2="237" stroke="#999" stroke-width="0.14112"/>
+<line x1="12" y1="243" x2="71.33333333333334" y2="243" stroke="#999" stroke-width="0.14112"/>
+<rect x="75.33333333333334" y="176" width="59.333333333333336" height="5" fill="#EDEDED" stroke="none" stroke-width="0.21168"/>
+<text x="77.33333333333334" y="179.6" font-family="Helvetica, Arial, sans-serif" font-size="2.8224" font-weight="bold" fill="#000" text-anchor="start" letter-spacing="0.169344">SO BIST DU DRAN</text>
+<rect x="75.33333333333334" y="182" width="59.333333333333336" height="60" fill="none" stroke="#777" stroke-width="0.14112" rx="1.5"/>
+<text x="78.33333333333334" y="188" font-family="Helvetica, Arial, sans-serif" font-size="2.9988" font-weight="normal" fill="#000" text-anchor="start">1. Lauf bis zu 9 m.</text>
+<text x="78.33333333333334" y="193.69844" font-family="Helvetica, Arial, sans-serif" font-size="2.9988" font-weight="normal" fill="#000" text-anchor="start">2. Tu eine Sache: angreifen,</text>
+<text x="78.33333333333334" y="197.59688" font-family="Helvetica, Arial, sans-serif" font-size="2.9988" font-weight="normal" fill="#000" text-anchor="start">einen Kniff nutzen, helfen oder</text>
+<text x="78.33333333333334" y="201.49532" font-family="Helvetica, Arial, sans-serif" font-size="2.9988" font-weight="normal" fill="#000" text-anchor="start">etwas anderes.</text>
+<text x="78.33333333333334" y="207.19376000000003" font-family="Helvetica, Arial, sans-serif" font-size="2.9988" font-weight="normal" fill="#000" text-anchor="start">3. Sag, was dein Charakter</text>
+<text x="78.33333333333334" y="211.09220000000002" font-family="Helvetica, Arial, sans-serif" font-size="2.9988" font-weight="normal" fill="#000" text-anchor="start">sagt. Das kostet nichts.</text>
+<text x="78.33333333333334" y="216.79064000000002" font-family="Helvetica, Arial, sans-serif" font-size="2.9988" font-weight="normal" fill="#000" text-anchor="start">Du weisst nicht weiter? Frag</text>
+<text x="78.33333333333334" y="220.68908000000002" font-family="Helvetica, Arial, sans-serif" font-size="2.9988" font-weight="normal" fill="#000" text-anchor="start">die Spielleitung: "Was kann ich</text>
+<text x="78.33333333333334" y="224.58752" font-family="Helvetica, Arial, sans-serif" font-size="2.9988" font-weight="normal" fill="#000" text-anchor="start">hier tun?"</text>
+<rect x="138.66666666666669" y="176" width="59.333333333333336" height="5" fill="#EDEDED" stroke="none" stroke-width="0.21168"/>
+<text x="140.66666666666669" y="179.6" font-family="Helvetica, Arial, sans-serif" font-size="2.8224" font-weight="bold" fill="#000" text-anchor="start" letter-spacing="0.169344">NOTIZEN</text>
+<line x1="138.66666666666669" y1="189" x2="198.00000000000003" y2="189" stroke="#999" stroke-width="0.14112"/>
+<line x1="138.66666666666669" y1="195" x2="198.00000000000003" y2="195" stroke="#999" stroke-width="0.14112"/>
+<line x1="138.66666666666669" y1="201" x2="198.00000000000003" y2="201" stroke="#999" stroke-width="0.14112"/>
+<line x1="138.66666666666669" y1="207" x2="198.00000000000003" y2="207" stroke="#999" stroke-width="0.14112"/>
+<line x1="138.66666666666669" y1="213" x2="198.00000000000003" y2="213" stroke="#999" stroke-width="0.14112"/>
+<line x1="138.66666666666669" y1="219" x2="198.00000000000003" y2="219" stroke="#999" stroke-width="0.14112"/>
+<line x1="138.66666666666669" y1="225" x2="198.00000000000003" y2="225" stroke="#999" stroke-width="0.14112"/>
+<line x1="138.66666666666669" y1="231" x2="198.00000000000003" y2="231" stroke="#999" stroke-width="0.14112"/>
+<line x1="138.66666666666669" y1="237" x2="198.00000000000003" y2="237" stroke="#999" stroke-width="0.14112"/>
+<line x1="138.66666666666669" y1="243" x2="198.00000000000003" y2="243" stroke="#999" stroke-width="0.14112"/>
+<line x1="12" y1="281" x2="198" y2="281" stroke="#999" stroke-width="0.10584"/>
+<text x="12" y="285" font-family="Helvetica, Arial, sans-serif" font-size="2.4696" font-weight="normal" fill="#444" text-anchor="start">Mira Nebelfeld · Stufe 3 · Längen in Meter · Seite 1 von 2</text>
+<text x="198" y="285" font-family="Helvetica, Arial, sans-serif" font-size="2.4696" font-weight="normal" fill="#444" text-anchor="end">Erstellt am 04.10.2026</text>
+</svg>
