@@ -216,7 +216,18 @@ importers:
         specifier: ^19.3.0
         version: 19.3.0(@types/react@19.3.0)
 
-  packages/core: {}
+  packages/core:
+    dependencies:
+      '@builder/format':
+        specifier: workspace:*
+        version: link:../format
+      zod:
+        specifier: ^4.6.5
+        version: 4.6.5
+    devDependencies:
+      '@builder/demo-package':
+        specifier: workspace:*
+        version: link:../demo-package
 
   packages/db:
     dependencies:

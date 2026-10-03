@@ -1,0 +1,130 @@
+/**
+ * Checks one answer against its choice in the current situation.
+ *
+ * Used twice: by the evaluation (does a stored answer still fit?) and
+ * before storing a new answer (reject what does not fit now).
+ */
+import type { Choice } from "@builder/format/pure";
+import { answerSchemaFor, type Answer, type DistributeAnswer } from "./draft.ts";
+
+/** Machine-readable reason why an answer does not fit. The UI words it. */
+export type Problem =
+  | "badShape"
+  | "duplicate"
+  | "notOffered"
+  | "tooMany"
+  | "badMethod"
+  | "badAssignment"
+  | "overBudget"
+  | "outOfRange"
+  | "empty"
+  | "tooLong"
+  | "badCharacters";
+
+/** What the evaluation knows about a choice right now. */
+export interface ChoiceContext {
+  /** Things that may be picked (pick choices). */
+  options?: readonly string[];
+  /** How many to pick (pickMany). */
+  count?: number;
+  /** Allowed range (number choices). */
+  min?: number;
+  max?: number;
+}
+
+export interface Judgement {
+  /** `incomplete`: fits, but more is needed (fewer picks than asked). */
+  status: "answered" | "incomplete" | "invalid";
+  problem?: Problem;
+  /** How many picks are still open, or points left unspent. */
+  remaining?: number;
+  /** Picks that count for the character (pick choices). */
+  counted?: string[];
+  /** Base values the answer sets (distribute and number choices). */
+  inputs?: Record<string, number>;
+}
+
+const invalid = (problem: Problem, extra: Partial<Judgement> = {}): Judgement => ({
+  status: "invalid",
+  problem,
+  ...extra,
+});
+
+// Control characters other than tab and line breaks never belong in a name or a description.
+// eslint-disable-next-line no-control-regex -- matching control characters is the point
+const CONTROL = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/;
+
+export function judgeAnswer(choice: Choice, raw: unknown, ctx: ChoiceContext): Judgement {
+  const schema = answerSchemaFor(choice.kind);
+  if (!schema) return invalid("badShape");
+  const parsed = schema.safeParse(raw);
+  if (!parsed.success) return invalid("badShape");
+  const answer: Answer = parsed.data;
+
+  switch (choice.kind) {
+    case "pickOne": {
+      const { pick } = answer as { pick: string };
+      if (!(ctx.options ?? []).includes(pick)) return invalid("notOffered", { counted: [] });
+      return { status: "answered", counted: [pick] };
+    }
+    case "pickMany": {
+      const { picks } = answer as { picks: string[] };
+      const count = ctx.count ?? 0;
+      const offered = new Set(ctx.options ?? []);
+      const valid = [...new Set(picks)].filter((p) => offered.has(p));
+      const counted = valid.slice(0, count);
+      if (new Set(picks).size !== picks.length) return invalid("duplicate", { counted });
+      if (valid.length !== picks.length) return invalid("notOffered", { counted });
+      if (picks.length > count) return invalid("tooMany", { counted });
+      if (picks.length === count || choice.upTo) return { status: "answered", counted };
+      return { status: "incomplete", counted, remaining: count - picks.length };
+    }
+    case "distribute":
+      return judgeDistribute(choice, answer as DistributeAnswer);
+    case "number": {
+      const { value } = answer as { value: number };
+      if (value < (ctx.min ?? -Infinity) || value > (ctx.max ?? Infinity)) return invalid("outOfRange");
+      return { status: "answered", inputs: { [choice.target]: value } };
+    }
+    case "text": {
+      const text = (answer as { text: string }).text.trim();
+      if (text.length === 0) return invalid("empty");
+      if ([...text].length > choice.maxLength) return invalid("tooLong");
+      if (CONTROL.test(text) || (!choice.multiline && /[\r\n]/.test(text))) return invalid("badCharacters");
+      return { status: "answered" };
+    }
+    case "info":
+      return invalid("badShape");
+  }
+}
+
+function judgeDistribute(
+  choice: Extract<Choice, { kind: "distribute" }>,
+  answer: DistributeAnswer,
+): Judgement {
+  const method = choice.methods[answer.method];
+  if (!method) return invalid("badMethod");
+  const keys = Object.keys(answer.assign);
+  if (keys.length !== choice.targets.length || !choice.targets.every((t) => t in answer.assign)) {
+    return invalid("badAssignment");
+  }
+  const inputs = { ...answer.assign };
+  if (method.method === "array") {
+    const given = choice.targets.map((t) => answer.assign[t]!).sort((a, b) => a - b);
+    const wanted = [...method.values].sort((a, b) => a - b);
+    if (given.length !== wanted.length || given.some((v, i) => v !== wanted[i])) {
+      return invalid("badAssignment");
+    }
+    return { status: "answered", inputs };
+  }
+  // Point buy: `costs` is the total cost of reaching a score.
+  let spent = 0;
+  for (const t of choice.targets) {
+    const cost = method.costs[String(answer.assign[t])];
+    if (cost === undefined) return invalid("outOfRange");
+    spent += cost;
+  }
+  if (spent > method.budget) return invalid("overBudget");
+  // Points may be left over; the package's own recommendations can do that too.
+  return { status: "answered", inputs, remaining: method.budget - spent };
+}

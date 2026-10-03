@@ -10,5 +10,12 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit -p ."
+  },
+  "dependencies": {
+    "@builder/format": "workspace:*",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@builder/demo-package": "workspace:*"
   }
 }
