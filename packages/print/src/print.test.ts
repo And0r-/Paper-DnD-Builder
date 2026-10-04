@@ -4,7 +4,7 @@ import type { ContentPackage, TextValue } from "@builder/format";
 import { getDocument } from "pdfjs-dist/legacy/build/pdf.mjs";
 import { beforeAll, describe, expect, it } from "vitest";
 import { MESSAGES } from "./messages.ts";
-import { buildPrintModel, PrintError } from "./model.ts";
+import { buildPrintModel, firstSentence, PrintError, type PrintModel, type SheetSection } from "./model.ts";
 import { renderPdf, type RenderedPdf } from "./render.ts";
 import { demoCharacter, loadDemoPackage } from "./testing.ts";
 
@@ -46,6 +46,39 @@ async function extract(pdf: RenderedPdf): Promise<Extracted> {
     minFontSize,
     title: info.Title ?? "",
   };
+}
+
+const PT = 72 / 25.4;
+
+interface Placed {
+  str: string;
+  /** Left edge and baseline, in mm from the top left corner of the page. */
+  x: number;
+  y: number;
+  /** Width in mm. */
+  w: number;
+}
+
+/** Every piece of text with its place on the page, per page. */
+async function positions(pdf: RenderedPdf): Promise<Placed[][]> {
+  const task = getDocument({ data: pdf.bytes.slice(), verbosity: 0 });
+  const loaded = await task.promise;
+  const pages: Placed[][] = [];
+  for (let i = 1; i <= loaded.numPages; i++) {
+    const page = await loaded.getPage(i);
+    const height = page.view[3]!;
+    const content = await page.getTextContent();
+    pages.push(
+      content.items
+        .filter((it) => "str" in it && it.str.trim() !== "")
+        .map((it) => {
+          const t = it as { str: string; transform: number[]; width: number };
+          return { str: t.str, x: t.transform[4]! / PT, y: (height - t.transform[5]!) / PT, w: t.width / PT };
+        }),
+    );
+  }
+  await task.destroy();
+  return pages;
 }
 
 async function print(language: string, units: Record<string, string>, p = pkg, d = doc) {
@@ -221,6 +254,162 @@ describe("printed character (demo package)", () => {
     const plainKnacks = plain.sections.find((s) => s.id === "knacks")!;
     expect(plainKnacks.hint).toBe("");
     expect(plain.cards.every((c) => c.uses === null)).toBe(true);
+  });
+
+  it("goes on on the next page with a section longer than a page, for every kind of rows", async () => {
+    const model = buildPrintModel(pkg, doc, { language: "de", createdAt });
+    const n = 45;
+    const names = (prefix: string) => Array.from({ length: n }, (_, i) => `${prefix} ${i + 1}`);
+    const base = { span: 4, hint: "Hinweis am Ende" };
+    const long: SheetSection[] = [
+      {
+        ...base,
+        id: "long-scores",
+        kind: "scoreColumn",
+        title: "Werte",
+        scores: names("Wert").map((label) => ({ label, value: "3", derivedLabel: "", derived: null })),
+      },
+      {
+        ...base,
+        id: "long-checks",
+        kind: "checkList",
+        title: "Haken",
+        items: names("Haken").map((name) => ({ name, marked: false, note: "" })),
+      },
+      {
+        ...base,
+        id: "long-table",
+        kind: "featureTable",
+        title: "Tabelle",
+        rows: names("Zeile").map((name) => ({ name, text: "Ein kurzer Text.", uses: null })),
+      },
+      { ...base, id: "long-list", kind: "list", title: "Liste", items: names("Ding"), blankLines: 3 },
+    ];
+    const withLong: PrintModel = { ...model, sections: [...model.sections.slice(0, 3), ...long] };
+    const pdf = await renderPdf(withLong);
+    const pages = await positions(pdf);
+    const sheet = pages.slice(0, pdf.sheetPages);
+    const all = sheet.flat().map((p) => p.str);
+    // Nothing is dropped: every row of every section is printed.
+    for (const prefix of ["Wert", "Haken", "Zeile", "Ding"])
+      for (const name of names(prefix)) expect(all).toContain(name);
+    expect(all.join(" ")).toContain("WERTE (FORTSETZUNG)");
+    // The hint is printed once, under the last part.
+    expect(all.filter((s) => s === "Hinweis am Ende")).toHaveLength(long.length);
+    // And nothing runs into the footer (its line is 16 mm above the bottom edge).
+    for (const page of sheet)
+      for (const item of page.filter((p) => /^(Wert|Haken|Zeile|Ding) \d+$/u.test(p.str)))
+        expect(item.y).toBeLessThan(297 - 16);
+  });
+
+  it("ends a hint after its first sentence, not at an ordinal number", async () => {
+    expect(firstSentence("So oft darfst du Kniffe des 1. Grades nutzen. Danach rastest du.", "de")).toBe(
+      "So oft darfst du Kniffe des 1. Grades nutzen.",
+    );
+    expect(firstSentence("Siehe z. B. die Laterne. Mehr.", "de")).toBe("Siehe z. B. die Laterne.");
+    expect(firstSentence("Uses of rank 1. Then rest.", "en")).toBe("Uses of rank 1.");
+
+    const texts: Record<string, Record<string, TextValue>> = {
+      ...pkg.texts,
+      de: {
+        ...pkg.texts["de"]!,
+        "value.guard.explain": "Das schützt dich bis zum 2. Treffer. Danach nicht.",
+      },
+    };
+    const { model, extracted } = await print("de", {}, { ...pkg, texts });
+    const primary = model.sections.find((s) => s.id === "primary");
+    if (primary?.kind !== "statBoxes") throw new Error("demo sheet changed");
+    expect(primary.boxes.find((b) => b.hint.startsWith("Das schützt"))?.hint).toBe(
+      "Das schützt dich bis zum 2. Treffer.",
+    );
+    expect(extracted.text).toContain("Treffer.");
+  });
+
+  it("wraps long card fields, labels and the source line inside their box", async () => {
+    const model = buildPrintModel(pkg, doc, { language: "de", createdAt });
+    const card = model.cards[0]!;
+    expect(card.fields.length).toBeGreaterThanOrEqual(2);
+    const long = "V, M (eine Laternenscherbe und ein Faden aus gesponnenem Nebelgarn)";
+    const fields = card.fields.map((f, i) => ({
+      ...f,
+      value: i % 2 === 0 ? "Gebündelte Aufmerksamkeit, bis zu 1 Minute" : long,
+    }));
+    const attribution = Array.from(
+      { length: 6 },
+      (_, i) => `Satz ${i + 1} der Quellenangabe, frei erfunden.`,
+    ).join(" ");
+    const pdf = await renderPdf({
+      ...model,
+      attribution,
+      cards: [{ ...card, fields, rules: ["Ein Nebel\u2011 oder Laternenwurf."] }, ...model.cards.slice(1)],
+    });
+    const pages = await positions(pdf);
+    const cards = pages.slice(pdf.sheetPages);
+    const text = cards
+      .flat()
+      .map((p) => p.str)
+      .join(" ");
+    for (const word of ["Laternenscherbe", "gesponnenem", "Nebelgarn)", "Minute"])
+      expect(text).toContain(word);
+    // A non-breaking hyphen prints as a hyphen, not as a missing glyph.
+    expect(text).toContain("Nebel- oder");
+    expect(text).not.toContain("\u2011");
+    // The whole source line is printed, on the page.
+    expect(text).toContain("Satz 6 der Quellenangabe");
+    for (const item of cards.flat()) expect(item.x + item.w).toBeLessThanOrEqual(210 - 10.5 + 0.2);
+
+    // Card texts stay in their half of the card: grid starts 10.5 mm from the left, cards are 63 mm wide.
+    const grid = { x: 10.5, y: (297 - 3 * 88) / 2, w: 63, pad: 4 };
+    for (const item of cards[0]!.filter((p) => p.y > grid.y && p.y < grid.y + 3 * 88)) {
+      const col = Math.floor((item.x - grid.x) / grid.w);
+      const left = grid.x + col * grid.w + grid.pad;
+      const half = (grid.w - 2 * grid.pad) / 2;
+      const inSecondHalf = item.x >= left + half - 0.2;
+      expect(item.x + item.w, item.str).toBeLessThanOrEqual(left + 2 * half + 0.2);
+      // A value in the first column never runs into the second one.
+      const isValue = fields.some((f) => f.value.includes(item.str));
+      if (!inSecondHalf && isValue) expect(item.x + item.w, item.str).toBeLessThanOrEqual(left + half);
+    }
+  });
+
+  it("wraps labels too long for their box instead of running out of it", async () => {
+    const model = buildPrintModel(pkg, doc, { language: "de", createdAt });
+    const sections = model.sections.map((s): SheetSection => {
+      if (s.kind === "statBoxes")
+        return { ...s, boxes: s.boxes.map((b) => ({ ...b, label: "Nebelwiderstandsschwellenwert-Stufe" })) };
+      if (s.kind === "scoreColumn")
+        return {
+          ...s,
+          scores: s.scores.map((sc) => ({
+            ...sc,
+            label: "Laternenfertigkeit",
+            derivedLabel: "Laternenfertigkeitszuschlagswert",
+          })),
+        };
+      return s;
+    });
+    const pdf = await renderPdf({ ...model, sections });
+    const page = (await positions(pdf))[0]!;
+    const primary = pdf.sheetLayout[0]!.find((p) => p.section.id === "primary")!;
+    const scores = pdf.sheetLayout[0]!.find((p) => p.section.id === "scores")!;
+    const boxW = (primary.w - 4 * 4) / 5;
+    for (const item of page.filter((p) => /^NEBEL|STUFE$/u.test(p.str))) {
+      const box = Math.floor((item.x - primary.x) / (boxW + 4));
+      const left = primary.x + box * (boxW + 4);
+      expect(item.x).toBeGreaterThanOrEqual(left);
+      expect(item.x + item.w).toBeLessThanOrEqual(left + boxW);
+    }
+    // The label and the derived label do not overlap.
+    const labels = page.filter((p) => p.str === "Laternenfertigkeit" && p.x < scores.x + scores.w);
+    const derived = page.filter((p) => p.str.startsWith("Laternenfertigkeitszuschlag"));
+    expect(labels.length).toBe(4);
+    expect(derived.length).toBe(4);
+    for (const [i, l] of labels.entries()) {
+      const d = derived[i]!;
+      const apart = d.x >= l.x + l.w || Math.abs(d.y - l.y) >= 2.4;
+      expect(apart).toBe(true);
+      expect(d.x + d.w).toBeLessThanOrEqual(scores.x + scores.w);
+    }
   });
 
   it("refuses a language without texts instead of mixing in another one", () => {

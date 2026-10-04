@@ -1,13 +1,14 @@
 /**
  * Writes sample PDFs of a demo character: German with meters, English with
- * feet, and German with an over-long (invented) rules text on the first
- * card, to show continuation cards. Usage:
+ * feet, German with an over-long (invented) rules text on the first card,
+ * to show continuation cards, and German with an over-long section, label
+ * and card field (all invented), to show that nothing is cut off. Usage:
  * node packages/print/scripts/sample.ts <outDir>
  */
 import type { ContentPackage } from "@builder/format";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { buildPrintModel, renderPdf } from "../src/index.ts";
+import { buildPrintModel, renderPdf, type PrintModel } from "../src/index.ts";
 import { demoCharacter, loadDemoPackage } from "../src/testing.ts";
 
 const out = process.argv[2] ?? ".";
@@ -41,3 +42,40 @@ for (const [p, language, units, file] of [
   await writeFile(path.join(out, file), pdf.bytes);
   console.log(`${file}: ${pdf.pages} pages (${pdf.sheetPages} sheet, ${pdf.cardPages} cards)`);
 }
+
+const model = buildPrintModel(pkg, doc, { language: "de", units: { length: "m", weight: "kg" }, createdAt });
+const overLong: PrintModel = {
+  ...model,
+  sections: model.sections.map((s) => {
+    if (s.kind === "checkList") {
+      const more = Array.from({ length: 70 }, (_, i) => ({
+        name: `Erfundenes Talent ${i + 1}`,
+        marked: i % 3 === 0,
+        note: "",
+      }));
+      return { ...s, items: [...s.items, ...more] };
+    }
+    if (s.kind === "statBoxes")
+      return {
+        ...s,
+        boxes: s.boxes.map((b, i) => (i === 1 ? { ...b, label: "Laternenschutzwert-Stufe" } : b)),
+      };
+    return s;
+  }),
+  cards: model.cards.map((c, i) =>
+    i === 0
+      ? {
+          ...c,
+          fields: c.fields.map((f, j) =>
+            j === c.fields.length - 1
+              ? { ...f, value: "V, M (eine Laternenscherbe und ein Faden aus gesponnenem Nebelgarn)" }
+              : f,
+          ),
+        }
+      : c,
+  ),
+};
+const file = "demo-character-de-over-long.pdf";
+const pdf = await renderPdf(overLong);
+await writeFile(path.join(out, file), pdf.bytes);
+console.log(`${file}: ${pdf.pages} pages (${pdf.sheetPages} sheet, ${pdf.cardPages} cards)`);
