@@ -245,6 +245,7 @@ export function StepFrame({
   introText?: string | undefined;
   children: ReactNode;
   footer: ReactNode;
+  /** "Choose for me" and "Decide later", under the intro (StepShortcuts). */
   laterLink?: ReactNode;
 }) {
   const { t } = useApp();
@@ -417,5 +418,65 @@ export function LaterLink({ entry }: { entry: FlowEntry }) {
     <p className="later">
       <Link href={next.href}>{t("flow.later")}</Link>
     </p>
+  );
+}
+
+/**
+ * The ways out of an open step, right under the intro: "Choose for me"
+ * (when the package can suggest something) and "Decide later". Seen before
+ * Next is ever pressed, so an intro that mentions the button keeps its word.
+ * After the click a short note takes the button's place and gets focus;
+ * the chosen values show in the step below.
+ */
+export function StepShortcuts({
+  entry,
+  open,
+  onChooseForMe,
+}: {
+  entry: FlowEntry;
+  /** True while the step still waits for an answer. */
+  open: boolean;
+  onChooseForMe: (() => void) | undefined;
+}) {
+  const { t } = useApp();
+  const hintId = useId();
+  const [chosen, setChosen] = useState(false);
+  const note = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (chosen) note.current?.focus();
+  }, [chosen]);
+
+  if (chosen && !open) {
+    return (
+      <div className="shortcuts__done" tabIndex={-1} ref={note}>
+        <Callout tone="success" role="status">
+          {t("flow.choseForMe")}
+        </Callout>
+      </div>
+    );
+  }
+  if (!open) return null;
+  return (
+    <div className="shortcuts">
+      {onChooseForMe && (
+        <div className="shortcuts__choose">
+          <Button
+            variant="secondary"
+            icon="sparkle"
+            aria-describedby={hintId}
+            onClick={() => {
+              onChooseForMe();
+              setChosen(true);
+            }}
+          >
+            {t("flow.chooseForMe")}
+          </Button>
+          <p className="shortcuts__hint" id={hintId}>
+            {t("flow.chooseForMeHint")}
+          </p>
+        </div>
+      )}
+      <LaterLink entry={entry} />
+    </div>
   );
 }

@@ -19,7 +19,7 @@ import {
   TextChoice,
 } from "../../../../../src/ui/flow/choices.tsx";
 import { useDraft } from "../../../../../src/ui/flow/draft-state.tsx";
-import { LaterLink, StepFooter, StepFrame, usePageTitle } from "../../../../../src/ui/flow/frame.tsx";
+import { StepFooter, StepFrame, StepShortcuts, usePageTitle } from "../../../../../src/ui/flow/frame.tsx";
 import { firstOpen, missingText } from "../../../../../src/ui/flow/model.ts";
 import { choiceTexts, plist, stepTexts } from "../../../../../src/ui/package-text.ts";
 import { useMeasure } from "../../../../../src/ui/components/RichText.tsx";
@@ -117,7 +117,7 @@ export default function StepPage() {
       headingId={headingId}
       question={texts.question}
       introText={texts.intro}
-      laterLink={open.length > 0 ? <LaterLink entry={entry} /> : undefined}
+      laterLink={<StepShortcuts entry={entry} open={open.length > 0} onChooseForMe={chooseForMe} />}
       footer={
         <StepFooter
           entry={entry}

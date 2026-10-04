@@ -365,12 +365,28 @@ export function DistributeChoice({
   const m = choice.methods[method]!;
   const stepName = stepTitle(lp, ev, state.step);
 
-  const save = (assign: Record<string, number>) =>
-    guard.request({ type: "answer", choice: choice.id, answer: { method, assign } }, () => ({
+  // The rows keep their own numbers while you type. An answer that comes
+  // from elsewhere ("Choose for me", a refused change) starts them afresh,
+  // so the screen always shows what is saved.
+  const sign = (a: { method: number; assign: Record<string, number> }) =>
+    JSON.stringify([a.method, ...choice.targets.map((v) => a.assign[v] ?? null)]);
+  const mine = useRef(stored ? sign(stored) : undefined);
+  const [round, setRound] = useState(0);
+  useEffect(() => {
+    if (!stored || sign(stored) === mine.current) return;
+    mine.current = sign(stored);
+    setMethod(stored.method);
+    setRound((r) => r + 1);
+  }, [stored]);
+
+  const save = (assign: Record<string, number>) => {
+    mine.current = sign({ method, assign });
+    return guard.request({ type: "answer", choice: choice.id, answer: { method, assign } }, () => ({
       title: t("change.title", { step: stepName }),
       lead: t("change.textGeneric"),
       after: t("change.afterGeneric"),
     }));
+  };
 
   return (
     <fieldset className="distribute" aria-labelledby={labelledBy}>
@@ -387,7 +403,7 @@ export function DistributeChoice({
       )}
       {m.method === "pointBuy" ? (
         <PointBuy
-          key={`pb-${method}`}
+          key={`pb-${method}-${round}`}
           lp={lp}
           targets={choice.targets}
           costs={m.costs}
@@ -398,7 +414,7 @@ export function DistributeChoice({
         />
       ) : (
         <ArrayAssign
-          key={`ar-${method}`}
+          key={`ar-${method}-${round}`}
           lp={lp}
           targets={choice.targets}
           values={m.values}

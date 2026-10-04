@@ -115,7 +115,7 @@ test("Next pressed too early: reason, Choose for me and focus are all in view", 
 
   const next = page.getByRole("button", { name: m["common.next"], exact: true });
   const reason = page.locator(".step-footer__reason");
-  const chooseForMe = page.getByRole("button", { name: m["flow.chooseForMe"] });
+  const chooseForMe = reason.getByRole("button", { name: m["flow.chooseForMe"] });
 
   // The long list: 14 cards, a search box, the page scrolls far.
   await page.goto(`/c/${id}/step/borrowed-knack`);

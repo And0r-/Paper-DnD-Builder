@@ -68,10 +68,12 @@ test("a newcomer builds a level-3 character from login to finished", async ({ pa
   await axe(page);
   await next(page);
 
+  // "Choose for me" waits under the intro before Next is ever pressed.
   await question(page, "Wo hat dein Charakter seine Kindheit verbracht?");
-  await next(page);
-  await page.getByRole("button", { name: m["flow.chooseForMe"] }).click();
+  await page.locator(".shortcuts").getByRole("button", { name: m["flow.chooseForMe"] }).click();
   await expect(page.getByRole("radio", { name: "Fährkind" })).toBeChecked();
+  await expect(page.locator(".shortcuts__done")).toBeFocused();
+  await expect(page.locator(".shortcuts__done")).toContainText(m["flow.choseForMe"]);
   await next(page);
 
   // Calling brings new steps; the count never changes without a word.
@@ -86,7 +88,8 @@ test("a newcomer builds a level-3 character from login to finished", async ({ pa
   await expect(page.getByText("0 von 2 gewählt")).toBeVisible();
   await next(page);
   await expect(page.getByText("Wähle noch 2 Talent(e).")).toBeVisible();
-  await page.getByRole("button", { name: m["flow.chooseForMe"] }).click();
+  // Pressed too early, the dock offers it right above Next as well.
+  await page.locator(".step-footer").getByRole("button", { name: m["flow.chooseForMe"] }).click();
   await expect(page.getByText("2 von 2 gewählt")).toBeVisible();
   await shot(page, "06-talente");
   await axe(page);

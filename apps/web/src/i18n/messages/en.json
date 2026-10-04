@@ -98,6 +98,8 @@
   "flow.overview": "Overview",
   "flow.later": "Decide later",
   "flow.chooseForMe": "Choose for me",
+  "flow.chooseForMeHint": "Takes a good suggestion. You can change it afterwards.",
+  "flow.choseForMe": "Done. You can see the choice below and change it.",
   "flow.backToOverview": "Back to the overview",
   "flow.missingGeneric": "Make a choice here first.",
   "flow.needsAttention": "This no longer fits because you changed something earlier. Please choose again.",
