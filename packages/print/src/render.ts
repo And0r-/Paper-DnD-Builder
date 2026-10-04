@@ -178,11 +178,12 @@ class Pen {
   label(text: string, s: TextStyle, width: number, min = 7): { style: TextStyle; lines: string[] } {
     const style = this.fit(text, s, width, min);
     if (this.width(text, style) <= width) return { style, lines: [text] };
-    // Rather a smaller size or tighter letters than a word split between letters.
+    // Rather a smaller size, tighter letters or no capitals than a word split between letters.
     const pieces = text.split(BREAKS).flatMap((w) => w.split(/(?<=[-/\u2010-\u2012])/u));
     const tries: TextStyle[] = [];
     for (let size = s.size; size >= min; size -= 0.5) tries.push({ ...s, size });
     if (s.spacing) tries.push({ ...s, size: min, spacing: 0 });
+    if (s.caps) tries.push({ ...s, size: min, spacing: 0, caps: false });
     for (const t of tries)
       if (pieces.every((p) => this.width(p, t) <= width))
         return { style: t, lines: this.wrap(text, t, width) };

@@ -464,6 +464,56 @@ describe("printed character (demo package)", () => {
     }
   });
 
+  it("prints a box's own label instead of a long value name, whole words at 7 pt or more", async () => {
+    // Six boxes in a row whose value names are long compounds, as in a package
+    // whose section title already says what the boxes have in common.
+    const values = ["might", "grace", "wit", "heart", "mightBonus", "graceBonus"];
+    // "Laternenfertigkeit" is too wide for a sixth of the row even at 7 pt in capitals.
+    const short = ["Kraft", "Flinkfingrigkeit", "Klugheit", "Herz", "Laternenfertigkeit", "Nebelsicht"];
+    const de: Record<string, TextValue> = { ...pkg.texts["de"]!, "sheet.trials.title": "Widerstandsproben" };
+    values.forEach((v, i) => {
+      de[`value.${v}.name`] = `${short[i]}widerstandsprobe`;
+      de[`sheet.trials.${v}`] = short[i]!;
+    });
+    const trials: ContentPackage["sheet"]["sections"][number] = {
+      id: "trials",
+      kind: "statBoxes",
+      span: 12,
+      boxes: values.map((v) => ({ value: v, style: "number", label: `sheet.trials.${v}` })),
+    };
+    const sheet = {
+      ...pkg.sheet,
+      sections: [pkg.sheet.sections[0]!, trials, ...pkg.sheet.sections.slice(1)],
+    };
+    const model = buildPrintModel({ ...pkg, sheet, texts: { ...pkg.texts, de } }, doc, {
+      language: "de",
+      createdAt,
+    });
+    const row = model.sections.find((s) => s.id === "trials");
+    if (row?.kind !== "statBoxes") throw new Error("section missing");
+    expect(row.boxes.map((b) => b.label)).toEqual(short);
+
+    const pdf = await renderPdf(model);
+    const placed = pdf.sheetLayout[0]!.find((p) => p.section.id === "trials")!;
+    const inRow = (await positions(pdf))[0]!.filter(
+      (p) => p.y > placed.y + 5 && p.y < placed.y + 25 && p.x >= placed.x && p.x < placed.x + placed.w,
+    );
+    // Each label is one piece of text in its box: the whole word, never split between letters.
+    const boxW = (placed.w - 5 * 4) / 6;
+    const labels = inRow.filter((p) => /^\p{L}+$/u.test(p.str));
+    expect(labels.map((p) => p.str)).toEqual([
+      ...short.slice(0, 4).map((s) => s.toLocaleUpperCase("de")),
+      "Laternenfertigkeit",
+      "NEBELSICHT",
+    ]);
+    labels.forEach((p, i) => {
+      expect(p.x).toBeGreaterThanOrEqual(placed.x + i * (boxW + 4));
+      expect(p.x + p.w).toBeLessThanOrEqual(placed.x + i * (boxW + 4) + boxW);
+    });
+    expect(inRow.some((p) => p.str.endsWith("-") || /widerstandsprobe/iu.test(p.str))).toBe(false);
+    expect((await extract(pdf)).minFontSize).toBeGreaterThanOrEqual(7 - 0.01);
+  });
+
   it("refuses a language without texts instead of mixing in another one", () => {
     expect(() => buildPrintModel(pkg, doc, { language: "fr" })).toThrow(PrintError);
   });
