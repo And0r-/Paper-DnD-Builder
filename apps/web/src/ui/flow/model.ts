@@ -26,6 +26,17 @@ export interface FlowEntry {
   status: EntryStatus;
   /** For package steps: the step's choices. */
   choices: string[];
+  /**
+   * The counted step this entry belongs to, from 0. Steps a choice brings
+   * along (granted steps) are parts of the step they came from, so the
+   * count never jumps when a choice adds them.
+   */
+  section: number;
+  /** Position within the section, from 1, and how many parts it has. */
+  part: number;
+  parts: number;
+  /** Key of the section's first entry. */
+  sectionKey: string;
 }
 
 export const LEVEL_KEY = "level";
@@ -51,9 +62,19 @@ export function buildFlow(
       title: ptext(lp, "level.name") ?? "",
       status: "done",
       choices: [],
+      section: 0,
+      part: 1,
+      parts: 1,
+      sectionKey: LEVEL_KEY,
     },
   ];
+  let section = 0;
+  let sectionKey = LEVEL_KEY;
   for (const s of ev.steps) {
+    if (s.origin === "flow") {
+      section++;
+      sectionKey = s.id;
+    }
     entries.push({
       key: s.id,
       kind: "step",
@@ -61,6 +82,10 @@ export function buildFlow(
       title: stepTexts(lp, s, ev).title,
       status: s.status,
       choices: s.choices.filter((c) => c in ev.choices),
+      section,
+      part: 1,
+      parts: 1,
+      sectionKey,
     });
   }
   entries.push({
@@ -70,8 +95,52 @@ export function buildFlow(
     title: t("flow.overview"),
     status: ev.complete ? "done" : "open",
     choices: [],
+    section: section + 1,
+    part: 1,
+    parts: 1,
+    sectionKey: OVERVIEW_KEY,
   });
+  for (const e of entries) {
+    const same = entries.filter((x) => x.section === e.section);
+    e.part = same.indexOf(e) + 1;
+    e.parts = same.length;
+  }
   return entries;
+}
+
+// A type, not an interface: it fills message placeholders ({current}, {part}).
+export type Position = {
+  /** Counted step, from 1, and how many there are. */
+  current: number;
+  total: number;
+  /** Part within that step, from 1; `parts` is 1 when the step has no parts. */
+  part: number;
+  parts: number;
+  /** Title of the counted step (the entry that starts the section). */
+  sectionTitle: string;
+};
+
+/** Where an entry is: "Step 3 of 9", and "part 2 of 4" inside a step that brought its own parts. */
+export function positionOf(entries: FlowEntry[], entry: FlowEntry): Position {
+  const last = entries.at(-1)!;
+  const head = entries.find((e) => e.key === entry.sectionKey) ?? entry;
+  return {
+    current: entry.section + 1,
+    total: last.section + 1,
+    part: entry.part,
+    parts: entry.parts,
+    sectionTitle: head.title,
+  };
+}
+
+/**
+ * How far along, from 0 to 1, by position: each counted step weighs the
+ * same, split among its parts. Moving on never makes the bar shorter, even
+ * when a choice brings new parts.
+ */
+export function progressFraction(entries: FlowEntry[], entry: FlowEntry): number {
+  const p = positionOf(entries, entry);
+  return (p.current - 1 + p.part / p.parts) / p.total;
 }
 
 /** Where "keep building" leads: the first step that is not done, else the overview. */
@@ -79,10 +148,9 @@ export function firstOpen(entries: FlowEntry[]): FlowEntry {
   return entries.find((e) => e.kind === "step" && e.status !== "done") ?? entries.at(-1)!;
 }
 
-/** Position for "Step 3 of 7": the first open step, counted from 1. */
-export function progressOf(entries: FlowEntry[]): { current: number; total: number } {
-  const open = firstOpen(entries);
-  return { current: entries.indexOf(open) + 1, total: entries.length };
+/** Position for "Step 3 of 7": the first open step. */
+export function progressOf(entries: FlowEntry[]): Position {
+  return positionOf(entries, firstOpen(entries));
 }
 
 /** True if a choice holds an answer that counts right now. */

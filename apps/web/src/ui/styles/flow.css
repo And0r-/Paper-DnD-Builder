@@ -50,7 +50,7 @@
   flex-direction: column;
 }
 
-.steplist__item a {
+.steplist__link {
   display: flex;
   align-items: center;
   gap: var(--space-2);
@@ -63,7 +63,7 @@
   text-decoration: none;
 }
 
-.steplist__item a:hover {
+.steplist__link:hover {
   background: var(--color-surface-sunk);
 }
 
@@ -77,32 +77,43 @@
   font-weight: var(--weight-bold);
 }
 
-.steplist__item--done .steplist__mark {
+.steplist__link--done .steplist__mark {
   color: var(--color-success);
 }
 
-.steplist__item--current a {
+.steplist__link--current {
   background: var(--color-primary-soft);
   font-weight: var(--weight-semibold);
 }
 
-.steplist__item--current .steplist__mark {
+.steplist__link--current .steplist__mark {
   color: var(--color-primary);
 }
 
-.steplist__item--open .steplist__mark {
+.steplist__link--open .steplist__mark {
   color: var(--color-ink-muted);
 }
 
-.steplist__item--needsAttention .steplist__mark {
+.steplist__link--needsAttention .steplist__mark {
   color: var(--color-warning);
   border: 2px solid currentColor;
   border-radius: 50%;
   font-size: var(--text-xs);
 }
 
-.steplist__item--needsAttention .steplist__name {
+.steplist__link--needsAttention .steplist__name {
   color: var(--color-warning);
+}
+
+/* Parts a choice brought along sit inside their step, so the count of steps stays put. */
+.steplist__parts {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  /* The line runs under the middle of the step's mark. */
+  margin-left: calc(var(--space-2) + var(--space-3) - 1px);
+  padding-left: var(--space-2);
+  border-left: 2px solid var(--color-border);
 }
 
 /* --------------------------------------------------------------- frame */
@@ -609,6 +620,15 @@
   font-weight: var(--weight-semibold);
 }
 
+.pointbuy__left--done {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-success);
+  background: var(--color-success-soft);
+  border-color: var(--color-success);
+}
+
 .pointbuy__hint {
   color: var(--color-warning);
   font-size: var(--text-sm);
@@ -622,8 +642,7 @@
   gap: var(--space-3);
 }
 
-.pointbuy__row,
-.array-assign__row {
+.pointbuy__row {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -657,9 +676,168 @@
   gap: var(--space-3);
 }
 
-.array-assign__missing {
+/* The numbers to give out, high to low; given ones are struck through. */
+.array-assign__tray {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.array-assign__tray-label {
   color: var(--color-ink-muted);
+  margin-right: var(--space-1);
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.25rem;
+  padding: 0 var(--space-2);
+  border: 2px solid var(--color-primary);
+  border-radius: var(--radius-sm);
+  font-weight: var(--weight-bold);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-primary);
+  background: var(--color-surface);
+}
+
+.chip--used {
+  border-color: var(--color-line);
+  color: var(--color-ink-muted);
+  background: var(--color-surface-sunk);
+  text-decoration: line-through;
+}
+
+/* What to do next, sticky like the points left, so it stays in view. */
+.array-assign__status {
+  position: sticky;
+  top: var(--topbar-height);
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
+  font-weight: var(--weight-semibold);
+}
+
+.array-assign__status--done {
+  color: var(--color-success);
+  background: var(--color-success-soft);
+  border-color: var(--color-success-soft);
+}
+
+.array-assign__row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-3) var(--space-4);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-1);
+  cursor: pointer;
+  transition:
+    border-color var(--motion-fast),
+    background-color var(--motion-fast);
+}
+
+.array-assign__row:hover {
+  border-color: var(--color-primary);
+}
+
+.array-assign__row--given {
+  border-color: var(--color-primary);
+  background: var(--color-primary-soft);
+}
+
+.array-assign__row:has(.array-assign__hit:focus-visible) {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.array-assign__row--fixed {
+  border-color: var(--color-line);
+  box-shadow: none;
+  cursor: default;
+}
+
+.array-assign__row--fixed:hover {
+  border-color: var(--color-line);
+}
+
+/* Name and number on one line; the button fills it, so the tap target is wide. */
+.array-assign__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  width: 100%;
+  min-height: var(--control-height);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: inherit;
+}
+
+.array-assign__hit:focus-visible {
+  outline: none;
+}
+
+.array-assign__label {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.array-assign__explain {
   font-size: var(--text-sm);
+  line-height: var(--text-sm-lh);
+  color: var(--color-ink-muted);
+}
+
+.array-assign__tip {
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--color-success-soft);
+  color: var(--color-success);
+  font-size: var(--text-sm);
+  line-height: var(--text-sm-lh);
+}
+
+/* The number this row has, or an empty circle waiting for one. */
+.array-assign__value {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: var(--target-min);
+  height: var(--target-min);
+  border-radius: 50%;
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+  font-size: var(--text-lg);
+  font-weight: var(--weight-bold);
+  font-variant-numeric: tabular-nums;
+}
+
+.array-assign__row--fixed .array-assign__value {
+  background: var(--color-surface-sunk);
+  color: var(--color-ink);
+}
+
+.array-assign__value--empty {
+  background: transparent;
+  border: 2px dashed var(--color-border);
 }
 
 .stepper {
@@ -750,6 +928,21 @@
   color: var(--color-ink);
 }
 
+/* The number on the sheet, when it is more than the gift alone. */
+.gift__sheet {
+  margin-top: var(--space-2);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--color-line);
+  font-weight: var(--weight-semibold);
+}
+
+.gift__later {
+  margin-top: var(--space-2);
+  font-size: var(--text-sm);
+  line-height: var(--text-sm-lh);
+  color: var(--color-ink-muted);
+}
+
 /* ------------------------------------------------------------- overview */
 
 .values__list {
@@ -778,6 +971,13 @@
 }
 
 .value__name {
+  font-weight: var(--weight-semibold);
+}
+
+/* Where the number comes from: "8 from … + 2 from …". */
+.value__from {
+  font-size: var(--text-sm);
+  line-height: var(--text-sm-lh);
   font-weight: var(--weight-semibold);
 }
 
@@ -825,6 +1025,50 @@
 
 .summary__line {
   overflow-wrap: anywhere;
+}
+
+/* "What you get without choosing", on the overview and at the end. */
+.origins {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.origins__intro {
+  font-size: var(--text-sm);
+  line-height: var(--text-sm-lh);
+  color: var(--color-ink-muted);
+}
+
+.origins__list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.origins__group {
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+.origins__from {
+  font-size: var(--text-sm);
+  line-height: var(--text-sm-lh);
+  font-weight: var(--weight-semibold);
+  color: var(--color-ink-muted);
+}
+
+.origins__things {
+  overflow-wrap: anywhere;
+}
+
+.done .origins {
+  width: 100%;
+  max-width: 32rem;
+  text-align: left;
 }
 
 /* ------------------------------------------------------------------ end */

@@ -17,7 +17,7 @@ async function visitAll(page: Page, id: string, lang: Lang) {
   const p = (lang === "de" ? pde : pen).entries as Record<string, string>;
   const screens: [string, string | RegExp][] = [
     ["/characters", m["characters.title"]],
-    [`/c/${id}/level`, m["level.question"]],
+    [`/c/${id}/level`, m["level.question"].replace("{levelName}", p["level.name"]!)],
     [`/c/${id}/step/folk`, p["choice.folk.question"]!],
     [`/c/${id}/step/talents`, p["step.talents.question"]!],
     [`/c/${id}/step/knacks`, p["step.knacks.question"]!],
@@ -27,7 +27,7 @@ async function visitAll(page: Page, id: string, lang: Lang) {
     [`/c/${id}/step/looks`, p["step.looks.question"]!],
     [`/c/${id}/overview`, m["overview.question"]],
     [`/c/${id}/done`, m["done.title"].replace("{name}", "Mira")],
-    ["/new", m["level.question"]],
+    ["/new", m["level.question"].replace("{levelName}", p["level.name"]!)],
     ["/settings", m["settings.title"]],
     ["/privacy", m["privacy.title"]],
   ];

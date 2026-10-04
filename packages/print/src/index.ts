@@ -3,6 +3,7 @@
  * server. The package decides what goes where (sheet.json); this module
  * owns the visual design and knows nothing about any game.
  */
+export { cardCount, isCard } from "./cards.ts";
 export { MESSAGES, PRINT_LANGUAGES, type Messages } from "./messages.ts";
 export {
   buildPrintModel,

@@ -289,13 +289,15 @@ describe("a complete level 3 character", () => {
     });
   });
 
-  it("asks the choices an info step lists before the info step itself", () => {
-    // The flow words them as already chosen, never as coming next.
+  it("asks an info step's choices before it, unless a gather group moves them later", () => {
+    // The flow words them as already chosen, or as chosen later at their step; never as coming next.
     const ev = evaluateDraft(pkg, build(3, LANTERN_BEARER_L3));
     const order = ev.steps.map((s) => s.id);
     const infoAt = order.indexOf(ev.choices["calling-gifts"]!.step);
+    const gathered = (c: string) => pkg.flow.choices.find((x) => x.id === c)?.gather !== undefined;
     for (const c of ev.choices["calling-gifts"]!.info!.choices) {
-      expect(order.indexOf(ev.choices[c]!.step)).toBeLessThan(infoAt);
+      const at = order.indexOf(ev.choices[c]!.step);
+      expect(at < infoAt || gathered(c)).toBe(true);
       expect(ev.choices[c]!.status).toBe("answered");
     }
   });

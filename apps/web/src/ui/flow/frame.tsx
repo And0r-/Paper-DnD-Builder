@@ -23,7 +23,7 @@ import { RichText } from "../components/RichText.tsx";
 import { AppShell } from "../components/Shell.tsx";
 import { ptext } from "../package-text.ts";
 import { useDraft } from "./draft-state.tsx";
-import { OVERVIEW_KEY, type FlowEntry } from "./model.ts";
+import { OVERVIEW_KEY, positionOf, progressFraction, type FlowEntry } from "./model.ts";
 
 // ------------------------------------------------------------ explanation
 
@@ -64,33 +64,56 @@ export function SaveStatus() {
   );
 }
 
+function StepLink({ entry, current }: { entry: FlowEntry; current: string | undefined }) {
+  const { t } = useApp();
+  const here = entry.key === current;
+  const state = here ? "current" : entry.status;
+  return (
+    <Link
+      href={entry.href}
+      aria-current={here ? "step" : undefined}
+      className={`steplist__link steplist__link--${state}`}
+    >
+      <span className="steplist__mark" aria-hidden="true">
+        {state === "done" ? (
+          <Icon name="check" size={18} />
+        ) : state === "current" ? (
+          <Icon name="dot" size={18} />
+        ) : state === "needsAttention" ? (
+          "!"
+        ) : (
+          <Icon name="circle" size={18} />
+        )}
+      </span>
+      <span className="steplist__name">{entry.title}</span>
+      <span className="visually-hidden">, {t(`flow.status.${state}`)}</span>
+    </Link>
+  );
+}
+
+/** The counted steps; the parts a choice brought along are listed inside their step. */
 export function StepList({ current }: { current: string | undefined }) {
   const { t } = useApp();
   const { entries } = useDraft();
+  const heads = entries.filter((e) => e.part === 1);
   return (
     <div className="steplist">
       <p className="steplist__title">{t("flow.steps")}</p>
       <ol className="steplist__items">
-        {entries.map((e) => {
-          const here = e.key === current;
-          const state = here ? "current" : e.status;
+        {heads.map((head) => {
+          const parts = entries.filter((e) => e.section === head.section && e.part > 1);
           return (
-            <li key={e.key} className={`steplist__item steplist__item--${state}`}>
-              <Link href={e.href} aria-current={here ? "step" : undefined}>
-                <span className="steplist__mark" aria-hidden="true">
-                  {state === "done" ? (
-                    <Icon name="check" size={18} />
-                  ) : state === "current" ? (
-                    <Icon name="dot" size={18} />
-                  ) : state === "needsAttention" ? (
-                    "!"
-                  ) : (
-                    <Icon name="circle" size={18} />
-                  )}
-                </span>
-                <span className="steplist__name">{e.title}</span>
-                <span className="visually-hidden">, {t(`flow.status.${state}`)}</span>
-              </Link>
+            <li key={head.key} className="steplist__item">
+              <StepLink entry={head} current={current} />
+              {parts.length > 0 && (
+                <ol className="steplist__parts">
+                  {parts.map((e) => (
+                    <li key={e.key} className="steplist__item">
+                      <StepLink entry={e} current={current} />
+                    </li>
+                  ))}
+                </ol>
+              )}
             </li>
           );
         })}
@@ -146,20 +169,20 @@ export function FlowLayout({ current, children }: { current: string | undefined;
 export function ProgressHeader({ entry }: { entry: FlowEntry }) {
   const { t } = useApp();
   const { entries } = useDraft();
-  const current = entries.findIndex((e) => e.key === entry.key) + 1;
-  const total = entries.length;
-  const done = entries.filter((e) => e.status === "done" && e.kind !== "level").length;
-  const text = t("flow.progress", { current, total });
-  const percent = Math.round((Math.max(done, 1) / (total - 1)) * 100);
+  const pos = positionOf(entries, entry);
+  const text = t("flow.progress", pos);
+  const part = pos.parts > 1 ? t("flow.part", pos) : undefined;
+  const percent = Math.round(progressFraction(entries, entry) * 100);
+  const full = [text, pos.sectionTitle, part].filter(Boolean).join(" · ");
   return (
     <div className="progress">
       <div
         className="progress__bar"
         role="progressbar"
         aria-valuemin={1}
-        aria-valuemax={total}
-        aria-valuenow={current}
-        aria-valuetext={text}
+        aria-valuemax={pos.total}
+        aria-valuenow={pos.current}
+        aria-valuetext={full}
         aria-label={text}
       >
         <div className="progress__fill" style={{ width: `${Math.min(100, percent)}%` }} />
@@ -167,35 +190,37 @@ export function ProgressHeader({ entry }: { entry: FlowEntry }) {
       <p className="progress__text">
         <span>{text}</span>
         <span aria-hidden="true"> · </span>
-        <span className="progress__step">{entry.title}</span>
+        <span className="progress__step">{pos.sectionTitle}</span>
+        {part && (
+          <>
+            <span aria-hidden="true"> · </span>
+            <span>{part}</span>
+          </>
+        )}
       </p>
     </div>
   );
 }
 
-/** Note when a choice added or removed steps; the count never jumps without a word. */
+/**
+ * Note when a choice added or removed steps or parts, in one short line;
+ * the count never changes without a word. Which ones they are stands in
+ * the step list and the progress line, not in the note. A switch that
+ * swaps parts only says what the new choice brings.
+ */
 export function StepNotice() {
   const { tc, list } = useApp();
   const { notice } = useDraft();
-  return (
-    <div aria-live="polite">
-      {notice && notice.added.length > 0 && (
-        <Callout tone="info">
-          {tc("flow.stepAdded", notice.added.length, { steps: list(notice.added) })}
-        </Callout>
-      )}
-      {notice && notice.removed.length > 0 && (
-        <Callout tone="info">
-          {tc("flow.stepRemoved", notice.removed.length, { steps: list(notice.removed) })}
-        </Callout>
-      )}
-      {notice && notice.grown.length > 0 && (
-        <Callout tone="info">
-          {tc("flow.stepGrown", notice.grown.length, { steps: list(notice.grown) })}
-        </Callout>
-      )}
-    </div>
-  );
+  const lines: string[] = [];
+  if (notice?.addedParts.length) lines.push(tc("flow.partsAdded", notice.addedParts.length));
+  else if (notice?.removedParts.length) lines.push(tc("flow.partsRemoved", notice.removedParts.length));
+  // After a first sentence the step count follows in a few words.
+  const too = lines.length > 0 ? "Too" : "";
+  if (notice?.added.length) lines.push(tc(`flow.stepAdded${too}`, notice.added.length));
+  if (notice?.removed.length) lines.push(tc(`flow.stepRemoved${too}`, notice.removed.length));
+  if (notice?.grown.length)
+    lines.push(tc("flow.stepGrown", notice.grown.length, { steps: list(notice.grown) }));
+  return <div aria-live="polite">{lines.length > 0 && <Callout tone="info">{lines.join(" ")}</Callout>}</div>;
 }
 
 /**
@@ -259,8 +284,7 @@ export function StepFrame({
   const { lp, entries, rejected } = useDraft();
   const autoId = useId();
   const headingId = givenHeadingId ?? autoId;
-  const position = entries.findIndex((e) => e.key === entry.key) + 1;
-  usePageTitle([question, t("flow.progress", { current: position, total: entries.length })]);
+  usePageTitle([question, t("flow.progress", positionOf(entries, entry))]);
   return (
     <div className="step" aria-labelledby={headingId}>
       <ProgressHeader entry={entry} />

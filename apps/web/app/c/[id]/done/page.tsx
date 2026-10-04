@@ -3,13 +3,15 @@
  * The end (flow spec 4.7). It shapes the memory of everything before it:
  * calm, clear, and the printout one tap away. No confetti.
  */
-import { useEffect, useRef, useState } from "react";
+import { cardCount } from "@builder/print/cards";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useApp } from "../../../../src/ui/app-state.tsx";
 import { Button, ButtonLink } from "../../../../src/ui/components/Button.tsx";
 import { Callout, EmptyState } from "../../../../src/ui/components/Feedback.tsx";
 import { Icon } from "../../../../src/ui/components/Icon.tsx";
 import { useDraft } from "../../../../src/ui/flow/draft-state.tsx";
 import { usePageTitle } from "../../../../src/ui/flow/frame.tsx";
+import { Origins } from "../../../../src/ui/flow/origins.tsx";
 
 type PdfState = "idle" | "preparing" | "error" | "notYet";
 
@@ -22,6 +24,8 @@ export default function DonePage() {
   const name = (nameState?.answer as { text?: string } | undefined)?.text?.trim();
   const title = name ? t("done.title", { name }) : t("done.titleUnnamed");
   usePageTitle([title]);
+  // Only promise cards when the PDF has some: not every character has things that are cards.
+  const hasCards = useMemo(() => cardCount(lp.pkg, ev) > 0, [lp.pkg, ev]);
   useEffect(() => headingRef.current?.focus(), []);
 
   if (draft.status !== "finished") {
@@ -67,7 +71,7 @@ export default function DonePage() {
       <h1 className="done__title" tabIndex={-1} ref={headingRef}>
         {title}
       </h1>
-      <p className="done__text">{t("done.text")}</p>
+      <p className="done__text">{t(hasCards ? "done.text" : "done.textSheetOnly")}</p>
       <div className="done__pdf">
         <Button
           icon="printer"
@@ -89,8 +93,9 @@ export default function DonePage() {
           )}
           {pdf === "notYet" && <Callout tone="info">{t("done.pdfNotYet")}</Callout>}
         </div>
-        <p className="done__tip">{t("done.tip")}</p>
+        <p className="done__tip">{t(hasCards ? "done.tip" : "done.tipSheetOnly")}</p>
       </div>
+      <Origins />
       <p className="note">{t("done.editHint")}</p>
       <div className="done__next">
         <ButtonLink href="/characters" variant="secondary">

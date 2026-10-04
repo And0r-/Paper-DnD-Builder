@@ -61,11 +61,14 @@ function send(id: string, version: number, next: Pending): Promise<DraftView> {
   }
 }
 
+/** Titles of steps a change added or removed: counted steps, and parts of a step. */
 export interface StepNotice {
   added: string[];
   removed: string[];
   /** Steps that were there before and now ask more (a gather step got a new choice). */
   grown: string[];
+  addedParts: string[];
+  removedParts: string[];
 }
 
 export interface DraftApi {
@@ -300,9 +303,14 @@ function ReadyDraft({
       const after = evaluateDraft(pkg, r.doc);
       const diff = stepDiff(before, after);
       if (diff.added.length > 0 || diff.removed.length > 0 || diff.grown.length > 0) {
+        const isPart = (e: Evaluation, id: string) => e.steps.find((s) => s.id === id)?.origin === "granted";
+        const titles = (e: Evaluation, ids: string[], parts: boolean) =>
+          ids.filter((id) => isPart(e, id) === parts).map((id) => stepTitle(lp, e, id));
         setNotice({
-          added: diff.added.map((s) => stepTitle(lp, after, s)),
-          removed: diff.removed.map((s) => stepTitle(lp, before, s)),
+          added: titles(after, diff.added, false),
+          removed: titles(before, diff.removed, false),
+          addedParts: titles(after, diff.added, true),
+          removedParts: titles(before, diff.removed, true),
           grown: diff.grown.map((s) => stepTitle(lp, after, s)),
         });
       }
