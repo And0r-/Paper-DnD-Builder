@@ -60,6 +60,8 @@ test("a newcomer builds a level-3 character from login to finished", async ({ pa
   await question(page, "Woher kommt dein Charakter?");
   await next(page);
   await expect(page.getByText(m["pick.missingOne"])).toBeVisible();
+  // A recommendation without a package badge reads "recommended".
+  await expect(page.locator('[data-option="folk.moorfolk"] .badge')).toHaveText(m["common.recommended"]);
   await pick(page, "Moorvolk");
   await page.getByRole("button", { name: m["common.moreInfo"] }).first().click();
   await expect(page.getByText(/Dein Tempo ist 7,5 Meter/)).toBeVisible();
@@ -78,6 +80,9 @@ test("a newcomer builds a level-3 character from login to finished", async ({ pa
 
   // Calling brings new steps; the count never changes without a word.
   await question(page, "Womit verdient dein Charakter sein Brot?");
+  // A package badge replaces "recommended" on the same option.
+  await expect(page.locator('[data-option="calling.lantern-bearer"] .badge')).toHaveText("Sanfter Einstieg");
+  await expect(page.getByRole("main").getByText(m["common.recommended"], { exact: true })).toHaveCount(0);
   await pick(page, "Laternenträgerin");
   await expect(page.getByText(/Durch deine Wahl kommen 4 Schritte dazu/)).toBeVisible();
   await shot(page, "05-beruf");
