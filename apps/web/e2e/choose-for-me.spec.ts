@@ -26,7 +26,9 @@ async function checkScores(page: Page, name: string) {
   await login(page, uniqueEmail(name));
   const id = await openScores(page);
   await page.goto(`/c/${id}/step/scores`);
-  await expect(page.getByRole("heading", { level: 1, name: "Worin ist dein Charakter stark?" })).toBeFocused();
+  await expect(
+    page.getByRole("heading", { level: 1, name: "Worin ist dein Charakter stark?" }),
+  ).toBeFocused();
 
   // Before any Next: the button is there, in view, with what it does next to it.
   const button = page.locator(".shortcuts").getByRole("button", { name: m["flow.chooseForMe"] });
