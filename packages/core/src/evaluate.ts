@@ -52,7 +52,8 @@ export interface ChoiceState {
   badges?: Record<string, string>;
   /**
    * Choices with `held`: things the character already has that an offered
-   * option is `about`, in option order. Those options come first in `recommended`.
+   * option is `about`, in option order. Those options come first in `recommended`,
+   * the ones also in the package's `recommend` ahead of the rest.
    */
   held?: string[];
   /** For `info` choices: what the thing picked in choice `of` gives at this level. */
@@ -415,7 +416,11 @@ function evaluateChoice(
         });
         state.held = onHand.map((o) => about(o)!);
         if (onHand.length > 0) {
-          const picks = [...new Set([...onHand, ...(recommended ?? [])])];
+          // When more fit than are asked for, the ones the package also
+          // recommends are kept: they are its pick among what the character has.
+          const rec = recommended ?? [];
+          const first = [...onHand.filter((o) => rec.includes(o)), ...onHand.filter((o) => !rec.includes(o))];
+          const picks = [...new Set([...first, ...rec])];
           recommended = picks.slice(0, choice.kind === "pickOne" ? 1 : state.count);
         }
       }

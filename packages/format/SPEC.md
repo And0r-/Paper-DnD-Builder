@@ -440,8 +440,9 @@ every player to the same pick.
 `held` (optional, `pickOne` and `pickMany`) helps the player pick options
 that fit what the character already has. It needs options with `about`
 (see [6](#6-things)). An offered option whose `about` thing the character
-has is recommended first; the `recommend` entry fills the remaining
-places, and the list is cut to `count` (one for `pickOne`). Above the
+has is recommended first, options also in `recommend` first among them;
+the `recommend` entry fills the remaining places, and the list is cut to
+`count` (one for `pickOne`). Above the
 list the builder shows the text `text` with `{{var:things}}`: the names of
 those things as a list ("A, B and C"), in option order. If the character
 has none of them, nothing is shown and `recommend` applies as usual.

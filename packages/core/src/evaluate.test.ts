@@ -200,6 +200,30 @@ describe("options", () => {
       expect(handling.recommended).toEqual(["handling.boat-hook", "handling.small-bell"]);
     });
 
+    it("keeps the package's own pick among them when more fit than are asked for", () => {
+      // Bell, boots and hook fit; the package recommends the boots, so they stay in.
+      const p: ContentPackage = {
+        ...pkg,
+        things: pkg.things.map((t) =>
+          t.id === "calling.river-runner"
+            ? { ...t, grants: [...(t.grants ?? []), { thing: "item.small-bell" }] }
+            : t,
+        ),
+        flow: {
+          ...pkg.flow,
+          choices: pkg.flow.choices.map((c) =>
+            c.id === "handling-river-runner" && c.kind === "pickMany"
+              ? { ...c, recommend: [{ pick: ["handling.trail-boots", "handling.rope"] }] }
+              : c,
+          ),
+        },
+      };
+      const handling = riverRunner({ gear: { pick: "item.trail-boots" } }, p).choices[
+        "handling-river-runner"
+      ]!;
+      expect(handling.recommended).toEqual(["handling.trail-boots", "handling.boat-hook"]);
+    });
+
     it("counts only what earlier steps brought", () => {
       // The upbringing's bell comes in a later step than the calling's choices.
       const ev = riverRunner({ upbringing: { pick: "upbringing.bell-tower" } });
