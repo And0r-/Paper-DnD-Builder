@@ -80,3 +80,19 @@ leaves something open makes it a draft again.
 
 It is a plain `GET` so the screen can offer it as an ordinary download
 link. The PDF is made on every request and never stored.
+
+## Screens and browser tests
+
+The screens live in [`app`](app) (routes) and [`src/ui`](src/ui)
+(components, design tokens in `src/ui/styles/tokens.css`). Screen texts
+are ours, one file per language in [`src/i18n/messages`](src/i18n/messages);
+package texts come from the package in the same language.
+
+```sh
+pnpm --filter @builder/web test:e2e   # builds, then runs Playwright
+```
+
+The browser tests start the server with `DATABASE_URL=pglite:memory`,
+the demo package and `MAIL_OUTBOX_DIR=e2e/.outbox`, log in through the real
+screens, and fail on any request to another origin. Screenshots land in
+`e2e/screenshots` (not committed).

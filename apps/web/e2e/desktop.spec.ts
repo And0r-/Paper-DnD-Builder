@@ -1,0 +1,72 @@
+/**
+ * Large screens: step list left, question in the middle, the explanation
+ * of the focused option on the right (design system 3). Plus the whole
+ * step done with the keyboard only, and a log of every request the browser
+ * made (done criterion 4).
+ */
+import AxeBuilder from "@axe-core/playwright";
+import { devices } from "@playwright/test";
+import { writeFile } from "node:fs/promises";
+import { join } from "node:path";
+import m from "../src/i18n/messages/de.json" with { type: "json" };
+import { expect, login, makeCharacter, SHOTS, shot, test, uniqueEmail } from "./helpers.ts";
+
+test.use({ ...devices["Desktop Chrome"], viewport: { width: 1366, height: 900 } });
+
+test("three columns, keyboard only, and only requests to the builder itself", async ({
+  page,
+  foreign,
+  baseURL,
+}) => {
+  const requests: string[] = [];
+  page.on("request", (r) => requests.push(`${r.method()} ${r.url()}`));
+
+  await login(page, uniqueEmail("desk"));
+  const id = await makeCharacter(page, false);
+
+  await page.goto(`/c/${id}/step/calling`);
+  await expect(page.getByRole("navigation", { name: m["flow.steps"] })).toBeVisible();
+  await page.getByRole("main").getByText("Kräuterkundige", { exact: true }).hover();
+  await expect(page.locator(".explain-panel")).toContainText("Kräuterkundige");
+  await shot(page, "40-desktop-beruf");
+
+  // Keyboard only: arrow keys move through the options, Enter on Next goes on.
+  await page.getByRole("radio", { name: "Laternenträgerin" }).focus();
+  await page.keyboard.press("ArrowDown");
+  const dialog = page.getByRole("dialog", { name: "Beruf ändern?" });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByRole("button", { name: m["change.keep"] })).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("radio", { name: "Laternenträgerin" })).toBeChecked();
+  // Focus goes back into the option group, where the keyboard user was.
+  await expect(page.locator("input[name='choice-calling']:focus")).toHaveCount(1);
+  await page.getByRole("button", { name: m["common.next"], exact: true }).focus();
+  await page.keyboard.press("Enter");
+  await expect(
+    page.getByRole("heading", { level: 1, name: "Worin ist dein Charakter geübt?" }),
+  ).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1 })).toBeFocused();
+
+  // First Tab stop is the skip link.
+  await page.goto(`/c/${id}/overview`);
+  await page.keyboard.press("Tab");
+  await expect(page.getByRole("link", { name: m["common.skipToContent"] })).toBeFocused();
+  await shot(page, "41-desktop-ueberblick");
+  const r = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"]).analyze();
+  expect(r.violations.map((v) => v.id)).toEqual([]);
+
+  await page.goto("/settings");
+  await shot(page, "42-desktop-einstellungen");
+
+  const own = new URL(baseURL!).origin;
+  await writeFile(
+    join(SHOTS, "network-log.txt"),
+    [
+      `Origin of the builder: ${own}`,
+      `Requests: ${requests.length}`,
+      `Requests to other origins: ${foreign.length}`,
+      "",
+      ...requests,
+    ].join("\n"),
+  );
+});

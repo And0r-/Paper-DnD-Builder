@@ -8,7 +8,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "typecheck": "next typegen && tsc --noEmit -p ."
+    "typecheck": "next typegen && tsc --noEmit -p .",
+    "test:e2e": "next build && playwright test",
+    "test:e2e:only": "playwright test"
   },
   "dependencies": {
     "@builder/core": "workspace:*",
@@ -24,8 +26,10 @@
     "zod": "^4.6.5"
   },
   "devDependencies": {
+    "@axe-core/playwright": "4.13.0",
     "@builder/demo-package": "workspace:*",
     "@electric-sql/pglite": "^0.5.8",
+    "@playwright/test": "1.63.0",
     "@types/nodemailer": "^8.0.2",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0"
