@@ -167,3 +167,39 @@ export async function expectOneLanguage(page: Page, lang: Lang): Promise<void> {
 export async function shot(page: Page, name: string): Promise<void> {
   await page.screenshot({ path: join(SHOTS, `${name}.png`), fullPage: true });
 }
+
+/** A finished level-3 character made through the API, so a test can visit every screen quickly. */
+export async function makeCharacter(page: Page, finish = true): Promise<string> {
+  const req = page.request;
+  const created = await req.post("/api/drafts", { data: { packageId: "demo" } });
+  expect(created.status()).toBe(201);
+  let view = (await created.json()) as { draft: { id: string; version: number } };
+  const id = view.draft.id;
+  const patch = await req.patch(`/api/drafts/${id}`, { data: { version: view.draft.version, level: 3 } });
+  view = await patch.json();
+  const answers: [string, unknown][] = [
+    ["folk", { pick: "folk.moorfolk" }],
+    ["upbringing", { pick: "upbringing.ferry-child" }],
+    ["calling", { pick: "calling.lantern-bearer" }],
+    ["talents-lantern-bearer", { picks: ["talent.mending", "talent.climbing"] }],
+    ["gear", { pick: "item.reed-shield" }],
+    ["knacks-lantern", { picks: ["knack.warm-glow", "knack.glow-thread", "knack.quiet-word"] }],
+    ["path", { pick: "path.lightwarden" }],
+    ["scores", { method: 0, assign: { might: 8, grace: 7, wit: 9, heart: 11 } }],
+    ["extra-talent", { pick: "talent.listening" }],
+    ["name", { text: "Mira" }],
+    ["age", { value: 20 }],
+  ];
+  for (const [choice, answer] of answers) {
+    const r = await req.put(`/api/drafts/${id}/answers/${choice}`, {
+      data: { version: view.draft.version, answer },
+    });
+    expect(r.status(), choice).toBe(200);
+    view = await r.json();
+  }
+  if (finish) {
+    const r = await req.post(`/api/drafts/${id}/finish`, { data: { version: view.draft.version } });
+    expect(r.status()).toBe(200);
+  }
+  return id;
+}

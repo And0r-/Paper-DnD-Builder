@@ -21,7 +21,7 @@ import { loadPackage, type LoadedPackage } from "../../src/ui/packages.ts";
 
 const UNDO_MS = 10_000;
 
-type Data = { drafts: DraftListEntry[]; packages: Map<string, LoadedPackage> };
+type Data = { lang: string; drafts: DraftListEntry[]; packages: Map<string, LoadedPackage> };
 
 export default function CharactersPage() {
   return <RequireAccount>{() => <Characters />}</RequireAccount>;
@@ -30,7 +30,9 @@ export default function CharactersPage() {
 function Characters() {
   const { t, lang } = useApp();
   usePageTitle([t("characters.title")]);
-  const [data, setData] = useState<Data | null>(null);
+  const [loaded, setData] = useState<Data | null>(null);
+  // Never show package words of the previous language.
+  const data = loaded?.lang === lang ? loaded : null;
   const [failed, setFailed] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const [confirm, setConfirm] = useState<{ id: string; name: string } | null>(null);
@@ -46,7 +48,7 @@ function Characters() {
       for (const id of new Set(drafts.filter((d) => d.packageAvailable).map((d) => d.packageId))) {
         packages.set(id, await loadPackage(id, lang));
       }
-      return { drafts, packages };
+      return { lang, drafts, packages };
     })().then(
       (d) => {
         if (!live) return;

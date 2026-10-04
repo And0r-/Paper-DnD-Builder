@@ -50,18 +50,25 @@ function Grants({ lp, thing, level }: { lp: LoadedPackage; thing: Thing; level: 
   const { t } = useApp();
   const ctx = useMeasure(lp);
   const items: ReactNode[] = [];
+  // Changes of one value over several levels count as one line ("Stamina +15").
+  const adds = new Map<string, number>();
+  for (const g of thing.grants ?? []) {
+    if ((g.atLevel ?? 1) <= level && g.value && typeof g.add === "number") {
+      adds.set(g.value, (adds.get(g.value) ?? 0) + g.add);
+    }
+  }
+  for (const [value, add] of adds) {
+    items.push(
+      <li key={`v-${value}`}>
+        {ptext(lp, `value.${value}.name`)} {formatValue(lp, ctx, value, add, true)}
+      </li>,
+    );
+  }
   for (const [i, g] of (thing.grants ?? []).entries()) {
     if ((g.atLevel ?? 1) > level) continue;
     if (g.thing) items.push(<li key={i}>{thingName(lp, g.thing)}</li>);
     else if (g.choice)
       items.push(<li key={i}>{t("option.youChoose", { title: choiceTexts(lp, g.choice).title })}</li>);
-    else if (g.value && typeof g.add === "number") {
-      items.push(
-        <li key={i}>
-          {ptext(lp, `value.${g.value}.name`)} {formatValue(lp, ctx, g.value, g.add, true)}
-        </li>,
-      );
-    }
   }
   if (items.length === 0) return null;
   return (

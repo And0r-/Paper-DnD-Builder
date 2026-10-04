@@ -27,7 +27,8 @@ export default function SettingsPage() {
 
 /** One unit choice per dimension the loaded packages know, with words from the first package that has it. */
 function useUnitPackages(lang: string) {
-  const [packages, setPackages] = useState<LoadedPackage[] | null>(null);
+  // Kept together with the language it was loaded in: never show words of the previous language.
+  const [loaded, setLoaded] = useState<{ lang: string; packages: LoadedPackage[] } | null>(null);
   const [failed, setFailed] = useState(false);
   const [attempt, setAttempt] = useState(0);
   useEffect(() => {
@@ -36,14 +37,18 @@ function useUnitPackages(lang: string) {
       const list = await loadPackageList(lang);
       return Promise.all(list.map((p) => loadPackage(p.id, lang)));
     })().then(
-      (p) => live && (setPackages(p), setFailed(false)),
+      (packages) => live && (setLoaded({ lang, packages }), setFailed(false)),
       () => live && setFailed(true),
     );
     return () => {
       live = false;
     };
   }, [lang, attempt]);
-  return { packages, failed, retry: () => setAttempt((n) => n + 1) };
+  return {
+    packages: loaded?.lang === lang ? loaded.packages : null,
+    failed,
+    retry: () => setAttempt((n) => n + 1),
+  };
 }
 
 function Settings({ account }: { account: Account }) {

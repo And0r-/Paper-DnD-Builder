@@ -466,6 +466,11 @@
   background: var(--color-surface-sunk);
 }
 
+.explain-panel .details__example,
+.explain-panel .rules__text {
+  background: var(--color-surface);
+}
+
 .explain-panel__title {
   font-size: var(--text-lg);
   line-height: var(--text-lg-lh);

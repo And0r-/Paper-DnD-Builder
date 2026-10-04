@@ -71,7 +71,11 @@ a:hover {
   outline-offset: 2px;
 }
 
-/* Headings that receive focus on screen change should not show a ring for mouse users. */
+/*
+ * Headings and the main area receive focus on screen change so screen
+ * readers start there. They are not controls, so they show no ring.
+ */
+h1[tabindex="-1"]:focus,
 [tabindex="-1"]:focus:not(:focus-visible) {
   outline: none;
 }

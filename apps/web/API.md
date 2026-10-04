@@ -71,3 +71,19 @@ no answer. A partial `pickMany` answer is allowed; the choice stays open.
 
 A finished character stays finished while it is complete; a change that
 leaves something open makes it a draft again.
+
+## Screens and browser tests
+
+The screens live in [`app`](app) (routes) and [`src/ui`](src/ui)
+(components, design tokens in `src/ui/styles/tokens.css`). Screen texts
+are ours, one file per language in [`src/i18n/messages`](src/i18n/messages);
+package texts come from the package in the same language.
+
+```sh
+pnpm --filter @builder/web test:e2e   # builds, then runs Playwright
+```
+
+The browser tests start the server with `DATABASE_URL=pglite:memory`,
+the demo package and `MAIL_OUTBOX_DIR=e2e/.outbox`, log in through the real
+screens, and fail on any request to another origin. Screenshots land in
+`e2e/screenshots` (not committed).

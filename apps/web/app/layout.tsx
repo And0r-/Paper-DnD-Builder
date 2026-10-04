@@ -1,7 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import { cookies, headers } from "next/headers";
 import type { ReactNode } from "react";
-import { isUiLanguage, MESSAGES, pickLanguage } from "../src/i18n/index.ts";
+import { MESSAGES } from "../src/i18n/index.ts";
+import { screenLanguage } from "../src/server/screen-language.ts";
 import { AppStateProvider, LANGUAGE_COOKIE } from "../src/ui/app-state.tsx";
 import { GlossaryProvider } from "../src/ui/components/RichText.tsx";
 import "../src/ui/styles/tokens.css";
@@ -15,11 +16,14 @@ export const viewport: Viewport = {
   themeColor: "#fbfaf7",
 };
 
-/** Before login: the language chosen earlier (cookie), else the browser's, else German. */
+/** The account's language when logged in; before login the one chosen earlier, else the browser's. */
 async function initialLanguage() {
-  const chosen = (await cookies()).get(LANGUAGE_COOKIE)?.value;
-  if (isUiLanguage(chosen)) return chosen;
-  return pickLanguage((await headers()).get("accept-language"));
+  const h = await headers();
+  return screenLanguage(
+    h.get("cookie"),
+    (await cookies()).get(LANGUAGE_COOKIE)?.value,
+    h.get("accept-language"),
+  );
 }
 
 export async function generateMetadata(): Promise<Metadata> {
