@@ -83,9 +83,11 @@ test("a newcomer builds a level-3 character from login to finished", async ({ pa
   // A package badge replaces "recommended" on the same option.
   await expect(page.locator('[data-option="calling.lantern-bearer"] .badge')).toHaveText("Sanfter Einstieg");
   await expect(page.getByRole("main").getByText(m["common.recommended"], { exact: true })).toHaveCount(0);
+  // Calling brings parts of its own; they belong to this step, so the count stays put.
+  const before = await page.locator(".progress__text").textContent();
   await pick(page, "Laternenträgerin");
-  // Calling brings new steps; the count never changes without a word.
-  await expect(page.getByText(/Durch deine Wahl kommen 4 Schritte dazu/)).toBeVisible();
+  await expect(page.getByText(/Deine Wahl bringt 4 eigene Teile mit/)).toBeVisible();
+  await expect(page.locator(".progress__text")).toHaveText(`${before!} · Teil 1 von 5`);
   await shot(page, "05-beruf");
   await axe(page);
   await next(page);

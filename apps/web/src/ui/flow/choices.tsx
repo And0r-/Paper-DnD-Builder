@@ -3,7 +3,7 @@
  * The six kinds of questions (flow spec 3): pickOne, pickMany, distribute,
  * number, text, info. Every option explains itself where it is chosen.
  */
-import { formatMeasure, type ChoiceState } from "@builder/core";
+import { explainValue, formatMeasure, type ChoiceState } from "@builder/core";
 import type { Choice, Thing } from "@builder/format/pure";
 import Link from "next/link";
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
@@ -16,7 +16,9 @@ import { RichText, useMeasure } from "../components/RichText.tsx";
 import {
   choiceTexts,
   distributeMethodLabels,
+  formatValue,
   grantedValue,
+  isYesNoValue,
   plain,
   plist,
   ptext,
@@ -24,6 +26,7 @@ import {
 } from "../package-text.ts";
 import type { LoadedPackage } from "../packages.ts";
 import { useDraft } from "./draft-state.tsx";
+import { laterSteps, sumText } from "./explain.ts";
 import { useExplain } from "./frame.tsx";
 import { useGuardedChange } from "./guard.tsx";
 import { stepHref, stepTitle } from "./model.ts";
@@ -763,6 +766,32 @@ export function TextChoice({
 
 // ------------------------------------------------------------------- info
 
+/**
+ * Under a gift like "Stamina +8": the number that ends up on the sheet when
+ * other things add to it too, and which later step still changes it.
+ */
+function GiftOnSheet({ valueId, add }: { valueId: string; add: number }) {
+  const { t, list } = useApp();
+  const { lp, ev } = useDraft();
+  const ctx = useMeasure(lp);
+  if (isYesNoValue(lp, valueId)) return null;
+  const exp = explainValue(lp.pkg, ev, valueId);
+  const later = laterSteps(lp, ev, valueId);
+  const differs = exp !== undefined && (exp.total !== add || exp.parts.length > 1);
+  if (!differs && later.length === 0) return null;
+  return (
+    <>
+      {exp && differs && (
+        <p className="gift__sheet">
+          {t("explain.onSheet", { total: formatValue(lp, ctx, valueId, exp.total) })}
+          {exp.parts.length > 1 && ` = ${sumText(lp, ctx, ev, valueId, exp.parts, { t, list })}`}
+        </p>
+      )}
+      {later.length > 0 && <p className="gift__later">{t("explain.later", { steps: list(later) })}</p>}
+    </>
+  );
+}
+
 export function InfoChoice({ state }: { state: ChoiceState }) {
   const { t } = useApp();
   const { lp, ev, draft } = useDraft();
@@ -799,6 +828,7 @@ export function InfoChoice({ state }: { state: ChoiceState }) {
                 <RichText lp={lp} text={ptext(lp, `value.${v.value}.explain`)} />
               </p>
             )}
+            <GiftOnSheet valueId={v.value} add={v.add} />
           </li>
         ))}
         {things.map((th) => (
