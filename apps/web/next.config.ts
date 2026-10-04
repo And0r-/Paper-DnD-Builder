@@ -27,7 +27,9 @@ const nextConfig: NextConfig = {
   // Trace files from the monorepo root so workspace packages end up in the bundle.
   outputFileTracingRoot: fileURLToPath(new URL("../../", import.meta.url)),
   // Workspace packages ship TypeScript sources.
-  transpilePackages: ["@builder/core", "@builder/format", "@builder/db"],
+  transpilePackages: ["@builder/core", "@builder/format", "@builder/db", "@builder/print"],
+  // pdfkit reads its own data files at run time; it stays a plain Node module.
+  serverExternalPackages: ["pdfkit"],
   poweredByHeader: false,
   async headers() {
     return [

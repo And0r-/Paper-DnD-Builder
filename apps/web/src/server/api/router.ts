@@ -19,6 +19,7 @@ import { accountRoutes } from "./routes/account.ts";
 import { authRoutes } from "./routes/auth.ts";
 import { draftRoutes } from "./routes/drafts.ts";
 import { packageRoutes } from "./routes/packages.ts";
+import { printRoutes } from "./routes/print.ts";
 import { assertSameOrigin, errorResponse, HttpError, json } from "./http.ts";
 
 export interface Session {
@@ -45,7 +46,13 @@ export interface Route {
   handler: (ctx: RequestContext) => Promise<Response>;
 }
 
-export const ROUTES: Route[] = [...authRoutes, ...accountRoutes, ...packageRoutes, ...draftRoutes];
+export const ROUTES: Route[] = [
+  ...authRoutes,
+  ...accountRoutes,
+  ...packageRoutes,
+  ...draftRoutes,
+  ...printRoutes,
+];
 
 function match(pattern: string, path: string): Record<string, string> | undefined {
   const p = pattern.split("/");

@@ -93,6 +93,15 @@ export class Client {
   }
 
   async call(method: string, path: string, body?: unknown, headers: Record<string, string> = {}) {
+    const res = await this.request(method, path, body, headers);
+    const text = await res.text();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test responses are checked field by field
+    const json: any = text ? JSON.parse(text) : null;
+    return { status: res.status, json, headers: res.headers };
+  }
+
+  /** The raw response, for answers that are not JSON (the PDF). */
+  async request(method: string, path: string, body?: unknown, headers: Record<string, string> = {}) {
     const h = new Headers({ "x-forwarded-for": this.ip, origin: "http://builder.test", ...headers });
     if (body !== undefined && !h.has("content-type")) h.set("content-type", "application/json");
     if (this.cookie) h.set("cookie", this.cookie);
@@ -107,10 +116,7 @@ export class Client {
       const pair = c.split(";")[0]!;
       this.cookie = pair.endsWith("=") ? undefined : pair;
     }
-    const text = await res.text();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- test responses are checked field by field
-    const json: any = text ? JSON.parse(text) : null;
-    return { status: res.status, json, headers: res.headers };
+    return res;
   }
 
   get hasSession(): boolean {
