@@ -1,13 +1,14 @@
 {
   "level": { "min": 1, "max": 3, "default": 1 },
   "steps": [
-    { "id": "folk", "choices": ["folk"] },
-    { "id": "upbringing", "choices": ["upbringing"] },
+    { "id": "character", "choices": ["name", "concept"] },
     { "id": "calling", "choices": ["calling"] },
     { "id": "calling-gifts", "choices": ["calling-gifts"] },
+    { "id": "upbringing", "choices": ["upbringing"] },
+    { "id": "folk", "choices": ["folk"] },
     { "id": "scores", "choices": ["scores"] },
     { "id": "extra-talent", "choices": ["extra-talent"], "when": "level >= 2" },
-    { "id": "identity", "choices": ["name", "age", "looks"] }
+    { "id": "looks", "choices": ["age", "looks"] }
   ],
   "choices": [
     {
@@ -144,6 +145,14 @@
       "source": "mistland",
       "maxLength": 40,
       "suggestions": "names.suggestions"
+    },
+    {
+      "id": "concept",
+      "kind": "text",
+      "source": "mistland",
+      "maxLength": 200,
+      "multiline": true,
+      "optional": true
     },
     {
       "id": "age",

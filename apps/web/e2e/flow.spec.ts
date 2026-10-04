@@ -56,36 +56,36 @@ test("a newcomer builds a level-3 character from login to finished", async ({ pa
   await axe(page);
   await next(page);
 
-  // Folk: pressing Next too early explains what is missing and offers a recommendation.
-  await question(page, "Woher kommt dein Charakter?");
-  await next(page);
-  await expect(page.getByText(m["pick.missingOne"])).toBeVisible();
-  // A recommendation without a package badge reads "recommended".
-  await expect(page.locator('[data-option="folk.moorfolk"] .badge')).toHaveText(m["common.recommended"]);
-  await pick(page, "Moorvolk");
-  await page.getByRole("button", { name: m["common.moreInfo"] }).first().click();
-  await expect(page.getByText(/Dein Tempo ist 7,5 Meter/)).toBeVisible();
-  await expectOneLanguage(page, "de");
-  await shot(page, "04-herkunft-mehr-erfahren");
+  // Your character first: name and one sentence, before any numbers.
+  await question(page, "Wer ist dein Charakter?");
+  await expect(page.getByText("Schritt 2 von")).toBeVisible();
+  await shot(page, "04-dein-charakter");
   await axe(page);
+  // Pressing Next too early explains what is missing and offers a name.
+  await next(page);
+  await expect(page.getByText("Gib deinem Charakter einen Namen.")).toBeVisible();
+  await expect(page.getByRole("button", { name: m["flow.chooseForMe"] })).toBeVisible();
+  await page.getByLabel("Wie heisst dein Charakter?").fill("Mira");
+  await page
+    .getByLabel("Beschreib deinen Charakter in einem Satz.")
+    .fill("Eine stille Fährfrau, die jeden Weg im Nebel kennt.");
+  await expect(page.getByText("Gespeichert ✓")).toBeVisible();
+  await expectOneLanguage(page, "de");
+  await shot(page, "04-dein-charakter-ausgefuellt");
   await next(page);
 
-  // "Choose for me" waits under the intro before Next is ever pressed.
-  await question(page, "Wo hat dein Charakter seine Kindheit verbracht?");
-  await page.locator(".shortcuts").getByRole("button", { name: m["flow.chooseForMe"] }).click();
-  await expect(page.getByRole("radio", { name: "Fährkind" })).toBeChecked();
-  await expect(page.locator(".shortcuts__done")).toBeFocused();
-  await expect(page.locator(".shortcuts__done")).toContainText(m["flow.choseForMe"]);
-  await next(page);
-
-  // Calling brings new steps; the count never changes without a word.
+  // From here on the name stands at the top of every screen.
   await question(page, "Womit verdient dein Charakter sein Brot?");
+  await expect(page.locator(".topbar__name")).toHaveText("Mira");
+  await expect(page.getByText("Schritt 3 von")).toBeVisible();
   // A package badge replaces "recommended" on the same option.
   await expect(page.locator('[data-option="calling.lantern-bearer"] .badge')).toHaveText("Sanfter Einstieg");
   await expect(page.getByRole("main").getByText(m["common.recommended"], { exact: true })).toHaveCount(0);
   await pick(page, "Laternenträgerin");
+  // Calling brings new steps; the count never changes without a word.
   await expect(page.getByText(/Durch deine Wahl kommen 4 Schritte dazu/)).toBeVisible();
   await shot(page, "05-beruf");
+  await axe(page);
   await next(page);
 
   // Talents: pick many with a counter.
@@ -144,12 +144,34 @@ test("a newcomer builds a level-3 character from login to finished", async ({ pa
   await shot(page, "09-geschenke");
   await page.getByRole("button", { name: m["info.continue"] }).click();
 
+  // "Choose for me" waits under the intro before Next is ever pressed.
+  await question(page, "Wo hat dein Charakter seine Kindheit verbracht?");
+  await page.locator(".shortcuts").getByRole("button", { name: m["flow.chooseForMe"] }).click();
+  await expect(page.getByRole("radio", { name: "Fährkind" })).toBeChecked();
+  await expect(page.locator(".shortcuts__done")).toBeFocused();
+  await expect(page.locator(".shortcuts__done")).toContainText(m["flow.choseForMe"]);
+  await next(page);
+
+  // Folk: "learn more" shows the long explanation, units from the settings.
+  await question(page, "Woher kommt dein Charakter?");
+  await next(page);
+  await expect(page.getByText(m["pick.missingOne"])).toBeVisible();
+  // A recommendation without a package badge reads "recommended".
+  await expect(page.locator('[data-option="folk.moorfolk"] .badge')).toHaveText(m["common.recommended"]);
+  await pick(page, "Moorvolk");
+  await page.getByRole("button", { name: m["common.moreInfo"] }).first().click();
+  await expect(page.getByText(/Dein Tempo ist 7,5 Meter/)).toBeVisible();
+  await expectOneLanguage(page, "de");
+  await shot(page, "10-herkunft-mehr-erfahren");
+  await axe(page);
+  await next(page);
+
   // Scores: spread points with − and +, then let the recommendation finish it.
   await question(page, "Worin ist dein Charakter stark?");
   await expect(page.getByText("Noch 14 Punkte übrig")).toBeVisible();
   await page.getByRole("button", { name: "Herz erhöhen" }).click();
   await expect(page.getByText("Noch 13 Punkte übrig")).toBeVisible();
-  await shot(page, "10-grundwerte");
+  await shot(page, "11-grundwerte");
   await axe(page);
   await next(page);
 
@@ -157,11 +179,11 @@ test("a newcomer builds a level-3 character from login to finished", async ({ pa
   await pick(page, "Lauschen");
   await next(page);
 
-  // Name and looks: several questions on one screen.
-  await question(page, "Wer ist dein Charakter?");
-  await page.getByLabel("Wie heisst dein Charakter?").fill("Mira");
+  // Looks last: several questions on one screen, all of them can stay as they are.
+  await question(page, "Wie stellst du dir deinen Charakter vor?");
+  await page.getByLabel("Wie sieht dein Charakter aus?").fill("Grauer Mantel, eine Laterne am Gürtel.");
   await expect(page.getByText("Gespeichert ✓")).toBeVisible();
-  await shot(page, "11-name");
+  await shot(page, "12-aussehen");
   await axe(page);
   await next(page);
 
@@ -169,15 +191,16 @@ test("a newcomer builds a level-3 character from login to finished", async ({ pa
   await question(page, m["overview.question"]);
   await expect(page.getByText(m["overview.openTitle"])).toHaveCount(0);
   await expect(page.getByText("Laternenträgerin").first()).toBeVisible();
+  await expect(page.getByText("Eine stille Fährfrau, die jeden Weg im Nebel kennt.")).toBeVisible();
   await expectOneLanguage(page, "de");
-  await shot(page, "12-ueberblick");
+  await shot(page, "13-ueberblick");
   await axe(page);
   await page.getByRole("button", { name: m["overview.finish"] }).click();
 
   // The end.
   await expect(page.getByRole("heading", { level: 1, name: "Mira ist fertig!" })).toBeVisible();
   await expectOneLanguage(page, "de");
-  await shot(page, "13-fertig");
+  await shot(page, "14-fertig");
   await axe(page);
 
   // The list shows the finished character.
@@ -185,5 +208,5 @@ test("a newcomer builds a level-3 character from login to finished", async ({ pa
   await expect(page.getByRole("heading", { name: "Mira" })).toBeVisible();
   await expect(page.getByText("Laternenträgerin · Stufe 3")).toBeVisible();
   await expect(page.getByText(m["characters.finished"])).toBeVisible();
-  await shot(page, "14-meine-charaktere");
+  await shot(page, "15-meine-charaktere");
 });

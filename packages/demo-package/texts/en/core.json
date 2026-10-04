@@ -77,7 +77,11 @@
     "choice.extra-talent.intro": "From level 2 on, you learn one more [[glossary:talent|talent]]. You can take any one you don't have yet.",
     "choice.name.title": "Name",
     "choice.name.question": "What is your character's name?",
-    "choice.name.intro": "Pick a name you'll like hearing at the table.",
+    "choice.name.intro": "Make up a name you'll like hearing at the table. Or roll for a suggestion.",
+    "choice.name.missing": "Give your character a name.",
+    "choice.concept.title": "In one sentence",
+    "choice.concept.question": "Describe your character in one sentence.",
+    "choice.concept.intro": "For example: \"A quiet ferrywoman who knows every path through the fog.\" You may take a character from a film or book as a model. You can skip this.",
     "choice.age.title": "Age",
     "choice.age.question": "How old is your character?",
     "choice.age.intro": "Age doesn't change any numbers. It helps you picture your character.",
@@ -85,9 +89,12 @@
     "choice.looks.question": "What does your character look like?",
     "choice.looks.intro": "One or two sentences are enough. You can skip this.",
 
-    "step.identity.title": "Name and looks",
-    "step.identity.question": "Who is your character?",
-    "step.identity.intro": "Last, you give your character a name and a face.",
+    "step.character.title": "Your character",
+    "step.character.question": "Who is your character?",
+    "step.character.intro": "First, picture roughly who you want to play. The numbers come later. With every choice after this, you can ask: what fits my character?",
+    "step.looks.title": "Looks",
+    "step.looks.question": "How do you picture your character?",
+    "step.looks.intro": "Last, you give your character a face. This doesn't change any numbers.",
 
     "names.suggestions": [
       "Mira",

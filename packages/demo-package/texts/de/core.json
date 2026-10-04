@@ -77,7 +77,11 @@
     "choice.extra-talent.intro": "Ab Stufe 2 lernst du ein weiteres [[glossary:talent|Talent]]. Du darfst jedes nehmen, das du noch nicht hast.",
     "choice.name.title": "Name",
     "choice.name.question": "Wie heisst dein Charakter?",
-    "choice.name.intro": "Wähle einen Namen, den du am Tisch gern hörst.",
+    "choice.name.intro": "Erfinde einen Namen, den du am Tisch gern hörst. Oder würfle einen Vorschlag.",
+    "choice.name.missing": "Gib deinem Charakter einen Namen.",
+    "choice.concept.title": "In einem Satz",
+    "choice.concept.question": "Beschreib deinen Charakter in einem Satz.",
+    "choice.concept.intro": "Zum Beispiel: «Eine stille Fährfrau, die jeden Weg im Nebel kennt.» Du darfst dir eine Figur aus einem Film oder Buch zum Vorbild nehmen. Das kannst du auch weglassen.",
     "choice.age.title": "Alter",
     "choice.age.question": "Wie alt ist dein Charakter?",
     "choice.age.intro": "Das Alter ändert keine Werte. Es hilft dir, dir den Charakter vorzustellen.",
@@ -85,9 +89,12 @@
     "choice.looks.question": "Wie sieht dein Charakter aus?",
     "choice.looks.intro": "Ein oder zwei Sätze reichen. Das kannst du auch weglassen.",
 
-    "step.identity.title": "Name und Aussehen",
-    "step.identity.question": "Wer ist dein Charakter?",
-    "step.identity.intro": "Zum Schluss gibst du deinem Charakter einen Namen und ein Gesicht.",
+    "step.character.title": "Dein Charakter",
+    "step.character.question": "Wer ist dein Charakter?",
+    "step.character.intro": "Stell dir zuerst grob vor, wen du spielen willst. Die Zahlen kommen später. Bei jeder Wahl kannst du dann fragen: Was passt zu meinem Charakter?",
+    "step.looks.title": "Aussehen",
+    "step.looks.question": "Wie stellst du dir deinen Charakter vor?",
+    "step.looks.intro": "Zum Schluss gibst du deinem Charakter ein Gesicht. Das ändert keine Werte.",
 
     "names.suggestions": [
       "Mira",
