@@ -1,6 +1,6 @@
 # Content package format — specification
 
-Format version **0.1**. This document describes everything a content
+Format version **0.2**. This document describes everything a content
 package contains and every rule a valid package follows. After reading it
 you should be able to write your own package. The demo package in
 [`packages/demo-package`](../demo-package) uses every feature and is the
@@ -122,7 +122,7 @@ people who distribute packages.
 
 ```json
 {
-  "formatVersion": "0.1",
+  "formatVersion": "0.2",
   "id": "demo",
   "version": "0.1.0",
   "languages": ["de", "en"],
@@ -641,9 +641,10 @@ builder owns the visual design; the package says what goes where.
       "span": 4,
       "scores": [{ "value": "might", "derived": "mightBonus" }]
     },
-    { "id": "talents", "kind": "checkList", "span": 8, "things": { "kind": "talent" } }
+    { "id": "talents", "kind": "checkList", "span": 8, "things": { "kind": "talent" }, "note": "score" },
+    { "id": "knacks", "kind": "featureTable", "span": 6, "things": { "kind": "knack" }, "uses": "uses" }
   ],
-  "cards": { "knack": { "fields": ["reach", "duration", "uses", "focus"] } }
+  "cards": { "knack": { "fields": ["reach", "duration", "uses", "focus"], "uses": "uses" } }
 }
 ```
 
@@ -651,22 +652,50 @@ The sheet is a 12-column grid. Sections fill it row by row; `span` is the
 width (3, 4, 6, 8 or 12). The first section should be the header. Section
 kinds:
 
-| Kind           | Shows                                                                                                                                     | Fields                          |
-| -------------- | ----------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------- |
-| `header`       | character name, `summary.line`, "played by", package name                                                                                 | —                               |
-| `statBoxes`    | up to 6 large boxes; `number` = computed value, `pencil` = value as a starting number to overwrite, `circles` = that many circles to tick | `boxes[]: { value, style }`     |
-| `scoreColumn`  | stacked boxes: value large, `derived` value small                                                                                         | `scores[]: { value, derived? }` |
-| `checkList`    | all things selected; marked if the character has them                                                                                     | `things` (like `options`)       |
-| `featureTable` | the selected things the character has: name, `short`, use boxes                                                                           | `things`                        |
-| `list`         | the selected things the character has, plus blank lines                                                                                   | `things`, `blankLines`          |
-| `answers`      | answers to text and number choices                                                                                                        | `choices[]`                     |
-| `helpBox`      | the text `sheet.<id>.text`                                                                                                                | —                               |
-| `notes`        | blank lines                                                                                                                               | `lines`                         |
+| Kind           | Shows                                                                                                                                     | Fields                             |
+| -------------- | ----------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------- |
+| `header`       | character name, `summary.line`, "played by", package name                                                                                 | —                                  |
+| `statBoxes`    | up to 6 large boxes; `number` = computed value, `pencil` = value as a starting number to overwrite, `circles` = that many circles to tick | `boxes[]: { value, style }`        |
+| `scoreColumn`  | stacked boxes: value large, `derived` value small                                                                                         | `scores[]: { value, derived? }`    |
+| `checkList`    | all things selected; marked if the character has them; `note` stat small next to the name                                                 | `things` (like `options`), `note?` |
+| `featureTable` | the selected things the character has: name, `short`, use boxes from the `uses` stat                                                      | `things`, `uses?`                  |
+| `list`         | the selected things the character has, plus blank lines                                                                                   | `things`, `blankLines`             |
+| `answers`      | answers to text and number choices                                                                                                        | `choices[]`                        |
+| `helpBox`      | the text `sheet.<id>.text`                                                                                                                | —                                  |
+| `notes`        | blank lines                                                                                                                               | `lines`                            |
+
+**Use boxes** (`uses`, on `featureTable` sections and on card layouts).
+Names a stat key. The builder knows no stat names, so this field is the
+only way it learns which stat counts the uses. Per thing:
+
+| The thing's stat                  | Printed                        |
+| --------------------------------- | ------------------------------ |
+| whole number n > 0                | n empty boxes to tick (□ □)    |
+| `{ "text": "stat-value.always" }` | the text, for example "always" |
+| 0, or the thing has no such stat  | nothing                        |
+
+Every value of that stat on the selected things must be a whole number
+≥ 0 or a `{text}`; quantities and true/false are errors. At least one
+selected thing must have the stat. The count is fixed per thing for now;
+a count that depends on the level would later become an expression.
+Explain the boxes in the section hint (`sheet.<id>.hint`, for example
+"□ = used once: tick it. Erase after a rest.").
+
+**Note** (`note`, on `checkList` sections). Names a stat key; its value is
+printed small next to each name, formatted like a card field (numbers as
+they are, quantities converted, `{text}` as the text). Typical use: the
+score a skill is rolled with. To show the name of a value, point the text
+at the value's own name, so the word exists only once:
+`"stats": { "score": { "text": "value.might.name" } }`. True/false values
+are errors; at least one selected thing must have the stat; things
+without it show no note.
 
 **Cards.** Every thing with `card: true` gets a card. `cards.<kind>.fields`
 names exactly four stat keys for the 2×2 grid on the card; quantities are
 converted. A card shows `card.<kind>.typeLine`, the name, the four stats,
-`explain.table` ("at the table") and, below it, `rules` if present.
+`explain.table` ("at the table") and, below it, `rules` if present. The
+footer shows the character name and level and, if `cards.<kind>.uses` is
+set, the use boxes as described above.
 
 `sheet.attribution` is printed in the footer of the last page.
 
@@ -699,7 +728,8 @@ well-formed does the second stage check the rules between files:
   consecutive and do not fall; arrays fit the targets;
 - each choice is asked exactly one way; `characterName` is a text choice;
 - sheet sections and card fields refer to existing values, choices and
-  stats; things with `card: true` have a layout;
+  stats; things with `card: true` have a layout; `uses` stats are whole
+  numbers or texts, `note` stats are not true/false;
 - units: every language has defaults; every stated amount can be converted;
 - texts: every required key exists in every language; placeholders and
   glossary links are well-formed and resolve; suggestion keys are lists.
@@ -733,9 +763,10 @@ are removed (saved characters may lose picks). Keys are never renamed.
 
 ### Changelog
 
-| Version | Date       | Change         | Migration |
-| ------- | ---------- | -------------- | --------- |
-| 0.1     | 2026-10-04 | First version. | —         |
+| Version | Date       | Change                                                                                                            | Migration                                                                                                                          |
+| ------- | ---------- | ----------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| 0.1     | 2026-10-04 | First version.                                                                                                    | —                                                                                                                                  |
+| 0.2     | 2026-10-04 | Optional `uses` on `featureTable` sections and card layouts (use boxes), optional `note` on `checkList` sections. | Set `formatVersion` to `"0.2"`. Nothing else changes: both fields are optional, so every valid 0.1 package is a valid 0.2 package. |
 
 ## 16. A minimal package
 
@@ -746,7 +777,7 @@ language. The validator accepts it as is.
 
 ```json
 {
-  "formatVersion": "0.1",
+  "formatVersion": "0.2",
   "id": "tiny",
   "version": "1.0.0",
   "languages": ["en"],
@@ -843,7 +874,7 @@ language. The validator accepts it as is.
 
 ## 17. Reserved for later versions
 
-Not part of 0.1; listed so nobody builds on a different idea:
+Not part of 0.2; listed so nobody builds on a different idea:
 
 - **Packages that extend other packages** (an expansion adding things to a
   base package). Planned: `manifest.dependsOn` and keys of the form

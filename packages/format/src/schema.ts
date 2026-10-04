@@ -300,6 +300,7 @@ export const flowSchema = z.strictObject({
 // --------------------------------------------------------------------- sheet
 
 const sectionBase = { id, span };
+const statKey = z.string().regex(VALUE_ID_PATTERN, "stat keys are camelCase");
 
 export const sectionSchema = z.discriminatedUnion("kind", [
   z.strictObject({ ...sectionBase, kind: z.literal("header") }),
@@ -321,8 +322,20 @@ export const sectionSchema = z.discriminatedUnion("kind", [
     kind: z.literal("scoreColumn"),
     scores: z.array(z.strictObject({ value: valueId, derived: valueId.optional() })).min(1),
   }),
-  z.strictObject({ ...sectionBase, kind: z.literal("checkList"), things: optionSourceSchema }),
-  z.strictObject({ ...sectionBase, kind: z.literal("featureTable"), things: optionSourceSchema }),
+  z.strictObject({
+    ...sectionBase,
+    kind: z.literal("checkList"),
+    things: optionSourceSchema,
+    /** Stat shown small next to each name (for example the score a skill is rolled with). */
+    note: statKey.optional(),
+  }),
+  z.strictObject({
+    ...sectionBase,
+    kind: z.literal("featureTable"),
+    things: optionSourceSchema,
+    /** Stat that gives the use boxes: a whole number n draws n boxes, a {text} stat prints the text. */
+    uses: statKey.optional(),
+  }),
   z.strictObject({
     ...sectionBase,
     kind: z.literal("list"),
@@ -342,6 +355,8 @@ export const sheetSchema = z.strictObject({
     z.strictObject({
       /** Exactly four stat keys for the 2x2 grid on the card. */
       fields: z.tuple([z.string(), z.string(), z.string(), z.string()]),
+      /** Stat that gives the use boxes in the card footer, as in featureTable. */
+      uses: statKey.optional(),
     }),
   ),
 });
