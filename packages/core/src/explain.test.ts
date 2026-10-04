@@ -126,4 +126,57 @@ describe("explainValue", () => {
     });
     expect(ev.steps.find((s) => s.id === "pick-bonus")?.grantedBy).toEqual(["folk.moorfolk"]);
   });
+
+  describe("a guard that is the best of a few ways to wear gear", () => {
+    // Like gear that sets the number outright, or adds to a bonus; a calling adds 1 to any of them.
+    let p: ContentPackage;
+    beforeAll(() => {
+      p = structuredClone(pkg);
+      p.values.find((v) => v.id === "guard")!.formula =
+        "max(6 + graceBonus, if(has('item.travel-cloak'), 9, 0), if(has('item.reed-shield'), 7 + graceBonus, 0))";
+      for (const id of ["item.travel-cloak", "item.reed-shield"])
+        p.things.find((t) => t.id === id)!.grants = [];
+      const calling = p.things.find((t) => t.id === "calling.lantern-bearer")!;
+      calling.grants = [
+        ...(calling.grants ?? []),
+        { value: "guard", add: "if(has('item.travel-cloak') or has('item.reed-shield'), 1, 0)" },
+      ];
+    });
+    const lanternBearer = (gear: string, grace: number): [string, unknown][] => [
+      ...LANTERN_BEARER.slice(0, 3),
+      ["gear", { pick: gear }],
+      ["scores", { method: 0, assign: { might: 6, grace, wit: 7, heart: 8 } }],
+    ];
+
+    it("names the gear whose branch won, not the values the other branches use", () => {
+      const ev = evaluateDraft(p, build(p, 1, lanternBearer("item.travel-cloak", 10)));
+      expect(ev.values["guard"]).toBe(10);
+      expect(explainValue(p, ev, "guard")?.parts).toEqual([
+        { amount: 9, source: { kind: "thing", thing: "item.travel-cloak" } },
+        { amount: 1, source: { kind: "thing", thing: "calling.lantern-bearer" } },
+      ]);
+    });
+
+    it("splits the winning branch into the gear's number and the bonus it adds", () => {
+      const ev = evaluateDraft(p, build(p, 1, lanternBearer("item.reed-shield", 10)));
+      // graceBonus = floor((10 + 1) / 3) - 2 = 1; max(7, 0, 7 + 1) + 1 = 9.
+      expect(ev.values["guard"]).toBe(9);
+      expect(explainValue(p, ev, "guard")?.parts).toEqual([
+        { amount: 7, source: { kind: "thing", thing: "item.reed-shield" } },
+        { amount: 1, source: { kind: "values", values: ["graceBonus"] } },
+        { amount: 1, source: { kind: "thing", thing: "calling.lantern-bearer" } },
+      ]);
+    });
+
+    it("gives no source rather than a wrong one when two branches tie", () => {
+      const q = structuredClone(p);
+      q.values.find((v) => v.id === "guard")!.formula =
+        "max(6 + graceBonus, if(has('item.travel-cloak'), 7, 0))";
+      const ev = evaluateDraft(q, build(q, 1, lanternBearer("item.travel-cloak", 10)));
+      expect(explainValue(q, ev, "guard")?.parts).toEqual([
+        { amount: 7, source: { kind: "unclear" } },
+        { amount: 1, source: { kind: "thing", thing: "calling.lantern-bearer" } },
+      ]);
+    });
+  });
 });

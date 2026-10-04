@@ -1,13 +1,15 @@
 /**
  * Where a number comes from, in parts a player can follow: "15 + 2 = 17",
- * "8 from X + 2 from Y". Only sums are taken apart; any other term of a
- * formula stays one part, named after the values it uses. The result is an
- * explanation, never a second calculation: if the parts do not add up to the
- * value (a minimum or maximum cut it), there is no explanation.
+ * "8 from X + 2 from Y". Sums are taken apart; a `max`, `min` or `if` is
+ * followed into the branch that gave its number, and a branch taken because
+ * of `has('thing')` is that thing's. Any other term stays one part, named
+ * after the values it uses. The result is an explanation, never a second
+ * calculation: if the parts do not add up to the value (a minimum or maximum
+ * cut it), there is no explanation.
  */
 import { collectRefs, parseExpr, type ContentPackage, type Expr } from "@builder/format/pure";
 import { evaluationScope, type Evaluation } from "./evaluate.ts";
-import { evaluateParsed } from "./expr.ts";
+import { evaluateParsed, evaluateParsedCondition } from "./expr.ts";
 
 export type PartSource =
   /** Set by an answer to this choice. */
@@ -17,7 +19,9 @@ export type PartSource =
   /** Worked out from other values (`level` included). */
   | { kind: "values"; values: string[] }
   /** The fixed number a value starts at. */
-  | { kind: "start" };
+  | { kind: "start" }
+  /** Could not be told for sure (two branches of a `max` gave the same number): no source rather than a wrong one. */
+  | { kind: "unclear" };
 
 export interface ValuePart {
   amount: number;
@@ -46,6 +50,8 @@ function sourceKey(s: PartSource): string {
       return `v:${s.values.join(",")}`;
     case "start":
       return "s";
+    case "unclear":
+      return "u";
   }
 }
 
@@ -69,6 +75,26 @@ export function explainValue(
       return [...terms(e.left, owner, seen), ...(e.op === "-" ? negate(right) : right)];
     }
     if (e.type === "num") return [{ amount: e.value, source: owner }];
+    if (e.type === "call" && e.fn === "if" && e.args.length === 3) {
+      const cond = e.args[0]!;
+      const yes = evaluateParsedCondition(cond, scope);
+      // "if(has('x'), 16, 0)": the 16 is x's, unless a thing already gives it.
+      const by = yes && owner.kind !== "thing" ? hasThing(cond) : undefined;
+      return terms(yes ? e.args[1]! : e.args[2]!, by ? { kind: "thing", thing: by } : owner, seen);
+    }
+    if (e.type === "call" && (e.fn === "max" || e.fn === "min") && e.args.length > 0) {
+      const amounts = e.args.map((a) => evaluateParsed(a, scope));
+      const amount = e.fn === "max" ? Math.max(...amounts) : Math.min(...amounts);
+      const winners = e.args.filter((_, i) => Math.abs(amounts[i]! - amount) < EPSILON);
+      if (winners.length === 1) return terms(winners[0]!, owner, seen);
+      // A tie. Values that all gave the number can be named together; a
+      // branch that hangs on a thing cannot be told apart from the others.
+      const refs = collectRefs({ type: "call", fn: e.fn, args: winners });
+      if (owner.kind === "thing") return [{ amount, source: owner }];
+      if (refs.things.size > 0) return [{ amount, source: { kind: "unclear" } }];
+      if (refs.values.size === 0) return [{ amount, source: owner }];
+      return [{ amount, source: { kind: "values", values: [...refs.values] } }];
+    }
     if (e.type === "ref" && e.name !== "level") {
       // A value without a formula is made of what set it and what was given:
       // show those parts instead of the value's own name.
@@ -115,6 +141,12 @@ export function explainValue(
     else merged.set(key, { ...p });
   }
   return { total, parts: [...merged.values()].filter((p) => Math.abs(p.amount) >= EPSILON) };
+}
+
+/** The thing a condition is `has('thing')`, if it is just that. */
+function hasThing(e: Expr): string | undefined {
+  const first = e.type === "call" && e.fn === "has" ? e.args[0] : undefined;
+  return first?.type === "str" ? first.value : undefined;
 }
 
 /**
