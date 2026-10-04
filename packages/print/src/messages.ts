@@ -54,7 +54,7 @@ export const MESSAGES: Readonly<Record<string, Messages>> = {
     unitsUsed: (u) => `Units: ${u.join(", ")}`,
     createdOn: (d) => `Made on ${d}`,
     cards: "Cards",
-    printHint: "Print at actual size (100 %). Cut along the lines.",
+    printHint: "Print at actual size (100%). Cut along the lines.",
     atTheTable: "At the table",
     rulesText: "Rules text",
     continued: "Continued",
