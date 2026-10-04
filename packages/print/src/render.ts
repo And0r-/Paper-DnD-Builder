@@ -39,14 +39,13 @@ const CARDS_PER_PAGE = 9;
 const CROP_GAP = 1.5;
 const CROP_LEN = 4;
 
-const FONT_FILES = {
-  regular: "AtkinsonHyperlegibleNext-Regular.ttf",
-  semibold: "AtkinsonHyperlegibleNext-SemiBold.ttf",
-  bold: "AtkinsonHyperlegibleNext-Bold.ttf",
-} as const;
-type FontName = keyof typeof FONT_FILES;
-
-const fontPath = (file: string) => fileURLToPath(new URL(`../fonts/${file}`, import.meta.url));
+// Written out one by one: bundlers can only ship files they see as literal URLs.
+const FONTS = {
+  regular: new URL("../fonts/AtkinsonHyperlegibleNext-Regular.ttf", import.meta.url),
+  semibold: new URL("../fonts/AtkinsonHyperlegibleNext-SemiBold.ttf", import.meta.url),
+  bold: new URL("../fonts/AtkinsonHyperlegibleNext-Bold.ttf", import.meta.url),
+};
+type FontName = keyof typeof FONTS;
 
 interface TextStyle {
   font?: FontName;
@@ -625,7 +624,7 @@ function cropMarks(pen: Pen, count: number): void {
 // ------------------------------------------------------------------ document
 
 export interface RenderedPdf {
-  bytes: Uint8Array;
+  bytes: Uint8Array<ArrayBuffer>;
   pages: number;
   sheetPages: number;
   cardPages: number;
@@ -642,7 +641,7 @@ export async function renderPdf(model: PrintModel): Promise<RenderedPdf> {
     subset: "PDF/A-2b",
     lang: model.language,
     displayTitle: true,
-    font: fontPath(FONT_FILES.regular),
+    font: fileURLToPath(FONTS.regular),
     info: {
       Title: model.name,
       Creator: "Character Builder",
@@ -651,7 +650,7 @@ export async function renderPdf(model: PrintModel): Promise<RenderedPdf> {
       ModDate: model.createdAt,
     },
   });
-  for (const [name, file] of Object.entries(FONT_FILES)) doc.registerFont(name, fontPath(file));
+  for (const [name, url] of Object.entries(FONTS)) doc.registerFont(name, fileURLToPath(url));
   const chunks: Buffer[] = [];
   doc.on("data", (c: Buffer) => chunks.push(c));
   const done = new Promise<void>((resolve, reject) => {
