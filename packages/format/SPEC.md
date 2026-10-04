@@ -348,12 +348,56 @@ small related choices on one screen (then it needs its own texts
 `step.<id>.title`, `.question`, `.intro`). `when` hides the step while the
 expression is false.
 
+A **gather step** has no `choices`. It is the place where granted choices
+of one gather group are asked (see `gather` in [9.3](#93-choices) and
+[9.4](#94-building-the-list-of-steps)):
+
+```json
+{ "id": "talents", "gather": "talents", "together": "list" }
+```
+
+- `gather`: the group. Each group has at most one gather step.
+- `together` (optional): how the gathered choices are shown. Missing: each
+  one is its own step here, as if it had been granted right here.
+  `"sections"`: one step with all of them, like a step with several
+  choices. `"list"`: one step with one shared list of options for all of
+  them (pick choices only, see below).
+- `when` (optional): as on other steps. A hidden gather step still asks
+  its gathered choices, each as its own step at its place.
+- With `together`, the step needs its own texts `step.<id>.title`,
+  `.question`, `.intro`.
+
+**One shared list** (`"together": "list"`). The player sees one list and
+picks from it; each pick counts for exactly one of the gathered choices.
+Every choice's options are worked out as before the step, so each choice
+offers its full list; the list is all of them together, without things
+the character already has. A thing picked for one choice cannot also count
+for another. The builder assigns picks to choices: a pick goes to a choice
+that offers it, no choice gets more than its `count`, and earlier picks
+stay where they are unless a new pick needs their place. Answers are still
+stored one per choice. The recommendation is the choices' recommendations
+together, each thing once, filled up from the list until every place is
+taken, so "choose for me" always finishes the step. The optional text
+`choice.<id>.from` names where a choice's places come from ("from your
+calling") for the counter "2 from your calling, 1 from your folk"; without
+it the builder names the thing that granted the choice.
+
 ### 9.3 Choices
 
 Every choice has `id`, `kind`, `source` (and optional `license`) and
 `optional: true` if the character can be finished without an answer. Texts:
 `choice.<id>.title` (short step name), `.question`, `.intro`, and optional
 `.missing` (what is still missing; see [10.4](#104-placeholders)).
+
+**Gather group.** `gather` (optional) names a group for a granted choice.
+Instead of right after the step that grants it, the choice is asked at the
+gather step of that group, if that step comes later ([9.4](#94-building-the-list-of-steps)).
+This keeps the basic steps together and asks details once everything that
+gives things for free is known:
+
+```json
+{ "id": "talents-lantern-bearer", "kind": "pickMany", "gather": "talents", ... }
+```
 
 **Text variants.** A choice may say something different to some
 characters, for example name a language they already know. `textVariants`
@@ -503,9 +547,16 @@ the character's name.
    choice becomes a step whose id is the choice id. Apply this again to the
    inserted steps.
 3. A choice granted by several things appears once, at its first position.
-4. A choice is either listed in `steps` or granted by things, never both.
+4. Exception: a granted choice with `gather` whose gather step comes later
+   is not inserted after the step; it waits at the gather step, in grant
+   order. If the gather step was already passed, or there is none, rule 2
+   applies. At the gather step the waiting choices become one step each
+   (no `together`; rule 2 applies to them) or one step with all of them
+   (`together`, step id = gather step id). A gather step with no waiting
+   choice is not shown.
+5. A choice is either listed in `steps` or granted by things, never both.
    A choice that is neither is never asked (a warning).
-5. The builder adds its own overview step at the end.
+6. The builder adds its own overview step at the end.
 
 Dependencies follow from the same data: a step depends on the steps whose
 answers gave the things that grant its choice, and on every thing named in
@@ -550,37 +601,38 @@ A key may be defined in only one file per language.
 
 Text keys follow from the keys of the things they belong to.
 
-| Key                                                                      | Required                         | For                                                     |
-| ------------------------------------------------------------------------ | -------------------------------- | ------------------------------------------------------- |
-| `package.name`, `package.short`                                          | yes                              | name and description of the package                     |
-| `level.name`, `level.intro`, `level.hint`                                | yes                              | the level screen (the word for "level" is package text) |
-| `kind.<kind>.name`                                                       | yes                              | name of a kind (card type line, headings)               |
-| `<thing>.name`                                                           | yes                              | name, at most 30 characters                             |
-| `<thing>.short`                                                          | yes                              | one sentence, at most 120 characters                    |
-| `<thing>.explain.what`                                                   | yes                              | plain language: what it is                              |
-| `<thing>.explain.table`                                                  | yes                              | plain language: what you do with it at the table        |
-| `<thing>.explain.example`                                                | no                               | a small scene                                           |
-| `<thing>.goodIf`                                                         | no                               | who it suits, at most 80 characters                     |
-| `<thing>.rules`                                                          | no                               | the official rules text, verbatim                       |
-| `choice.<id>.title`, `.question`, `.intro`                               | yes                              | a choice's step                                         |
-| `choice.<id>.missing`                                                    | no                               | what is still missing                                   |
-| `choice.<id>.variant.<variant>.title`, `.question`, `.intro`, `.missing` | no; once in one language, in all | a text variant (9.3)                                    |
-| `step.<id>.title`, `.question`, `.intro`                                 | if the step has several choices  | a combined step                                         |
-| `group.<group>.name`                                                     | yes, per group used              | heading in option lists                                 |
-| `value.<id>.name`                                                        | yes                              | name of a value                                         |
-| `value.<id>.explain`                                                     | no                               | one-line explanation                                    |
-| `stat.<key>.name`                                                        | yes, per stat used               | label of a stat                                         |
-| any key used in `{ "text": ... }` stats or `suggestions`                 | yes                              | stat words, suggestion lists                            |
-| `unit.<unit>.short`, `unit.<unit>.long`                                  | yes                              | unit forms ("m", "meters")                              |
-| `unit.<unit>.longOne`                                                    | no                               | singular long form for the amount 1 ("foot")            |
-| `glossary.<id>.name`, `.short`, `.explain.what`, `.explain.table`        | yes                              | a glossary entry                                        |
-| `glossary.<id>.explain.example`                                          | no                               | example for a glossary entry                            |
-| `summary.line`                                                           | yes                              | one-line summary in the character list                  |
-| `sheet.attribution`                                                      | yes                              | source and license line on the printed sheet            |
-| `sheet.<section>.title`                                                  | yes, except header               | sheet section title                                     |
-| `sheet.<section>.text`                                                   | for `helpBox`                    | help box content                                        |
-| `sheet.<section>.hint`                                                   | no                               | one-line hint under a section                           |
-| `card.<kind>.typeLine`                                                   | yes, per card layout             | first line of a card                                    |
+| Key                                                                      | Required                                                            | For                                                     |
+| ------------------------------------------------------------------------ | ------------------------------------------------------------------- | ------------------------------------------------------- |
+| `package.name`, `package.short`                                          | yes                                                                 | name and description of the package                     |
+| `level.name`, `level.intro`, `level.hint`                                | yes                                                                 | the level screen (the word for "level" is package text) |
+| `kind.<kind>.name`                                                       | yes                                                                 | name of a kind (card type line, headings)               |
+| `<thing>.name`                                                           | yes                                                                 | name, at most 30 characters                             |
+| `<thing>.short`                                                          | yes                                                                 | one sentence, at most 120 characters                    |
+| `<thing>.explain.what`                                                   | yes                                                                 | plain language: what it is                              |
+| `<thing>.explain.table`                                                  | yes                                                                 | plain language: what you do with it at the table        |
+| `<thing>.explain.example`                                                | no                                                                  | a small scene                                           |
+| `<thing>.goodIf`                                                         | no                                                                  | who it suits, at most 80 characters                     |
+| `<thing>.rules`                                                          | no                                                                  | the official rules text, verbatim                       |
+| `choice.<id>.title`, `.question`, `.intro`                               | yes                                                                 | a choice's step                                         |
+| `choice.<id>.missing`                                                    | no                                                                  | what is still missing                                   |
+| `choice.<id>.variant.<variant>.title`, `.question`, `.intro`, `.missing` | no; once in one language, in all                                    | a text variant (9.3)                                    |
+| `step.<id>.title`, `.question`, `.intro`                                 | if the step has several choices or is a gather step with `together` | a combined step                                         |
+| `choice.<id>.from`                                                       | no                                                                  | where a gathered choice's places come from (9.2)        |
+| `group.<group>.name`                                                     | yes, per group used                                                 | heading in option lists                                 |
+| `value.<id>.name`                                                        | yes                                                                 | name of a value                                         |
+| `value.<id>.explain`                                                     | no                                                                  | one-line explanation                                    |
+| `stat.<key>.name`                                                        | yes, per stat used                                                  | label of a stat                                         |
+| any key used in `{ "text": ... }` stats or `suggestions`                 | yes                                                                 | stat words, suggestion lists                            |
+| `unit.<unit>.short`, `unit.<unit>.long`                                  | yes                                                                 | unit forms ("m", "meters")                              |
+| `unit.<unit>.longOne`                                                    | no                                                                  | singular long form for the amount 1 ("foot")            |
+| `glossary.<id>.name`, `.short`, `.explain.what`, `.explain.table`        | yes                                                                 | a glossary entry                                        |
+| `glossary.<id>.explain.example`                                          | no                                                                  | example for a glossary entry                            |
+| `summary.line`                                                           | yes                                                                 | one-line summary in the character list                  |
+| `sheet.attribution`                                                      | yes                                                                 | source and license line on the printed sheet            |
+| `sheet.<section>.title`                                                  | yes, except header                                                  | sheet section title                                     |
+| `sheet.<section>.text`                                                   | for `helpBox`                                                       | help box content                                        |
+| `sheet.<section>.hint`                                                   | no                                                                  | one-line hint under a section                           |
+| `card.<kind>.typeLine`                                                   | yes, per card layout                                                | first line of a card                                    |
 
 The validator reports every required key missing in a language, and warns
 about keys nothing uses (often typos). Length limits come from the style
@@ -821,6 +873,8 @@ well-formed does the second stage check the rules between files:
   needs options with `about`, and its text exists in every language; distribute and number targets take input; point-buy costs are
   consecutive and do not fall; arrays fit the targets;
 - each choice is asked exactly one way; `characterName` is a text choice;
+  each gather group has at most one gather step; a `list` gather step
+  gathers only `pickOne` and `pickMany` choices;
 - sheet sections and card fields refer to existing values, choices and
   stats; section and box conditions (`when`) parse and refer to existing
   values and things; box labels (`label`) exist in every language; things with `card: true` have a layout; `uses` stats are whole
@@ -834,7 +888,9 @@ well-formed does the second stage check the rules between files:
 Warnings: texts marked `null`; unused texts; style length limits; units
 written as plain text; quantities that differ between languages; choices
 never asked; computed quantities without a conversion fallback; text
-variants without any text.
+variants without any text; a gather group without a gather step; a choice
+with `gather` that is listed in a fixed step; a gather step that no choice
+is gathered in.
 
 In code: `validatePackageDir(dir)` returns `{ ok, errors, warnings,
 package }`; `package` is the typed, loaded content including the origin of
@@ -861,15 +917,16 @@ are removed (saved characters may lose picks). Keys are never renamed.
 
 ### Changelog
 
-| Version | Date       | Change                                                                                                                                                  | Migration                                                                                                                                               |
-| ------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 0.1     | 2026-10-04 | First version.                                                                                                                                          | —                                                                                                                                                       |
-| 0.2     | 2026-10-04 | Optional `uses` on `featureTable` sections and card layouts (use boxes), optional `note` on `checkList` sections.                                       | Set `formatVersion` to `"0.2"`. Nothing else changes: both fields are optional, so every valid 0.1 package is a valid 0.2 package.                      |
-| 0.3     | 2026-10-04 | Optional `when` (condition) on every sheet section and on each box of a `statBoxes` section: false means not printed.                                   | Set `formatVersion` to `"0.3"`. Nothing else changes: the field is optional, so every valid 0.2 package is a valid 0.3 package.                         |
-| 0.4     | 2026-10-04 | Optional `label` (text key) on each box of a `statBoxes` section, printed instead of the value name.                                                    | Set `formatVersion` to `"0.4"`. Nothing else changes: the field is optional, so every valid 0.3 package is a valid 0.4 package.                         |
-| 0.5     | 2026-10-04 | Optional `badges` on `pickOne` and `pickMany` choices: a package text shown on options instead of "recommended".                                        | Set `formatVersion` to `"0.5"`. Nothing else changes: the field is optional, so every valid 0.4 package is a valid 0.5 package.                         |
-| 0.6     | 2026-10-04 | Optional `textVariants` on every choice (other texts while a condition holds); `{{var:count}}` in the title, question and intro of a `pickMany` choice. | Set `formatVersion` to `"0.6"`. Nothing else changes: the field is optional and the variable is new, so every valid 0.5 package is a valid 0.6 package. |
-| 0.7     | 2026-10-04 | Optional `about` on things and `held` on `pickOne` and `pickMany` choices: recommend and name what the character has.                                   | Set `formatVersion` to `"0.7"`. Nothing else changes: both fields are optional, so every valid 0.6 package is a valid 0.7 package.                      |
+| Version | Date       | Change                                                                                                                                                         | Migration                                                                                                                                                                |
+| ------- | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 0.1     | 2026-10-04 | First version.                                                                                                                                                 | —                                                                                                                                                                        |
+| 0.2     | 2026-10-04 | Optional `uses` on `featureTable` sections and card layouts (use boxes), optional `note` on `checkList` sections.                                              | Set `formatVersion` to `"0.2"`. Nothing else changes: both fields are optional, so every valid 0.1 package is a valid 0.2 package.                                       |
+| 0.3     | 2026-10-04 | Optional `when` (condition) on every sheet section and on each box of a `statBoxes` section: false means not printed.                                          | Set `formatVersion` to `"0.3"`. Nothing else changes: the field is optional, so every valid 0.2 package is a valid 0.3 package.                                          |
+| 0.4     | 2026-10-04 | Optional `label` (text key) on each box of a `statBoxes` section, printed instead of the value name.                                                           | Set `formatVersion` to `"0.4"`. Nothing else changes: the field is optional, so every valid 0.3 package is a valid 0.4 package.                                          |
+| 0.5     | 2026-10-04 | Optional `badges` on `pickOne` and `pickMany` choices: a package text shown on options instead of "recommended".                                               | Set `formatVersion` to `"0.5"`. Nothing else changes: the field is optional, so every valid 0.4 package is a valid 0.5 package.                                          |
+| 0.6     | 2026-10-04 | Optional `textVariants` on every choice (other texts while a condition holds); `{{var:count}}` in the title, question and intro of a `pickMany` choice.        | Set `formatVersion` to `"0.6"`. Nothing else changes: the field is optional and the variable is new, so every valid 0.5 package is a valid 0.6 package.                  |
+| 0.7     | 2026-10-04 | Optional `about` on things and `held` on `pickOne` and `pickMany` choices: recommend and name what the character has.                                          | Set `formatVersion` to `"0.7"`. Nothing else changes: both fields are optional, so every valid 0.6 package is a valid 0.7 package.                                       |
+| 0.8     | 2026-10-04 | Gather steps (`gather`, optional `together`: `sections` or one shared `list`) in `flow.steps`, optional `gather` on choices, optional text `choice.<id>.from`. | Set `formatVersion` to `"0.8"`. Nothing else changes: a package without gather steps builds the same steps as before, so every valid 0.7 package is a valid 0.8 package. |
 
 ## 16. A minimal package
 
