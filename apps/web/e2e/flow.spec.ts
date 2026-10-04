@@ -116,6 +116,9 @@ test("a newcomer builds a level-3 character from login to finished", async ({ pa
 
   // Info step: nothing to choose, only what you get.
   await question(page, "Das bekommst du durch deinen Beruf");
+  // Granted choices came right after the calling: they read as done, not as "next".
+  await expect(page.getByText(m["info.chosen"]!)).toBeVisible();
+  await expect(page.getByText(m["info.choices"]!)).toHaveCount(0);
   await shot(page, "09-geschenke");
   await page.getByRole("button", { name: m["info.continue"] }).click();
 

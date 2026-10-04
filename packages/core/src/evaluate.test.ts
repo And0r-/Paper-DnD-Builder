@@ -216,6 +216,17 @@ describe("a complete level 3 character", () => {
     });
   });
 
+  it("asks the choices an info step lists before the info step itself", () => {
+    // The flow words them as already chosen, never as coming next.
+    const ev = evaluateDraft(pkg, build(3, LANTERN_BEARER_L3));
+    const order = ev.steps.map((s) => s.id);
+    const infoAt = order.indexOf(ev.choices["calling-gifts"]!.step);
+    for (const c of ev.choices["calling-gifts"]!.info!.choices) {
+      expect(order.indexOf(ev.choices[c]!.step)).toBeLessThan(infoAt);
+      expect(ev.choices[c]!.status).toBe("answered");
+    }
+  });
+
   it("works out an info step's value changes with the values of later steps", () => {
     // The calling's grant uses heart, which is only set on the later scores step.
     const withFormula: ContentPackage = {
