@@ -28,6 +28,8 @@ const nextConfig: NextConfig = {
   outputFileTracingRoot: fileURLToPath(new URL("../../", import.meta.url)),
   // Workspace packages ship TypeScript sources.
   transpilePackages: ["@builder/core", "@builder/format", "@builder/db"],
+  // In-process database for local trials and browser tests (see src/server/local-backends.ts).
+  serverExternalPackages: ["@electric-sql/pglite"],
   poweredByHeader: false,
   async headers() {
     return [

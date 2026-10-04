@@ -6,6 +6,7 @@
 import { createSql, sqlExecutor, type SqlExecutor } from "@builder/db";
 import { RateLimiter } from "./auth/rate-limit.ts";
 import { readConfig, type Config } from "./config.ts";
+import { memoryDatabase, outboxMailer, PGLITE_MEMORY_URL } from "./local-backends.ts";
 import { createSmtpMailer, type Mailer } from "./mail.ts";
 import { loadPackages, type PackageRegistry } from "./packages/loader.ts";
 import { Store } from "./store.ts";
@@ -79,14 +80,19 @@ export function getApp(): Promise<App> {
     const config = readConfig();
     if (!config.databaseUrl) throw new Error("DATABASE_URL is not set. See .env.example.");
     const packages = await loadPackages(config.packagesDir);
-    if (!config.smtp || !config.mailFrom) {
+    const outbox = process.env["MAIL_OUTBOX_DIR"]?.trim();
+    if (!outbox && (!config.smtp || !config.mailFrom)) {
       console.error("Mail: SMTP_HOST or MAIL_FROM is not set; nobody can receive a password.");
     }
     return createApp({
       config,
-      db: sqlExecutor(createSql(config.databaseUrl)),
+      // Local trials and browser tests only; see local-backends.ts.
+      db:
+        config.databaseUrl === PGLITE_MEMORY_URL
+          ? await memoryDatabase()
+          : sqlExecutor(createSql(config.databaseUrl)),
       packages,
-      mailer: createSmtpMailer(config.smtp, config.mailFrom),
+      mailer: outbox ? outboxMailer(outbox) : createSmtpMailer(config.smtp, config.mailFrom),
     });
   })();
   return holder.__builderApp;
