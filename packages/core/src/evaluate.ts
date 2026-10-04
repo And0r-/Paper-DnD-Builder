@@ -94,6 +94,8 @@ export interface Evaluation {
   /** Everything the character has, in the order it was gained. */
   things: HeldThing[];
   values: Record<string, number>;
+  /** Values set directly by an answer (distribute, number), with the choice that set them. */
+  inputs: Record<string, { amount: number; choice: string }>;
   /** Choices that still need an answer (missing, incomplete or invalid, not optional). */
   open: string[];
   complete: boolean;
@@ -127,6 +129,8 @@ class Character {
   readonly held = new Map<string, HeldThing>();
   /** Base values set by answers (distribute, number). */
   readonly inputs = new Map<string, number>();
+  /** The choice that set each input. */
+  readonly inputChoices = new Map<string, string>();
   private memo = new Map<string, number>();
   private computing = new Set<string>();
 
@@ -155,8 +159,11 @@ class Character {
     }
   }
 
-  setInputs(inputs: Record<string, number>): void {
-    for (const [k, v] of Object.entries(inputs)) this.inputs.set(k, v);
+  setInputs(inputs: Record<string, number>, choice: string): void {
+    for (const [k, v] of Object.entries(inputs)) {
+      this.inputs.set(k, v);
+      this.inputChoices.set(k, choice);
+    }
     this.memo.clear();
   }
 
@@ -341,6 +348,9 @@ export function evaluateDraft(pkg: ContentPackage, doc: DraftDocument): Evaluati
     choices,
     things: [...character.held.values()],
     values: character.allValues(),
+    inputs: Object.fromEntries(
+      [...character.inputs].map(([k, amount]) => [k, { amount, choice: character.inputChoices.get(k)! }]),
+    ),
     open,
     complete: open.length === 0,
     inactiveAnswers: Object.keys(doc.answers).filter((k) => !(k in choices)),
@@ -435,7 +445,7 @@ function evaluateChoice(
   else if (j.status !== "incomplete") delete state.remaining;
   // Picks that fit count even if others in the same answer do not; inputs only from a fitting answer.
   for (const id of j.counted ?? []) character.give(id, { pickedIn: choice.id }, stepId, granted);
-  if (j.status !== "invalid" && j.inputs) character.setInputs(j.inputs);
+  if (j.status !== "invalid" && j.inputs) character.setInputs(j.inputs, choice.id);
   return state;
 }
 
