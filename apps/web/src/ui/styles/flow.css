@@ -182,6 +182,32 @@
   min-height: var(--target-min);
 }
 
+/* "Choose for me" and "Decide later" right under the intro: always in the
+   same place while the step is open, before Next is ever pressed. */
+.shortcuts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  column-gap: var(--space-5);
+  row-gap: var(--space-2);
+}
+
+.shortcuts__choose {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: var(--space-3);
+  row-gap: var(--space-2);
+}
+
+.shortcuts__hint {
+  max-width: 34ch;
+  font-size: var(--text-sm);
+  line-height: var(--text-sm-lh);
+  color: var(--color-ink-muted);
+}
+
 .subquestion {
   display: flex;
   flex-direction: column;

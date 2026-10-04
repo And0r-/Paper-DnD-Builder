@@ -98,6 +98,8 @@
   "flow.overview": "Überblick",
   "flow.later": "Später entscheiden",
   "flow.chooseForMe": "Für mich wählen",
+  "flow.chooseForMeHint": "Nimmt einen guten Vorschlag. Du kannst ihn danach ändern.",
+  "flow.choseForMe": "Erledigt. Du siehst die Wahl unten und kannst sie ändern.",
   "flow.backToOverview": "Zurück zum Überblick",
   "flow.missingGeneric": "Triff hier noch eine Wahl.",
   "flow.needsAttention": "Das passt nicht mehr, weil du vorher etwas geändert hast. Wähle bitte neu.",
