@@ -446,6 +446,15 @@ export function validatePackageFiles(files: PackageFiles): ValidationResult {
               err(F, `${p}.recommend[${j}].pick[${k}]`, `${lit(id)} is not one of this choice's options`);
           });
         });
+        const badged = new Set<string>();
+        c.badges?.forEach((b, j) => {
+          b.things.forEach((id, k) => {
+            const bp = `${p}.badges[${j}].things[${k}]`;
+            if (!optionIds.has(id)) err(F, bp, `${lit(id)} is not one of this choice's options`);
+            else if (badged.has(id)) err(F, bp, `${lit(id)} already has a badge in this choice`);
+            badged.add(id);
+          });
+        });
         break;
       }
       case "distribute": {
@@ -670,6 +679,8 @@ export function validatePackageFiles(files: PackageFiles): ValidationResult {
     need(`choice.${c.id}.question`, `question of choice ${lit(c.id)}`);
     need(`choice.${c.id}.intro`, `introduction of choice ${lit(c.id)}`);
     optional.add(`choice.${c.id}.missing`);
+    if (c.kind === "pickOne" || c.kind === "pickMany")
+      for (const b of c.badges ?? []) need(b.text, `badge of choice ${lit(c.id)}`);
   }
   // A variant replaces any of the four texts; which ones it replaces is up to the package.
   const variantTexts = flow.choices.flatMap((c) =>

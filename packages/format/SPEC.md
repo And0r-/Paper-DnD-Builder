@@ -420,6 +420,22 @@ character does not already have from somewhere else.
 no `when`) is the recommendation. It drives the "recommended" badge and
 the "choose for me" button. A `pickOne` recommends exactly one thing.
 
+`badges` (optional, `pickOne` and `pickMany`) puts a short label of the
+package's own on some options, for example how easy they are to play.
+Each entry lists `things` (options of this choice) and a `text` key (any
+key, for example `choice.<id>.badge.<name>`) that must exist in every
+language. A thing has at most one badge per choice. The builder shows the
+badge where it would show "recommended", and instead of it: an option
+with a badge never shows "recommended", but "choose for me" still picks
+the recommendation. Use badges when "recommended" on one option would push
+every player to the same pick.
+
+```json
+"badges": [
+  { "things": ["calling.lantern-bearer"], "text": "choice.calling.badge.gentle" }
+]
+```
+
 **`distribute`** — spread points or fixed numbers over values.
 
 ```json
@@ -781,7 +797,8 @@ well-formed does the second stage check the rules between files:
 - every expression parses and refers to existing values and things;
   formulas are not circular;
 - option sources select at least one thing; recommendations are among the
-  options; distribute and number targets take input; point-buy costs are
+  options; badges name options, at most one per thing, and their texts
+  exist in every language; distribute and number targets take input; point-buy costs are
   consecutive and do not fall; arrays fit the targets;
 - each choice is asked exactly one way; `characterName` is a text choice;
 - sheet sections and card fields refer to existing values, choices and
@@ -830,6 +847,7 @@ are removed (saved characters may lose picks). Keys are never renamed.
 | 0.2     | 2026-10-04 | Optional `uses` on `featureTable` sections and card layouts (use boxes), optional `note` on `checkList` sections.                                       | Set `formatVersion` to `"0.2"`. Nothing else changes: both fields are optional, so every valid 0.1 package is a valid 0.2 package.                      |
 | 0.3     | 2026-10-04 | Optional `when` (condition) on every sheet section and on each box of a `statBoxes` section: false means not printed.                                   | Set `formatVersion` to `"0.3"`. Nothing else changes: the field is optional, so every valid 0.2 package is a valid 0.3 package.                         |
 | 0.4     | 2026-10-04 | Optional `label` (text key) on each box of a `statBoxes` section, printed instead of the value name.                                                    | Set `formatVersion` to `"0.4"`. Nothing else changes: the field is optional, so every valid 0.3 package is a valid 0.4 package.                         |
+| 0.5     | 2026-10-04 | Optional `badges` on `pickOne` and `pickMany` choices: a package text shown on options instead of "recommended".                                        | Set `formatVersion` to `"0.5"`. Nothing else changes: the field is optional, so every valid 0.4 package is a valid 0.5 package.                         |
 | 0.6     | 2026-10-04 | Optional `textVariants` on every choice (other texts while a condition holds); `{{var:count}}` in the title, question and intro of a `pickMany` choice. | Set `formatVersion` to `"0.6"`. Nothing else changes: the field is optional and the variable is new, so every valid 0.5 package is a valid 0.6 package. |
 
 ## 16. A minimal package

@@ -48,6 +48,8 @@ export interface ChoiceState {
   max?: number;
   /** Recommended picks (pick choices) or assignment (distribute). */
   recommended?: string[] | { method: number; assign: Record<string, number> };
+  /** Badge text key by offered option (pick choices); shown instead of "recommended". */
+  badges?: Record<string, string>;
   /** For `info` choices: what the thing picked in choice `of` gives at this level. */
   info?: InfoContent;
   /** Active text variant: its texts `choice.<id>.variant.<textVariant>.*` replace the base texts. */
@@ -396,6 +398,10 @@ function evaluateChoice(
       }
       const rec = choice.recommend?.find((r) => r.when === undefined || evaluateCondition(r.when, scope));
       if (rec) state.recommended = rec.pick.filter((p) => options.includes(p));
+      const badges: Record<string, string> = {};
+      for (const b of choice.badges ?? [])
+        for (const t of b.things) if (options.includes(t)) badges[t] ??= b.text;
+      if (Object.keys(badges).length > 0) state.badges = badges;
       break;
     }
     case "distribute": {

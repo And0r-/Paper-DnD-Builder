@@ -212,6 +212,9 @@ const choiceBase = {
 
 const pickRecommendation = z.strictObject({ when: expr.optional(), pick: z.array(id).min(1) });
 
+/** A short label (text key) shown on the listed options, e.g. how hard they are to play. */
+const badge = z.strictObject({ things: z.array(id).min(1), text: textKey });
+
 export const pointBuySchema = z.strictObject({
   method: z.literal("pointBuy"),
   budget: z.number().int().positive(),
@@ -231,6 +234,8 @@ export const choiceSchema = z.discriminatedUnion("kind", [
     kind: z.literal("pickOne"),
     options: optionSourceSchema,
     recommend: z.array(pickRecommendation).optional(),
+    /** Shown on an option instead of the "recommended" badge. At most one per thing. */
+    badges: z.array(badge).optional(),
   }),
   z.strictObject({
     ...choiceBase,
@@ -241,6 +246,7 @@ export const choiceSchema = z.discriminatedUnion("kind", [
     /** If true, up to `count`; otherwise exactly `count`. */
     upTo: z.boolean().optional(),
     recommend: z.array(pickRecommendation).optional(),
+    badges: z.array(badge).optional(),
   }),
   z.strictObject({
     ...choiceBase,
