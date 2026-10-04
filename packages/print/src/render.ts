@@ -64,6 +64,30 @@ interface TextStyle {
 const SHAPES = /([●○□■→])/u;
 
 /**
+ * Characters the font has no glyph for, mapped to one it has. Package texts
+ * come from typeset sources and carry non-breaking hyphens, soft hyphens and
+ * thin spaces; printed as is, they would show as empty boxes.
+ */
+const STAND_INS: Readonly<Record<string, string>> = {
+  "\u2010": "-",
+  "\u2011": "-",
+  "\u2012": "-",
+  "\u00AD": "",
+  "\u200B": "",
+  "\u2060": "",
+  "\uFEFF": "",
+  "\u202F": "\u00A0",
+  "\u2007": "\u00A0",
+  "\u200A": " ",
+  "\u2032": "'",
+  "\u2033": '"',
+};
+const MISSING_GLYPHS = new RegExp(`[${Object.keys(STAND_INS).join("")}]`, "gu");
+
+/** Spaces a line may break at: any white space but the non-breaking ones. */
+const BREAKS = /[^\S\u00A0\u202F\u2007]+/u;
+
+/**
  * Drawing in millimetres. With `dry` set, nothing is drawn and only sizes
  * are measured: every section is laid out twice, once to find its height
  * and once to draw it, by the same code.
@@ -87,7 +111,8 @@ class Pen {
   }
 
   private shown(text: string, s: TextStyle): string {
-    return s.caps ? text.toLocaleUpperCase(this.language) : text;
+    const printable = text.replace(MISSING_GLYPHS, (c) => STAND_INS[c] ?? "");
+    return s.caps ? printable.toLocaleUpperCase(this.language) : printable;
   }
 
   private shapeWidth(s: TextStyle): number {
@@ -107,12 +132,16 @@ class Pen {
     return w;
   }
 
-  /** Breaks text into lines no wider than `width`. Words longer than a line are split. */
+  /**
+   * Breaks text into lines no wider than `width`. A word longer than a line
+   * is split after a hyphen or slash if it has one, else between letters
+   * with a hyphen added.
+   */
   wrap(text: string, s: TextStyle, width: number): string[] {
     const lines: string[] = [];
     for (const paragraph of text.split("\n")) {
       let line = "";
-      for (const word of paragraph.split(/\s+/u).filter((w) => w !== "")) {
+      for (const word of paragraph.split(BREAKS).filter((w) => w !== "")) {
         const candidate = line === "" ? word : `${line} ${word}`;
         if (this.width(candidate, s) <= width) {
           line = candidate;
@@ -121,15 +150,43 @@ class Pen {
         if (line !== "") lines.push(line);
         line = word;
         while (this.width(line, s) > width && line.length > 1) {
-          let cut = line.length - 1;
-          while (cut > 1 && this.width(line.slice(0, cut), s) > width) cut--;
-          lines.push(line.slice(0, cut));
-          line = line.slice(cut);
+          const { at, mark } = this.cut(line, s, width);
+          lines.push(line.slice(0, at) + mark);
+          line = line.slice(at);
         }
       }
       lines.push(line);
     }
     return lines;
+  }
+
+  /** Where to split a word that is wider than `width`, and what to print at the end of the first part. */
+  private cut(word: string, s: TextStyle, width: number): { at: number; mark: string } {
+    for (let at = word.length - 1; at > 0; at--)
+      if (/[-/\u2010-\u2012]/u.test(word[at - 1]!) && this.width(word.slice(0, at), s) <= width)
+        return { at, mark: "" };
+    let at = word.length - 1;
+    while (at > 1 && this.width(`${word.slice(0, at)}-`, s) > width) at--;
+    const between = /\p{L}/u.test(word[at - 1]!) && /\p{L}/u.test(word[at]!);
+    return { at, mark: between ? "-" : "" };
+  }
+
+  /**
+   * A label at the largest size from `s.size` down to `min` that fits on one
+   * line; if it does not fit even at `min`, wrapped at `min`.
+   */
+  label(text: string, s: TextStyle, width: number, min = 7): { style: TextStyle; lines: string[] } {
+    const style = this.fit(text, s, width, min);
+    if (this.width(text, style) <= width) return { style, lines: [text] };
+    // Rather a smaller size or tighter letters than a word split between letters.
+    const pieces = text.split(BREAKS).flatMap((w) => w.split(/(?<=[-/\u2010-\u2012])/u));
+    const tries: TextStyle[] = [];
+    for (let size = s.size; size >= min; size -= 0.5) tries.push({ ...s, size });
+    if (s.spacing) tries.push({ ...s, size: min, spacing: 0 });
+    for (const t of tries)
+      if (pieces.every((p) => this.width(p, t) <= width))
+        return { style: t, lines: this.wrap(text, t, width) };
+    return { style, lines: this.wrap(text, style, width) };
   }
 
   /** The largest size from `size` down to `min` at which the text fits on one line. */
@@ -315,15 +372,32 @@ function drawSection(pen: Pen, s: SheetSection, x: number, top: number, w: numbe
       break;
     case "scoreColumn":
       for (const sc of s.scores) {
-        const h = 19;
+        const label = pen.label(sc.label, S.fieldName, w - 25);
+        const labelLh = pen.lineHeight(label.style, 1.15);
+        // The derived label shares the top line with the label if both fit;
+        // else it gets lines of its own above it, so the two never overlap.
+        const besideW = w - 5 - pen.width(label.lines[0]!, label.style) - 3;
+        const beside = sc.derived !== null && pen.width(sc.derivedLabel, S.hint) <= besideW;
+        const above = sc.derived === null || beside ? [] : pen.wrap(sc.derivedLabel, S.hint, w - 4);
+        const aboveLh = pen.lineHeight(S.hint, 1.15);
+        const top = y + above.length * aboveLh;
+        const h = 19 + (top - y) + (label.lines.length - 1) * labelLh;
+        const body = top + (label.lines.length - 1) * labelLh;
         pen.rect(x, y, w, h, { width: 0.7, radius: 1.5 });
-        pen.text(sc.label, x + 3, y + 5, pen.fit(sc.label, S.fieldName, w - 25));
-        pen.text(sc.value, x + 3, y + 15.5, pen.fit(sc.value, S.scoreValue, w - 25, 12));
+        above.forEach((l, j) => pen.text(l, x + w - 2, y + 3.4 + j * aboveLh, S.hint, "right"));
+        label.lines.forEach((l, j) => pen.text(l, x + 3, top + 5 + j * labelLh, label.style));
+        pen.text(sc.value, x + 3, body + 15.5, pen.fit(sc.value, S.scoreValue, w - 25, 12));
         if (sc.derived !== null) {
           const cx = x + w - 11;
-          pen.circle(cx, y + 11.5, 6.3, { width: 0.7 });
-          pen.text(sc.derived, cx, y + 13.7, pen.fit(sc.derived, { font: "bold", size: 12 }, 11), "center");
-          pen.text(sc.derivedLabel, x + w - 2, y + 3.4, pen.fit(sc.derivedLabel, S.hint, w - 24), "right");
+          pen.circle(cx, body + 11.5, 6.3, { width: 0.7 });
+          pen.text(
+            sc.derived,
+            cx,
+            body + 13.7,
+            pen.fit(sc.derived, { font: "bold", size: 12 }, 11),
+            "center",
+          );
+          if (beside) pen.text(sc.derivedLabel, x + w - 2, y + 3.4, S.hint, "right");
         }
         y += h + 3;
       }
@@ -332,17 +406,33 @@ function drawSection(pen: Pen, s: SheetSection, x: number, top: number, w: numbe
     case "checkList": {
       const columns = w >= 90 ? 2 : 1;
       const cw = (w - (columns - 1) * 4) / columns;
-      const rows = Math.ceil(s.items.length / columns);
-      s.items.forEach((item, i) => {
-        const cx = x + (i % columns) * (cw + 4);
-        const cy = y + 4.5 + Math.floor(i / columns) * 7;
-        pen.circle(cx + 2, cy - 1.3, 1.6, { fill: item.marked });
+      const laid = s.items.map((item) => {
         const noteW = item.note === "" ? 0 : Math.min(pen.width(item.note, S.hint), (cw - 15) / 2);
-        pen.text(item.name, cx + 5.5, cy, pen.fit(item.name, S.body, cw - 15 - (noteW > 0 ? noteW + 2 : 0)));
-        pen.text(item.note, cx + cw - 9.5, cy, pen.fit(item.note, S.hint, noteW), "right");
-        pen.rect(cx + cw - 7.5, cy - 4.2, 7, 5.5, { width: 0.5, radius: 0.8 });
+        const name = pen.label(item.name, S.body, cw - 15 - (noteW > 0 ? noteW + 2 : 0));
+        const note = pen.label(item.note, S.hint, Math.max(noteW, 1));
+        const lh = pen.lineHeight(name.style, 1.15);
+        // A name or note that needs more lines makes its row taller.
+        const extra = Math.max(
+          (name.lines.length - 1) * lh,
+          (note.lines.length - 1) * pen.lineHeight(note.style, 1.15),
+        );
+        return { item, name, note, lh, extra };
       });
-      y += rows * 7;
+      let rowTop = y;
+      for (let r = 0; r * columns < laid.length; r++) {
+        const row = laid.slice(r * columns, (r + 1) * columns);
+        for (const [c, { item, name, note, lh }] of row.entries()) {
+          const cx = x + c * (cw + 4);
+          const cy = rowTop + 4.5;
+          pen.circle(cx + 2, cy - 1.3, 1.6, { fill: item.marked });
+          name.lines.forEach((l, j) => pen.text(l, cx + 5.5, cy + j * lh, name.style));
+          const noteLh = pen.lineHeight(note.style, 1.15);
+          note.lines.forEach((l, j) => pen.text(l, cx + cw - 9.5, cy + j * noteLh, note.style, "right"));
+          pen.rect(cx + cw - 7.5, cy - 4.2, 7, 5.5, { width: 0.5, radius: 0.8 });
+        }
+        rowTop += 7 + Math.max(...row.map((l) => l.extra));
+      }
+      y = rowTop;
       break;
     }
     case "featureTable": {
@@ -433,25 +523,30 @@ function drawStatBoxes(pen: Pen, boxes: StatBox[], x: number, y: number, w: numb
   const n = boxes.length;
   const bw = (w - (n - 1) * 4) / n;
   const hints = boxes.map((b) => pen.wrap(b.hint, S.hint, bw - 3).filter((l) => l !== ""));
-  // Hints are never cut: all boxes grow to the longest one.
-  const h = 22.5 + Math.max(1, ...hints.map((l) => l.length)) * 2.7;
+  // Labels and hints are never cut: all boxes grow to the longest one.
+  const labels = boxes.map((b) => pen.label(b.label, S.sectionTitle, bw - 3));
+  const labelLh = pen.lineHeight(S.sectionTitle, 1.15);
+  const extra = (Math.max(1, ...labels.map((l) => l.lines.length)) - 1) * labelLh;
+  const h = 22.5 + extra + Math.max(1, ...hints.map((l) => l.length)) * 2.7;
   boxes.forEach((b, i) => {
     const bx = x + i * (bw + 4);
     const mid = bx + bw / 2;
     pen.rect(bx, y, bw, h, { width: 0.8, radius: 1.5 });
-    pen.text(b.label, mid, y + 5, pen.fit(b.label, S.sectionTitle, bw - 3), "center");
+    const label = labels[i]!;
+    label.lines.forEach((l, j) => pen.text(l, mid, y + 5 + j * labelLh, label.style, "center"));
+    const top = y + extra;
     if (b.style === "pencil") {
-      pen.rect(bx + 5, y + 8, bw - 10, 11, { stroke: "#777", width: 0.4, radius: 1 });
-      pen.text(pen.messages.pencil, mid, y + 14.8, { size: 7, color: "#555" }, "center");
+      pen.rect(bx + 5, top + 8, bw - 10, 11, { stroke: "#777", width: 0.4, radius: 1 });
+      pen.text(pen.messages.pencil, mid, top + 14.8, { size: 7, color: "#555" }, "center");
     } else if (b.style === "circles") {
       const step = Math.min(8, (bw - 6) / Math.max(1, b.circles));
       const r = Math.min(2.8, step * 0.38);
       for (let c = 0; c < b.circles; c++)
-        pen.circle(mid + (c - (b.circles - 1) / 2) * step, y + 13.5, r, { width: 0.7 });
+        pen.circle(mid + (c - (b.circles - 1) / 2) * step, top + 13.5, r, { width: 0.7 });
     } else {
-      pen.text(b.text, mid, y + 18, pen.fit(b.text, S.bigValue, bw - 4, 12), "center");
+      pen.text(b.text, mid, top + 18, pen.fit(b.text, S.bigValue, bw - 4, 12), "center");
     }
-    hints[i]!.forEach((l, j) => pen.text(l, mid, y + 23.8 + j * 2.7, S.hint, "center"));
+    hints[i]!.forEach((l, j) => pen.text(l, mid, top + 23.8 + j * 2.7, S.hint, "center"));
   });
   return y + h;
 }
@@ -466,6 +561,84 @@ export interface Placed {
 
 const CONTINUATION_HEADER_H = 9;
 const MIN_NOTE_LINES = 3;
+/** Fewest rows a split section leaves at the bottom of a page; fewer start the next page. */
+const MIN_SPLIT_ROWS = 2;
+
+/** How many rows a section can be split between; 0 for a section that is one box. */
+function partCount(s: SheetSection): number {
+  switch (s.kind) {
+    case "header":
+    case "statBoxes":
+      return 0;
+    case "scoreColumn":
+      return s.scores.length;
+    case "checkList":
+      return s.items.length;
+    case "featureTable":
+    case "answers":
+      return s.rows.length;
+    case "list":
+      return s.items.length + s.blankLines;
+    case "helpBox":
+      return s.paragraphs.flatMap(steps).length;
+    case "notes":
+      return s.lines;
+  }
+}
+
+/**
+ * The first `n` rows of a section and the rest. The hint stays with the
+ * last part, which carries the title marked as continued.
+ */
+function splitSection(s: SheetSection, n: number, m: Messages): [SheetSection, SheetSection] {
+  const head = { ...s, hint: "" };
+  const marker = ` (${m.continued})`;
+  const tail = { ...s, title: s.title === "" || s.title.endsWith(marker) ? s.title : s.title + marker };
+  switch (s.kind) {
+    case "header":
+    case "statBoxes":
+      throw new Error(`a ${s.kind} section cannot be split`);
+    case "scoreColumn":
+      return [
+        { ...head, kind: s.kind, scores: s.scores.slice(0, n) },
+        { ...tail, kind: s.kind, scores: s.scores.slice(n) },
+      ];
+    case "checkList":
+      return [
+        { ...head, kind: s.kind, items: s.items.slice(0, n) },
+        { ...tail, kind: s.kind, items: s.items.slice(n) },
+      ];
+    case "featureTable":
+      return [
+        { ...head, kind: s.kind, rows: s.rows.slice(0, n) },
+        { ...tail, kind: s.kind, rows: s.rows.slice(n) },
+      ];
+    case "answers":
+      return [
+        { ...head, kind: s.kind, rows: s.rows.slice(0, n) },
+        { ...tail, kind: s.kind, rows: s.rows.slice(n) },
+      ];
+    case "list": {
+      const items = Math.min(n, s.items.length);
+      return [
+        { ...head, kind: s.kind, items: s.items.slice(0, items), blankLines: n - items },
+        { ...tail, kind: s.kind, items: s.items.slice(items), blankLines: s.blankLines - (n - items) },
+      ];
+    }
+    case "helpBox": {
+      const paragraphs = s.paragraphs.flatMap(steps);
+      return [
+        { ...head, kind: s.kind, paragraphs: paragraphs.slice(0, n) },
+        { ...tail, kind: s.kind, paragraphs: paragraphs.slice(n) },
+      ];
+    }
+    case "notes":
+      return [
+        { ...head, kind: s.kind, lines: n },
+        { ...tail, kind: s.kind, lines: s.lines - n },
+      ];
+  }
+}
 
 /**
  * Places the sections on the 12-column grid, top to bottom (print layout
@@ -473,7 +646,9 @@ const MIN_NOTE_LINES = 3;
  * never above the section before it, so the sheet still reads in package
  * order; a short section next to a tall one moves up into the free space
  * instead of leaving a gap. A section that does not fit the page starts the
- * next one: pages break between sections, never inside a box.
+ * next one: pages break between sections, never inside a box. Only a section
+ * taller than a whole page is split, between its rows, and goes on on the
+ * next page under its title marked as continued; nothing is ever cut off.
  */
 function placeSections(pen: Pen, sections: SheetSection[], bottom: number): Placed[][] {
   const pages: Placed[][] = [[]];
@@ -486,8 +661,22 @@ function placeSections(pen: Pen, sections: SheetSection[], bottom: number): Plac
     pen.dry = false;
     return height;
   };
-  for (const [i, next] of sections.entries()) {
-    let section = next;
+  /** The most rows of `section` that fit into `room`, split off; null if not even the minimum fits. */
+  const splitToFit = (section: SheetSection, w: number, room: number, min: number) => {
+    const parts = partCount(section);
+    let lo = Math.min(min, parts - 1);
+    if (lo < 1 || measure(splitSection(section, lo, pen.messages)[0], w) > room) return null;
+    let hi = parts - 1;
+    while (lo < hi) {
+      const mid = Math.ceil((lo + hi) / 2);
+      if (measure(splitSection(section, mid, pen.messages)[0], w) <= room) lo = mid;
+      else hi = mid - 1;
+    }
+    return splitSection(section, lo, pen.messages);
+  };
+  const queue = [...sections];
+  while (queue.length > 0) {
+    let section = queue.shift()!;
     let span = Math.min(12, section.span);
     let w = span * COLUMN_W + (span - 1) * COLUMN_GAP;
     let height = measure(section, w);
@@ -508,13 +697,23 @@ function placeSections(pen: Pen, sections: SheetSection[], bottom: number): Plac
         height = measure(section, w);
       }
     }
+    // Taller than a whole page: what fits here stays (at least a few rows,
+    // else it starts the next page), the rest goes on after it.
+    const keep = (split: [SheetSection, SheetSection] | null) => {
+      if (!split) return;
+      section = split[0];
+      height = measure(section, w);
+      queue.unshift(split[1]);
+    };
+    if (spot.y + height > bottom && height > bottom - pageTop(1))
+      keep(splitToFit(section, w, bottom - spot.y, MIN_SPLIT_ROWS));
     if (spot.y + height > bottom && pages.at(-1)!.length > 0) {
       pages.push([]);
       floor = new Array<number>(12).fill(pageTop(pages.length - 1));
       previousY = pageTop(pages.length - 1);
       // Notes that end the sheet alone on a new page take the whole page
       // (print layout 2.1): a small box on an empty page looks broken.
-      if (section.kind === "notes" && i === sections.length - 1) {
+      if (section.kind === "notes" && queue.length === 0) {
         span = 12;
         w = CONTENT_W;
         const frame = measure({ ...section, lines: 0 }, w);
@@ -526,6 +725,7 @@ function placeSections(pen: Pen, sections: SheetSection[], bottom: number): Plac
       }
       spot = place();
     }
+    if (spot.y + height > bottom) keep(splitToFit(section, w, bottom - spot.y, 1));
     pages.at(-1)!.push({ section, x: MARGIN + spot.col * (COLUMN_W + COLUMN_GAP), y: spot.y, w });
     for (let c = spot.col; c < spot.col + span; c++) floor[c] = spot.y + height + ROW_GAP;
     previousY = spot.y;
@@ -549,13 +749,44 @@ interface CardFace {
 
 const CARD_INNER_W = CARD_W - 2 * CARD_PAD;
 const CARD_HEAD_BOTTOM = 16;
-const CARD_FIELDS_H = 21;
+const FIELD_ROW_H = 8.5;
 const CARD_RULES_BOTTOM = CARD_H - CARD_PAD - 6;
+
+interface FieldLayout {
+  label: { style: TextStyle; lines: string[] };
+  value: { style: TextStyle; lines: string[] };
+  /** Top of its row, relative to the top of the fields block. */
+  top: number;
+}
+
+/**
+ * The fields in two columns. A value too long for its column is wrapped in
+ * it, not shrunk below 8 pt and never run into the next column or card; its
+ * row grows instead.
+ */
+function cardFields(pen: Pen, fields: Card["fields"]): { fields: FieldLayout[]; height: number } {
+  const cw = CARD_INNER_W / 2 - 1;
+  const laid = fields.map((f) => ({
+    label: pen.label(f.label, S.cardLabel, cw),
+    value: pen.label(f.value, S.cardValue, cw, 8),
+  }));
+  const extra = (l: (typeof laid)[number]) =>
+    (l.label.lines.length - 1) * pen.lineHeight(l.label.style, 1.15) +
+    (l.value.lines.length - 1) * pen.lineHeight(l.value.style, 1.15);
+  const out: FieldLayout[] = [];
+  let top = 0;
+  for (let r = 0; r * 2 < laid.length; r++) {
+    const row = laid.slice(r * 2, r * 2 + 2);
+    for (const l of row) out.push({ ...l, top });
+    top += FIELD_ROW_H + Math.max(...row.map(extra));
+  }
+  return { fields: out, height: fields.length === 0 ? 0 : top + 4 };
+}
 
 /** Top of the "at the table" block and of the rules block, relative to the card. */
 function cardBlocks(pen: Pen, face: Pick<CardFace, "fields" | "table">): { rulesTop: number } {
   let y = CARD_HEAD_BOTTOM;
-  if (face.fields.length > 0) y += CARD_FIELDS_H;
+  y += cardFields(pen, face.fields).height;
   if (face.table !== "") {
     y += 4.5;
     y += pen.wrap(face.table, S.cardTable, CARD_INNER_W).length * pen.lineHeight(S.cardTable, CARD_LEAD) + 1;
@@ -617,13 +848,17 @@ function drawCard(pen: Pen, face: CardFace, model: PrintModel, x: number, y: num
   let yy = y + CARD_HEAD_BOTTOM;
   if (face.fields.length > 0) {
     const cw = CARD_INNER_W / 2;
-    face.fields.forEach((f, j) => {
+    const { fields, height } = cardFields(pen, face.fields);
+    fields.forEach((f, j) => {
       const fx = left + (j % 2) * cw;
-      const fy = yy + 4 + Math.floor(j / 2) * 8.5;
-      pen.text(f.label, fx, fy, pen.fit(f.label, S.cardLabel, cw - 1));
-      pen.text(f.value, fx, fy + 4.2, pen.fit(f.value, S.cardValue, cw - 1));
+      const fy = yy + 4 + f.top;
+      const labelLh = pen.lineHeight(f.label.style, 1.15);
+      const valueLh = pen.lineHeight(f.value.style, 1.15);
+      f.label.lines.forEach((l, i) => pen.text(l, fx, fy + i * labelLh, f.label.style));
+      const valueTop = fy + 4.2 + (f.label.lines.length - 1) * labelLh;
+      f.value.lines.forEach((l, i) => pen.text(l, fx, valueTop + i * valueLh, f.value.style));
     });
-    yy += CARD_FIELDS_H;
+    yy += height;
     pen.line(left, yy - 1, x + CARD_W - CARD_PAD, yy - 1, 0.3, "#BBB");
   }
   if (face.table !== "") {
@@ -706,8 +941,16 @@ export async function renderPdf(model: PrintModel): Promise<RenderedPdf> {
   const pen = new Pen(doc, model.language, model.messages);
   const m = model.messages;
 
-  // Room for the source and license line if the sheet's last page is the document's last.
-  const sheetBottom = CONTENT_BOTTOM - (model.cards.length === 0 && model.attribution !== "" ? 8 : 0);
+  // The source and license line is wrapped, never cut; on the sheet it needs
+  // room above the footer if the sheet's last page is the document's last.
+  const attributionLh = pen.lineHeight(S.footer, 1.2);
+  const sheetAttribution = pen.wrap(model.attribution, S.footer, CONTENT_W).filter((l) => l !== "");
+  const cardAttribution = pen.wrap(model.attribution, S.footer, PAGE_W - 2 * GRID_X).filter((l) => l !== "");
+  const sheetBottom =
+    CONTENT_BOTTOM -
+    (model.cards.length === 0 && sheetAttribution.length > 0
+      ? sheetAttribution.length * attributionLh + 2
+      : 0);
   const sheetPages = placeSections(pen, model.sections, sheetBottom);
   const faces = model.cards.flatMap((c) => cardFaces(pen, c, m));
   const cardPages = Math.ceil(faces.length / CARDS_PER_PAGE);
@@ -722,8 +965,14 @@ export async function renderPdf(model: PrintModel): Promise<RenderedPdf> {
       pen.line(MARGIN, MARGIN + 6, MARGIN + CONTENT_W, MARGIN + 6, 0.6);
     }
     for (const p of placed) drawSection(pen, p.section, p.x, p.y, p.w);
-    if (isLast(page) && model.attribution !== "")
-      pen.paragraph(model.attribution, MARGIN, FOOTER_LINE_Y - 7, CONTENT_W, S.footer, 1.2);
+    if (isLast(page))
+      pen.lines(
+        sheetAttribution,
+        MARGIN,
+        FOOTER_LINE_Y - 1.5 - sheetAttribution.length * attributionLh,
+        S.footer,
+        1.2,
+      );
     pen.line(MARGIN, FOOTER_LINE_Y, MARGIN + CONTENT_W, FOOTER_LINE_Y, 0.3, "#999");
     const footer = [model.name, model.levelLabel, model.unitsLine, m.page(page, total)].join(" · ");
     pen.text(footer, MARGIN, PAGE_H - MARGIN, pen.fit(footer, S.footer, CONTENT_W - 40));
@@ -741,10 +990,14 @@ export async function renderPdf(model: PrintModel): Promise<RenderedPdf> {
       drawCard(pen, face, model, GRID_X + (i % 3) * CARD_W, GRID_Y + Math.floor(i / 3) * CARD_H),
     );
     cropMarks(pen, onPage.length);
-    if (isLast(page) && model.attribution !== "") {
-      const style = pen.fit(model.attribution, S.footer, PAGE_W - 2 * GRID_X);
-      pen.text(model.attribution, GRID_X, PAGE_H - 6.5, style);
-    }
+    if (isLast(page))
+      pen.lines(
+        cardAttribution,
+        GRID_X,
+        PAGE_H - 4.5 - cardAttribution.length * attributionLh,
+        S.footer,
+        1.2,
+      );
   }
 
   doc.end();
