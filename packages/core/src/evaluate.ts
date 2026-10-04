@@ -52,6 +52,8 @@ export interface ChoiceState {
   badges?: Record<string, string>;
   /** For `info` choices: what the thing picked in choice `of` gives at this level. */
   info?: InfoContent;
+  /** Active text variant: its texts `choice.<id>.variant.<textVariant>.*` replace the base texts. */
+  textVariant?: string;
 }
 
 export interface InfoContent {
@@ -369,6 +371,8 @@ function evaluateChoice(
     optional: choice.optional ?? false,
     status: "missing",
   };
+  const variant = choice.textVariants?.find((v) => evaluateCondition(v.when, scope));
+  if (variant) state.textVariant = variant.id;
   const hasAnswer = Object.hasOwn(doc.answers, choice.id) && doc.answers[choice.id] !== null;
   if (hasAnswer) state.answer = doc.answers[choice.id];
   const ctx: ChoiceContext = {};

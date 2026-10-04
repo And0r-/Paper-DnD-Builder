@@ -2,7 +2,14 @@
  * Reading package texts. Keys follow SPEC 10.2. A missing text (null or
  * absent) stays missing: it is never filled from another language.
  */
-import { formatMeasure, renderText, type MeasureContext, type TextPart } from "@builder/core";
+import {
+  formatMeasure,
+  renderText,
+  type ChoiceState,
+  type Evaluation,
+  type MeasureContext,
+  type TextPart,
+} from "@builder/core";
 import type { Choice, Step } from "@builder/format/pure";
 import type { LoadedPackage } from "./packages.ts";
 
@@ -46,28 +53,76 @@ export function choiceOf(lp: LoadedPackage, id: string): Choice | undefined {
 export interface StepTexts {
   title: string;
   question: string;
+  /** Template; show it with `RichText` and `vars`. */
   intro: string | undefined;
+  /** Variables for the intro (SPEC 10.4), already filled into title and question. */
+  vars: Record<string, number>;
 }
 
-/** A step with one choice uses the choice's texts; a combined step has its own. */
-export function stepTexts(lp: LoadedPackage, step: Pick<Step, "id" | "choices">): StepTexts {
-  const prefix = step.choices.length === 1 ? `choice.${step.choices[0]}` : `step.${step.id}`;
-  return {
-    title: ptext(lp, `${prefix}.title`) ?? "",
-    question: ptext(lp, `${prefix}.question`) ?? "",
-    intro: ptext(lp, `${prefix}.intro`),
-  };
+export type ChoiceTexts = StepTexts & {
+  /** Template; the caller adds `remaining` to `vars`. */
+  missing: string | undefined;
+};
+
+type TextField = "title" | "question" | "intro" | "missing";
+
+/** A choice text: the active variant's if the package has it, else the base text (SPEC 9.3). */
+function choiceText(
+  lp: LoadedPackage,
+  choiceId: string,
+  field: TextField,
+  state: ChoiceState | undefined,
+): string | undefined {
+  const variant = state?.textVariant;
+  return (
+    (variant !== undefined ? ptext(lp, `choice.${choiceId}.variant.${variant}.${field}`) : undefined) ??
+    ptext(lp, `choice.${choiceId}.${field}`)
+  );
 }
 
+/**
+ * The texts of a choice for this character. `state` (from the evaluation)
+ * picks the text variant and supplies `count` of a pickMany choice; without
+ * it the base texts show. `ctx` sets the units of any quantity in a title.
+ */
 export function choiceTexts(
   lp: LoadedPackage,
   choiceId: string,
-): StepTexts & { missing: string | undefined } {
+  state?: ChoiceState,
+  ctx: MeasureContext = measureContext(lp, undefined),
+): ChoiceTexts {
+  const vars: Record<string, number> =
+    state?.kind === "pickMany" && state.count !== undefined ? { count: state.count } : {};
   return {
-    title: ptext(lp, `choice.${choiceId}.title`) ?? "",
-    question: ptext(lp, `choice.${choiceId}.question`) ?? "",
-    intro: ptext(lp, `choice.${choiceId}.intro`),
-    missing: ptext(lp, `choice.${choiceId}.missing`),
+    title: plain(ctx, choiceText(lp, choiceId, "title", state), vars),
+    question: plain(ctx, choiceText(lp, choiceId, "question", state), vars),
+    intro: choiceText(lp, choiceId, "intro", state),
+    missing: choiceText(lp, choiceId, "missing", state),
+    vars,
+  };
+}
+
+/**
+ * A step with one choice uses the choice's texts; a combined step has its
+ * own. `ev` lets a single choice use its text variant and count.
+ */
+export function stepTexts(
+  lp: LoadedPackage,
+  step: Pick<Step, "id" | "choices">,
+  ev?: Evaluation,
+  ctx: MeasureContext = measureContext(lp, undefined),
+): StepTexts {
+  if (step.choices.length === 1) {
+    const id = step.choices[0]!;
+    const { missing: _, ...texts } = choiceTexts(lp, id, ev?.choices[id], ctx);
+    return texts;
+  }
+  const prefix = `step.${step.id}`;
+  return {
+    title: plain(ctx, ptext(lp, `${prefix}.title`)),
+    question: plain(ctx, ptext(lp, `${prefix}.question`)),
+    intro: ptext(lp, `${prefix}.intro`),
+    vars: {},
   };
 }
 

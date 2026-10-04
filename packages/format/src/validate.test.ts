@@ -125,8 +125,8 @@ describe("cross-file rules", () => {
   it.each<[string, (f: RawFiles) => void, string]>([
     [
       "format version",
-      (f) => (f.get("manifest.json").formatVersion = "0.4"),
-      "manifest.json formatVersion: package is written for format 0.4, this builder understands 0.5",
+      (f) => (f.get("manifest.json").formatVersion = "0.3"),
+      "manifest.json formatVersion: package is written for format 0.3, this builder understands 0.6",
     ],
     [
       "duplicate thing",
@@ -176,25 +176,6 @@ describe("cross-file rules", () => {
       "recommendation outside the options",
       (f) => (f.get("flow.json").choices[0].recommend = [{ pick: ["calling.herbalist"] }]),
       'flow.json choices[0].recommend[0].pick[0]: "calling.herbalist" is not one of this choice\'s options',
-    ],
-    [
-      "badge outside the options",
-      (f) => f.get("flow.json").choices[2].badges[0].things.push("folk.moorfolk"),
-      'flow.json choices[2].badges[0].things[1]: "folk.moorfolk" is not one of this choice\'s options',
-    ],
-    [
-      "two badges on one thing",
-      (f) =>
-        f.get("flow.json").choices[2].badges.push({
-          things: ["calling.lantern-bearer"],
-          text: "choice.calling.badge.gentle",
-        }),
-      'flow.json choices[2].badges[1].things[0]: "calling.lantern-bearer" already has a badge in this choice',
-    ],
-    [
-      "badge without text",
-      (f) => delete texts(f, "de")["choice.calling.badge.gentle"],
-      'texts/de/ choice.calling.badge.gentle: missing text (badge of choice "calling")',
     ],
     [
       "array method with wrong length",
@@ -310,6 +291,21 @@ describe("cross-file rules", () => {
       (f) => (texts(f, "de")["names.suggestions"] = "Mira"),
       "texts/de/core.json entries.names.suggestions: must be a list of strings",
     ],
+    [
+      "text variant in one language only",
+      (f) => delete texts(f, "en")["choice.talents-herbalist.variant.hillfolk.intro"],
+      'texts/en/ choice.talents-herbalist.variant.hillfolk.intro: missing text (text of variant "hillfolk" of choice "talents-herbalist")',
+    ],
+    [
+      "text variant condition with unknown value",
+      (f) => (f.get("flow.json").choices[4].textVariants[0].when = "luckk > 2"),
+      'flow.json choices[4].textVariants[0].when: expression "luckk > 2" uses unknown value "luckk"',
+    ],
+    [
+      "text variant declared twice",
+      (f) => f.get("flow.json").choices[4].textVariants.push({ id: "hillfolk", when: "level >= 2" }),
+      'flow.json choices[4].textVariants: text variant "hillfolk" is declared twice',
+    ],
   ])("%s", (_name, change, expected) => {
     const r = mutate(change);
     expect(r.ok).toBe(false);
@@ -348,6 +344,11 @@ describe("warnings", () => {
       "choice never asked",
       (f) => f.get("flow.json").steps.splice(0, 1),
       'flow.json choices[14]: choice "name" is never asked: no step lists it and no thing grants it',
+    ],
+    [
+      "text variant without texts",
+      (f) => (f.get("flow.json").choices[0].textVariants = [{ id: "quiet", when: "level >= 2" }]),
+      'flow.json choices[0].textVariants: text variant "quiet" has no texts and changes nothing',
     ],
   ])("%s", (_name, change, expected) => {
     const r = mutate(change);

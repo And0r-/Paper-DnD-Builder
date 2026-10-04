@@ -1,6 +1,18 @@
+import { evaluateDraft } from "@builder/core";
+import { DEMO_PACKAGE_DIR } from "@builder/demo-package";
+import { validatePackageDir } from "@builder/format";
 import { describe, expect, it } from "vitest";
 import { translator } from "../i18n/index.ts";
-import { distributeMethodLabels, grantedValue, isYesNoValue, measureContext } from "./package-text.ts";
+import { stepTitle } from "./flow/model.ts";
+import {
+  choiceTexts,
+  distributeMethodLabels,
+  grantedValue,
+  isYesNoValue,
+  measureContext,
+  plain,
+  stepTexts,
+} from "./package-text.ts";
 import type { LoadedPackage } from "./packages.ts";
 
 const de = translator("de");
@@ -54,5 +66,67 @@ describe("what you get", () => {
     expect(isYesNoValue(lp, "stamina")).toBe(false);
     expect(isYesNoValue(lp, "capped")).toBe(false);
     expect(grantedValue(lp, ctx, "stamina", 15)).toBe("Ausdauer +15");
+  });
+});
+
+const pkg = (await validatePackageDir(DEMO_PACKAGE_DIR)).package!;
+
+describe("texts of a choice for this character (SPEC 9.3, 10.4)", () => {
+  const loaded = (lang: string) => ({ pkg, lang, texts: pkg.texts[lang]! }) as LoadedPackage;
+  const runner = (folk: string) =>
+    evaluateDraft(pkg, {
+      level: 1,
+      answers: { folk: { pick: folk }, calling: { pick: "calling.river-runner" } },
+    });
+  const intro = (lang: string, folk: string) => {
+    const lp = loaded(lang);
+    const step = { id: "talents-river-runner", choices: ["talents-river-runner"] };
+    const texts = stepTexts(lp, step, runner(folk));
+    return plain(measureContext(lp, undefined), texts.intro, texts.vars);
+  };
+
+  it("says how many talents and, for hillfolk only, why one more", () => {
+    expect(intro("de", "folk.hillfolk")).toBe(
+      "Als Flussläufer lernst du 3 Talente, eins mehr als die anderen: Das Bergvolk lernt viel von seinen Alten. Wähle die, die zu deinem Charakter passen.",
+    );
+    expect(intro("de", "folk.moorfolk")).toBe(
+      "Als Flussläufer lernst du 2 Talente. Wähle die, die zu deinem Charakter passen.",
+    );
+    expect(intro("en", "folk.hillfolk")).toBe(
+      "As a River Runner, you learn 3 talents, one more than others: the hillfolk learn a lot from their elders. Pick the ones that fit your character.",
+    );
+    expect(intro("en", "folk.moorfolk")).toBe(
+      "As a River Runner, you learn 2 talents. Pick the ones that fit your character.",
+    );
+  });
+
+  it("keeps the base text for every text the variant does not change", () => {
+    const lp = loaded("de");
+    const state = runner("folk.hillfolk").choices["talents-river-runner"]!;
+    expect(state.textVariant).toBe("hillfolk");
+    const texts = choiceTexts(lp, "talents-river-runner", state);
+    expect(texts.title).toBe("Talente");
+    expect(texts.question).toBe("Worin ist dein Charakter geübt?");
+    expect(texts.missing).toBe("Wähle noch {{var:remaining}} Talent(e).");
+  });
+
+  it("fills {{var:count}} in a title and a question", () => {
+    const lp = {
+      ...loaded("en"),
+      texts: {
+        "choice.talents-river-runner.title": "{{var:count}} talents",
+        "choice.talents-river-runner.question": "Which {{var:count}}?",
+        "choice.talents-river-runner.variant.hillfolk.question": "Which {{var:count}}, hillfolk?",
+      },
+    } as LoadedPackage;
+    const ev = runner("folk.hillfolk");
+    expect(choiceTexts(lp, "talents-river-runner", ev.choices["talents-river-runner"])).toMatchObject({
+      title: "3 talents",
+      question: "Which 3, hillfolk?",
+    });
+    expect(stepTitle(lp, ev, "talents-river-runner")).toBe("3 talents");
+    expect(
+      choiceTexts(lp, "talents-river-runner", runner("folk.moorfolk").choices["talents-river-runner"]),
+    ).toMatchObject({ title: "2 talents", question: "Which 2?" });
   });
 });
