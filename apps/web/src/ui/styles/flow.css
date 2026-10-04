@@ -50,7 +50,7 @@
   flex-direction: column;
 }
 
-.steplist__item a {
+.steplist__link {
   display: flex;
   align-items: center;
   gap: var(--space-2);
@@ -63,7 +63,7 @@
   text-decoration: none;
 }
 
-.steplist__item a:hover {
+.steplist__link:hover {
   background: var(--color-surface-sunk);
 }
 
@@ -77,32 +77,43 @@
   font-weight: var(--weight-bold);
 }
 
-.steplist__item--done .steplist__mark {
+.steplist__link--done .steplist__mark {
   color: var(--color-success);
 }
 
-.steplist__item--current a {
+.steplist__link--current {
   background: var(--color-primary-soft);
   font-weight: var(--weight-semibold);
 }
 
-.steplist__item--current .steplist__mark {
+.steplist__link--current .steplist__mark {
   color: var(--color-primary);
 }
 
-.steplist__item--open .steplist__mark {
+.steplist__link--open .steplist__mark {
   color: var(--color-ink-muted);
 }
 
-.steplist__item--needsAttention .steplist__mark {
+.steplist__link--needsAttention .steplist__mark {
   color: var(--color-warning);
   border: 2px solid currentColor;
   border-radius: 50%;
   font-size: var(--text-xs);
 }
 
-.steplist__item--needsAttention .steplist__name {
+.steplist__link--needsAttention .steplist__name {
   color: var(--color-warning);
+}
+
+/* Parts a choice brought along sit inside their step, so the count of steps stays put. */
+.steplist__parts {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  /* The line runs under the middle of the step's mark. */
+  margin-left: calc(var(--space-2) + var(--space-3) - 1px);
+  padding-left: var(--space-2);
+  border-left: 2px solid var(--color-border);
 }
 
 /* --------------------------------------------------------------- frame */
@@ -673,6 +684,21 @@
   color: var(--color-ink);
 }
 
+/* The number on the sheet, when it is more than the gift alone. */
+.gift__sheet {
+  margin-top: var(--space-2);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--color-line);
+  font-weight: var(--weight-semibold);
+}
+
+.gift__later {
+  margin-top: var(--space-2);
+  font-size: var(--text-sm);
+  line-height: var(--text-sm-lh);
+  color: var(--color-ink-muted);
+}
+
 /* ------------------------------------------------------------- overview */
 
 .values__list {
@@ -701,6 +727,13 @@
 }
 
 .value__name {
+  font-weight: var(--weight-semibold);
+}
+
+/* Where the number comes from: "8 from … + 2 from …". */
+.value__from {
+  font-size: var(--text-sm);
+  line-height: var(--text-sm-lh);
   font-weight: var(--weight-semibold);
 }
 
@@ -748,6 +781,50 @@
 
 .summary__line {
   overflow-wrap: anywhere;
+}
+
+/* "What you get without choosing", on the overview and at the end. */
+.origins {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.origins__intro {
+  font-size: var(--text-sm);
+  line-height: var(--text-sm-lh);
+  color: var(--color-ink-muted);
+}
+
+.origins__list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.origins__group {
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+.origins__from {
+  font-size: var(--text-sm);
+  line-height: var(--text-sm-lh);
+  font-weight: var(--weight-semibold);
+  color: var(--color-ink-muted);
+}
+
+.origins__things {
+  overflow-wrap: anywhere;
+}
+
+.done .origins {
+  width: 100%;
+  max-width: 32rem;
+  text-align: left;
 }
 
 /* ------------------------------------------------------------------ end */

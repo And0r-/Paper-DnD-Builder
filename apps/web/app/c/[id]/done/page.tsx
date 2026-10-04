@@ -10,6 +10,7 @@ import { Callout, EmptyState } from "../../../../src/ui/components/Feedback.tsx"
 import { Icon } from "../../../../src/ui/components/Icon.tsx";
 import { useDraft } from "../../../../src/ui/flow/draft-state.tsx";
 import { usePageTitle } from "../../../../src/ui/flow/frame.tsx";
+import { Origins } from "../../../../src/ui/flow/origins.tsx";
 
 type PdfState = "idle" | "preparing" | "error" | "notYet";
 
@@ -91,6 +92,7 @@ export default function DonePage() {
         </div>
         <p className="done__tip">{t("done.tip")}</p>
       </div>
+      <Origins />
       <p className="note">{t("done.editHint")}</p>
       <div className="done__next">
         <ButtonLink href="/characters" variant="secondary">

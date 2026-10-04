@@ -74,10 +74,12 @@ test("a newcomer builds a level-3 character from login to finished", async ({ pa
   await expect(page.getByRole("radio", { name: "Fährkind" })).toBeChecked();
   await next(page);
 
-  // Calling brings new steps; the count never changes without a word.
+  // Calling brings parts of its own; they belong to this step, so the count stays put.
   await question(page, "Womit verdient dein Charakter sein Brot?");
+  const before = await page.locator(".progress__text").textContent();
   await pick(page, "Laternenträgerin");
-  await expect(page.getByText(/Durch deine Wahl kommen 4 Schritte dazu/)).toBeVisible();
+  await expect(page.getByText(/Deine Wahl bringt 4 eigene Teile mit/)).toBeVisible();
+  await expect(page.locator(".progress__text")).toHaveText(`${before!} · Teil 1 von 5`);
   await shot(page, "05-beruf");
   await next(page);
 
