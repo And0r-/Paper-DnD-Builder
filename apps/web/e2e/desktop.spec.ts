@@ -47,15 +47,18 @@ test("three columns, keyboard only, and only requests to the builder itself", as
   ).toBeVisible();
   await expect(page.getByRole("heading", { level: 1 })).toBeFocused();
 
-  // First Tab stop is the skip link.
+  // Flow screens focus their question on arrival (screen readers start there).
   await page.goto(`/c/${id}/overview`);
-  await page.keyboard.press("Tab");
-  await expect(page.getByRole("link", { name: m["common.skipToContent"] })).toBeFocused();
+  await expect(page.getByRole("heading", { level: 1 })).toBeFocused();
   await shot(page, "41-desktop-ueberblick");
   const r = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"]).analyze();
   expect(r.violations.map((v) => v.id)).toEqual([]);
 
+  // On a page that leaves focus alone, the first Tab stop is the skip link.
   await page.goto("/settings");
+  await expect(page.getByRole("heading", { level: 1, name: m["settings.title"] })).toBeVisible();
+  await page.keyboard.press("Tab");
+  await expect(page.getByRole("link", { name: m["common.skipToContent"] })).toBeFocused();
   await shot(page, "42-desktop-einstellungen");
 
   const own = new URL(baseURL!).origin;
