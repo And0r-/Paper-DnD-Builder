@@ -645,6 +645,12 @@ textarea.field__input {
   white-space: nowrap;
 }
 
+/* A package badge sorts an option ("easy"); it does not urge, so no colour. */
+.badge--neutral {
+  background: var(--color-surface-sunk);
+  color: var(--color-ink);
+}
+
 /* ----------------------------------------------------------------- toast */
 
 .toast {

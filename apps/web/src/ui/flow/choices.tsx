@@ -138,6 +138,7 @@ function OptionCard({
   name,
   checked,
   recommended,
+  badge,
   level,
   onToggle,
 }: {
@@ -147,6 +148,8 @@ function OptionCard({
   name: string;
   checked: boolean;
   recommended: boolean;
+  /** Package text key of this option's badge; shown instead of "recommended". */
+  badge: string | undefined;
   level: number;
   onToggle: () => void;
 }) {
@@ -155,6 +158,7 @@ function OptionCard({
   const id = useId();
   const input = useRef<HTMLInputElement>(null);
   const goodIf = ptext(lp, `${thing.id}.goodIf`);
+  const badgeText = badge ? ptext(lp, badge) : undefined;
   const details = <OptionDetails lp={lp} thing={thing} level={level} />;
   const showExplain = () =>
     explain(
@@ -193,7 +197,11 @@ function OptionCard({
         <label className="option__name" htmlFor={id}>
           {thingName(lp, thing.id)}
         </label>
-        {recommended && <span className="badge">{t("common.recommended")}</span>}
+        {badgeText ? (
+          <span className="badge badge--neutral">{badgeText}</span>
+        ) : (
+          recommended && <span className="badge">{t("common.recommended")}</span>
+        )}
       </div>
       <p className="option__short" id={`${id}-short`}>
         <RichText lp={lp} text={ptext(lp, `${thing.id}.short`)} />
@@ -334,6 +342,7 @@ export function PickChoice({
                 name={name}
                 checked={picked.includes(th.id)}
                 recommended={recommended.includes(th.id)}
+                badge={state.badges?.[th.id]}
                 level={ev.level}
                 onToggle={() => toggle(th.id)}
               />
