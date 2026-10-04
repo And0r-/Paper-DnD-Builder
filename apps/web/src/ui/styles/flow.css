@@ -217,15 +217,22 @@
   align-self: flex-start;
 }
 
+.step-footer__dock {
+  display: flex;
+  flex-direction: column;
+}
+
 .step-footer__bar {
   display: flex;
   justify-content: space-between;
   gap: var(--space-3);
 }
 
-/* Phones: Back and Next sit in a fixed bar at the bottom. */
+/* Phones: Back and Next sit in a fixed dock at the bottom. When Next is
+   pressed too early, the reason and "Choose for me" join the dock, so they
+   are seen where the thumb already is. */
 @media (max-width: 599px) {
-  .step .step-footer__bar {
+  .step .step-footer__dock {
     position: fixed;
     left: 0;
     right: 0;
@@ -237,6 +244,11 @@
     border-top: 1px solid var(--color-line);
     box-shadow: 0 -2px 8px rgb(29 28 26 / 0.06);
   }
+
+  .step .step-footer__reason {
+    margin-bottom: var(--space-3);
+  }
+
   .step .step-footer__bar .btn {
     flex: 1;
     padding-left: var(--space-3);

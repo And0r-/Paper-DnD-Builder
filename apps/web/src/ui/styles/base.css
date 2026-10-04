@@ -188,7 +188,7 @@ h1[tabindex="-1"]:focus,
   min-width: 0;
   max-width: calc(var(--content-max) + 2 * var(--space-4));
   padding: var(--space-5) var(--space-4)
-    calc(var(--footer-height) + var(--space-6) + env(safe-area-inset-bottom));
+    calc(var(--dock-height, var(--footer-height)) + var(--space-6) + env(safe-area-inset-bottom));
 }
 
 .shell__main:focus {

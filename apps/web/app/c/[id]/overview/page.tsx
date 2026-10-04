@@ -12,7 +12,12 @@ import { Button, ButtonLink } from "../../../../src/ui/components/Button.tsx";
 import { Callout } from "../../../../src/ui/components/Feedback.tsx";
 import { RichText, useMeasure } from "../../../../src/ui/components/RichText.tsx";
 import { useDraft } from "../../../../src/ui/flow/draft-state.tsx";
-import { ProgressHeader, QuestionHeader, usePageTitle } from "../../../../src/ui/flow/frame.tsx";
+import {
+  ProgressHeader,
+  QuestionHeader,
+  useFooterDock,
+  usePageTitle,
+} from "../../../../src/ui/flow/frame.tsx";
 import { describeAnswer, OVERVIEW_KEY } from "../../../../src/ui/flow/model.ts";
 import { choiceTexts, formatValue, ptext } from "../../../../src/ui/package-text.ts";
 
@@ -24,6 +29,7 @@ export default function OverviewPage() {
   const headingId = useId();
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string>();
+  const dock = useFooterDock();
   const entry = entries.find((e) => e.key === OVERVIEW_KEY)!;
   const index = entries.indexOf(entry);
   usePageTitle([t("overview.question"), t("flow.progress", { current: index + 1, total: entries.length })]);
@@ -124,15 +130,23 @@ export default function OverviewPage() {
       </ul>
 
       <div className="step-footer">
-        <div aria-live="polite">{problem && <Callout tone="warning">{problem}</Callout>}</div>
         {!ev.complete && <p className="note">{t("overview.finishBlocked")}</p>}
-        <div className="step-footer__bar">
-          <ButtonLink href={entries[index - 1]!.href} variant="secondary" icon="arrowLeft">
-            {t("common.back")}
-          </ButtonLink>
-          <Button icon="printer" onClick={onFinish} busy={busy} busyLabel={t("overview.finishing")}>
-            {t("overview.finish")}
-          </Button>
+        <div className="step-footer__dock" ref={dock}>
+          <div aria-live="polite">
+            {problem && (
+              <div className="step-footer__reason">
+                <Callout tone="warning">{problem}</Callout>
+              </div>
+            )}
+          </div>
+          <div className="step-footer__bar">
+            <ButtonLink href={entries[index - 1]!.href} variant="secondary" icon="arrowLeft">
+              {t("common.back")}
+            </ButtonLink>
+            <Button icon="printer" onClick={onFinish} busy={busy} busyLabel={t("overview.finishing")}>
+              {t("overview.finish")}
+            </Button>
+          </div>
         </div>
       </div>
     </div>
