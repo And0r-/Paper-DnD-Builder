@@ -83,9 +83,15 @@ export default function StepPage() {
   const chooseForMe =
     open.length > 0 && recs.every(Boolean) ? () => recs.forEach((r) => r && change(r)) : undefined;
 
+  // The first answer of the open choice, not the search box above the list:
+  // an empty search field says nothing about what is missing.
   const focusTarget = () => {
     const block = open[0] && document.getElementById(`block-${open[0].def.id}`);
-    return block?.querySelector<HTMLElement>("input, select, textarea, button") ?? null;
+    return (
+      block?.querySelector<HTMLElement>("input:not([type='search']), select, textarea, button") ??
+      block?.querySelector<HTMLElement>("input") ??
+      null
+    );
   };
 
   const render = (def: Choice, state: ChoiceState, labelledBy: string, label: string) => {
