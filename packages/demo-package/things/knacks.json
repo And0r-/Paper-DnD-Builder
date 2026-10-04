@@ -1,0 +1,434 @@
+[
+  {
+    "id": "knack.spark-shower",
+    "kind": "knack",
+    "source": "mistland",
+    "rank": 1,
+    "group": "daring",
+    "tags": ["lantern"],
+    "stats": {
+      "reach": {
+        "amount": 30,
+        "unit": "ft"
+      },
+      "duration": {
+        "text": "stat-value.instant"
+      },
+      "uses": 2,
+      "focus": {
+        "text": "stat-value.lantern"
+      }
+    },
+    "card": true
+  },
+  {
+    "id": "knack.glow-thread",
+    "kind": "knack",
+    "source": "mistland",
+    "rank": 1,
+    "group": "helping",
+    "tags": ["lantern"],
+    "stats": {
+      "reach": {
+        "amount": 60,
+        "unit": "ft"
+      },
+      "duration": {
+        "text": "stat-value.hour"
+      },
+      "uses": 3,
+      "focus": {
+        "text": "stat-value.lantern"
+      }
+    },
+    "card": true
+  },
+  {
+    "id": "knack.quiet-word",
+    "kind": "knack",
+    "source": "mistland",
+    "rank": 1,
+    "group": "helping",
+    "tags": ["lantern", "root"],
+    "stats": {
+      "reach": {
+        "amount": 10,
+        "unit": "ft"
+      },
+      "duration": {
+        "text": "stat-value.minute"
+      },
+      "uses": 2,
+      "focus": {
+        "text": "stat-value.nothing"
+      }
+    },
+    "card": true
+  },
+  {
+    "id": "knack.warm-glow",
+    "kind": "knack",
+    "source": "mistland",
+    "rank": 1,
+    "group": "helping",
+    "tags": ["lantern"],
+    "stats": {
+      "reach": {
+        "text": "stat-value.touch"
+      },
+      "duration": {
+        "text": "stat-value.instant"
+      },
+      "uses": 2,
+      "focus": {
+        "text": "stat-value.lantern"
+      }
+    },
+    "card": true
+  },
+  {
+    "id": "knack.shadow-ward",
+    "kind": "knack",
+    "source": "mistland",
+    "rank": 1,
+    "group": "daring",
+    "tags": ["lantern"],
+    "stats": {
+      "reach": {
+        "text": "stat-value.self"
+      },
+      "duration": {
+        "text": "stat-value.minute"
+      },
+      "uses": 1,
+      "focus": {
+        "text": "stat-value.lantern"
+      }
+    },
+    "card": true
+  },
+  {
+    "id": "knack.light-bridge",
+    "kind": "knack",
+    "source": "mistland",
+    "rank": 2,
+    "group": "helping",
+    "tags": ["lantern"],
+    "requires": "level >= 3",
+    "stats": {
+      "reach": {
+        "amount": 40,
+        "unit": "ft"
+      },
+      "duration": {
+        "text": "stat-value.minute"
+      },
+      "uses": 1,
+      "focus": {
+        "text": "stat-value.lantern"
+      }
+    },
+    "card": true
+  },
+  {
+    "id": "knack.lantern-call",
+    "kind": "knack",
+    "source": "mistland",
+    "rank": 2,
+    "group": "daring",
+    "stats": {
+      "reach": {
+        "amount": 100,
+        "unit": "ft"
+      },
+      "duration": {
+        "text": "stat-value.instant"
+      },
+      "uses": 1,
+      "focus": {
+        "text": "stat-value.lantern"
+      }
+    },
+    "card": true
+  },
+  {
+    "id": "knack.fog-hop",
+    "kind": "knack",
+    "source": "mistland",
+    "rank": 1,
+    "group": "daring",
+    "tags": ["current"],
+    "stats": {
+      "reach": {
+        "amount": 30,
+        "unit": "ft"
+      },
+      "duration": {
+        "text": "stat-value.instant"
+      },
+      "uses": 2,
+      "focus": {
+        "text": "stat-value.water"
+      }
+    },
+    "card": true
+  },
+  {
+    "id": "knack.eddy",
+    "kind": "knack",
+    "source": "mistland",
+    "rank": 1,
+    "group": "daring",
+    "tags": ["current"],
+    "stats": {
+      "reach": {
+        "amount": 20,
+        "unit": "ft"
+      },
+      "duration": {
+        "text": "stat-value.minute"
+      },
+      "uses": 2,
+      "focus": {
+        "text": "stat-value.water"
+      }
+    },
+    "card": true
+  },
+  {
+    "id": "knack.driftwood-guard",
+    "kind": "knack",
+    "source": "mistland",
+    "rank": 1,
+    "group": "helping",
+    "tags": ["current"],
+    "stats": {
+      "reach": {
+        "text": "stat-value.self"
+      },
+      "duration": {
+        "text": "stat-value.minute"
+      },
+      "uses": 1,
+      "focus": {
+        "text": "stat-value.nothing"
+      }
+    },
+    "card": true
+  },
+  {
+    "id": "knack.wave-push",
+    "kind": "knack",
+    "source": "mistland",
+    "rank": 1,
+    "group": "daring",
+    "tags": ["current"],
+    "stats": {
+      "reach": {
+        "amount": 15,
+        "unit": "ft"
+      },
+      "duration": {
+        "text": "stat-value.instant"
+      },
+      "uses": 2,
+      "focus": {
+        "text": "stat-value.water"
+      }
+    },
+    "card": true
+  },
+  {
+    "id": "knack.dew-breath",
+    "kind": "knack",
+    "source": "mistland",
+    "rank": 1,
+    "group": "helping",
+    "tags": ["current"],
+    "stats": {
+      "reach": {
+        "text": "stat-value.touch"
+      },
+      "duration": {
+        "text": "stat-value.hour"
+      },
+      "uses": 3,
+      "focus": {
+        "text": "stat-value.water"
+      }
+    },
+    "card": true
+  },
+  {
+    "id": "knack.rapid-rush",
+    "kind": "knack",
+    "source": "mistland",
+    "rank": 2,
+    "group": "daring",
+    "tags": ["current"],
+    "requires": "level >= 3",
+    "stats": {
+      "reach": {
+        "text": "stat-value.self"
+      },
+      "duration": {
+        "text": "stat-value.minute"
+      },
+      "uses": 1,
+      "focus": {
+        "text": "stat-value.water"
+      }
+    },
+    "card": true
+  },
+  {
+    "id": "knack.river-voice",
+    "kind": "knack",
+    "source": "mistland",
+    "rank": 2,
+    "group": "helping",
+    "stats": {
+      "reach": {
+        "amount": 60,
+        "unit": "ft"
+      },
+      "duration": {
+        "text": "stat-value.hour"
+      },
+      "uses": 1,
+      "focus": {
+        "text": "stat-value.water"
+      }
+    },
+    "card": true
+  },
+  {
+    "id": "knack.moss-bed",
+    "kind": "knack",
+    "source": "mistland",
+    "rank": 1,
+    "group": "helping",
+    "tags": ["root"],
+    "stats": {
+      "reach": {
+        "text": "stat-value.touch"
+      },
+      "duration": {
+        "text": "stat-value.hour"
+      },
+      "uses": 1,
+      "focus": {
+        "text": "stat-value.herbs"
+      }
+    },
+    "card": true
+  },
+  {
+    "id": "knack.thorn-ring",
+    "kind": "knack",
+    "source": "mistland",
+    "rank": 1,
+    "group": "daring",
+    "tags": ["root"],
+    "stats": {
+      "reach": {
+        "amount": 10,
+        "unit": "ft"
+      },
+      "duration": {
+        "text": "stat-value.minute"
+      },
+      "uses": 2,
+      "focus": {
+        "text": "stat-value.herbs"
+      }
+    },
+    "card": true
+  },
+  {
+    "id": "knack.herb-scent",
+    "kind": "knack",
+    "source": "mistland",
+    "rank": 1,
+    "group": "helping",
+    "tags": ["root"],
+    "stats": {
+      "reach": {
+        "text": "stat-value.touch"
+      },
+      "duration": {
+        "text": "stat-value.instant"
+      },
+      "uses": 3,
+      "focus": {
+        "text": "stat-value.herbs"
+      }
+    },
+    "card": true
+  },
+  {
+    "id": "knack.root-grip",
+    "kind": "knack",
+    "source": "mistland",
+    "rank": 1,
+    "group": "daring",
+    "tags": ["root"],
+    "stats": {
+      "reach": {
+        "amount": 30,
+        "unit": "ft"
+      },
+      "duration": {
+        "text": "stat-value.minute"
+      },
+      "uses": 2,
+      "focus": {
+        "text": "stat-value.herbs"
+      }
+    },
+    "card": true
+  },
+  {
+    "id": "knack.mushroom-glow",
+    "kind": "knack",
+    "source": "mistland",
+    "rank": 1,
+    "group": "helping",
+    "tags": ["root"],
+    "stats": {
+      "reach": {
+        "amount": 20,
+        "unit": "ft"
+      },
+      "duration": {
+        "text": "stat-value.hour"
+      },
+      "uses": 2,
+      "focus": {
+        "text": "stat-value.herbs"
+      }
+    },
+    "card": true
+  },
+  {
+    "id": "knack.spore-veil",
+    "kind": "knack",
+    "source": "mistland",
+    "rank": 2,
+    "group": "daring",
+    "stats": {
+      "reach": {
+        "amount": 15,
+        "unit": "ft"
+      },
+      "duration": {
+        "text": "stat-value.minute"
+      },
+      "uses": 1,
+      "focus": {
+        "text": "stat-value.herbs"
+      }
+    },
+    "card": true
+  }
+]

@@ -1,0 +1,173 @@
+{
+  "level": { "min": 1, "max": 3, "default": 1 },
+  "steps": [
+    { "id": "folk", "choices": ["folk"] },
+    { "id": "upbringing", "choices": ["upbringing"] },
+    { "id": "calling", "choices": ["calling"] },
+    { "id": "calling-gifts", "choices": ["calling-gifts"] },
+    { "id": "scores", "choices": ["scores"] },
+    { "id": "extra-talent", "choices": ["extra-talent"], "when": "level >= 2" },
+    { "id": "identity", "choices": ["name", "age", "looks"] }
+  ],
+  "choices": [
+    {
+      "id": "folk",
+      "kind": "pickOne",
+      "source": "mistland",
+      "options": { "kind": "folk" },
+      "recommend": [{ "pick": ["folk.moorfolk"] }]
+    },
+    {
+      "id": "upbringing",
+      "kind": "pickOne",
+      "source": "mistland",
+      "options": { "kind": "upbringing" },
+      "recommend": [{ "pick": ["upbringing.ferry-child"] }]
+    },
+    {
+      "id": "calling",
+      "kind": "pickOne",
+      "source": "mistland",
+      "options": { "kind": "calling" },
+      "recommend": [{ "pick": ["calling.lantern-bearer"] }]
+    },
+    { "id": "calling-gifts", "kind": "info", "source": "mistland", "of": "calling" },
+    {
+      "id": "talents-lantern-bearer",
+      "kind": "pickMany",
+      "source": "mistland",
+      "options": { "kind": "talent", "tags": ["for-lantern-bearer"] },
+      "count": 2,
+      "recommend": [{ "pick": ["talent.mending", "talent.climbing"] }]
+    },
+    {
+      "id": "talents-river-runner",
+      "kind": "pickMany",
+      "source": "mistland",
+      "options": { "kind": "talent", "tags": ["for-river-runner"] },
+      "count": 2,
+      "recommend": [{ "pick": ["talent.climbing", "talent.sneaking"] }]
+    },
+    {
+      "id": "talents-herbalist",
+      "kind": "pickMany",
+      "source": "mistland",
+      "options": { "kind": "talent", "tags": ["for-herbalist"] },
+      "count": 2,
+      "recommend": [{ "pick": ["talent.mending", "talent.tracking"] }]
+    },
+    {
+      "id": "gear",
+      "kind": "pickOne",
+      "source": "mistland",
+      "options": { "kind": "item", "tags": ["gear-choice"] },
+      "recommend": [
+        { "when": "has('calling.herbalist')", "pick": ["item.mortar"] },
+        { "pick": ["item.reed-shield"] }
+      ]
+    },
+    {
+      "id": "knacks-lantern",
+      "kind": "pickMany",
+      "source": "mistland",
+      "options": { "kind": "knack", "tags": ["lantern"] },
+      "count": "if(level >= 2, 3, 2)",
+      "recommend": [
+        { "when": "level >= 2", "pick": ["knack.warm-glow", "knack.glow-thread", "knack.quiet-word"] },
+        { "pick": ["knack.warm-glow", "knack.glow-thread"] }
+      ]
+    },
+    {
+      "id": "knacks-current",
+      "kind": "pickMany",
+      "source": "mistland",
+      "options": { "kind": "knack", "tags": ["current"] },
+      "count": "if(level >= 2, 3, 2)",
+      "recommend": [
+        { "when": "level >= 2", "pick": ["knack.fog-hop", "knack.dew-breath", "knack.wave-push"] },
+        { "pick": ["knack.fog-hop", "knack.dew-breath"] }
+      ]
+    },
+    {
+      "id": "knacks-root",
+      "kind": "pickMany",
+      "source": "mistland",
+      "options": { "kind": "knack", "tags": ["root"] },
+      "count": "if(level >= 2, 3, 2)",
+      "recommend": [
+        { "when": "level >= 2", "pick": ["knack.herb-scent", "knack.root-grip", "knack.moss-bed"] },
+        { "pick": ["knack.herb-scent", "knack.root-grip"] }
+      ]
+    },
+    {
+      "id": "path",
+      "kind": "pickOne",
+      "source": "mistland",
+      "options": { "kind": "path" }
+    },
+    {
+      "id": "scores",
+      "kind": "distribute",
+      "source": "mistland",
+      "targets": ["might", "grace", "wit", "heart"],
+      "methods": [
+        {
+          "method": "pointBuy",
+          "budget": 14,
+          "costs": { "6": 0, "7": 1, "8": 2, "9": 3, "10": 4, "11": 6, "12": 8 }
+        },
+        { "method": "array", "values": [11, 10, 9, 7] }
+      ],
+      "recommend": [
+        {
+          "when": "has('calling.lantern-bearer')",
+          "assign": { "might": 8, "grace": 7, "wit": 9, "heart": 11 }
+        },
+        {
+          "when": "has('calling.river-runner')",
+          "assign": { "might": 9, "grace": 11, "wit": 8, "heart": 7 }
+        },
+        { "assign": { "might": 7, "grace": 8, "wit": 11, "heart": 9 } }
+      ]
+    },
+    {
+      "id": "extra-talent",
+      "kind": "pickOne",
+      "source": "mistland",
+      "options": { "kind": "talent" },
+      "recommend": [{ "pick": ["talent.listening"] }]
+    },
+    {
+      "id": "name",
+      "kind": "text",
+      "source": "mistland",
+      "maxLength": 40,
+      "suggestions": "names.suggestions"
+    },
+    {
+      "id": "age",
+      "kind": "number",
+      "source": "mistland",
+      "target": "age",
+      "min": 14,
+      "max": 90,
+      "default": 20
+    },
+    {
+      "id": "looks",
+      "kind": "text",
+      "source": "mistland",
+      "maxLength": 300,
+      "multiline": true,
+      "optional": true
+    }
+  ],
+  "characterName": "name",
+  "summary": {
+    "fields": ["stamina", "guard", "pace", "luck"],
+    "line": {
+      "calling": { "choice": "calling" },
+      "level": { "value": "level" }
+    }
+  }
+}

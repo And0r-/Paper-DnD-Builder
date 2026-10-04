@@ -1,0 +1,11 @@
+[
+  { "id": "stamina", "source": "mistland" },
+  { "id": "guard", "source": "mistland" },
+  { "id": "pace", "source": "mistland" },
+  { "id": "luck-token", "source": "mistland" },
+  { "id": "knack", "source": "mistland" },
+  { "id": "talent", "source": "mistland" },
+  { "id": "rest", "source": "mistland" },
+  { "id": "dice", "source": "mistland" },
+  { "id": "game-leader", "source": "mistland" }
+]

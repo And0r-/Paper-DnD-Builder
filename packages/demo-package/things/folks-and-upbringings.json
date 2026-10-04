@@ -1,0 +1,36 @@
+[
+  {
+    "id": "folk.moorfolk",
+    "kind": "folk",
+    "source": "mistland",
+    "grants": [{ "value": "pace", "add": 25 }, { "thing": "trait.mist-sight" }]
+  },
+  {
+    "id": "folk.hillfolk",
+    "kind": "folk",
+    "source": "mistland",
+    "grants": [
+      { "value": "pace", "add": 20 },
+      { "value": "stamina", "add": 2 },
+      { "thing": "trait.stone-steady" }
+    ]
+  },
+  {
+    "id": "folk.coastfolk",
+    "kind": "folk",
+    "source": "mistland",
+    "grants": [{ "value": "pace", "add": 30 }, { "thing": "trait.salt-blood" }]
+  },
+  {
+    "id": "upbringing.ferry-child",
+    "kind": "upbringing",
+    "source": "mistland",
+    "grants": [{ "thing": "talent.weather-sense" }, { "thing": "talent.haggling" }, { "thing": "item.rope" }]
+  },
+  {
+    "id": "upbringing.bell-tower",
+    "kind": "upbringing",
+    "source": "mistland",
+    "grants": [{ "thing": "talent.legends" }, { "thing": "talent.listening" }, { "thing": "item.small-bell" }]
+  }
+]

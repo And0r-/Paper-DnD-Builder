@@ -1,12 +1,15 @@
 /**
- * Demo content package.
+ * Demo content package "Mistland".
  *
- * Reserved for the content/format role. It will contain an invented world
- * (a few small classes, a handful of spells) used to develop and test the
- * builder. It must never contain text from any published rulebook.
- *
- * Placeholder until the demo package task lands.
+ * The package itself is the JSON in this folder (manifest.json, things/,
+ * texts/, ...). This module only tells code where to find it, so tests and
+ * local development can load it without a mounted volume. Everything in it
+ * is invented; it must never contain text from any published rulebook.
  */
+import { fileURLToPath } from "node:url";
 
-/** Directory name the demo package will be exported under. */
+/** Package key, as in manifest.json. */
 export const DEMO_PACKAGE_ID = "demo";
+
+/** Absolute path of the package root (the folder holding manifest.json). */
+export const DEMO_PACKAGE_DIR = fileURLToPath(new URL("..", import.meta.url));

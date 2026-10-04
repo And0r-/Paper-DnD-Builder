@@ -1,0 +1,384 @@
+/**
+ * Zod schemas for every file of a content package (structure only).
+ *
+ * These schemas check the shape of each file on its own. Cross-file rules
+ * (references resolve, texts complete, unit tables cover every amount, ...)
+ * live in validate.ts. SPEC.md is the human-readable description of both.
+ */
+import { z } from "zod";
+
+// ---------------------------------------------------------------- identifiers
+
+/** Stable, language-independent key of a thing, choice, step, glossary entry, ... */
+export const ID_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*(?:\.[a-z0-9]+(?:-[a-z0-9]+)*)*$/;
+/** Key of a value; usable as a name inside expressions. */
+export const VALUE_ID_PATTERN = /^[a-z][a-zA-Z0-9]*$/;
+/** Key of a text inside texts/<lang>/*.json. */
+export const TEXT_KEY_PATTERN = /^[a-zA-Z0-9]+(?:[.-][a-zA-Z0-9]+)*$/;
+export const LANGUAGE_PATTERN = /^[a-z]{2,3}(?:-[A-Z]{2})?$/;
+export const UNIT_PATTERN = /^[a-z][a-z0-9]*$/;
+
+export const id = z
+  .string()
+  .regex(ID_PATTERN, 'must be lowercase words joined by "-" and ".", e.g. "calling.lamplighter"');
+export const valueId = z
+  .string()
+  .regex(
+    VALUE_ID_PATTERN,
+    'must start with a lowercase letter and contain only letters and digits, e.g. "mightBonus"',
+  )
+  .refine((v) => v !== "level", { message: '"level" is built in and cannot be declared' });
+export const textKey = z.string().regex(TEXT_KEY_PATTERN, 'must look like "group.some-name.field"');
+export const language = z
+  .string()
+  .regex(LANGUAGE_PATTERN, 'must be a language code like "de", "en" or "pt-BR"');
+export const unitId = z.string().regex(UNIT_PATTERN, 'must be a short lowercase unit key like "ft" or "m"');
+/** An expression string; parsed and checked in validate.ts. */
+export const expr = z.string().min(1, "expression must not be empty");
+const level = z.number().int().min(1);
+const span = z.union([z.literal(3), z.literal(4), z.literal(6), z.literal(8), z.literal(12)]);
+
+// ------------------------------------------------------------------ manifest
+
+export const licenseSchema = z.strictObject({
+  /** Human-readable name, e.g. "Creative Commons Attribution 4.0". Not shown to players. */
+  name: z.string().min(1),
+  /** SPDX identifier if one exists, e.g. "CC-BY-4.0". */
+  spdx: z.string().min(1).optional(),
+  url: z.url().optional(),
+  /** May content under this license be distributed publicly? */
+  publishable: z.boolean(),
+});
+
+export const sourceSchema = z.strictObject({
+  title: z.string().min(1),
+  url: z.url().optional(),
+  version: z.string().min(1).optional(),
+  /** Date the source was retrieved, YYYY-MM-DD. */
+  retrieved: z.iso.date().optional(),
+  /** Default license of entries from this source (key into `licenses`). */
+  license: id,
+});
+
+export const manifestSchema = z.strictObject({
+  /** Format version this package is written against, "MAJOR.MINOR". */
+  formatVersion: z.string().regex(/^\d+\.\d+$/, 'must be "MAJOR.MINOR", e.g. "0.1"'),
+  /** Package key. Also the folder name when mounted. Never changes. */
+  id: z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'must be lowercase words joined by "-"'),
+  /** Version of the package content (semantic versioning). */
+  version: z.string().regex(/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/, 'must be semantic, e.g. "1.0.0"'),
+  /** Languages this package ships texts for. Each needs texts/<lang>/. */
+  languages: z.array(language).min(1),
+  /** Categories of things. The builder does not interpret them; they group things and select cards. */
+  kinds: z.array(id).min(1),
+  sources: z.record(id, sourceSchema).refine((r) => Object.keys(r).length > 0, "declare at least one source"),
+  licenses: z
+    .record(id, licenseSchema)
+    .refine((r) => Object.keys(r).length > 0, "declare at least one license"),
+});
+
+// --------------------------------------------------------------------- units
+
+export const unitsSchema = z.strictObject({
+  /** A dimension groups interchangeable units, e.g. "length": ft, m. */
+  dimensions: z.record(
+    id,
+    z.strictObject({
+      /** Unit amounts in texts (`{{length:30}}`) are written in. */
+      source: unitId,
+      units: z.array(unitId).min(1),
+    }),
+  ),
+  /** Suggested unit per dimension for a new account, by language. */
+  languageDefaults: z.record(language, z.record(id, unitId)),
+  conversions: z.array(
+    z.strictObject({
+      from: unitId,
+      to: unitId,
+      /** Exact display values: [fromAmount, toAmount]. */
+      table: z.array(z.tuple([z.number(), z.number()])).min(1),
+      /** Optional rule for amounts not in the table: amount * factor, rounded to the nearest `step`. */
+      fallback: z.strictObject({ factor: z.number().positive(), step: z.number().positive() }).optional(),
+    }),
+  ),
+});
+
+export const quantitySchema = z.strictObject({ amount: z.number(), unit: unitId });
+
+// -------------------------------------------------------------------- values
+
+export const valueSchema = z
+  .strictObject({
+    id: valueId,
+    source: id,
+    license: id.optional(),
+    /** Unit of the value, if it is a quantity. Amounts are in this unit. */
+    unit: unitId.optional(),
+    /** Starting value if neither a formula nor an input sets it. Default 0. */
+    default: z.number().optional(),
+    /** Expression computing the value before modifiers are added. */
+    formula: expr.optional(),
+    min: z.number().optional(),
+    max: z.number().optional(),
+  })
+  .refine((v) => !(v.formula !== undefined && v.default !== undefined), {
+    message: "use either formula or default, not both",
+  });
+
+export const valuesSchema = z.array(valueSchema);
+
+// -------------------------------------------------------------------- things
+
+export const grantSchema = z
+  .strictObject({
+    /** Give the character this thing. */
+    thing: id.optional(),
+    /** Ask the player this choice (inserted as a step). */
+    choice: id.optional(),
+    /** Add to this value ... */
+    value: valueId.optional(),
+    /** ... this number or expression. */
+    add: z.union([z.number(), expr]).optional(),
+    /** Character level from which the grant applies. Default 1. */
+    atLevel: level.optional(),
+  })
+  .superRefine((g, ctx) => {
+    const set = [g.thing, g.choice, g.value].filter((x) => x !== undefined).length;
+    if (set !== 1) {
+      ctx.addIssue({ code: "custom", message: 'a grant needs exactly one of "thing", "choice" or "value"' });
+    }
+    if (g.value !== undefined && g.add === undefined) {
+      ctx.addIssue({ code: "custom", message: 'a value grant needs "add"', path: ["add"] });
+    }
+    if (g.value === undefined && g.add !== undefined) {
+      ctx.addIssue({ code: "custom", message: '"add" only goes with "value"', path: ["add"] });
+    }
+  });
+
+export const statValueSchema = z.union(
+  [z.number(), z.boolean(), quantitySchema, z.strictObject({ text: textKey })],
+  { error: 'must be a number, true/false, {"amount": n, "unit": "u"} or {"text": "text.key"}' },
+);
+
+export const thingSchema = z.strictObject({
+  id,
+  kind: id,
+  source: id,
+  license: id.optional(),
+  /** Rank of the thing itself (not the character level), shown on cards. */
+  rank: z.number().int().min(0).optional(),
+  /** Display group inside long option lists. Texts: group.<group>.name */
+  group: id.optional(),
+  tags: z.array(id).optional(),
+  /** Condition under which the thing may be chosen. */
+  requires: expr.optional(),
+  /** Fixed facts shown on cards and in the "learn more" panel. Labels: stat.<key>.name */
+  stats: z.record(z.string().regex(VALUE_ID_PATTERN, "stat keys are camelCase"), statValueSchema).optional(),
+  grants: z.array(grantSchema).optional(),
+  /** Print a card for this thing (layout from sheet.json "cards" by kind). */
+  card: z.boolean().optional(),
+});
+
+export const thingsFileSchema = z.array(thingSchema);
+
+// ---------------------------------------------------------------------- flow
+
+export const optionSourceSchema = z
+  .strictObject({
+    kind: id.optional(),
+    /** Every listed tag must be present on the thing. */
+    tags: z.array(id).optional(),
+    ids: z.array(id).optional(),
+  })
+  .refine((o) => o.kind !== undefined || o.ids !== undefined || o.tags !== undefined, {
+    message: 'select options with "kind", "tags" or "ids"',
+  });
+
+const choiceBase = {
+  id,
+  source: id,
+  license: id.optional(),
+  /** Player may finish the character without answering. */
+  optional: z.boolean().optional(),
+};
+
+const pickRecommendation = z.strictObject({ when: expr.optional(), pick: z.array(id).min(1) });
+
+export const pointBuySchema = z.strictObject({
+  method: z.literal("pointBuy"),
+  budget: z.number().int().positive(),
+  /** Total cost of reaching each score, by score. Lowest key is the start value. */
+  costs: z.record(z.string().regex(/^-?\d+$/, "keys are whole numbers"), z.number().int().min(0)),
+});
+
+export const arraySchema = z.strictObject({
+  method: z.literal("array"),
+  /** Fixed numbers, each assigned to one target. */
+  values: z.array(z.number().int()).min(1),
+});
+
+export const choiceSchema = z.discriminatedUnion("kind", [
+  z.strictObject({
+    ...choiceBase,
+    kind: z.literal("pickOne"),
+    options: optionSourceSchema,
+    recommend: z.array(pickRecommendation).optional(),
+  }),
+  z.strictObject({
+    ...choiceBase,
+    kind: z.literal("pickMany"),
+    options: optionSourceSchema,
+    /** How many to pick: a number or an expression. */
+    count: z.union([z.number().int().positive(), expr]),
+    /** If true, up to `count`; otherwise exactly `count`. */
+    upTo: z.boolean().optional(),
+    recommend: z.array(pickRecommendation).optional(),
+  }),
+  z.strictObject({
+    ...choiceBase,
+    kind: z.literal("distribute"),
+    targets: z.array(valueId).min(1),
+    methods: z.array(z.discriminatedUnion("method", [pointBuySchema, arraySchema])).min(1),
+    recommend: z
+      .array(z.strictObject({ when: expr.optional(), assign: z.record(valueId, z.number().int()) }))
+      .optional(),
+  }),
+  z.strictObject({
+    ...choiceBase,
+    kind: z.literal("number"),
+    /** The value the answer is stored in. */
+    target: valueId,
+    min: z.union([z.number(), expr]),
+    max: z.union([z.number(), expr]),
+    default: z.number().optional(),
+  }),
+  z.strictObject({
+    ...choiceBase,
+    kind: z.literal("text"),
+    maxLength: z.number().int().positive(),
+    multiline: z.boolean().optional(),
+    /** Text key whose value is a list of suggestions ("roll a suggestion"). */
+    suggestions: textKey.optional(),
+  }),
+  z.strictObject({
+    ...choiceBase,
+    kind: z.literal("info"),
+    /** Show what the option picked in this pickOne choice grants. */
+    of: id,
+  }),
+]);
+
+export const flowSchema = z.strictObject({
+  level: z
+    .strictObject({ min: level, max: level, default: level })
+    .refine((l) => l.min <= l.default && l.default <= l.max, { message: "need min <= default <= max" }),
+  steps: z
+    .array(
+      z.strictObject({
+        id,
+        /** Choices shown on this step. More than one only for small related questions. */
+        choices: z.array(id).min(1),
+        /** Step is shown only while this expression is true. */
+        when: expr.optional(),
+      }),
+    )
+    .min(1),
+  choices: z.array(choiceSchema).min(1),
+  /** The text choice whose answer is the character's name. */
+  characterName: id,
+  summary: z.strictObject({
+    /** Values shown large on the overview screen. */
+    fields: z.array(valueId),
+    /** Arguments for the summary.line text, by {{var:name}}. */
+    line: z.record(
+      z.string().regex(VALUE_ID_PATTERN),
+      z.union([z.strictObject({ choice: id }), z.strictObject({ value: z.string() })]),
+    ),
+  }),
+});
+
+// --------------------------------------------------------------------- sheet
+
+const sectionBase = { id, span };
+
+export const sectionSchema = z.discriminatedUnion("kind", [
+  z.strictObject({ ...sectionBase, kind: z.literal("header") }),
+  z.strictObject({
+    ...sectionBase,
+    kind: z.literal("statBoxes"),
+    boxes: z
+      .array(
+        z.strictObject({
+          value: z.string(),
+          style: z.enum(["number", "pencil", "circles"]),
+        }),
+      )
+      .min(1)
+      .max(6),
+  }),
+  z.strictObject({
+    ...sectionBase,
+    kind: z.literal("scoreColumn"),
+    scores: z.array(z.strictObject({ value: valueId, derived: valueId.optional() })).min(1),
+  }),
+  z.strictObject({ ...sectionBase, kind: z.literal("checkList"), things: optionSourceSchema }),
+  z.strictObject({ ...sectionBase, kind: z.literal("featureTable"), things: optionSourceSchema }),
+  z.strictObject({
+    ...sectionBase,
+    kind: z.literal("list"),
+    things: optionSourceSchema,
+    blankLines: z.number().int().min(0),
+  }),
+  z.strictObject({ ...sectionBase, kind: z.literal("answers"), choices: z.array(id).min(1) }),
+  z.strictObject({ ...sectionBase, kind: z.literal("helpBox") }),
+  z.strictObject({ ...sectionBase, kind: z.literal("notes"), lines: z.number().int().min(1) }),
+]);
+
+export const sheetSchema = z.strictObject({
+  sections: z.array(sectionSchema).min(1),
+  /** Card layout per thing kind. */
+  cards: z.record(
+    id,
+    z.strictObject({
+      /** Exactly four stat keys for the 2x2 grid on the card. */
+      fields: z.tuple([z.string(), z.string(), z.string(), z.string()]),
+    }),
+  ),
+});
+
+// ------------------------------------------------------------------ glossary
+
+export const glossarySchema = z.array(z.strictObject({ id, source: id, license: id.optional() }));
+
+// --------------------------------------------------------------------- texts
+
+/** A text: a string, a list of strings, or null for "known missing, not translated yet". */
+export const textValueSchema = z.union([z.string().min(1), z.array(z.string().min(1)).min(1), z.null()]);
+
+export const textsFileSchema = z.strictObject({
+  /** Where the texts in this file come from. One file per source and language. */
+  source: id,
+  license: id.optional(),
+  entries: z.record(textKey, textValueSchema),
+});
+
+// --------------------------------------------------------------------- types
+
+export type License = z.infer<typeof licenseSchema>;
+export type Source = z.infer<typeof sourceSchema>;
+export type Manifest = z.infer<typeof manifestSchema>;
+export type Units = z.infer<typeof unitsSchema>;
+export type Quantity = z.infer<typeof quantitySchema>;
+export type Value = z.infer<typeof valueSchema>;
+export type Grant = z.infer<typeof grantSchema>;
+export type StatValue = z.infer<typeof statValueSchema>;
+export type Thing = z.infer<typeof thingSchema>;
+export type OptionSource = z.infer<typeof optionSourceSchema>;
+export type Choice = z.infer<typeof choiceSchema>;
+export type Flow = z.infer<typeof flowSchema>;
+export type Step = Flow["steps"][number];
+export type Section = z.infer<typeof sectionSchema>;
+export type Sheet = z.infer<typeof sheetSchema>;
+export type GlossaryEntry = z.infer<typeof glossarySchema>[number];
+export type TextValue = z.infer<typeof textValueSchema>;
+export type TextsFile = z.infer<typeof textsFileSchema>;

@@ -19,7 +19,8 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm format:check",
-    "db:migrate": "node packages/db/src/cli.ts migrate"
+    "db:migrate": "node packages/db/src/cli.ts migrate",
+    "validate-package": "node packages/format/src/cli.ts"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",

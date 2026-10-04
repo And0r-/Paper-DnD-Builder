@@ -1,0 +1,136 @@
+[
+  {
+    "id": "item.lantern-staff",
+    "kind": "item",
+    "source": "mistland",
+    "stats": {
+      "weight": {
+        "amount": 4,
+        "unit": "lb"
+      }
+    }
+  },
+  {
+    "id": "item.boat-hook",
+    "kind": "item",
+    "source": "mistland",
+    "stats": {
+      "weight": {
+        "amount": 5,
+        "unit": "lb"
+      }
+    }
+  },
+  {
+    "id": "item.herb-satchel",
+    "kind": "item",
+    "source": "mistland",
+    "stats": {
+      "weight": {
+        "amount": 2,
+        "unit": "lb"
+      }
+    }
+  },
+  {
+    "id": "item.rope",
+    "kind": "item",
+    "source": "mistland",
+    "stats": {
+      "weight": {
+        "amount": 10,
+        "unit": "lb"
+      }
+    }
+  },
+  {
+    "id": "item.small-bell",
+    "kind": "item",
+    "source": "mistland",
+    "stats": {
+      "weight": {
+        "amount": 1,
+        "unit": "lb"
+      }
+    }
+  },
+  {
+    "id": "item.provisions",
+    "kind": "item",
+    "source": "mistland",
+    "stats": {
+      "weight": {
+        "amount": 8,
+        "unit": "lb"
+      }
+    }
+  },
+  {
+    "id": "item.travel-cloak",
+    "kind": "item",
+    "source": "mistland",
+    "tags": ["gear-choice"],
+    "stats": {
+      "weight": {
+        "amount": 3,
+        "unit": "lb"
+      }
+    },
+    "grants": [
+      {
+        "value": "guard",
+        "add": 1
+      }
+    ]
+  },
+  {
+    "id": "item.reed-shield",
+    "kind": "item",
+    "source": "mistland",
+    "tags": ["gear-choice"],
+    "requires": "has('calling.lantern-bearer') or has('calling.river-runner')",
+    "stats": {
+      "weight": {
+        "amount": 6,
+        "unit": "lb"
+      }
+    },
+    "grants": [
+      {
+        "value": "guard",
+        "add": 2
+      }
+    ]
+  },
+  {
+    "id": "item.trail-boots",
+    "kind": "item",
+    "source": "mistland",
+    "tags": ["gear-choice"],
+    "stats": {
+      "weight": {
+        "amount": 2,
+        "unit": "lb"
+      }
+    },
+    "grants": [
+      {
+        "value": "pace",
+        "add": 5
+      }
+    ]
+  },
+  {
+    "id": "item.mortar",
+    "kind": "item",
+    "source": "mistland",
+    "tags": ["gear-choice"],
+    "requires": "has('calling.herbalist')",
+    "stats": {
+      "weight": {
+        "amount": 3,
+        "unit": "lb"
+      }
+    }
+  }
+]

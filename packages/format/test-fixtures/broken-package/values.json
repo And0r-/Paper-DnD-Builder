@@ -1,0 +1,4 @@
+[
+  { "id": "speed", "source": "lab", "formula": "speed + 1" },
+  { "id": "power", "source": "lab", "formula": "floor(speed" }
+]

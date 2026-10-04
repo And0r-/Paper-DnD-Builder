@@ -1,0 +1,9 @@
+[
+  {
+    "id": "gadget.whistle",
+    "kind": "gadget",
+    "source": "lab",
+    "stats": { "reach": { "amount": 30, "unit": "ft" } },
+    "grants": [{ "choice": "tune" }]
+  }
+]

@@ -1,0 +1,74 @@
+[
+  {
+    "id": "calling.lantern-bearer",
+    "kind": "calling",
+    "source": "mistland",
+    "grants": [
+      { "value": "stamina", "add": 8 },
+      { "value": "stamina", "add": 5, "atLevel": 2 },
+      { "value": "stamina", "add": 5, "atLevel": 3 },
+      { "thing": "item.lantern-staff" },
+      { "thing": "item.provisions" },
+      { "choice": "talents-lantern-bearer" },
+      { "choice": "gear" },
+      { "choice": "knacks-lantern" },
+      { "thing": "trait.steady-flame", "atLevel": 2 },
+      { "choice": "path", "atLevel": 3 }
+    ]
+  },
+  {
+    "id": "calling.river-runner",
+    "kind": "calling",
+    "source": "mistland",
+    "grants": [
+      { "value": "stamina", "add": 10 },
+      { "value": "stamina", "add": 6, "atLevel": 2 },
+      { "value": "stamina", "add": 6, "atLevel": 3 },
+      { "thing": "item.boat-hook" },
+      { "thing": "item.provisions" },
+      { "choice": "talents-river-runner" },
+      { "choice": "gear" },
+      { "choice": "knacks-current" },
+      { "thing": "trait.quick-feet", "atLevel": 2 },
+      { "choice": "path", "atLevel": 3 }
+    ]
+  },
+  {
+    "id": "calling.herbalist",
+    "kind": "calling",
+    "source": "mistland",
+    "grants": [
+      { "value": "stamina", "add": 7 },
+      { "value": "stamina", "add": 4, "atLevel": 2 },
+      { "value": "stamina", "add": 4, "atLevel": 3 },
+      { "thing": "item.herb-satchel" },
+      { "thing": "item.provisions" },
+      { "choice": "talents-herbalist" },
+      { "choice": "gear" },
+      { "choice": "knacks-root" },
+      { "thing": "trait.green-thumb", "atLevel": 2 },
+      { "choice": "path", "atLevel": 3 }
+    ]
+  },
+  {
+    "id": "path.lightwarden",
+    "kind": "path",
+    "source": "mistland",
+    "requires": "has('calling.lantern-bearer')",
+    "grants": [{ "thing": "trait.warding-glow" }, { "thing": "knack.lantern-call" }]
+  },
+  {
+    "id": "path.ferrymaster",
+    "kind": "path",
+    "source": "mistland",
+    "requires": "has('calling.river-runner')",
+    "grants": [{ "thing": "trait.ferry-sense" }, { "thing": "knack.river-voice" }]
+  },
+  {
+    "id": "path.mushroom-whisperer",
+    "kind": "path",
+    "source": "mistland",
+    "requires": "has('calling.herbalist')",
+    "grants": [{ "thing": "trait.spore-friend" }, { "thing": "knack.spore-veil" }]
+  }
+]
