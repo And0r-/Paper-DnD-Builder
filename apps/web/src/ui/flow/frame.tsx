@@ -275,9 +275,10 @@ export function StepFrame({
 }
 
 /**
- * The footer dock is fixed to the bottom on phones. The page leaves room
- * below the content as tall as the dock is now, so a reason shown in the
- * dock never hides the last answer.
+ * The footer dock is fixed to the bottom on phones and sticks to the bottom
+ * edge on larger screens. The page leaves room below the content as tall as
+ * the fixed dock is now, so a reason shown in the dock never hides the last
+ * answer, and focus never lands behind the dock (--dock-cover).
  */
 export function useFooterDock() {
   const dock = useRef<HTMLDivElement>(null);
@@ -286,9 +287,15 @@ export function useFooterDock() {
     if (!el || typeof ResizeObserver === "undefined") return;
     const root = document.documentElement;
     const update = () => {
-      if (getComputedStyle(el).position === "fixed")
-        root.style.setProperty("--dock-height", `${el.offsetHeight}px`);
+      // Larger screens make the whole footer (the dock's parent) sticky.
+      const footer = el.parentElement;
+      const fixed = getComputedStyle(el).position === "fixed";
+      const sticky = footer !== null && getComputedStyle(footer).position === "sticky";
+      if (fixed) root.style.setProperty("--dock-height", `${el.offsetHeight}px`);
       else root.style.removeProperty("--dock-height");
+      if (fixed) root.style.setProperty("--dock-cover", `${el.offsetHeight}px`);
+      else if (sticky) root.style.setProperty("--dock-cover", `${footer.offsetHeight}px`);
+      else root.style.removeProperty("--dock-cover");
     };
     const ro = new ResizeObserver(update);
     ro.observe(el);
@@ -296,6 +303,7 @@ export function useFooterDock() {
     return () => {
       ro.disconnect();
       root.style.removeProperty("--dock-height");
+      root.style.removeProperty("--dock-cover");
     };
   }, []);
   return dock;
@@ -303,7 +311,9 @@ export function useFooterDock() {
 
 /**
  * Back and Next. Next is never disabled: pressed too early, it says what is
- * missing right above itself and moves focus to the first open place.
+ * missing right above itself and moves focus to the first open place. The
+ * dock stays on screen on every size, so the reason and "Choose for me" are
+ * in view wherever that place is.
  */
 export function StepFooter({
   entry,

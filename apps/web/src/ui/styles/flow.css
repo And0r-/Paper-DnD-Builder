@@ -228,6 +228,20 @@
   gap: var(--space-3);
 }
 
+/* Larger screens: the dock sticks to the bottom edge while the list
+   scrolls. Pressed too early, Next moves focus up to the open choice; the
+   reason and "Choose for me" stay in view right above Next. */
+@media (min-width: 600px) {
+  .step .step-footer {
+    position: sticky;
+    bottom: 0;
+    z-index: 3;
+    padding: var(--space-3) 0;
+    background: var(--color-bg);
+    border-top: 1px solid var(--color-line);
+  }
+}
+
 /* Phones: Back and Next sit in a fixed dock at the bottom. When Next is
    pressed too early, the reason and "Choose for me" join the dock, so they
    are seen where the thumb already is. */
