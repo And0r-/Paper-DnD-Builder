@@ -10,7 +10,7 @@ pnpm validate-package packages/demo-package
 
 ## What it covers
 
-Every feature of format 0.7 is used at least once (see
+Every feature of format 0.8 is used at least once (see
 [`packages/format/SPEC.md`](../format/SPEC.md)):
 
 | Feature                 | Where                                                                                          |
@@ -19,7 +19,7 @@ Every feature of format 0.7 is used at least once (see
 | 3 folks, 2 upbringings  | `things/folks-and-upbringings.json`                                                            |
 | 20 knacks               | `things/knacks.json`; cards, ranks, groups, tags, a shared knack                               |
 | Gear                    | `things/items.json`, `things/community.json` (second source and license)                       |
-| Levels 1–3              | `flow.json` `level`; `atLevel` grants; `when: level >= 2` step                                 |
+| Levels 1–3              | `flow.json` `level`; `atLevel` grants (`extra-talent` from level 2, `path` from level 3)       |
 | Long list with search   | `borrowed-knack`: 14 knacks, granted to herbalists from level 2 (search shows from 12 options) |
 | All six choice kinds    | pickOne, pickMany (count by expression), distribute (point buy and array), number, text, info  |
 | Dependencies            | granted choices, `requires`, `has(...)` in recommendations                                     |
@@ -32,6 +32,9 @@ Every feature of format 0.7 is used at least once (see
 | Option badges           | `flow.json`: choice `calling` gives `calling.lantern-bearer` the badge "Gentle start"          |
 | Text variants           | `talents-*`: hillfolk (tag `bonus-talent`) pick one more; `textVariants` and `{{var:count}}`   |
 | What the character has  | `handling-river-runner` (`held`): `things/handling.json` are `about` items the character has   |
+| Step condition          | step `handling-river-runner` has `when: has('calling.river-runner')`                           |
+| Gather steps            | `paths` (each choice its own step), `talents` (`list`), `knacks` (`sections`), `equipment`     |
+| One shared list         | `talents`: calling, folk (coastfolk, overlapping list) and level 2; upbringing talents held    |
 
 ## Layout
 

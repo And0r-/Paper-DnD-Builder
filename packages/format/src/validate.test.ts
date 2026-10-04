@@ -227,7 +227,7 @@ describe("cross-file rules", () => {
     [
       "choice both fixed and granted",
       (f) => f.get("flow.json").steps.push({ id: "gear", choices: ["gear"] }),
-      'flow.json steps[11].choices[0]: choice "gear" is granted by "calling.herbalist" and cannot also be a fixed step',
+      'flow.json steps[12].choices[0]: choice "gear" is granted by "calling.herbalist" and cannot also be a fixed step',
     ],
     [
       "card without layout",
@@ -401,15 +401,10 @@ describe("gather", () => {
   const choice = (f: RawFiles, id: string) => f.get("flow.json").choices.find((c: any) => c.id === id);
   const step = (f: RawFiles, id: string) => f.get("flow.json").steps.find((s: any) => s.id === id);
   /* eslint-enable @typescript-eslint/no-explicit-any */
-  const KNACKS = ["knacks-lantern", "knacks-current", "knacks-root"];
-  // The three granted knack choices are gathered in one list step after the folk.
+  // The demo gathers its knack choices in one step with `sections` near the end.
   const gatherKnacks = (f: RawFiles, together?: string) => {
-    for (const id of KNACKS) choice(f, id).gather = "knacks";
-    const steps = f.get("flow.json").steps;
-    const at = steps.indexOf(step(f, "folk")) + 1;
-    steps.splice(at, 0, { id: "knacks", gather: "knacks", ...(together ? { together } : {}) });
-    for (const lang of ["de", "en"])
-      for (const field of ["title", "question", "intro"]) texts(f, lang)[`step.knacks.${field}`] = "Knacks";
+    if (together) step(f, "knacks").together = together;
+    else delete step(f, "knacks").together;
   };
 
   it("accepts a gather step and the choices gathered there", () => {
@@ -419,10 +414,7 @@ describe("gather", () => {
   });
 
   it("needs step texts for a step that shows its choices together", () => {
-    const r = mutate((f) => {
-      gatherKnacks(f, "sections");
-      delete texts(f, "en")["step.knacks.intro"];
-    });
+    const r = mutate((f) => delete texts(f, "en")["step.knacks.intro"]);
     expect(messages(r)).toContain(
       'texts/en/ step.knacks.intro: missing text (introduction of step "knacks")',
     );
@@ -477,7 +469,7 @@ describe("gather", () => {
     [
       "a gather step without choices",
       (f) => f.get("flow.json").steps.push({ id: "spare", gather: "spare" }),
-      'flow.json steps[11].gather: no choice is gathered in group "spare"; the step is never shown',
+      'flow.json steps[12].gather: no choice is gathered in group "spare"; the step is never shown',
     ],
   ])("warns about %s", (_name, change, expected) => {
     expect(messages(mutate(change), "warnings")).toContain(expected);

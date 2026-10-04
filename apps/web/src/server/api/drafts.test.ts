@@ -72,14 +72,14 @@ describe("building a character over the API", () => {
     expect(answered).toEqual([
       "name",
       "calling",
-      "gear",
-      "knacks-lantern",
-      "path",
-      "upbringing",
       "folk",
-      "talents-lantern-bearer",
+      "upbringing",
+      "path",
       "scores",
+      "talents-lantern-bearer",
       "extra-talent",
+      "knacks-lantern",
+      "gear",
       "age",
     ]);
     expect(view.evaluation.complete).toBe(true);
@@ -113,7 +113,7 @@ describe("building a character over the API", () => {
     expect(res.status).toBe(422);
     expect(res.json.error).toEqual({
       code: "incomplete",
-      open: ["name", "calling", "upbringing", "folk", "scores", "age"],
+      open: ["name", "calling", "folk", "upbringing", "scores", "age"],
     });
   });
 
@@ -129,7 +129,7 @@ describe("building a character over the API", () => {
       code: "changeRejected",
       reason: { code: "answerDoesNotFit", problem: "notOffered" },
     });
-    // The demo has no step with one shared list (the core tests cover those).
+    // Only a step with one shared list takes a list change.
     const pool = await client.call("PUT", `/api/drafts/${id}/pools/folk`, { version: 1, picks: [] });
     expect(pool.status).toBe(422);
     expect(pool.json.error.reason).toEqual({ code: "unknownStep" });
@@ -178,6 +178,8 @@ describe("building a character over the API", () => {
       ["upbringing", { pick: "upbringing.bell-tower" }],
       ["calling", { pick: "calling.river-runner" }],
       ["talents-river-runner", { picks: ["talent.climbing", "talent.sneaking"] }],
+      // Coastfolk add a talent of their own; the bell tower already taught listening.
+      ["coastfolk-talent", { pick: "talent.weather-sense" }],
       ["gear", { pick: "item.fishing-net" }],
       ["handling-river-runner", { picks: ["handling.boat-hook", "handling.small-bell"] }],
       ["knacks-current", { picks: ["knack.fog-hop", "knack.eddy"] }],
@@ -191,13 +193,13 @@ describe("building a character over the API", () => {
     }
     const done = await client.call("POST", `/api/drafts/${id}/finish`, { version });
     expect(done.json.draft.status).toBe("finished");
-    // Level 2 asks for one more knack: the character is open again.
+    // Level 2 asks for one more talent and one more knack: the character is open again.
     const up = await client.call("PATCH", `/api/drafts/${id}`, {
       version: done.json.draft.version,
       level: 2,
     });
     expect(up.json.draft.status).toBe("draft");
-    expect(up.json.evaluation.open).toEqual(["knacks-current", "extra-talent"]);
+    expect(up.json.evaluation.open).toEqual(["extra-talent", "knacks-current"]);
   });
 
   it("keeps drafts private to their account", async () => {

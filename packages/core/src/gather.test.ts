@@ -5,7 +5,7 @@ import { applyChange, evaluateDraft, newDraft, type DraftChange, type DraftDocum
 
 // Gather steps (SPEC 9.4) on a variant of the demo package: the lantern
 // bearer's talents and an invented extra talent of the hillfolk are granted
-// choices with the gather group "talents", asked at a step after the folk.
+// choices with the gather group "talents", asked at a step after the upbringing.
 let demo: ContentPackage;
 beforeAll(async () => {
   const r = await validatePackageDir(DEMO_PACKAGE_DIR);
@@ -15,7 +15,7 @@ beforeAll(async () => {
 
 interface Variant {
   together?: "sections" | "list";
-  /** Index in the demo's steps where the gather step goes; default right after the folk. */
+  /** Index in the demo's steps where the gather step goes; default right after the upbringing. */
   at?: number;
   when?: string;
 }
@@ -27,7 +27,6 @@ function variant({ together, at, when }: Variant = {}): ContentPackage {
     Choice,
     { kind: "pickMany" }
   >;
-  talents.gather = "talents";
   talents.count = 2;
   const folkTalent: Choice = {
     id: "folk-talent",
@@ -39,17 +38,15 @@ function variant({ together, at, when }: Variant = {}): ContentPackage {
     gather: "talents",
   };
   flow.choices.push(folkTalent);
-  flow.steps = flow.steps.filter((s) => s.id !== "talents-lantern-bearer");
+  // The demo's own talents step is replaced by one with the options under test.
+  flow.steps = flow.steps.filter((s) => s.id !== "talents");
   const step: Step = {
     id: "talents",
     gather: "talents",
     ...(together ? { together } : {}),
     ...(when ? { when } : {}),
   };
-  flow.steps.splice(at ?? flow.steps.findIndex((s) => s.id === "folk") + 1, 0, step);
-  pkg.things
-    .find((t) => t.id === "calling.lantern-bearer")!
-    .grants!.push({ choice: "talents-lantern-bearer" });
+  flow.steps.splice(at ?? flow.steps.findIndex((s) => s.id === "upbringing") + 1, 0, step);
   pkg.things.find((t) => t.id === "folk.hillfolk")!.grants!.push({ choice: "folk-talent" });
   return pkg;
 }
@@ -82,14 +79,14 @@ describe("gather steps", () => {
     expect(ev.steps.map((s) => s.id)).toEqual([
       "character",
       "calling",
-      "gear",
-      "knacks-lantern",
       "calling-gifts",
-      "upbringing",
       "folk",
+      "upbringing",
       "talents-lantern-bearer",
       "folk-talent",
       "scores",
+      "knacks",
+      "gear",
       "looks",
     ]);
     const talents = ev.steps.find((s) => s.id === "talents-lantern-bearer")!;
@@ -102,7 +99,8 @@ describe("gather steps", () => {
 
   it("does not show a gather step that gathered nothing", () => {
     const pkg = variant({ together: "list" });
-    const ev = evaluateDraft(pkg, build(pkg, [["calling", { pick: "calling.river-runner" }]]));
+    // Before a calling is picked, nothing grants a talent choice yet.
+    const ev = evaluateDraft(pkg, build(pkg, [["folk", { pick: "folk.moorfolk" }]]));
     expect(ev.steps.map((s) => s.id)).not.toContain("talents");
   });
 
@@ -112,14 +110,14 @@ describe("gather steps", () => {
     expect(ev.steps.map((s) => s.id)).toEqual([
       "character",
       "calling",
-      "gear",
-      "knacks-lantern",
       "talents-lantern-bearer",
       "calling-gifts",
-      "upbringing",
       "folk",
       "folk-talent",
+      "upbringing",
       "scores",
+      "knacks",
+      "gear",
       "looks",
     ]);
   });

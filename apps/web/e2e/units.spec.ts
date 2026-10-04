@@ -26,7 +26,7 @@ async function overviewPace(page: Page, id: string) {
 }
 
 async function knackReach(page: Page, id: string, lang: "de" | "en") {
-  await page.goto(`/c/${id}/step/knacks-lantern`);
+  await page.goto(`/c/${id}/step/knacks`);
   const card = page.locator("[data-option='knack.glow-thread']");
   await card.getByRole("button", { name: (lang === "de" ? de : en)["common.moreInfo"] }).click();
   return card.locator(".stats").innerText();
