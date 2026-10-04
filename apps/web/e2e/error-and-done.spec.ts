@@ -12,16 +12,20 @@ const MESSAGES = { de, en };
 
 /**
  * Code files fetched from now on fail, as after a rebuild while the page was
- * open. Next.js tries each file twice by itself; `times` failures per file.
+ * open. Next.js then loads the page anew by itself. With `stayLost`, the
+ * files that failed before keep failing after that load; else the new load
+ * brings them.
  */
-async function loseNewChunks(page: Page, times = Infinity): Promise<void> {
-  const failed = new Map<string, number>();
+async function loseNewChunks(page: Page, stayLost = false): Promise<void> {
+  const lost = new Set<string>();
+  let reloaded = false;
+  page.on("request", (r) => {
+    if (r.isNavigationRequest() && r.frame() === page.mainFrame()) reloaded = true;
+  });
   await page.route("**/_next/static/chunks/**", (route) => {
     const url = route.request().url();
-    const n = failed.get(url) ?? 0;
-    if (n >= times) return route.continue();
-    failed.set(url, n + 1);
-    return route.abort("failed");
+    if (!reloaded) lost.add(url);
+    return lost.has(url) && (!reloaded || stayLost) ? route.abort("failed") : route.continue();
   });
 }
 
@@ -39,7 +43,7 @@ for (const lang of ["de", "en"] as const) {
     await page.waitForLoadState("networkidle");
 
     // Usually one automatic reload fetches the new code and the screen just opens.
-    await loseNewChunks(page, 2);
+    await loseNewChunks(page);
     await openSettings(page, m);
     await expect(page.getByRole("heading", { level: 1, name: m["settings.title"] })).toBeVisible();
     await page.unrouteAll();
@@ -49,7 +53,7 @@ for (const lang of ["de", "en"] as const) {
     await expect(page.getByRole("heading", { name: m["characters.title"], level: 1 })).toBeVisible();
     await page.waitForLoadState("networkidle");
     await page.evaluate(() => sessionStorage.setItem("builder.chunkReloadAt", String(Date.now())));
-    await loseNewChunks(page);
+    await loseNewChunks(page, true);
     await openSettings(page, m);
     await expect(page.getByText(m["common.errorTitle"])).toBeVisible();
     await expect(page.getByText(m["common.errorText"])).toBeVisible();

@@ -62,6 +62,17 @@ async function checkScores(page: Page, name: string) {
   // And it is saved: a fresh visit shows the same numbers.
   await page.reload();
   await expect(page.locator(".stepper__value")).toHaveText(["9", "7", "9", "11"]);
+
+  // The last point spent: a calm "all spent", no warning before anyone tries for more.
+  await page.getByRole("button", { name: "Kraft erhöhen" }).click();
+  await expect(page.getByText(m["dist.allSpent"])).toBeVisible();
+  await expect(page.locator(".pointbuy__hint")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Kraft erhöhen" })).toHaveAttribute("aria-disabled", "true");
+  await shot(page, `${name}-alle-punkte`);
+  // Trying anyway (aria-disabled still takes the tap) says why and what to do.
+  await page.getByRole("button", { name: "Kraft erhöhen" }).click({ force: true });
+  await expect(page.getByText(m["dist.notEnough"])).toBeVisible();
+  await expect(page.locator(".stepper__value").first()).toHaveText("10");
 }
 
 test("phone: Choose for me is there before Next and shows what it set", async ({ page }) => {
