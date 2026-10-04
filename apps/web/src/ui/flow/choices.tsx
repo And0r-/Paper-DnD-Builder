@@ -311,6 +311,21 @@ export function PickChoice({
           {t("flow.needsAttention")}
         </Callout>
       )}
+      {choice.held && state.held && state.held.length > 0 && (
+        <Callout tone="info">
+          <p data-held>
+            <RichText
+              lp={lp}
+              text={ptext(lp, choice.held.text)}
+              vars={{
+                things: new Intl.ListFormat(lp.lang, { type: "conjunction" }).format(
+                  state.held.map((id) => thingName(lp, id)),
+                ),
+              }}
+            />
+          </p>
+        </Callout>
+      )}
       {options.length >= SEARCH_FROM && (
         <TextField
           label={t("pick.search")}
