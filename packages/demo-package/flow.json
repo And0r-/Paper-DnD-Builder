@@ -160,6 +160,31 @@
       "maxLength": 300,
       "multiline": true,
       "optional": true
+    },
+    {
+      "id": "borrowed-knack",
+      "kind": "pickMany",
+      "source": "mistland",
+      "options": {
+        "ids": [
+          "knack.spark-shower",
+          "knack.glow-thread",
+          "knack.warm-glow",
+          "knack.shadow-ward",
+          "knack.light-bridge",
+          "knack.lantern-call",
+          "knack.fog-hop",
+          "knack.eddy",
+          "knack.driftwood-guard",
+          "knack.wave-push",
+          "knack.dew-breath",
+          "knack.rapid-rush",
+          "knack.river-voice",
+          "knack.spore-veil"
+        ]
+      },
+      "count": 1,
+      "recommend": [{ "pick": ["knack.warm-glow"] }]
     }
   ],
   "characterName": "name",

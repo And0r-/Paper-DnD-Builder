@@ -47,6 +47,7 @@
       { "choice": "gear" },
       { "choice": "knacks-root" },
       { "thing": "trait.green-thumb", "atLevel": 2 },
+      { "choice": "borrowed-knack", "atLevel": 2 },
       { "choice": "path", "atLevel": 3 }
     ]
   },
