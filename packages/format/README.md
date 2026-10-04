@@ -17,4 +17,4 @@ pnpm validate-package packages/demo-package
 pnpm validate-package path/to/package --strict   # warnings fail too
 ```
 
-Current format version: **0.4** (`PACKAGE_FORMAT_VERSION`).
+Current format version: **0.5** (`PACKAGE_FORMAT_VERSION`).

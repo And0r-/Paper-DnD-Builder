@@ -31,7 +31,7 @@ describe("loadPackages", () => {
     await copyPackage(DEMO_PACKAGE_DIR, "demo");
     const reg = await loadPackages(root, logger());
     expect([...reg.packages.keys()]).toEqual(["demo"]);
-    expect(reg.get("demo")?.manifest.version).toBe("0.4.0");
+    expect(reg.get("demo")?.manifest.version).toBe("0.5.0");
     expect(reg.rejected).toEqual([]);
     expect(log.info.join("\n")).toContain("1 loaded, 0 rejected");
   });
@@ -81,9 +81,9 @@ describe("loadPackages", () => {
 
   it("picks up a swapped package on the next start, no rebuild", async () => {
     const dir = await copyPackage(DEMO_PACKAGE_DIR, "demo");
-    expect((await loadPackages(root, logger())).get("demo")!.manifest.version).toBe("0.4.0");
+    expect((await loadPackages(root, logger())).get("demo")!.manifest.version).toBe("0.5.0");
     const manifest = JSON.parse(await readFile(path.join(dir, "manifest.json"), "utf8"));
-    await writeFile(path.join(dir, "manifest.json"), JSON.stringify({ ...manifest, version: "0.4.1" }));
-    expect((await loadPackages(root, logger())).get("demo")!.manifest.version).toBe("0.4.1");
+    await writeFile(path.join(dir, "manifest.json"), JSON.stringify({ ...manifest, version: "0.5.1" }));
+    expect((await loadPackages(root, logger())).get("demo")!.manifest.version).toBe("0.5.1");
   });
 });
