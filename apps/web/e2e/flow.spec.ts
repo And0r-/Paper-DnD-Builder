@@ -51,7 +51,6 @@ test("a newcomer builds a level-3 character from login to finished", async ({ pa
   await question(page, m["level.question"]);
   await expect(page.getByText("Schritt 1 von")).toBeVisible();
   await pick(page, "3");
-  await expect(page.getByText(/Durch deine Wahl komm/)).toBeVisible();
   await shot(page, "03-stufe");
   await axe(page);
   await next(page);
@@ -84,48 +83,19 @@ test("a newcomer builds a level-3 character from login to finished", async ({ pa
   await expect(page.locator('[data-option="calling.lantern-bearer"] .badge')).toHaveText("Sanfter Einstieg");
   await expect(page.getByRole("main").getByText(m["common.recommended"], { exact: true })).toHaveCount(0);
   await pick(page, "Laternenträgerin");
-  // Calling brings new steps; the count never changes without a word.
+  // Calling brings new steps (specialisation, talents, knacks, gear); the count never changes without a word.
   await expect(page.getByText(/Durch deine Wahl kommen 4 Schritte dazu/)).toBeVisible();
   await shot(page, "05-beruf");
   await axe(page);
   await next(page);
 
-  await question(page, "Was nimmt dein Charakter zusätzlich mit?");
-  await pick(page, "Schilfschild");
-  await next(page);
-
-  // Knacks: level 3 gives three; units in the facts follow the settings.
-  await question(page, "Welche Kniffe kann dein Charakter?");
-  await expect(page.getByText("0 von 3 gewählt")).toBeVisible();
-  await pick(page, "Warmer Schein");
-  await pick(page, "Leuchtfaden");
-  await pick(page, "Stilles Wort");
-  await expect(page.getByText("3 von 3 gewählt")).toBeVisible();
-  await pick(page, "Funkenregen");
-  await expect(page.getByText("Du hast schon 3. Nimm erst eine weg.")).toBeVisible();
-  await shot(page, "08-kniffe");
-  await axe(page);
-  await next(page);
-
-  await question(page, "Worauf hat sich dein Charakter spezialisiert?");
-  await pick(page, "Lichtwächterin");
-  await next(page);
-
-  // Info step: nothing to choose, only what you get.
+  // Info step: nothing to choose, only what you get; the details come later.
   await question(page, "Das bekommst du durch deinen Beruf");
   // Granted choices came right after the calling: they read as done, not as "next".
   await expect(page.getByText(m["info.chosen"]!)).toBeVisible();
   await expect(page.getByText(m["info.choices"]!)).toHaveCount(0);
   await shot(page, "09-geschenke");
   await page.getByRole("button", { name: m["info.continue"] }).click();
-
-  // "Choose for me" waits under the intro before Next is ever pressed.
-  await question(page, "Wo hat dein Charakter seine Kindheit verbracht?");
-  await page.locator(".shortcuts").getByRole("button", { name: m["flow.chooseForMe"] }).click();
-  await expect(page.getByRole("radio", { name: "Fährkind" })).toBeChecked();
-  await expect(page.locator(".shortcuts__done")).toBeFocused();
-  await expect(page.locator(".shortcuts__done")).toContainText(m["flow.choseForMe"]);
-  await next(page);
 
   // Folk: "learn more" shows the long explanation, units from the settings.
   await question(page, "Woher kommt dein Charakter?");
@@ -141,7 +111,29 @@ test("a newcomer builds a level-3 character from login to finished", async ({ pa
   await axe(page);
   await next(page);
 
-  // Talents come after the folk, which can add one: pick many with a counter.
+  // "Choose for me" waits under the intro before Next is ever pressed.
+  await question(page, "Wo hat dein Charakter seine Kindheit verbracht?");
+  await page.locator(".shortcuts").getByRole("button", { name: m["flow.chooseForMe"] }).click();
+  await expect(page.getByRole("radio", { name: "Fährkind" })).toBeChecked();
+  await expect(page.locator(".shortcuts__done")).toBeFocused();
+  await expect(page.locator(".shortcuts__done")).toContainText(m["flow.choseForMe"]);
+  await next(page);
+
+  // The specialisation shapes the character, so it comes before the numbers.
+  await question(page, "Worauf hat sich dein Charakter spezialisiert?");
+  await pick(page, "Lichtwächterin");
+  await next(page);
+
+  // Scores: spread points with − and +, then let the recommendation finish it.
+  await question(page, "Worin ist dein Charakter stark?");
+  await expect(page.getByText("Noch 14 Punkte übrig")).toBeVisible();
+  await page.getByRole("button", { name: "Herz erhöhen" }).click();
+  await expect(page.getByText("Noch 13 Punkte übrig")).toBeVisible();
+  await shot(page, "11-grundwerte");
+  await axe(page);
+  await next(page);
+
+  // Talents: the calling's and the one of level 2 on one step (format 0.8 gather).
   await question(page, "Worin ist dein Charakter geübt?");
   await expect(page.getByText("0 von 2 gewählt")).toBeVisible();
   await next(page);
@@ -149,6 +141,7 @@ test("a newcomer builds a level-3 character from login to finished", async ({ pa
   // Pressed too early, the dock offers it right above Next as well.
   await page.locator(".step-footer").getByRole("button", { name: m["flow.chooseForMe"] }).click();
   await expect(page.getByText("2 von 2 gewählt")).toBeVisible();
+  await expect(page.getByRole("radio", { name: "Lauschen" })).toBeChecked();
   await shot(page, "06-talente");
   await axe(page);
   await next(page);
@@ -171,17 +164,22 @@ test("a newcomer builds a level-3 character from login to finished", async ({ pa
   // Browser back works like "Back"; we were on the next step before.
   await page.goBack();
 
-  // Scores: spread points with − and +, then let the recommendation finish it.
-  await question(page, "Worin ist dein Charakter stark?");
-  await expect(page.getByText("Noch 14 Punkte übrig")).toBeVisible();
-  await page.getByRole("button", { name: "Herz erhöhen" }).click();
-  await expect(page.getByText("Noch 13 Punkte übrig")).toBeVisible();
-  await shot(page, "11-grundwerte");
+  // Knacks: level 3 gives three; units in the facts follow the settings.
+  await question(page, "Welche Kniffe kann dein Charakter?");
+  await expect(page.getByText("0 von 3 gewählt")).toBeVisible();
+  await pick(page, "Warmer Schein");
+  await pick(page, "Leuchtfaden");
+  await pick(page, "Stilles Wort");
+  await expect(page.getByText("3 von 3 gewählt")).toBeVisible();
+  await pick(page, "Funkenregen");
+  await expect(page.getByText("Du hast schon 3. Nimm erst eine weg.")).toBeVisible();
+  await shot(page, "08-kniffe");
   await axe(page);
   await next(page);
 
-  await question(page, "Was hat dein Charakter unterwegs dazugelernt?");
-  await pick(page, "Lauschen");
+  // Gear near the end, once the character is clear.
+  await question(page, "Was nimmt dein Charakter zusätzlich mit?");
+  await pick(page, "Schilfschild");
   await next(page);
 
   // Looks last: several questions on one screen, all of them can stay as they are.

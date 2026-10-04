@@ -4,21 +4,18 @@
     { "id": "character", "choices": ["name", "concept"] },
     { "id": "calling", "choices": ["calling"] },
     { "id": "calling-gifts", "choices": ["calling-gifts"] },
-    { "id": "upbringing", "choices": ["upbringing"] },
     { "id": "folk", "choices": ["folk"] },
+    { "id": "upbringing", "choices": ["upbringing"] },
+    { "id": "paths", "gather": "path" },
+    { "id": "scores", "choices": ["scores"] },
+    { "id": "talents", "gather": "talents", "together": "list" },
+    { "id": "knacks", "gather": "knacks", "together": "sections" },
+    { "id": "equipment", "gather": "gear" },
     {
-      "id": "talents-lantern-bearer",
-      "choices": ["talents-lantern-bearer"],
-      "when": "has('calling.lantern-bearer')"
-    },
-    {
-      "id": "talents-river-runner",
-      "choices": ["talents-river-runner"],
+      "id": "handling-river-runner",
+      "choices": ["handling-river-runner"],
       "when": "has('calling.river-runner')"
     },
-    { "id": "talents-herbalist", "choices": ["talents-herbalist"], "when": "has('calling.herbalist')" },
-    { "id": "scores", "choices": ["scores"] },
-    { "id": "extra-talent", "choices": ["extra-talent"], "when": "level >= 2" },
     { "id": "looks", "choices": ["age", "looks"] }
   ],
   "choices": [
@@ -58,7 +55,8 @@
         },
         { "pick": ["talent.mending", "talent.climbing"] }
       ],
-      "textVariants": [{ "id": "hillfolk", "when": "has('folk.hillfolk')" }]
+      "textVariants": [{ "id": "hillfolk", "when": "has('folk.hillfolk')" }],
+      "gather": "talents"
     },
     {
       "id": "talents-river-runner",
@@ -73,7 +71,8 @@
         },
         { "pick": ["talent.climbing", "talent.sneaking"] }
       ],
-      "textVariants": [{ "id": "hillfolk", "when": "has('folk.hillfolk')" }]
+      "textVariants": [{ "id": "hillfolk", "when": "has('folk.hillfolk')" }],
+      "gather": "talents"
     },
     {
       "id": "talents-herbalist",
@@ -88,7 +87,8 @@
         },
         { "pick": ["talent.mending", "talent.tracking"] }
       ],
-      "textVariants": [{ "id": "hillfolk", "when": "has('folk.hillfolk')" }]
+      "textVariants": [{ "id": "hillfolk", "when": "has('folk.hillfolk')" }],
+      "gather": "talents"
     },
     {
       "id": "gear",
@@ -98,7 +98,8 @@
       "recommend": [
         { "when": "has('calling.herbalist')", "pick": ["item.mortar"] },
         { "pick": ["item.reed-shield"] }
-      ]
+      ],
+      "gather": "gear"
     },
     {
       "id": "knacks-lantern",
@@ -109,7 +110,8 @@
       "recommend": [
         { "when": "level >= 2", "pick": ["knack.warm-glow", "knack.glow-thread", "knack.quiet-word"] },
         { "pick": ["knack.warm-glow", "knack.glow-thread"] }
-      ]
+      ],
+      "gather": "knacks"
     },
     {
       "id": "knacks-current",
@@ -120,7 +122,8 @@
       "recommend": [
         { "when": "level >= 2", "pick": ["knack.fog-hop", "knack.dew-breath", "knack.wave-push"] },
         { "pick": ["knack.fog-hop", "knack.dew-breath"] }
-      ]
+      ],
+      "gather": "knacks"
     },
     {
       "id": "knacks-root",
@@ -131,13 +134,15 @@
       "recommend": [
         { "when": "level >= 2", "pick": ["knack.herb-scent", "knack.root-grip", "knack.moss-bed"] },
         { "pick": ["knack.herb-scent", "knack.root-grip"] }
-      ]
+      ],
+      "gather": "knacks"
     },
     {
       "id": "path",
       "kind": "pickOne",
       "source": "mistland",
-      "options": { "kind": "path" }
+      "options": { "kind": "path" },
+      "gather": "path"
     },
     {
       "id": "scores",
@@ -169,7 +174,8 @@
       "kind": "pickOne",
       "source": "mistland",
       "options": { "kind": "talent" },
-      "recommend": [{ "pick": ["talent.listening"] }]
+      "recommend": [{ "pick": ["talent.listening"] }],
+      "gather": "talents"
     },
     {
       "id": "name",
@@ -226,7 +232,8 @@
         ]
       },
       "count": 1,
-      "recommend": [{ "pick": ["knack.warm-glow"] }]
+      "recommend": [{ "pick": ["knack.warm-glow"] }],
+      "gather": "knacks"
     },
     {
       "id": "handling-river-runner",
@@ -236,6 +243,14 @@
       "count": 2,
       "recommend": [{ "pick": ["handling.boat-hook", "handling.rope"] }],
       "held": { "text": "choice.handling-river-runner.held" }
+    },
+    {
+      "id": "coastfolk-talent",
+      "kind": "pickOne",
+      "source": "mistland",
+      "options": { "kind": "talent", "tags": ["for-coastfolk"] },
+      "recommend": [{ "pick": ["talent.listening"] }],
+      "gather": "talents"
     }
   ],
   "characterName": "name",

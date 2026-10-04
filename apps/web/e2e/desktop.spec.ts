@@ -43,7 +43,7 @@ test("three columns, keyboard only, and only requests to the builder itself", as
   await page.getByRole("button", { name: m["common.next"], exact: true }).focus();
   await page.keyboard.press("Enter");
   await expect(
-    page.getByRole("heading", { level: 1, name: "Was nimmt dein Charakter zusätzlich mit?" }),
+    page.getByRole("heading", { level: 1, name: "Das bekommst du durch deinen Beruf" }),
   ).toBeVisible();
   await expect(page.getByRole("heading", { level: 1 })).toBeFocused();
 
@@ -117,24 +117,26 @@ test("Next pressed too early: reason, Choose for me and focus are all in view", 
   const reason = page.locator(".step-footer__reason");
   const chooseForMe = reason.getByRole("button", { name: m["flow.chooseForMe"] });
 
-  // The long list: 14 cards, a search box, the page scrolls far.
-  await page.goto(`/c/${id}/step/borrowed-knack`);
+  // The long list: 14 cards, a search box, the page scrolls far. The borrowed
+  // knack shares the knacks step with the calling's knacks (format 0.8 `sections`).
+  await page.goto(`/c/${id}/step/knacks`);
   await expect(page.getByRole("searchbox", { name: m["pick.search"] })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollHeight)).toBeGreaterThan(2 * 900);
   await next.scrollIntoViewIfNeeded();
   await next.click();
-  await expect(reason).toContainText("Wähle noch 1 Kniff.");
+  await expect(reason).toContainText("Wähle noch 3 Kniff(e).");
   await page.screenshot({ path: join(SHOTS, "43-desktop-zu-frueh-weiter.png") });
   await expectInView(page, reason);
   await expectInView(page, chooseForMe);
   await expectInView(page, next);
   await expectFocusSeen(page);
   await chooseForMe.click();
+  await expect(page.getByText("3 von 3 gewählt")).toBeVisible();
   await expect(page.getByText("1 von 1 gewählt")).toBeVisible();
   await expect(reason).toHaveCount(0);
 
   // The same for one pick, many picks without search, and points to share out.
-  for (const step of ["folk", "talents-herbalist", "scores"]) {
+  for (const step of ["folk", "talents", "scores"]) {
     await page.goto(`/c/${id}/step/${step}`);
     await expect(page.getByRole("heading", { level: 1 })).toBeFocused();
     await next.click();

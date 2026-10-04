@@ -3,7 +3,7 @@
     "id": "talent.climbing",
     "kind": "talent",
     "source": "mistland",
-    "tags": ["for-lantern-bearer", "for-river-runner"],
+    "tags": ["for-lantern-bearer", "for-river-runner", "for-coastfolk"],
     "stats": {
       "score": {
         "text": "value.might.name"
@@ -47,7 +47,7 @@
     "id": "talent.listening",
     "kind": "talent",
     "source": "mistland",
-    "tags": ["for-river-runner"],
+    "tags": ["for-river-runner", "for-coastfolk"],
     "stats": {
       "score": {
         "text": "value.wit.name"
@@ -80,7 +80,7 @@
     "id": "talent.weather-sense",
     "kind": "talent",
     "source": "mistland",
-    "tags": ["for-river-runner", "for-herbalist"],
+    "tags": ["for-river-runner", "for-herbalist", "for-coastfolk"],
     "stats": {
       "score": {
         "text": "value.wit.name"
