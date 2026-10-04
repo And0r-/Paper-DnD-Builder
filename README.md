@@ -63,6 +63,13 @@ start if a file changed after it was applied; add a new migration instead.
 Tests use an in-process PostgreSQL (PGlite), so `pnpm check` needs no
 running database.
 
+For `pnpm dev`, set `PACKAGES_DIR=packages/demo-package` (it may point at a
+single package or at a folder of packages) and `DATABASE_URL`. Logging in
+needs SMTP (`SMTP_*`, `MAIL_FROM`); for local development point it at a
+local mail catcher. The server never logs passwords.
+
+The HTTP API is described in [apps/web/API.md](apps/web/API.md).
+
 ## Running with Docker Compose
 
 ```sh
@@ -72,9 +79,17 @@ docker compose up -d --build
 ```
 
 The web container applies pending migrations on start, then serves on
-`WEB_PORT` (default 3000). `GET /api/health` reports liveness. To swap a
+`WEB_PORT` (default 3000). `GET /api/health` reports liveness. Each folder
+in `./packages-mount` with a `manifest.json` is one package (to try the
+builder, copy `packages/demo-package` there). Packages are validated on
+start; an invalid one is rejected with the validator's report in the log
+(`docker compose logs web`) and the builder starts without it. To swap a
 content package, replace its files in `./packages-mount` and run
 `docker compose restart web`.
+
+Run it behind a reverse proxy that terminates TLS and appends
+`X-Forwarded-For` (per-IP login limits use the last entry). With an
+`https://` `BASE_URL`, cookies are `Secure` and `__Host-` prefixed.
 
 ## Contributing
 

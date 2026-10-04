@@ -12,11 +12,19 @@
   },
   "dependencies": {
     "@builder/core": "workspace:*",
+    "@builder/db": "workspace:*",
+    "@builder/format": "workspace:*",
+    "@node-rs/argon2": "^2.2.1",
     "next": "^16.3.8",
+    "nodemailer": "10.0.13",
     "react": "^19.3.0",
-    "react-dom": "^19.3.0"
+    "react-dom": "^19.3.0",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
+    "@builder/demo-package": "workspace:*",
+    "@electric-sql/pglite": "^0.5.8",
+    "@types/nodemailer": "^8.0.2",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0"
   }

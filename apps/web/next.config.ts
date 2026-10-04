@@ -27,7 +27,7 @@ const nextConfig: NextConfig = {
   // Trace files from the monorepo root so workspace packages end up in the bundle.
   outputFileTracingRoot: fileURLToPath(new URL("../../", import.meta.url)),
   // Workspace packages ship TypeScript sources.
-  transpilePackages: ["@builder/core"],
+  transpilePackages: ["@builder/core", "@builder/format", "@builder/db"],
   poweredByHeader: false,
   async headers() {
     return [
