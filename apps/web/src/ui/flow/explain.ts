@@ -1,6 +1,6 @@
 /**
- * Where numbers and things come from, in words: "15 + 2 from Background
- * Soldier = 17", "from Folk Moorfolk". A player who sees a number change, or
+ * Where numbers and things come from, in words: "7 + 1 from Ferry Child
+ * (Upbringing) = 8", "from Folk Moorfolk". A player who sees a number change, or
  * a thing on the sheet they never picked, can see why.
  */
 import {
@@ -101,7 +101,7 @@ export function valueOrigin(
 /**
  * One line per target of a distribute answer. A target that is added to
  * something else on the sheet (a base and a bonus) shows the whole sum:
- * "Might: 15 + 2 from Background Soldier = 17".
+ * "Grace: 7 + 1 from Ferry Child (Upbringing) = 8".
  */
 export function distributeLines(
   lp: LoadedPackage,

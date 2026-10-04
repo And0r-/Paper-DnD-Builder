@@ -36,14 +36,14 @@ const WORDS = {
     origin: "Aus Herkunft Moorvolk",
     onSheet: /^Auf deinem Bogen: 21 = 3 aus .+ \+ 18 aus Beruf Laternenträgerin$/,
     later: "Diese Zahl ändert sich noch. Sie hängt auch von deiner Wahl im Schritt Grundwerte ab.",
-    progress: /^Schritt \d+ von \d+ · Beruf · Teil 2 von 5$/,
+    progress: /^Schritt \d+ von \d+ · Beruf · Teil 2 von 4$/,
   },
   en: {
     score: /Grace: 7 \+ 1 from Ferry Child \(Upbringing\) = 8/,
     origin: "From Moorfolk (Folk)",
     onSheet: /^On your sheet: 21 = 3 from .+ \+ 18 from Lantern Bearer \(Calling\)$/,
     later: "This number still changes. It also depends on what you choose in the step Scores.",
-    progress: /^Step \d+ of \d+ · Calling · Part 2 of 5$/,
+    progress: /^Step \d+ of \d+ · Calling · Part 2 of 4$/,
   },
 } as const;
 
@@ -52,7 +52,7 @@ async function checkAll(page: Page, id: string, early: string, lang: Lang) {
   const w = WORDS[lang];
 
   // A part the calling brought: same step number as the calling, with its part.
-  await page.goto(`/c/${id}/step/talents-lantern-bearer`);
+  await page.goto(`/c/${id}/step/gear`);
   await expect(page.locator(".progress__text")).toHaveText(w.progress);
   await expectOneLanguage(page, lang);
   await shot(page, `50-teil-eines-schritts-${lang}`);
