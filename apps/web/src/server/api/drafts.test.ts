@@ -129,6 +129,10 @@ describe("building a character over the API", () => {
       code: "changeRejected",
       reason: { code: "answerDoesNotFit", problem: "notOffered" },
     });
+    // The demo has no step with one shared list (the core tests cover those).
+    const pool = await client.call("PUT", `/api/drafts/${id}/pools/folk`, { version: 1, picks: [] });
+    expect(pool.status).toBe(422);
+    expect(pool.json.error.reason).toEqual({ code: "unknownStep" });
     const level = await client.call("PATCH", `/api/drafts/${id}`, { version: 1, level: 9 });
     expect(level.json.error.reason).toEqual({ code: "levelOutOfRange", min: 1, max: 3 });
     const unknownPackage = await client.call("POST", "/api/drafts", { packageId: "nope" });
@@ -175,6 +179,7 @@ describe("building a character over the API", () => {
       ["calling", { pick: "calling.river-runner" }],
       ["talents-river-runner", { picks: ["talent.climbing", "talent.sneaking"] }],
       ["gear", { pick: "item.fishing-net" }],
+      ["handling-river-runner", { picks: ["handling.boat-hook", "handling.small-bell"] }],
       ["knacks-current", { picks: ["knack.fog-hop", "knack.eddy"] }],
       ["scores", { method: 1, assign: { might: 9, grace: 11, wit: 10, heart: 7 } }],
       ["name", { text: "Tobin" }],

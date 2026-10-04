@@ -167,6 +167,21 @@ export const draftRoutes: Route[] = [
     },
   },
   {
+    // All picks of a step with one shared list; the core spreads them over the step's choices.
+    method: "PUT",
+    path: "/api/drafts/:id/pools/:step",
+    handler: async (ctx) => {
+      const body = await readJson(
+        ctx.req,
+        z.strictObject({ version, picks: z.array(z.string().min(1).max(200)).max(200) }),
+      );
+      const step = ctx.params["step"]!;
+      return change(ctx, body.version, (pkg, row) =>
+        applyOrReject(pkg, row, { type: "pool", step, picks: body.picks }),
+      );
+    },
+  },
+  {
     method: "POST",
     path: "/api/drafts/:id/finish",
     handler: async (ctx) => {

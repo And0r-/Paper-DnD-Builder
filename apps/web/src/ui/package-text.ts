@@ -10,7 +10,7 @@ import {
   type MeasureContext,
   type TextPart,
 } from "@builder/core";
-import type { Choice, Step } from "@builder/format/pure";
+import type { Choice } from "@builder/format/pure";
 import type { LoadedPackage } from "./packages.ts";
 
 export function ptext(lp: LoadedPackage, key: string): string | undefined {
@@ -103,16 +103,17 @@ export function choiceTexts(
 }
 
 /**
- * A step with one choice uses the choice's texts; a combined step has its
- * own. `ev` lets a single choice use its text variant and count.
+ * A step with one choice uses the choice's texts; a combined step (several
+ * choices, or a gather step showing them together) has its own. `ev` lets a
+ * single choice use its text variant and count.
  */
 export function stepTexts(
   lp: LoadedPackage,
-  step: Pick<Step, "id" | "choices">,
+  step: { id: string; choices?: string[]; gather?: unknown },
   ev?: Evaluation,
   ctx: MeasureContext = measureContext(lp, undefined),
 ): StepTexts {
-  if (step.choices.length === 1) {
+  if (step.gather === undefined && step.choices?.length === 1) {
     const id = step.choices[0]!;
     const { missing: _, ...texts } = choiceTexts(lp, id, ev?.choices[id], ctx);
     return texts;
