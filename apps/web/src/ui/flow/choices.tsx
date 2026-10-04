@@ -56,6 +56,7 @@ function Stats({ lp, thing }: { lp: LoadedPackage; thing: Thing }) {
 
 function Grants({ lp, thing, level }: { lp: LoadedPackage; thing: Thing; level: number }) {
   const { t } = useApp();
+  const { ev } = useDraft();
   const ctx = useMeasure(lp);
   const items: ReactNode[] = [];
   // Changes of one value over several levels count as one line ("Stamina +15").
@@ -72,7 +73,11 @@ function Grants({ lp, thing, level }: { lp: LoadedPackage; thing: Thing; level: 
     if ((g.atLevel ?? 1) > level) continue;
     if (g.thing) items.push(<li key={i}>{thingName(lp, g.thing)}</li>);
     else if (g.choice)
-      items.push(<li key={i}>{t("option.youChoose", { title: choiceTexts(lp, g.choice).title })}</li>);
+      items.push(
+        <li key={i}>
+          {t("option.youChoose", { title: choiceTexts(lp, g.choice, ev.choices[g.choice], ctx).title })}
+        </li>,
+      );
   }
   if (items.length === 0) return null;
   return (
@@ -585,6 +590,7 @@ export function NumberChoice({
 }) {
   const { t } = useApp();
   const { lp, change } = useDraft();
+  const ctx = useMeasure(lp);
   const min = state.min ?? 0;
   const max = state.max ?? min;
   const stored = (state.answer as { value?: number } | undefined)?.value;
@@ -610,7 +616,7 @@ export function NumberChoice({
   if (max - min <= 4) {
     return (
       <Segmented
-        legend={choiceTexts(lp, choice.id).question}
+        legend={choiceTexts(lp, choice.id, state, ctx).question}
         legendHidden
         options={Array.from({ length: max - min + 1 }, (_, i) => ({
           value: min + i,
@@ -787,7 +793,7 @@ export function InfoChoice({ state }: { state: ChoiceState }) {
           <p className="gifts__choices-title">{t("info.choices")}</p>
           <ul>
             {info.choices.map((c) => (
-              <li key={c}>{choiceTexts(lp, c).title}</li>
+              <li key={c}>{choiceTexts(lp, c, ev.choices[c], ctx).title}</li>
             ))}
           </ul>
         </div>

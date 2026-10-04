@@ -233,6 +233,7 @@ export function StepFrame({
   question,
   intro,
   introText,
+  introVars,
   children,
   footer,
   laterLink,
@@ -243,6 +244,7 @@ export function StepFrame({
   question: string;
   intro?: ReactNode;
   introText?: string | undefined;
+  introVars?: Record<string, string | number>;
   children: ReactNode;
   footer: ReactNode;
   laterLink?: ReactNode;
@@ -259,7 +261,10 @@ export function StepFrame({
       <QuestionHeader
         id={headingId}
         question={question}
-        intro={intro ?? (introText !== undefined ? <RichText lp={lp} text={introText} /> : undefined)}
+        intro={
+          intro ??
+          (introText !== undefined ? <RichText lp={lp} text={introText} vars={introVars} /> : undefined)
+        }
       />
       {laterLink}
       <StepNotice />

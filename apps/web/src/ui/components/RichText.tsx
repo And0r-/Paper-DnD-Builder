@@ -88,7 +88,7 @@ export function RichText({
 }: {
   lp: LoadedPackage;
   text: string | undefined;
-  vars?: Record<string, string | number>;
+  vars?: Record<string, string | number> | undefined;
 }) {
   const ctx = useMeasure(lp);
   const glossary = useContext(GlossaryCtx);
