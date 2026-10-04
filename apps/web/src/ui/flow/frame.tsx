@@ -275,6 +275,33 @@ export function StepFrame({
 }
 
 /**
+ * The footer dock is fixed to the bottom on phones. The page leaves room
+ * below the content as tall as the dock is now, so a reason shown in the
+ * dock never hides the last answer.
+ */
+export function useFooterDock() {
+  const dock = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = dock.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const root = document.documentElement;
+    const update = () => {
+      if (getComputedStyle(el).position === "fixed")
+        root.style.setProperty("--dock-height", `${el.offsetHeight}px`);
+      else root.style.removeProperty("--dock-height");
+    };
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    update();
+    return () => {
+      ro.disconnect();
+      root.style.removeProperty("--dock-height");
+    };
+  }, []);
+  return dock;
+}
+
+/**
  * Back and Next. Next is never disabled: pressed too early, it says what is
  * missing right above itself and moves focus to the first open place.
  */
@@ -302,6 +329,7 @@ export function StepFooter({
   const prev = entries[index - 1];
   const next = entries[index + 1];
   const reasonId = useId();
+  const dock = useFooterDock();
 
   useEffect(() => {
     // Once the step is complete the reason goes away by itself.
@@ -320,46 +348,50 @@ export function StepFooter({
 
   return (
     <div className="step-footer">
-      <div aria-live="polite" id={reasonId}>
-        {shown !== undefined && (
-          <div className="step-footer__reason">
-            <Callout tone="warning">{shown}</Callout>
-            {onChooseForMe && (
-              <Button
-                variant="secondary"
-                icon="sparkle"
-                onClick={() => {
-                  onChooseForMe();
-                  setShown(undefined);
-                }}
-              >
-                {t("flow.chooseForMe")}
+      {/* On phones this whole dock is fixed to the bottom: the reason and
+          "Choose for me" appear right above Next, never below the screen edge. */}
+      <div className="step-footer__dock" ref={dock}>
+        <div aria-live="polite" id={reasonId}>
+          {shown !== undefined && (
+            <div className="step-footer__reason">
+              <Callout tone="warning">{shown}</Callout>
+              {onChooseForMe && (
+                <Button
+                  variant="secondary"
+                  icon="sparkle"
+                  onClick={() => {
+                    onChooseForMe();
+                    setShown(undefined);
+                  }}
+                >
+                  {t("flow.chooseForMe")}
+                </Button>
+              )}
+            </div>
+          )}
+        </div>
+        <div className="step-footer__bar">
+          {prev ? (
+            <ButtonLink href={prev.href} variant="secondary" icon="arrowLeft">
+              {t("common.back")}
+            </ButtonLink>
+          ) : (
+            <ButtonLink href="/characters" variant="secondary" icon="arrowLeft">
+              {t("common.back")}
+            </ButtonLink>
+          )}
+          {toOverview ? (
+            <ButtonLink href={`/c/${draft.id}/overview`} iconAfter="arrowRight">
+              {t("flow.backToOverview")}
+            </ButtonLink>
+          ) : (
+            next && (
+              <Button iconAfter="arrowRight" onClick={goNext} aria-describedby={shown ? reasonId : undefined}>
+                {nextLabel ?? t("common.next")}
               </Button>
-            )}
-          </div>
-        )}
-      </div>
-      <div className="step-footer__bar">
-        {prev ? (
-          <ButtonLink href={prev.href} variant="secondary" icon="arrowLeft">
-            {t("common.back")}
-          </ButtonLink>
-        ) : (
-          <ButtonLink href="/characters" variant="secondary" icon="arrowLeft">
-            {t("common.back")}
-          </ButtonLink>
-        )}
-        {toOverview ? (
-          <ButtonLink href={`/c/${draft.id}/overview`} iconAfter="arrowRight">
-            {t("flow.backToOverview")}
-          </ButtonLink>
-        ) : (
-          next && (
-            <Button iconAfter="arrowRight" onClick={goNext} aria-describedby={shown ? reasonId : undefined}>
-              {nextLabel ?? t("common.next")}
-            </Button>
-          )
-        )}
+            )
+          )}
+        </div>
       </div>
     </div>
   );

@@ -134,6 +134,7 @@
   "dist.method": "Wie willst du die Werte festlegen?",
   "dist.pointBuy": "Punkte verteilen",
   "dist.array": "Feste Zahlen zuordnen",
+  "dist.arrayOf": "Zahlen {values} vergeben",
   "dist.left.one": "Noch 1 Punkt übrig",
   "dist.left.other": "Noch {count} Punkte übrig",
   "dist.decrease": "{name} senken",

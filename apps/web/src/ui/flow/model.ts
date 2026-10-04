@@ -12,7 +12,7 @@ import {
 } from "@builder/core";
 import type { ContentPackage } from "@builder/format/pure";
 import type { Translator } from "../../i18n/index.ts";
-import { choiceTexts, formatValue, plain, ptext, stepTexts, thingName } from "../package-text.ts";
+import { choiceTexts, grantedValue, plain, ptext, stepTexts, thingName } from "../package-text.ts";
 import type { LoadedPackage } from "../packages.ts";
 
 export type EntryStatus = "done" | "open" | "needsAttention";
@@ -149,10 +149,7 @@ export function describeAnswer(
       if (!info) return undefined;
       const parts = [
         ...info.things.map((id) => thingName(lp, id)),
-        ...info.values.map(
-          (v) =>
-            `${ptext(lp, `value.${v.value}.name`) ?? v.value} ${formatValue(lp, ctx, v.value, v.add, true)}`,
-        ),
+        ...info.values.map((v) => grantedValue(lp, ctx, v.value, v.add)),
       ];
       return parts.length > 0 ? list(parts) : undefined;
     }

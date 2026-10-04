@@ -134,6 +134,7 @@
   "dist.method": "How do you want to set the values?",
   "dist.pointBuy": "Spread points",
   "dist.array": "Assign fixed numbers",
+  "dist.arrayOf": "Give out {values}",
   "dist.left.one": "1 point left",
   "dist.left.other": "{count} points left",
   "dist.decrease": "Lower {name}",

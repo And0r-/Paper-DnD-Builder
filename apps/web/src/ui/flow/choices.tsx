@@ -13,7 +13,15 @@ import { Callout } from "../components/Feedback.tsx";
 import { Disclosure, Segmented, TextField } from "../components/Fields.tsx";
 import { Icon } from "../components/Icon.tsx";
 import { RichText, useMeasure } from "../components/RichText.tsx";
-import { choiceTexts, formatValue, plain, plist, ptext, thingName } from "../package-text.ts";
+import {
+  choiceTexts,
+  distributeMethodLabels,
+  grantedValue,
+  plain,
+  plist,
+  ptext,
+  thingName,
+} from "../package-text.ts";
 import type { LoadedPackage } from "../packages.ts";
 import { useDraft } from "./draft-state.tsx";
 import { useExplain } from "./frame.tsx";
@@ -58,11 +66,7 @@ function Grants({ lp, thing, level }: { lp: LoadedPackage; thing: Thing; level: 
     }
   }
   for (const [value, add] of adds) {
-    items.push(
-      <li key={`v-${value}`}>
-        {ptext(lp, `value.${value}.name`)} {formatValue(lp, ctx, value, add, true)}
-      </li>,
-    );
+    items.push(<li key={`v-${value}`}>{grantedValue(lp, ctx, value, add)}</li>);
   }
   for (const [i, g] of (thing.grants ?? []).entries()) {
     if ((g.atLevel ?? 1) > level) continue;
@@ -353,7 +357,7 @@ export function DistributeChoice({
   state: ChoiceState;
   labelledBy: string;
 }) {
-  const { t, tc } = useApp();
+  const { t, tc, list } = useApp();
   const { lp, ev } = useDraft();
   const guard = useGuardedChange();
   const stored = state.answer as { method: number; assign: Record<string, number> } | undefined;
@@ -373,9 +377,9 @@ export function DistributeChoice({
       {choice.methods.length > 1 && (
         <Segmented
           legend={t("dist.method")}
-          options={choice.methods.map((x, i) => ({
+          options={distributeMethodLabels(choice.methods, lp.lang, t, list).map((label, i) => ({
             value: i,
-            label: x.method === "pointBuy" ? t("dist.pointBuy") : t("dist.array"),
+            label,
           }))}
           value={method}
           onChange={setMethod}
@@ -758,9 +762,7 @@ export function InfoChoice({ state }: { state: ChoiceState }) {
       <ul className="gifts__list">
         {info.values.map((v) => (
           <li className="gift" key={`v-${v.value}`}>
-            <p className="gift__name">
-              {ptext(lp, `value.${v.value}.name`)}: {formatValue(lp, ctx, v.value, v.add, true)}
-            </p>
+            <p className="gift__name">{grantedValue(lp, ctx, v.value, v.add)}</p>
             {ptext(lp, `value.${v.value}.explain`) && (
               <p className="gift__text">
                 <RichText lp={lp} text={ptext(lp, `value.${v.value}.explain`)} />
