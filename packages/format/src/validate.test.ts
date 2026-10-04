@@ -126,7 +126,7 @@ describe("cross-file rules", () => {
     [
       "format version",
       (f) => (f.get("manifest.json").formatVersion = "0.3"),
-      "manifest.json formatVersion: package is written for format 0.3, this builder understands 0.7",
+      "manifest.json formatVersion: package is written for format 0.3, this builder understands 0.8",
     ],
     [
       "duplicate thing",
@@ -393,6 +393,94 @@ describe("warnings", () => {
     const r = mutate(change);
     expect(r.ok).toBe(true);
     expect(messages(r, "warnings")).toContain(expected);
+  });
+});
+
+describe("gather", () => {
+  /* eslint-disable @typescript-eslint/no-explicit-any -- tests poke into raw JSON */
+  const choice = (f: RawFiles, id: string) => f.get("flow.json").choices.find((c: any) => c.id === id);
+  const step = (f: RawFiles, id: string) => f.get("flow.json").steps.find((s: any) => s.id === id);
+  /* eslint-enable @typescript-eslint/no-explicit-any */
+  const KNACKS = ["knacks-lantern", "knacks-current", "knacks-root"];
+  // The three granted knack choices are gathered in one list step after the folk.
+  const gatherKnacks = (f: RawFiles, together?: string) => {
+    for (const id of KNACKS) choice(f, id).gather = "knacks";
+    const steps = f.get("flow.json").steps;
+    const at = steps.indexOf(step(f, "folk")) + 1;
+    steps.splice(at, 0, { id: "knacks", gather: "knacks", ...(together ? { together } : {}) });
+    for (const lang of ["de", "en"])
+      for (const field of ["title", "question", "intro"]) texts(f, lang)[`step.knacks.${field}`] = "Knacks";
+  };
+
+  it("accepts a gather step and the choices gathered there", () => {
+    const r = mutate((f) => gatherKnacks(f, "list"));
+    expect(messages(r)).toEqual([]);
+    expect(messages(r, "warnings")).toEqual([]);
+  });
+
+  it("needs step texts for a step that shows its choices together", () => {
+    const r = mutate((f) => {
+      gatherKnacks(f, "sections");
+      delete texts(f, "en")["step.knacks.intro"];
+    });
+    expect(messages(r)).toContain(
+      'texts/en/ step.knacks.intro: missing text (introduction of step "knacks")',
+    );
+  });
+
+  it("does not need step texts when each gathered choice is its own step", () => {
+    const r = mutate((f) => {
+      gatherKnacks(f);
+      for (const lang of ["de", "en"])
+        for (const field of ["title", "question", "intro"]) delete texts(f, lang)[`step.knacks.${field}`];
+    });
+    expect(messages(r)).toEqual([]);
+  });
+
+  it.each<[string, (f: RawFiles) => void, string]>([
+    [
+      "the same group gathered twice",
+      (f) => {
+        gatherKnacks(f);
+        f.get("flow.json").steps.push({ id: "knacks-again", gather: "knacks" });
+      },
+      'flow.json steps[12].gather: group "knacks" is already gathered in step "knacks"',
+    ],
+    [
+      "a list step with a choice that is not picked from a list",
+      (f) => {
+        gatherKnacks(f, "list");
+        step(f, "looks").choices = ["age"];
+        choice(f, "looks").gather = "knacks";
+        thing(f, "callings-and-paths", "calling.herbalist").grants.push({ choice: "looks" });
+      },
+      'flow.json choices[17].gather: step "knacks" shows one list of options; choice "looks" is text',
+    ],
+  ])("rejects %s", (_name, change, expected) => {
+    expect(messages(mutate(change))).toContain(expected);
+  });
+
+  it.each<[string, (f: RawFiles) => void, string]>([
+    [
+      "a group without a gather step",
+      (f) => (choice(f, "gear").gather = "kit"),
+      'flow.json choices[7].gather: no step gathers group "kit"; the choice is asked right after the step that grants it',
+    ],
+    [
+      "a gathered choice listed in a fixed step",
+      (f) => {
+        gatherKnacks(f);
+        choice(f, "folk").gather = "knacks";
+      },
+      'flow.json choices[0].gather: choice "folk" is listed in step "folk", so it is never gathered',
+    ],
+    [
+      "a gather step without choices",
+      (f) => f.get("flow.json").steps.push({ id: "spare", gather: "spare" }),
+      'flow.json steps[11].gather: no choice is gathered in group "spare"; the step is never shown',
+    ],
+  ])("warns about %s", (_name, change, expected) => {
+    expect(messages(mutate(change), "warnings")).toContain(expected);
   });
 });
 

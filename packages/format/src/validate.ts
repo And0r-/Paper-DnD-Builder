@@ -18,6 +18,7 @@ import {
   unitsSchema,
   valuesSchema,
   type Flow,
+  type GatherStep,
   type GlossaryEntry,
   type Manifest,
   type OptionSource,
@@ -524,8 +525,16 @@ export function validatePackageFiles(files: PackageFiles): ValidationResult {
 
   const inStep = new Map<string, string>();
   duplicates(flow.steps.map((s) => s.id)).forEach((s) => err(F, "steps", `step ${lit(s)} is declared twice`));
+  const gatherSteps = new Map<string, GatherStep>(); // group → its gather step
   flow.steps.forEach((s, i) => {
     if (s.when !== undefined) checkExpr(F, `steps[${i}].when`, s.when);
+    if ("gather" in s) {
+      const first = gatherSteps.get(s.gather);
+      if (first)
+        err(F, `steps[${i}].gather`, `group ${lit(s.gather)} is already gathered in step ${lit(first.id)}`);
+      else gatherSteps.set(s.gather, s);
+      return;
+    }
     s.choices.forEach((cid, j) => {
       const sp = `steps[${i}].choices[${j}]`;
       if (!choiceById.has(cid)) err(F, sp, `unknown choice ${lit(cid)}${known(choiceById)}`);
@@ -541,10 +550,41 @@ export function validatePackageFiles(files: PackageFiles): ValidationResult {
       inStep.set(cid, s.id);
     });
   });
+  const gathered = new Set<string>();
   flow.choices.forEach((c, i) => {
     if (!inStep.has(c.id) && !grantedChoices.has(c.id)) {
       warn(F, `choices[${i}]`, `choice ${lit(c.id)} is never asked: no step lists it and no thing grants it`);
     }
+    if (c.gather === undefined) return;
+    gathered.add(c.gather);
+    const at = gatherSteps.get(c.gather);
+    if (inStep.has(c.id)) {
+      warn(
+        F,
+        `choices[${i}].gather`,
+        `choice ${lit(c.id)} is listed in step ${lit(inStep.get(c.id)!)}, so it is never gathered`,
+      );
+    } else if (!at) {
+      warn(
+        F,
+        `choices[${i}].gather`,
+        `no step gathers group ${lit(c.gather)}; the choice is asked right after the step that grants it`,
+      );
+    } else if (at.together === "list" && c.kind !== "pickOne" && c.kind !== "pickMany") {
+      err(
+        F,
+        `choices[${i}].gather`,
+        `step ${lit(at.id)} shows one list of options; choice ${lit(c.id)} is ${c.kind}`,
+      );
+    }
+  });
+  flow.steps.forEach((s, i) => {
+    if ("gather" in s && !gathered.has(s.gather))
+      warn(
+        F,
+        `steps[${i}].gather`,
+        `no choice is gathered in group ${lit(s.gather)}; the step is never shown`,
+      );
   });
   const nameChoice = choiceById.get(flow.characterName);
   if (!nameChoice) err(F, "characterName", `unknown choice ${lit(flow.characterName)}`);
@@ -685,6 +725,7 @@ export function validatePackageFiles(files: PackageFiles): ValidationResult {
     need(`choice.${c.id}.question`, `question of choice ${lit(c.id)}`);
     need(`choice.${c.id}.intro`, `introduction of choice ${lit(c.id)}`);
     optional.add(`choice.${c.id}.missing`);
+    if (c.gather !== undefined) optional.add(`choice.${c.id}.from`);
     if (c.kind === "pickOne" || c.kind === "pickMany") {
       for (const b of c.badges ?? []) need(b.text, `badge of choice ${lit(c.id)}`);
       if (c.held) need(c.held.text, `line naming what the character has, in choice ${lit(c.id)}`);
@@ -700,7 +741,7 @@ export function validatePackageFiles(files: PackageFiles): ValidationResult {
   );
   for (const v of variantTexts) for (const k of v.keys) optional.add(k);
   for (const s of flow.steps) {
-    if (s.choices.length > 1) {
+    if ("gather" in s ? s.together !== undefined : s.choices.length > 1) {
       need(`step.${s.id}.title`, `title of step ${lit(s.id)}`);
       need(`step.${s.id}.question`, `question of step ${lit(s.id)}`);
       need(`step.${s.id}.intro`, `introduction of step ${lit(s.id)}`);
