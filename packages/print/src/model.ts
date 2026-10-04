@@ -21,6 +21,7 @@ import {
   type MeasureContext,
 } from "@builder/core";
 import type { ContentPackage, Section, StatValue, Thing } from "@builder/format/pure";
+import { isCard } from "./cards.ts";
 import { MESSAGES, type Messages } from "./messages.ts";
 
 export interface PrintSettings {
@@ -335,7 +336,7 @@ export function buildPrintModel(
   const collator = new Intl.Collator(language);
   const cards: Card[] = ev.things
     .map((h) => ({ h, t: things.get(h.id)! }))
-    .filter(({ t }) => t.card === true && pkg.sheet.cards[t.kind] !== undefined)
+    .filter(({ t }) => isCard(pkg, t))
     .map(({ h, t }) => ({ t, step: stepIndex.get(h.step) ?? 0, name: thingName(t.id) }))
     .sort((a, b) => a.step - b.step || (a.t.rank ?? 0) - (b.t.rank ?? 0) || collator.compare(a.name, b.name))
     .map(({ t, name: cardName }) => ({
