@@ -20,10 +20,13 @@ export default function LevelPage() {
   const { min, max } = lp.pkg.flow.level;
   const levelName = ptext(lp, "level.name") ?? "";
   const hint = ptext(lp, "level.hint");
+  // Inside an English sentence the word is written small ("What level …");
+  // German nouns keep their capital.
+  const levelWord = lp.lang === "de" ? levelName : levelName.toLocaleLowerCase(lp.lang);
   return (
     <StepFrame
       entry={entry}
-      question={t("level.question")}
+      question={t("level.question", { levelName: levelWord })}
       introText={ptext(lp, "level.intro")}
       footer={<StepFooter entry={entry} problem={undefined} />}
     >

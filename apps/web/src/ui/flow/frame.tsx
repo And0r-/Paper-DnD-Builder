@@ -203,36 +203,22 @@ export function ProgressHeader({ entry }: { entry: FlowEntry }) {
 }
 
 /**
- * Note when a choice added or removed steps or parts; the count never
- * changes without a word, and parts say that the count stays the same.
+ * Note when a choice added or removed steps or parts, in one short line;
+ * the count never changes without a word. Which ones they are stands in
+ * the step list and the progress line, not in the note. A switch that
+ * swaps parts only says what the new choice brings.
  */
 export function StepNotice() {
-  const { tc, list } = useApp();
+  const { tc } = useApp();
   const { notice } = useDraft();
-  return (
-    <div aria-live="polite">
-      {notice && notice.addedParts.length > 0 && (
-        <Callout tone="info">
-          {tc("flow.partsAdded", notice.addedParts.length, { steps: list(notice.addedParts) })}
-        </Callout>
-      )}
-      {notice && notice.removedParts.length > 0 && (
-        <Callout tone="info">
-          {tc("flow.partsRemoved", notice.removedParts.length, { steps: list(notice.removedParts) })}
-        </Callout>
-      )}
-      {notice && notice.added.length > 0 && (
-        <Callout tone="info">
-          {tc("flow.stepAdded", notice.added.length, { steps: list(notice.added) })}
-        </Callout>
-      )}
-      {notice && notice.removed.length > 0 && (
-        <Callout tone="info">
-          {tc("flow.stepRemoved", notice.removed.length, { steps: list(notice.removed) })}
-        </Callout>
-      )}
-    </div>
-  );
+  const lines: string[] = [];
+  if (notice?.addedParts.length) lines.push(tc("flow.partsAdded", notice.addedParts.length));
+  else if (notice?.removedParts.length) lines.push(tc("flow.partsRemoved", notice.removedParts.length));
+  // After a first sentence the step count follows in a few words.
+  const too = lines.length > 0 ? "Too" : "";
+  if (notice?.added.length) lines.push(tc(`flow.stepAdded${too}`, notice.added.length));
+  if (notice?.removed.length) lines.push(tc(`flow.stepRemoved${too}`, notice.removed.length));
+  return <div aria-live="polite">{lines.length > 0 && <Callout tone="info">{lines.join(" ")}</Callout>}</div>;
 }
 
 /**

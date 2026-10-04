@@ -27,6 +27,7 @@ import {
 import type { LoadedPackage } from "../packages.ts";
 import { useDraft } from "./draft-state.tsx";
 import { laterSteps, sumText } from "./explain.ts";
+import { fillArray, forcedArray, freeMarks } from "./array-fill.ts";
 import { useExplain } from "./frame.tsx";
 import { useGuardedChange } from "./guard.tsx";
 import { stepHref, stepTitle } from "./model.ts";
@@ -369,10 +370,13 @@ export function DistributeChoice({
   choice,
   state,
   labelledBy,
+  onMethod,
 }: {
   choice: Extract<Choice, { kind: "distribute" }>;
   state: ChoiceState;
   labelledBy: string;
+  /** Told which way is shown, so the step can say what is missing in its words. */
+  onMethod?: (method: number) => void;
 }) {
   const { t, tc, list } = useApp();
   const { lp, ev } = useDraft();
@@ -380,6 +384,7 @@ export function DistributeChoice({
   const stored = state.answer as { method: number; assign: Record<string, number> } | undefined;
   const [method, setMethod] = useState<number>(stored?.method ?? 0);
   const m = choice.methods[method]!;
+  useEffect(() => onMethod?.(method), [method, onMethod]);
   const stepName = stepTitle(lp, ev, state.step);
 
   // The rows keep their own numbers while you type. An answer that comes
@@ -396,14 +401,30 @@ export function DistributeChoice({
     setRound((r) => r + 1);
   }, [stored]);
 
-  const save = (assign: Record<string, number>) => {
-    mine.current = sign({ method, assign });
-    return guard.request({ type: "answer", choice: choice.id, answer: { method, assign } }, () => ({
-      title: t("change.title", { step: stepName }),
-      lead: t("change.textGeneric"),
-      after: t("change.afterGeneric"),
-    }));
+  const words = () => ({
+    title: t("change.title", { step: stepName }),
+    lead: t("change.textGeneric"),
+    after: t("change.afterGeneric"),
+  });
+  const saveAs = (way: number, assign: Record<string, number>) => {
+    mine.current = sign({ method: way, assign });
+    return guard.request({ type: "answer", choice: choice.id, answer: { method: way, assign } }, words);
   };
+  const save = (assign: Record<string, number>) => saveAs(method, assign);
+  // An answer the screen no longer shows is taken back, so the step never
+  // looks open while an old answer still counts.
+  const clear = () => {
+    mine.current = undefined;
+    return guard.request({ type: "answer", choice: choice.id, answer: null }, words);
+  };
+  const changeMethod = (way: number) => {
+    setMethod(way);
+    const m2 = choice.methods[way]!;
+    const forced = m2.method === "array" ? forcedArray(choice.targets, m2.values) : undefined;
+    if (forced) saveAs(way, forced);
+    else if (stored && stored.method !== way) clear();
+  };
+  const rec = state.recommended && !Array.isArray(state.recommended) ? state.recommended : undefined;
 
   return (
     <fieldset className="distribute" aria-labelledby={labelledBy}>
@@ -415,7 +436,7 @@ export function DistributeChoice({
             label,
           }))}
           value={method}
-          onChange={setMethod}
+          onChange={changeMethod}
         />
       )}
       {m.method === "pointBuy" ? (
@@ -436,7 +457,9 @@ export function DistributeChoice({
           targets={choice.targets}
           values={m.values}
           initial={stored?.method === method ? stored.assign : undefined}
+          tip={rec?.method === method ? rec.assign : undefined}
           onSave={save}
+          onClear={clear}
         />
       )}
       {guard.dialog}
@@ -543,64 +566,147 @@ function PointBuy({
   );
 }
 
+/**
+ * Fixed numbers, given out by tapping (no dropdowns). A tap on an open row
+ * gives it the highest number still free; a tap on a row with a number
+ * takes it back. Once only the lowest number is left, the open rows get it
+ * by themselves, so a row of equal numbers needs no tap at all.
+ */
 function ArrayAssign({
   lp,
   targets,
   values,
   initial,
+  tip,
   onSave,
+  onClear,
 }: {
   lp: LoadedPackage;
   targets: string[];
   values: number[];
   initial: Record<string, number> | undefined;
+  /** The package's suggestion for this row of numbers, shown on each row while open. */
+  tip: Record<string, number> | undefined;
   onSave: (assign: Record<string, number>) => void;
+  onClear: () => void;
 }) {
   const { t } = useApp();
-  const [assign, setAssign] = useState<Record<string, number | undefined>>(() => initial ?? {});
+  const lowest = Math.min(...values);
+  // Only the numbers given by a tap are kept; the lowest number fills the rest.
+  const [taps, setTaps] = useState<Record<string, number>>(() =>
+    Object.fromEntries(Object.entries(initial ?? {}).filter(([, n]) => n !== lowest)),
+  );
+  const { assign, free, implicit } = fillArray(targets, values, taps);
   const complete = targets.every((v) => assign[v] !== undefined);
+  const next = free[0];
 
-  const set = (v: string, raw: string) => {
-    const next = { ...assign, [v]: raw === "" ? undefined : Number(raw) };
-    setAssign(next);
-    if (targets.every((x) => next[x] !== undefined)) onSave(next as Record<string, number>);
+  const tap = (v: string) => {
+    const nextTaps = { ...taps };
+    if (taps[v] !== undefined) delete nextTaps[v];
+    else if (next !== undefined) nextTaps[v] = next;
+    else return;
+    setTaps(nextTaps);
+    const filled = fillArray(targets, values, nextTaps);
+    if (targets.every((x) => filled.assign[x] !== undefined)) onSave(filled.assign as Record<string, number>);
+    else if (complete) onClear();
   };
 
-  // Each number of the row may be used once; count how often each is still free.
-  const usedCount = (n: number, except: string) =>
-    targets.filter((x) => x !== except && assign[x] === n).length;
-  const available = (n: number, except: string) =>
-    values.filter((x) => x === n).length - usedCount(n, except) > 0;
+  const allSame = Object.keys(taps).length === 0 && complete;
+  const status = allSame
+    ? t("dist.allSame", { value: String(lowest) })
+    : complete
+      ? t("dist.tapDone")
+      : t("dist.tapNext", { value: String(next) });
 
   return (
     <div className="array-assign">
-      <p className="array-assign__hint">{t("dist.arrayHint")}</p>
+      {!allSame && (
+        <p className="array-assign__tray">
+          <span className="array-assign__tray-label">{t("dist.toGive")}</span>
+          {freeMarks(values, free).map(({ n, used }, i) => {
+            return (
+              <span key={i} className={used ? "chip chip--used" : "chip"}>
+                {n}
+                {used && <span className="visually-hidden"> ({t("dist.used")})</span>}
+              </span>
+            );
+          })}
+        </p>
+      )}
+      <p
+        className={complete ? "array-assign__status array-assign__status--done" : "array-assign__status"}
+        aria-live="polite"
+      >
+        {complete && <Icon name="check" size={20} />}
+        {status}
+      </p>
       <ul className="array-assign__rows">
         {targets.map((v) => {
-          const id = `arr-${v}`;
-          return (
-            <li key={v} className="array-assign__row">
-              <label htmlFor={id} className="array-assign__name">
-                {ptext(lp, `value.${v}.name`)}
-              </label>
-              <select
-                id={id}
-                className="select"
-                value={assign[v] ?? ""}
-                onChange={(e) => set(v, e.target.value)}
+          const name = ptext(lp, `value.${v}.name`) ?? v;
+          const explain = ptext(lp, `value.${v}.explain`);
+          const value = assign[v];
+          const fixed = implicit.includes(v);
+          const suggested = !complete && tip?.[v] !== undefined && tip[v] !== lowest ? tip[v] : undefined;
+          const head = (
+            <>
+              <span className="array-assign__label">
+                <span className="array-assign__name">{name}</span>
+                {suggested !== undefined && (
+                  <span className="array-assign__tip">{t("dist.tip", { value: String(suggested) })}</span>
+                )}
+              </span>
+              <span
+                className={
+                  value === undefined
+                    ? "array-assign__value array-assign__value--empty"
+                    : "array-assign__value"
+                }
               >
-                <option value="">{t("dist.choose")}</option>
-                {[...new Set(values)].map((n) => (
-                  <option key={n} value={n} disabled={!available(n, v)}>
-                    {available(n, v) ? String(n) : `${n} (${t("dist.used")})`}
-                  </option>
-                ))}
-              </select>
+                {value ?? <span className="visually-hidden">{t("dist.empty")}</span>}
+              </span>
+            </>
+          );
+          const rowClass = [
+            "array-assign__row",
+            fixed && "array-assign__row--fixed",
+            value !== undefined && !fixed && "array-assign__row--given",
+          ]
+            .filter(Boolean)
+            .join(" ");
+          return (
+            // The whole card answers a tap; the button inside is what keyboards and
+            // screen readers use. The explanation stays outside the button, so its
+            // glossary words keep working (like the option cards).
+            <li
+              key={v}
+              className={rowClass}
+              onClick={(e) => {
+                if (fixed || (e.target as HTMLElement).closest("button, a")) return;
+                tap(v);
+              }}
+            >
+              {fixed ? (
+                <div className="array-assign__head">{head}</div>
+              ) : (
+                <button
+                  type="button"
+                  className="array-assign__head array-assign__hit"
+                  aria-pressed={value !== undefined}
+                  data-open-target={value === undefined || undefined}
+                  onClick={() => tap(v)}
+                >
+                  {head}
+                </button>
+              )}
+              {explain && (
+                <span className="array-assign__explain">
+                  <RichText lp={lp} text={explain} />
+                </span>
+              )}
             </li>
           );
         })}
       </ul>
-      {!complete && <p className="array-assign__missing">{t("dist.arrayMissing")}</p>}
     </div>
   );
 }

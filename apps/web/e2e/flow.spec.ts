@@ -48,10 +48,10 @@ test("a newcomer builds a level-3 character from login to finished", async ({ pa
   await page.getByRole("link", { name: m["characters.emptyAction"] }).click();
 
   // Level: one game is loaded, so the game question is skipped.
-  await question(page, m["level.question"]);
+  await question(page, "Welche Stufe hat dein Charakter?");
   await expect(page.getByText("Schritt 1 von")).toBeVisible();
   await pick(page, "3");
-  await expect(page.getByText(/Durch deine Wahl komm/)).toBeVisible();
+  await expect(page.getByText(/^Deine Wahl bringt (einen|\d+) Schritte? dazu\.$/)).toBeVisible();
   await shot(page, "03-stufe");
   await axe(page);
   await next(page);
@@ -83,11 +83,12 @@ test("a newcomer builds a level-3 character from login to finished", async ({ pa
   // A package badge replaces "recommended" on the same option.
   await expect(page.locator('[data-option="calling.lantern-bearer"] .badge')).toHaveText("Sanfter Einstieg");
   await expect(page.getByRole("main").getByText(m["common.recommended"], { exact: true })).toHaveCount(0);
-  // Calling brings parts of its own; they belong to this step, so the count stays put.
-  const before = await page.locator(".progress__text").textContent();
+  // Calling brings parts of its own; they belong to this step, which keeps its number.
   await pick(page, "Laternenträgerin");
-  await expect(page.getByText(/Deine Wahl bringt 4 eigene Teile mit/)).toBeVisible();
-  await expect(page.locator(".progress__text")).toHaveText(`${before!} · Teil 1 von 5`);
+  await expect(
+    page.getByText("Deine Wahl bringt 3 eigene Teile mit. Dazu kommt ein Schritt.", { exact: true }),
+  ).toBeVisible();
+  await expect(page.locator(".progress__text")).toHaveText(/^Schritt 3 von \d+ · Beruf · Teil 1 von 4$/);
   await shot(page, "05-beruf");
   await axe(page);
   await next(page);
