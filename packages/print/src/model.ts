@@ -93,6 +93,42 @@ export class PrintError extends Error {
   }
 }
 
+/** Languages that write ordinal numbers with a dot ("1." = "first"). */
+const ORDINAL_DOT = new Set([
+  "cs",
+  "da",
+  "de",
+  "et",
+  "fi",
+  "hr",
+  "hu",
+  "is",
+  "lv",
+  "nb",
+  "nn",
+  "no",
+  "pl",
+  "sk",
+  "sl",
+  "sr",
+  "tr",
+]);
+
+/**
+ * The text up to the first full stop, question or exclamation mark that ends
+ * a sentence. A dot after a single letter ("z. B.") does not end one, nor,
+ * in languages that write ordinals with a dot, one after a number ("des 1.
+ * Grades").
+ */
+export function firstSentence(s: string, language: string): string {
+  const ordinals = ORDINAL_DOT.has(language.split("-")[0]!);
+  const end = ordinals
+    ? /^.*?(?<!(?:^|[\s(])(?:\d+|\p{L}))[.!?](?=\s|$)/u
+    : /^.*?(?<!(?:^|[\s(])\p{L})[.!?](?=\s|$)/u;
+  const m = end.exec(s);
+  return (m ? m[0] : s).trim();
+}
+
 /** Languages a package can be printed in: it has texts for them and the builder has page words. */
 export function printLanguages(pkg: ContentPackage): string[] {
   return pkg.manifest.languages.filter((l) => l in MESSAGES && pkg.texts[l] !== undefined);
@@ -154,11 +190,7 @@ export function buildPrintModel(
   };
   const valueLabel = (id: string) => (id === "level" ? text("level.name") : text(`value.${id}.name`));
   /** First sentence of a value's explanation: the hint under its box. */
-  const valueHint = (id: string): string => {
-    const s = text(`value.${id}.explain`);
-    const m = /^.*?[.!?](?=\s|$)/u.exec(s);
-    return (m ? m[0] : s).trim();
-  };
+  const valueHint = (id: string): string => firstSentence(text(`value.${id}.explain`), language);
   const statText = (v: StatValue | undefined): string => {
     if (v === undefined) return "—";
     if (typeof v === "number") return numberFormat.format(v);

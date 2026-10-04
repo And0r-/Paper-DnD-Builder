@@ -321,6 +321,15 @@ export function evaluateDraft(pkg: ContentPackage, doc: DraftDocument): Evaluati
     queue.unshift(...inserted);
   }
 
+  // An info step shows what the thing gives the finished character: a grant's
+  // formula may use a value set by a later step (scores picked after the
+  // calling), so it is worked out again once every step has been walked.
+  for (const state of Object.values(choices)) {
+    const choice = ix.choices.get(state.id);
+    if (choice?.kind === "info" && state.info)
+      state.info = infoFor(pkg, choice.of, choices, character.level, character.scope);
+  }
+
   const open = Object.values(choices)
     .filter((c) => !c.optional && !isSettled(c))
     .map((c) => c.id);

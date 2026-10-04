@@ -38,12 +38,15 @@ export function useApp(): AppState {
 
 export function AppStateProvider({
   initialLanguage,
+  maybeSignedIn = true,
   children,
 }: {
   initialLanguage: UiLanguage;
+  /** False when the server saw no session: the account is null without asking (no 401 in the console). */
+  maybeSignedIn?: boolean;
   children: ReactNode;
 }) {
-  const [account, setAccount] = useState<Account | null | undefined>(undefined);
+  const [account, setAccount] = useState<Account | null | undefined>(maybeSignedIn ? undefined : null);
   const [accountError, setAccountError] = useState(false);
   const [guestLanguage, setGuestLanguage] = useState<UiLanguage>(initialLanguage);
 
@@ -67,8 +70,8 @@ export function AppStateProvider({
   }, []);
 
   useEffect(() => {
-    reloadAccount().catch(() => {});
-  }, [reloadAccount]);
+    if (maybeSignedIn) reloadAccount().catch(() => {});
+  }, [reloadAccount, maybeSignedIn]);
 
   useEffect(() => {
     document.documentElement.lang = lang;
