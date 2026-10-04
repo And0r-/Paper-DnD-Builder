@@ -188,7 +188,7 @@ describe("cross-file rules", () => {
     [
       "choice both fixed and granted",
       (f) => f.get("flow.json").steps.push({ id: "gear", choices: ["gear"] }),
-      'flow.json steps[7].choices[0]: choice "gear" is granted by "calling.herbalist" and cannot also be a fixed step',
+      'flow.json steps[8].choices[0]: choice "gear" is granted by "calling.herbalist" and cannot also be a fixed step',
     ],
     [
       "card without layout",
@@ -327,7 +327,7 @@ describe("warnings", () => {
     ],
     [
       "choice never asked",
-      (f) => f.get("flow.json").steps.splice(6, 1),
+      (f) => f.get("flow.json").steps.splice(0, 1),
       'flow.json choices[14]: choice "name" is never asked: no step lists it and no thing grants it',
     ],
   ])("%s", (_name, change, expected) => {

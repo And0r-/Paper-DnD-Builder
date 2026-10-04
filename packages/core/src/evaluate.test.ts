@@ -54,15 +54,16 @@ describe("steps", () => {
   it("lists the flow's steps for a new level 1 draft and hides steps whose condition is false", () => {
     const ev = evaluateDraft(pkg, draft(1));
     expect(ev.steps.map((s) => s.id)).toEqual([
-      "folk",
-      "upbringing",
+      "character",
       "calling",
       "calling-gifts",
+      "upbringing",
+      "folk",
       "scores",
-      "identity",
+      "looks",
     ]);
     expect(ev.complete).toBe(false);
-    expect(ev.open).toEqual(["folk", "upbringing", "calling", "scores", "name", "age"]);
+    expect(ev.open).toEqual(["name", "calling", "upbringing", "folk", "scores", "age"]);
   });
 
   it("shows level-dependent steps from their level on", () => {
@@ -72,17 +73,18 @@ describe("steps", () => {
   it("inserts granted choices right after the step that granted them, in grant order", () => {
     const ev = evaluateDraft(pkg, draft(3, { calling: { pick: "calling.lantern-bearer" } }));
     expect(ev.steps.map((s) => s.id)).toEqual([
-      "folk",
-      "upbringing",
+      "character",
       "calling",
       "talents-lantern-bearer",
       "gear",
       "knacks-lantern",
       "path",
       "calling-gifts",
+      "upbringing",
+      "folk",
       "scores",
       "extra-talent",
-      "identity",
+      "looks",
     ]);
     const talents = ev.steps.find((s) => s.id === "talents-lantern-bearer")!;
     expect(talents.origin).toBe("granted");
@@ -100,17 +102,19 @@ describe("options", () => {
   it("does not offer things the character already has from elsewhere", () => {
     const ev = evaluateDraft(
       pkg,
-      draft(1, {
-        upbringing: { pick: "upbringing.ferry-child" },
+      draft(2, {
         calling: { pick: "calling.lantern-bearer" },
+        "talents-lantern-bearer": { picks: ["talent.climbing", "talent.mending"] },
+        upbringing: { pick: "upbringing.ferry-child" },
       }),
     );
-    // Haggling comes with the upbringing, so it is not offered again.
-    expect(ev.choices["talents-lantern-bearer"]!.options).toEqual([
-      "talent.climbing",
-      "talent.mending",
-      "talent.legends",
-    ]);
+    // Climbing and mending come with the calling, weather sense and haggling
+    // with the upbringing, so the extra talent does not offer them again.
+    const options = ev.choices["extra-talent"]!.options;
+    expect(options).toContain("talent.legends");
+    for (const had of ["talent.climbing", "talent.mending", "talent.weather-sense", "talent.haggling"]) {
+      expect(options).not.toContain(had);
+    }
   });
 
   it("offers only things whose condition holds", () => {

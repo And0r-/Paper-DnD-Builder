@@ -188,9 +188,7 @@ export function missingText(
   const own = choiceTexts(lp, state.id).missing;
   const count = state.count ?? 0;
   const remaining = state.remaining ?? count;
-  if (own && (state.kind === "pickMany" || state.kind === "distribute")) {
-    return plain(ctx, own, { remaining, count });
-  }
+  if (own) return plain(ctx, own, { remaining, count });
   if (state.kind === "pickMany") {
     return t("pick.missing", { remaining, picked: count - remaining, count });
   }

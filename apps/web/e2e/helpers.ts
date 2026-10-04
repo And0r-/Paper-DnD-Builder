@@ -188,6 +188,7 @@ export async function makeCharacter(page: Page, finish = true): Promise<string> 
     ["scores", { method: 0, assign: { might: 8, grace: 7, wit: 9, heart: 11 } }],
     ["extra-talent", { pick: "talent.listening" }],
     ["name", { text: "Mira" }],
+    ["concept", { text: "Mira trägt das Licht durch jeden Sumpf." }],
     ["age", { value: 20 }],
   ];
   for (const [choice, answer] of answers) {

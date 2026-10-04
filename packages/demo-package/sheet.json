@@ -30,7 +30,7 @@
     { "id": "path", "kind": "featureTable", "span": 4, "things": { "kind": "path" }, "when": "level >= 3" },
     { "id": "gear", "kind": "list", "span": 6, "things": { "kind": "item" }, "blankLines": 4 },
     { "id": "how-to-play", "kind": "helpBox", "span": 6 },
-    { "id": "about", "kind": "answers", "span": 6, "choices": ["age", "looks"] },
+    { "id": "about", "kind": "answers", "span": 6, "choices": ["concept", "age", "looks"] },
     { "id": "notes", "kind": "notes", "span": 6, "lines": 6 }
   ],
   "cards": {
