@@ -152,6 +152,8 @@
     "card.knack.typeLine": "{{var:kind}} · Rang {{var:rank}}",
 
     "sheet.primary.title": "Am Tisch",
+
+    "sheet.primary.nerve": "Mut",
     "sheet.scores.title": "Grundwerte",
     "sheet.scores.hint": "Die Zahl im Kreis zählst du zu passenden Würfen dazu.",
     "sheet.talents.title": "Talente",

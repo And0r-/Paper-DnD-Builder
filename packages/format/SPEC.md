@@ -122,7 +122,7 @@ people who distribute packages.
 
 ```json
 {
-  "formatVersion": "0.3",
+  "formatVersion": "0.4",
   "id": "demo",
   "version": "0.1.0",
   "languages": ["de", "en"],
@@ -632,7 +632,8 @@ builder owns the visual design; the package says what goes where.
       "span": 12,
       "boxes": [
         { "value": "stamina", "style": "pencil" },
-        { "value": "luck", "style": "circles" }
+        { "value": "luck", "style": "circles" },
+        { "value": "nerve", "style": "number", "label": "sheet.primary.nerve" }
       ]
     },
     {
@@ -653,17 +654,17 @@ The sheet is a 12-column grid. Sections fill it row by row; `span` is the
 width (3, 4, 6, 8 or 12). The first section should be the header. Section
 kinds:
 
-| Kind           | Shows                                                                                                                                     | Fields                             |
-| -------------- | ----------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------- |
-| `header`       | character name, `summary.line`, "played by", package name                                                                                 | —                                  |
-| `statBoxes`    | up to 6 large boxes; `number` = computed value, `pencil` = value as a starting number to overwrite, `circles` = that many circles to tick | `boxes[]: { value, style, when? }` |
-| `scoreColumn`  | stacked boxes: value large, `derived` value small                                                                                         | `scores[]: { value, derived? }`    |
-| `checkList`    | all things selected; marked if the character has them; `note` stat small next to the name                                                 | `things` (like `options`), `note?` |
-| `featureTable` | the selected things the character has: name, `short`, use boxes from the `uses` stat                                                      | `things`, `uses?`                  |
-| `list`         | the selected things the character has, plus blank lines                                                                                   | `things`, `blankLines`             |
-| `answers`      | answers to text and number choices                                                                                                        | `choices[]`                        |
-| `helpBox`      | the text `sheet.<id>.text`                                                                                                                | —                                  |
-| `notes`        | blank lines                                                                                                                               | `lines`                            |
+| Kind           | Shows                                                                                                                                     | Fields                                     |
+| -------------- | ----------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------ |
+| `header`       | character name, `summary.line`, "played by", package name                                                                                 | —                                          |
+| `statBoxes`    | up to 6 large boxes; `number` = computed value, `pencil` = value as a starting number to overwrite, `circles` = that many circles to tick | `boxes[]: { value, style, label?, when? }` |
+| `scoreColumn`  | stacked boxes: value large, `derived` value small                                                                                         | `scores[]: { value, derived? }`            |
+| `checkList`    | all things selected; marked if the character has them; `note` stat small next to the name                                                 | `things` (like `options`), `note?`         |
+| `featureTable` | the selected things the character has: name, `short`, use boxes from the `uses` stat                                                      | `things`, `uses?`                          |
+| `list`         | the selected things the character has, plus blank lines                                                                                   | `things`, `blankLines`                     |
+| `answers`      | answers to text and number choices                                                                                                        | `choices[]`                                |
+| `helpBox`      | the text `sheet.<id>.text`                                                                                                                | —                                          |
+| `notes`        | blank lines                                                                                                                               | `lines`                                    |
 
 **Conditions** (`when`, on every section and on each box of a
 `statBoxes` section). An expression (section 8) evaluated with the
@@ -678,6 +679,17 @@ characters need, for example `"when": "level >= 3"` or
 when a value is above zero (`"when": "glow > 0"`). The validator checks
 that the expression parses and names existing values and things, as for
 `requires`.
+
+**Box labels** (`label`, on each box of a `statBoxes` section). A box is
+labeled with the name of its value (`value.<id>.name`). Six boxes in a row
+are narrow, so a long name is printed small and may wrap. If the section
+title already says what the boxes have in common, give the box a shorter
+label: `label` is a text key (any key, for example `value.might.name` or
+`sheet.<section>.<box>`) printed instead of the value name. Example: a
+section "Resistances" with boxes "Might", "Grace" instead of "Might
+resistance", "Grace resistance". The builder prints a label as large as
+fits, down to 7 pt, and splits a word between letters only if it does not
+fit even then; keep labels to one word of about 15 letters.
 
 **Use boxes** (`uses`, on `featureTable` sections and on card layouts).
 Names a stat key. The builder knows no stat names, so this field is the
@@ -744,7 +756,7 @@ well-formed does the second stage check the rules between files:
 - each choice is asked exactly one way; `characterName` is a text choice;
 - sheet sections and card fields refer to existing values, choices and
   stats; section and box conditions (`when`) parse and refer to existing
-  values and things; things with `card: true` have a layout; `uses` stats are whole
+  values and things; box labels (`label`) exist in every language; things with `card: true` have a layout; `uses` stats are whole
   numbers or texts, `note` stats are not true/false;
 - units: every language has defaults; every stated amount can be converted;
 - texts: every required key exists in every language; placeholders and
@@ -784,6 +796,7 @@ are removed (saved characters may lose picks). Keys are never renamed.
 | 0.1     | 2026-10-04 | First version.                                                                                                        | —                                                                                                                                  |
 | 0.2     | 2026-10-04 | Optional `uses` on `featureTable` sections and card layouts (use boxes), optional `note` on `checkList` sections.     | Set `formatVersion` to `"0.2"`. Nothing else changes: both fields are optional, so every valid 0.1 package is a valid 0.2 package. |
 | 0.3     | 2026-10-04 | Optional `when` (condition) on every sheet section and on each box of a `statBoxes` section: false means not printed. | Set `formatVersion` to `"0.3"`. Nothing else changes: the field is optional, so every valid 0.2 package is a valid 0.3 package.    |
+| 0.4     | 2026-10-04 | Optional `label` (text key) on each box of a `statBoxes` section, printed instead of the value name.                  | Set `formatVersion` to `"0.4"`. Nothing else changes: the field is optional, so every valid 0.3 package is a valid 0.4 package.    |
 
 ## 16. A minimal package
 
@@ -794,7 +807,7 @@ language. The validator accepts it as is.
 
 ```json
 {
-  "formatVersion": "0.3",
+  "formatVersion": "0.4",
   "id": "tiny",
   "version": "1.0.0",
   "languages": ["en"],

@@ -691,6 +691,10 @@ export function validatePackageFiles(files: PackageFiles): ValidationResult {
   for (const s of sheet.sections) {
     if (s.kind !== "header") need(`sheet.${s.id}.title`, `title of sheet section ${lit(s.id)}`);
     if (s.kind === "helpBox") need(`sheet.${s.id}.text`, `text of help box ${lit(s.id)}`);
+    if (s.kind === "statBoxes")
+      for (const b of s.boxes)
+        if (b.label !== undefined)
+          need(b.label, `label of box ${lit(b.value)} in sheet section ${lit(s.id)}`);
     optional.add(`sheet.${s.id}.hint`);
   }
   for (const kind of Object.keys(sheet.cards))

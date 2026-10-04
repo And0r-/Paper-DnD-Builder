@@ -1,19 +1,19 @@
 {
-  "formatVersion": "0.3",
+  "formatVersion": "0.4",
   "id": "demo",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "languages": ["de", "en"],
   "kinds": ["folk", "upbringing", "calling", "path", "talent", "trait", "knack", "item"],
   "sources": {
     "mistland": {
       "title": "Mistland demo world, invented for the character builder repository",
-      "version": "0.3.0",
+      "version": "0.4.0",
       "retrieved": "2026-10-04",
       "license": "agpl"
     },
     "mistland-community": {
       "title": "Example of a community addition to the Mistland demo world",
-      "version": "0.3.0",
+      "version": "0.4.0",
       "retrieved": "2026-10-04",
       "license": "cc0"
     }

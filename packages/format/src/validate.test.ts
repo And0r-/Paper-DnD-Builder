@@ -125,8 +125,8 @@ describe("cross-file rules", () => {
   it.each<[string, (f: RawFiles) => void, string]>([
     [
       "format version",
-      (f) => (f.get("manifest.json").formatVersion = "0.2"),
-      "manifest.json formatVersion: package is written for format 0.2, this builder understands 0.3",
+      (f) => (f.get("manifest.json").formatVersion = "0.3"),
+      "manifest.json formatVersion: package is written for format 0.3, this builder understands 0.4",
     ],
     [
       "duplicate thing",
@@ -244,6 +244,11 @@ describe("cross-file rules", () => {
       "box condition on an unknown thing",
       (f) => (f.get("sheet.json").sections[1].boxes[0].when = "has('calling.lamplighter')"),
       `sheet.json sections[1].boxes[0].when: expression "has('calling.lamplighter')" asks has("calling.lamplighter") but there is no such thing`,
+    ],
+    [
+      "box label without text",
+      (f) => delete texts(f, "en")["sheet.primary.nerve"],
+      'texts/en/ sheet.primary.nerve: missing text (label of box "nerve" in sheet section "primary")',
     ],
     [
       "language without unit defaults",

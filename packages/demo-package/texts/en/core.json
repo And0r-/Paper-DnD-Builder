@@ -156,6 +156,8 @@
     "card.knack.typeLine": "{{var:kind}} · Rank {{var:rank}}",
 
     "sheet.primary.title": "At the table",
+
+    "sheet.primary.nerve": "Nerve",
     "sheet.scores.title": "Scores",
     "sheet.scores.hint": "Add the number in the circle to matching rolls.",
     "sheet.talents.title": "Talents",

@@ -250,7 +250,7 @@ export function buildPrintModel(
           ...base,
           kind: "statBoxes",
           boxes: s.boxes.filter(shown).map((b) => ({
-            label: valueLabel(b.value),
+            label: b.label !== undefined ? text(b.label) : valueLabel(b.value),
             style: b.style,
             text: valueText(b.value),
             circles: b.style === "circles" ? Math.max(0, Math.min(12, Math.round(valueOf(b.value)))) : 0,
