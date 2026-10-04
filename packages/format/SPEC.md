@@ -122,7 +122,7 @@ people who distribute packages.
 
 ```json
 {
-  "formatVersion": "0.5",
+  "formatVersion": "0.6",
   "id": "demo",
   "version": "0.1.0",
   "languages": ["de", "en"],
@@ -208,6 +208,7 @@ Each `things/*.json` file is an array of things:
 | `requires` | no       | [Expression](#8-expressions). The thing is offered as an option only while it is true.                                                                                     |
 | `stats`    | no       | Fixed facts shown on cards and in details: number, `true`/`false`, quantity `{amount, unit}` or `{text}` (a text key, for words like "instant"). Label: `stat.<key>.name`. |
 | `grants`   | no       | What having this thing gives, see below.                                                                                                                                   |
+| `about`    | no       | Another thing this one is about, for example skill with one tool → that tool. Used by choices with `held` ([9.3](#93-choices)).                                            |
 | `card`     | no       | Print a card for this thing. Needs a card layout for its kind in `sheet.json`.                                                                                             |
 
 ### Grants
@@ -410,6 +411,23 @@ every player to the same pick.
 ]
 ```
 
+`held` (optional, `pickOne` and `pickMany`) helps the player pick options
+that fit what the character already has. It needs options with `about`
+(see [6](#6-things)). An offered option whose `about` thing the character
+has is recommended first; the `recommend` entry fills the remaining
+places, and the list is cut to `count` (one for `pickOne`). Above the
+list the builder shows the text `text` with `{{var:things}}`: the names of
+those things as a list ("A, B and C"), in option order. If the character
+has none of them, nothing is shown and `recommend` applies as usual.
+
+```json
+"options": { "kind": "handling" },
+"held": { "text": "choice.handling-river-runner.held" }
+```
+
+with `"choice.handling-river-runner.held": "In your pack you have: {{var:things}}."`
+and things like `{ "id": "handling.rope", "kind": "handling", "about": "item.rope", ... }`.
+
 **`distribute`** — spread points or fixed numbers over values.
 
 ```json
@@ -562,11 +580,12 @@ validator flags texts that write a unit as plain text next to a number
 | `[[glossary:stamina\|Stamina]]` | "Stamina", marked as a glossary link to entry `stamina`                                                        |
 | `{{var:name}}`                  | a value the screen supplies (table below)                                                                      |
 
-| Text                   | Variables                                                             |
-| ---------------------- | --------------------------------------------------------------------- |
-| `summary.line`         | the names in `flow.summary.line`                                      |
-| `card.<kind>.typeLine` | `kind` (name of the kind), `rank` (the thing's rank), `level`         |
-| `choice.<id>.missing`  | `remaining` (how many are still missing), `count` (how many in total) |
+| Text                   | Variables                                                                 |
+| ---------------------- | ------------------------------------------------------------------------- |
+| `summary.line`         | the names in `flow.summary.line`                                          |
+| `card.<kind>.typeLine` | `kind` (name of the kind), `rank` (the thing's rank), `level`             |
+| `choice.<id>.missing`  | `remaining` (how many are still missing), `count` (how many in total)     |
+| the `held` text        | `things` (names of the things the character has, as a list: "A, B and C") |
 
 Amounts in placeholders are always in the dimension's source unit, so all
 languages state the same amount. The validator warns if languages of one
@@ -768,7 +787,8 @@ well-formed does the second stage check the rules between files:
   formulas are not circular;
 - option sources select at least one thing; recommendations are among the
   options; badges name options, at most one per thing, and their texts
-  exist in every language; distribute and number targets take input; point-buy costs are
+  exist in every language; `about` names another existing thing; `held`
+  needs options with `about`, and its text exists in every language; distribute and number targets take input; point-buy costs are
   consecutive and do not fall; arrays fit the targets;
 - each choice is asked exactly one way; `characterName` is a text choice;
 - sheet sections and card fields refer to existing values, choices and
@@ -815,6 +835,7 @@ are removed (saved characters may lose picks). Keys are never renamed.
 | 0.3     | 2026-10-04 | Optional `when` (condition) on every sheet section and on each box of a `statBoxes` section: false means not printed. | Set `formatVersion` to `"0.3"`. Nothing else changes: the field is optional, so every valid 0.2 package is a valid 0.3 package.    |
 | 0.4     | 2026-10-04 | Optional `label` (text key) on each box of a `statBoxes` section, printed instead of the value name.                  | Set `formatVersion` to `"0.4"`. Nothing else changes: the field is optional, so every valid 0.3 package is a valid 0.4 package.    |
 | 0.5     | 2026-10-04 | Optional `badges` on `pickOne` and `pickMany` choices: a package text shown on options instead of "recommended".      | Set `formatVersion` to `"0.5"`. Nothing else changes: the field is optional, so every valid 0.4 package is a valid 0.5 package.    |
+| 0.6     | 2026-10-04 | Optional `about` on things and `held` on `pickOne` and `pickMany` choices: recommend and name what the character has. | Set `formatVersion` to `"0.6"`. Nothing else changes: both fields are optional, so every valid 0.5 package is a valid 0.6 package. |
 
 ## 16. A minimal package
 
@@ -825,7 +846,7 @@ language. The validator accepts it as is.
 
 ```json
 {
-  "formatVersion": "0.5",
+  "formatVersion": "0.6",
   "id": "tiny",
   "version": "1.0.0",
   "languages": ["en"],

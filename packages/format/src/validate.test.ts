@@ -125,8 +125,8 @@ describe("cross-file rules", () => {
   it.each<[string, (f: RawFiles) => void, string]>([
     [
       "format version",
-      (f) => (f.get("manifest.json").formatVersion = "0.4"),
-      "manifest.json formatVersion: package is written for format 0.4, this builder understands 0.5",
+      (f) => (f.get("manifest.json").formatVersion = "0.5"),
+      "manifest.json formatVersion: package is written for format 0.5, this builder understands 0.6",
     ],
     [
       "duplicate thing",
@@ -136,7 +136,7 @@ describe("cross-file rules", () => {
     [
       "unknown kind",
       (f) => (thing(f, "items", "item.rope").kind = "tool"),
-      'things/items.json [3].kind: unknown kind "tool" (known: folk, upbringing, calling, path, talent, trait, knack, item)',
+      'things/items.json [3].kind: unknown kind "tool" (known: folk, upbringing, calling, path, talent, trait, knack, item, …)',
     ],
     [
       "unknown source",
@@ -195,6 +195,26 @@ describe("cross-file rules", () => {
       "badge without text",
       (f) => delete texts(f, "de")["choice.calling.badge.gentle"],
       'texts/de/ choice.calling.badge.gentle: missing text (badge of choice "calling")',
+    ],
+    [
+      "about an unknown thing",
+      (f) => (f.get("things/handling.json")[0].about = "item.lantern"),
+      'things/handling.json [0].about: unknown thing "item.lantern"',
+    ],
+    [
+      "about itself",
+      (f) => (f.get("things/handling.json")[0].about = "handling.lantern-staff"),
+      "things/handling.json [0].about: a thing cannot be about itself",
+    ],
+    [
+      "held on options that are about nothing",
+      (f) => (f.get("flow.json").choices[2].held = { text: "choice.calling.badge.gentle" }),
+      'flow.json choices[2].held: none of this choice\'s options is "about" another thing',
+    ],
+    [
+      "held without text",
+      (f) => delete texts(f, "en")["choice.handling-river-runner.held"],
+      'texts/en/ choice.handling-river-runner.held: missing text (line naming what the character has, in choice "handling-river-runner")',
     ],
     [
       "array method with wrong length",

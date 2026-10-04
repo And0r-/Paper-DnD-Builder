@@ -175,6 +175,8 @@ export const thingSchema = z.strictObject({
   /** Fixed facts shown on cards and in the "learn more" panel. Labels: stat.<key>.name */
   stats: z.record(z.string().regex(VALUE_ID_PATTERN, "stat keys are camelCase"), statValueSchema).optional(),
   grants: z.array(grantSchema).optional(),
+  /** Another thing this one is about, e.g. a skill with one tool is about that tool. See choice `held`. */
+  about: id.optional(),
   /** Print a card for this thing (layout from sheet.json "cards" by kind). */
   card: z.boolean().optional(),
 });
@@ -207,6 +209,12 @@ const pickRecommendation = z.strictObject({ when: expr.optional(), pick: z.array
 /** A short label (text key) shown on the listed options, e.g. how hard they are to play. */
 const badge = z.strictObject({ things: z.array(id).min(1), text: textKey });
 
+/**
+ * Prefer options whose `about` thing the character already has: they are
+ * recommended first, and `text` (with {{var:things}}) names those things above the list.
+ */
+const held = z.strictObject({ text: textKey });
+
 export const pointBuySchema = z.strictObject({
   method: z.literal("pointBuy"),
   budget: z.number().int().positive(),
@@ -228,6 +236,7 @@ export const choiceSchema = z.discriminatedUnion("kind", [
     recommend: z.array(pickRecommendation).optional(),
     /** Shown on an option instead of the "recommended" badge. At most one per thing. */
     badges: z.array(badge).optional(),
+    held: held.optional(),
   }),
   z.strictObject({
     ...choiceBase,
@@ -239,6 +248,7 @@ export const choiceSchema = z.discriminatedUnion("kind", [
     upTo: z.boolean().optional(),
     recommend: z.array(pickRecommendation).optional(),
     badges: z.array(badge).optional(),
+    held: held.optional(),
   }),
   z.strictObject({
     ...choiceBase,
