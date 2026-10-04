@@ -800,6 +800,7 @@ export function InfoChoice({ state }: { state: ChoiceState }) {
   const things = info.things
     .map((id) => lp.pkg.things.find((th) => th.id === id))
     .filter((x): x is Thing => !!x);
+  const chosen = info.choices.filter((c) => ev.choices[c]?.status === "answered");
   if (things.length === 0 && info.values.length === 0 && info.choices.length === 0) {
     return <p>{t("info.nothing")}</p>;
   }
@@ -828,15 +829,23 @@ export function InfoChoice({ state }: { state: ChoiceState }) {
           </li>
         ))}
       </ul>
-      {info.choices.length > 0 && (
-        <div className="gifts__choices">
-          <p className="gifts__choices-title">{t("info.choices")}</p>
-          <ul>
-            {info.choices.map((c) => (
-              <li key={c}>{choiceTexts(lp, c, ev.choices[c], ctx).title}</li>
-            ))}
-          </ul>
-        </div>
+      {/* Granted choices sit right after the step that grants them, so by the
+          info step they are usually answered already: say so, never "next". */}
+      {[
+        { title: t("info.chosen"), ids: chosen },
+        { title: t("info.choices"), ids: info.choices.filter((c) => !chosen.includes(c)) },
+      ].map(
+        (group) =>
+          group.ids.length > 0 && (
+            <div className="gifts__choices" key={group.title}>
+              <p className="gifts__choices-title">{group.title}</p>
+              <ul>
+                {group.ids.map((c) => (
+                  <li key={c}>{choiceTexts(lp, c, ev.choices[c], ctx).title}</li>
+                ))}
+              </ul>
+            </div>
+          ),
       )}
     </div>
   );
