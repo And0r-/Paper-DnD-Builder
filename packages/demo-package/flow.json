@@ -39,24 +39,45 @@
       "kind": "pickMany",
       "source": "mistland",
       "options": { "kind": "talent", "tags": ["for-lantern-bearer"] },
-      "count": 2,
-      "recommend": [{ "pick": ["talent.mending", "talent.climbing"] }]
+      "count": "2 + count('bonus-talent')",
+      "recommend": [
+        {
+          "when": "count('bonus-talent') > 0",
+          "pick": ["talent.mending", "talent.climbing", "talent.legends"]
+        },
+        { "pick": ["talent.mending", "talent.climbing"] }
+      ],
+      "textVariants": [{ "id": "hillfolk", "when": "has('folk.hillfolk')" }]
     },
     {
       "id": "talents-river-runner",
       "kind": "pickMany",
       "source": "mistland",
       "options": { "kind": "talent", "tags": ["for-river-runner"] },
-      "count": 2,
-      "recommend": [{ "pick": ["talent.climbing", "talent.sneaking"] }]
+      "count": "2 + count('bonus-talent')",
+      "recommend": [
+        {
+          "when": "count('bonus-talent') > 0",
+          "pick": ["talent.climbing", "talent.sneaking", "talent.tracking"]
+        },
+        { "pick": ["talent.climbing", "talent.sneaking"] }
+      ],
+      "textVariants": [{ "id": "hillfolk", "when": "has('folk.hillfolk')" }]
     },
     {
       "id": "talents-herbalist",
       "kind": "pickMany",
       "source": "mistland",
       "options": { "kind": "talent", "tags": ["for-herbalist"] },
-      "count": 2,
-      "recommend": [{ "pick": ["talent.mending", "talent.tracking"] }]
+      "count": "2 + count('bonus-talent')",
+      "recommend": [
+        {
+          "when": "count('bonus-talent') > 0",
+          "pick": ["talent.mending", "talent.tracking", "talent.legends"]
+        },
+        { "pick": ["talent.mending", "talent.tracking"] }
+      ],
+      "textVariants": [{ "id": "hillfolk", "when": "has('folk.hillfolk')" }]
     },
     {
       "id": "gear",

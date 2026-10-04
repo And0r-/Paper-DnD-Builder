@@ -58,7 +58,7 @@ export function buildFlow(
       key: s.id,
       kind: "step",
       href: stepHref(draftId, s.id),
-      title: stepTexts(lp, s).title,
+      title: stepTexts(lp, s, ev).title,
       status: s.status,
       choices: s.choices.filter((c) => c in ev.choices),
     });
@@ -130,7 +130,7 @@ export function stepDiff(before: Evaluation, after: Evaluation): { added: string
 
 export function stepTitle(lp: LoadedPackage, ev: Evaluation, stepId: string): string {
   const s = ev.steps.find((x) => x.id === stepId) ?? lp.pkg.flow.steps.find((x) => x.id === stepId);
-  return s ? stepTexts(lp, s).title : (choiceTexts(lp, stepId).title ?? stepId);
+  return s ? stepTexts(lp, s, ev).title : choiceTexts(lp, stepId, ev.choices[stepId]).title || stepId;
 }
 
 /** The answer to one choice in a short sentence, for the overview. */
@@ -185,7 +185,7 @@ export function missingText(
   t: Translator["t"],
 ): string {
   if (state.status === "invalid") return t("flow.needsAttention");
-  const own = choiceTexts(lp, state.id).missing;
+  const own = choiceTexts(lp, state.id, state, ctx).missing;
   const count = state.count ?? 0;
   const remaining = state.remaining ?? count;
   if (own) return plain(ctx, own, { remaining, count });
