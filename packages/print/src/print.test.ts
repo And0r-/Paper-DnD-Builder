@@ -213,7 +213,9 @@ describe("printed character (demo package)", () => {
   });
 
   it("gives notes the whole page when they end the sheet alone on a new page", async () => {
-    const { pdf } = await print("de", {});
+    // Level 1: the level-3 "path" section is left out (`when`), so notes end up alone.
+    const level1 = demoCharacter(pkg, 1);
+    const { pdf } = await print("de", {}, pkg, level1);
     const last = pdf.sheetLayout.at(-1)!;
     expect(last.map((p) => p.section.id)).toEqual(["notes"]);
     const notes = last[0]!;
@@ -226,7 +228,7 @@ describe("printed character (demo package)", () => {
       ...pkg,
       sheet: { ...pkg.sheet, sections: pkg.sheet.sections.filter((s) => s.id !== "gear") },
     };
-    const { pdf: onePage } = await print("de", {}, short);
+    const { pdf: onePage } = await print("de", {}, short, level1);
     expect(onePage.sheetPages).toBe(1);
     const placed = onePage.sheetLayout[0]!.find((p) => p.section.id === "notes")!;
     expect(placed.w).toBeLessThan(100);
@@ -254,6 +256,56 @@ describe("printed character (demo package)", () => {
     const plainKnacks = plain.sections.find((s) => s.id === "knacks")!;
     expect(plainKnacks.hint).toBe("");
     expect(plain.cards.every((c) => c.uses === null)).toBe(true);
+  });
+
+  it("leaves out sections and boxes whose `when` is false; the rest moves up", async () => {
+    const title = pkg.texts["de"]!["sheet.path.title"] as string;
+    const pathShort = pkg.texts["de"]!["path.lightwarden.short"] as string;
+
+    // Level 3: "level >= 3" holds, the section is on the sheet.
+    const { model, pdf, extracted } = await print("de", {});
+    expect(model.sections.map((s) => s.id)).toContain("path");
+    expect(pdf.sheetLayout.flat().map((p) => p.section.id)).toContain("path");
+    expect(extracted.text).toContain(pathShort);
+
+    // Level 2: no section, no title, no empty frame; every other section still placed.
+    const level2 = demoCharacter(pkg, 2);
+    const low = await print("de", {}, pkg, level2);
+    const ids = pkg.sheet.sections.map((s) => s.id).filter((id) => id !== "path");
+    expect(low.model.sections.map((s) => s.id)).toEqual(ids);
+    expect(low.pdf.sheetLayout.flat().map((p) => p.section.id)).toEqual(ids);
+    expect(low.extracted.pageTexts.slice(0, low.pdf.sheetPages).join("\n")).not.toContain(title);
+
+    // Boxes: a false `when` drops the box, its row keeps the others; all gone drops the row.
+    const withBoxWhen = (when: (value: string) => string | undefined): ContentPackage => ({
+      ...pkg,
+      sheet: {
+        ...pkg.sheet,
+        sections: pkg.sheet.sections.map((s) =>
+          s.kind === "statBoxes"
+            ? {
+                ...s,
+                boxes: s.boxes.map((b) => ({ ...b, ...(when(b.value) ? { when: when(b.value)! } : {}) })),
+              }
+            : s,
+        ),
+      },
+    });
+    const noLuck = buildPrintModel(
+      withBoxWhen((v) => (v === "luck" ? "luck > 99" : undefined)),
+      doc,
+      { language: "de", createdAt },
+    );
+    const primary = noLuck.sections.find((s) => s.id === "primary")!;
+    if (primary.kind !== "statBoxes") throw new Error("demo sheet changed");
+    expect(primary.boxes.map((b) => b.label)).not.toContain(pkg.texts["de"]!["value.luck.name"]);
+    expect(primary.boxes).toHaveLength(4);
+    const none = buildPrintModel(
+      withBoxWhen(() => "level > 99"),
+      doc,
+      { language: "de", createdAt },
+    );
+    expect(none.sections.map((s) => s.id)).not.toContain("primary");
   });
 
   it("goes on on the next page with a section longer than a page, for every kind of rows", async () => {

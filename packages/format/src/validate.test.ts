@@ -125,8 +125,8 @@ describe("cross-file rules", () => {
   it.each<[string, (f: RawFiles) => void, string]>([
     [
       "format version",
-      (f) => (f.get("manifest.json").formatVersion = "0.1"),
-      "manifest.json formatVersion: package is written for format 0.1, this builder understands 0.2",
+      (f) => (f.get("manifest.json").formatVersion = "0.2"),
+      "manifest.json formatVersion: package is written for format 0.2, this builder understands 0.3",
     ],
     [
       "duplicate thing",
@@ -229,6 +229,21 @@ describe("cross-file rules", () => {
       "check list note from a stat nobody has",
       (f) => (f.get("sheet.json").sections.find((s: { id: string }) => s.id === "talents").note = "basis"),
       'sheet.json sections[3].note: no thing has a stat "basis"',
+    ],
+    [
+      "section condition on an unknown value",
+      (f) => (f.get("sheet.json").sections.find((s: { id: string }) => s.id === "path").when = "glow > 0"),
+      'sheet.json sections[6].when: expression "glow > 0" uses unknown value "glow"',
+    ],
+    [
+      "section condition that does not parse",
+      (f) => (f.get("sheet.json").sections.find((s: { id: string }) => s.id === "path").when = "level >="),
+      'sheet.json sections[6].when: cannot read expression "level >=": unexpected end of expression (at character 9)',
+    ],
+    [
+      "box condition on an unknown thing",
+      (f) => (f.get("sheet.json").sections[1].boxes[0].when = "has('calling.lamplighter')"),
+      `sheet.json sections[1].boxes[0].when: expression "has('calling.lamplighter')" asks has("calling.lamplighter") but there is no such thing`,
     ],
     [
       "language without unit defaults",

@@ -10,7 +10,7 @@ pnpm validate-package packages/demo-package
 
 ## What it covers
 
-Every feature of format 0.2 is used at least once (see
+Every feature of format 0.3 is used at least once (see
 [`packages/format/SPEC.md`](../format/SPEC.md)):
 
 | Feature                 | Where                                                                                         |
@@ -26,6 +26,7 @@ Every feature of format 0.2 is used at least once (see
 | Units                   | `units.json`: ft→m and lb→kg tables with fallback, language defaults                          |
 | Two languages           | `texts/de`, `texts/en`, complete; glossary links and unit placeholders                        |
 | Print hints             | `sheet.json`: every section kind, card layout for knacks                                      |
+| Sheet conditions        | `sheet.json`: section `path` has `when: level >= 3`                                           |
 
 ## Layout
 

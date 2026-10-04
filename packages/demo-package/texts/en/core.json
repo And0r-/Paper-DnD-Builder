@@ -164,6 +164,7 @@
     "sheet.traits.hint": "□ = used once: tick it. Erase after a rest.",
     "sheet.knacks.title": "Knacks",
     "sheet.knacks.hint": "□ = used once: tick it. Erase after a rest.",
+    "sheet.path.title": "Path",
     "sheet.gear.title": "Gear",
     "sheet.how-to-play.title": "Your turn",
     "sheet.how-to-play.text": "1. Say what your character wants to do. 2. The game leader says if you need to roll. 3. Roll and add the matching number. 4. The game leader tells you what happens.",

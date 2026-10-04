@@ -1,6 +1,6 @@
 # Content package format — specification
 
-Format version **0.2**. This document describes everything a content
+Format version **0.3**. This document describes everything a content
 package contains and every rule a valid package follows. After reading it
 you should be able to write your own package. The demo package in
 [`packages/demo-package`](../demo-package) uses every feature and is the
@@ -122,7 +122,7 @@ people who distribute packages.
 
 ```json
 {
-  "formatVersion": "0.2",
+  "formatVersion": "0.3",
   "id": "demo",
   "version": "0.1.0",
   "languages": ["de", "en"],
@@ -642,7 +642,8 @@ builder owns the visual design; the package says what goes where.
       "scores": [{ "value": "might", "derived": "mightBonus" }]
     },
     { "id": "talents", "kind": "checkList", "span": 8, "things": { "kind": "talent" }, "note": "score" },
-    { "id": "knacks", "kind": "featureTable", "span": 6, "things": { "kind": "knack" }, "uses": "uses" }
+    { "id": "knacks", "kind": "featureTable", "span": 6, "things": { "kind": "knack" }, "uses": "uses" },
+    { "id": "path", "kind": "featureTable", "span": 6, "things": { "kind": "path" }, "when": "level >= 3" }
   ],
   "cards": { "knack": { "fields": ["reach", "duration", "uses", "focus"], "uses": "uses" } }
 }
@@ -655,7 +656,7 @@ kinds:
 | Kind           | Shows                                                                                                                                     | Fields                             |
 | -------------- | ----------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------- |
 | `header`       | character name, `summary.line`, "played by", package name                                                                                 | —                                  |
-| `statBoxes`    | up to 6 large boxes; `number` = computed value, `pencil` = value as a starting number to overwrite, `circles` = that many circles to tick | `boxes[]: { value, style }`        |
+| `statBoxes`    | up to 6 large boxes; `number` = computed value, `pencil` = value as a starting number to overwrite, `circles` = that many circles to tick | `boxes[]: { value, style, when? }` |
 | `scoreColumn`  | stacked boxes: value large, `derived` value small                                                                                         | `scores[]: { value, derived? }`    |
 | `checkList`    | all things selected; marked if the character has them; `note` stat small next to the name                                                 | `things` (like `options`), `note?` |
 | `featureTable` | the selected things the character has: name, `short`, use boxes from the `uses` stat                                                      | `things`, `uses?`                  |
@@ -663,6 +664,20 @@ kinds:
 | `answers`      | answers to text and number choices                                                                                                        | `choices[]`                        |
 | `helpBox`      | the text `sheet.<id>.text`                                                                                                                | —                                  |
 | `notes`        | blank lines                                                                                                                               | `lines`                            |
+
+**Conditions** (`when`, on every section and on each box of a
+`statBoxes` section). An expression (section 8) evaluated with the
+finished character: every value, `level`, `has()` and `count()`. If it is
+false, the section is not printed at all, title and hint included, and the
+sections after it move up to fill the grid. A box with a false `when` is
+left out and the other boxes of its row share the width; a `statBoxes`
+section whose boxes are all left out is not printed. Without `when`, a
+section or box is always printed. Typical use: a section that only some
+characters need, for example `"when": "level >= 3"` or
+`"when": "has('calling.herbalist')"`, or a box row that only makes sense
+when a value is above zero (`"when": "glow > 0"`). The validator checks
+that the expression parses and names existing values and things, as for
+`requires`.
 
 **Use boxes** (`uses`, on `featureTable` sections and on card layouts).
 Names a stat key. The builder knows no stat names, so this field is the
@@ -728,7 +743,8 @@ well-formed does the second stage check the rules between files:
   consecutive and do not fall; arrays fit the targets;
 - each choice is asked exactly one way; `characterName` is a text choice;
 - sheet sections and card fields refer to existing values, choices and
-  stats; things with `card: true` have a layout; `uses` stats are whole
+  stats; section and box conditions (`when`) parse and refer to existing
+  values and things; things with `card: true` have a layout; `uses` stats are whole
   numbers or texts, `note` stats are not true/false;
 - units: every language has defaults; every stated amount can be converted;
 - texts: every required key exists in every language; placeholders and
@@ -763,10 +779,11 @@ are removed (saved characters may lose picks). Keys are never renamed.
 
 ### Changelog
 
-| Version | Date       | Change                                                                                                            | Migration                                                                                                                          |
-| ------- | ---------- | ----------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| 0.1     | 2026-10-04 | First version.                                                                                                    | —                                                                                                                                  |
-| 0.2     | 2026-10-04 | Optional `uses` on `featureTable` sections and card layouts (use boxes), optional `note` on `checkList` sections. | Set `formatVersion` to `"0.2"`. Nothing else changes: both fields are optional, so every valid 0.1 package is a valid 0.2 package. |
+| Version | Date       | Change                                                                                                                | Migration                                                                                                                          |
+| ------- | ---------- | --------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| 0.1     | 2026-10-04 | First version.                                                                                                        | —                                                                                                                                  |
+| 0.2     | 2026-10-04 | Optional `uses` on `featureTable` sections and card layouts (use boxes), optional `note` on `checkList` sections.     | Set `formatVersion` to `"0.2"`. Nothing else changes: both fields are optional, so every valid 0.1 package is a valid 0.2 package. |
+| 0.3     | 2026-10-04 | Optional `when` (condition) on every sheet section and on each box of a `statBoxes` section: false means not printed. | Set `formatVersion` to `"0.3"`. Nothing else changes: the field is optional, so every valid 0.2 package is a valid 0.3 package.    |
 
 ## 16. A minimal package
 
@@ -777,7 +794,7 @@ language. The validator accepts it as is.
 
 ```json
 {
-  "formatVersion": "0.2",
+  "formatVersion": "0.3",
   "id": "tiny",
   "version": "1.0.0",
   "languages": ["en"],
@@ -874,7 +891,7 @@ language. The validator accepts it as is.
 
 ## 17. Reserved for later versions
 
-Not part of 0.2; listed so nobody builds on a different idea:
+Not part of 0.3; listed so nobody builds on a different idea:
 
 - **Packages that extend other packages** (an expansion adding things to a
   base package). Planned: `manifest.dependsOn` and keys of the form

@@ -299,7 +299,12 @@ export const flowSchema = z.strictObject({
 
 // --------------------------------------------------------------------- sheet
 
-const sectionBase = { id, span };
+const sectionBase = {
+  id,
+  span,
+  /** Section is printed only while this expression is true (title included). */
+  when: expr.optional(),
+};
 const statKey = z.string().regex(VALUE_ID_PATTERN, "stat keys are camelCase");
 
 export const sectionSchema = z.discriminatedUnion("kind", [
@@ -312,6 +317,8 @@ export const sectionSchema = z.discriminatedUnion("kind", [
         z.strictObject({
           value: z.string(),
           style: z.enum(["number", "pencil", "circles"]),
+          /** Box is printed only while this expression is true; the other boxes close up. */
+          when: expr.optional(),
         }),
       )
       .min(1)
