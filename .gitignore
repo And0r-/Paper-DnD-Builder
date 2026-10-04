@@ -13,3 +13,8 @@ packages-mount/*
 # Local agent tooling
 .claude/
 next-env.d.ts
+
+# Browser tests
+apps/web/e2e/.outbox/
+apps/web/e2e/.results/
+apps/web/e2e/screenshots/
