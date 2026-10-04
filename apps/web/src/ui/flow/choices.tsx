@@ -485,8 +485,9 @@ function PointBuy({
 
   return (
     <div className="pointbuy">
-      <p className="pointbuy__left" aria-live="polite">
-        {tc("dist.left", left)}
+      <p className={left === 0 ? "pointbuy__left pointbuy__left--done" : "pointbuy__left"} aria-live="polite">
+        {left === 0 && <Icon name="check" size={20} />}
+        {left === 0 ? t("dist.allSpent") : tc("dist.left", left)}
       </p>
       {hint && (
         <p className="pointbuy__hint" role="status">
@@ -497,6 +498,8 @@ function PointBuy({
         {targets.map((v) => {
           const score = assign[v] ?? low;
           const name = ptext(lp, `value.${v}.name`) ?? v;
+          // Too expensive is shown before the tap; tapping anyway explains why (the hint).
+          const affordable = (costs[String(score + 1)] ?? Infinity) - (costs[String(score)] ?? 0) <= left;
           return (
             <li className="pointbuy__row" key={v}>
               <div className="pointbuy__label">
@@ -526,7 +529,7 @@ function PointBuy({
                   type="button"
                   className="stepper__btn"
                   aria-label={t("dist.increase", { name })}
-                  aria-disabled={score >= high || undefined}
+                  aria-disabled={score >= high || !affordable || undefined}
                   onClick={() => score < high && set(v, score + 1)}
                 >
                   <Icon name="plus" />

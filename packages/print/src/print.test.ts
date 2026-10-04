@@ -3,6 +3,7 @@ import { evaluateDraft } from "@builder/core";
 import type { ContentPackage, TextValue } from "@builder/format";
 import { getDocument } from "pdfjs-dist/legacy/build/pdf.mjs";
 import { beforeAll, describe, expect, it } from "vitest";
+import { cardCount } from "./cards.ts";
 import { MESSAGES } from "./messages.ts";
 import { buildPrintModel, firstSentence, PrintError, type PrintModel, type SheetSection } from "./model.ts";
 import { renderPdf, type RenderedPdf } from "./render.ts";
@@ -128,6 +129,10 @@ describe("printed character (demo package)", () => {
     const cardThings = ev.things.filter((h) => pkg.things.find((t) => t.id === h.id)?.card);
     expect(cardThings.length).toBeGreaterThan(0);
     expect(model.cards).toHaveLength(cardThings.length);
+    // The done screen asks the same question before offering cards.
+    expect(cardCount(pkg, ev)).toBe(model.cards.length);
+    const noCards = { ...pkg, things: pkg.things.map((t) => ({ ...t, card: false })) };
+    expect(cardCount(noCards, ev)).toBe(0);
 
     // Sheet pages first, then one page per nine cards.
     expect(pdf.cardPages).toBe(Math.ceil(cardThings.length / 9));
