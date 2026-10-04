@@ -64,7 +64,9 @@ test("a newcomer builds a level-3 character from login to finished", async ({ pa
   // Pressing Next too early explains what is missing and offers a name.
   await next(page);
   await expect(page.getByText("Gib deinem Charakter einen Namen.")).toBeVisible();
-  await expect(page.getByRole("button", { name: m["flow.chooseForMe"] })).toBeVisible();
+  await expect(
+    page.locator(".step-footer").getByRole("button", { name: m["flow.chooseForMe"] }),
+  ).toBeVisible();
   await page.getByLabel("Wie heisst dein Charakter?").fill("Mira");
   await page
     .getByLabel("Beschreib deinen Charakter in einem Satz.")
