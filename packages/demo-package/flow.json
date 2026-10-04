@@ -29,7 +29,8 @@
       "kind": "pickOne",
       "source": "mistland",
       "options": { "kind": "calling" },
-      "recommend": [{ "pick": ["calling.lantern-bearer"] }]
+      "recommend": [{ "pick": ["calling.lantern-bearer"] }],
+      "badges": [{ "things": ["calling.lantern-bearer"], "text": "choice.calling.badge.gentle" }]
     },
     { "id": "calling-gifts", "kind": "info", "source": "mistland", "of": "calling" },
     {

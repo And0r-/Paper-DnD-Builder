@@ -137,6 +137,14 @@ describe("options", () => {
       assign: { might: 8, grace: 7, wit: 9, heart: 11 },
     });
   });
+
+  it("resolves badges to text keys by offered option", () => {
+    const ev = evaluateDraft(pkg, draft(1, {}));
+    expect(ev.choices["calling"]!.badges).toEqual({
+      "calling.lantern-bearer": "choice.calling.badge.gentle",
+    });
+    expect(ev.choices["folk"]!.badges).toBeUndefined();
+  });
 });
 
 describe("a complete level 3 character", () => {

@@ -125,8 +125,8 @@ describe("cross-file rules", () => {
   it.each<[string, (f: RawFiles) => void, string]>([
     [
       "format version",
-      (f) => (f.get("manifest.json").formatVersion = "0.3"),
-      "manifest.json formatVersion: package is written for format 0.3, this builder understands 0.4",
+      (f) => (f.get("manifest.json").formatVersion = "0.4"),
+      "manifest.json formatVersion: package is written for format 0.4, this builder understands 0.5",
     ],
     [
       "duplicate thing",
@@ -176,6 +176,25 @@ describe("cross-file rules", () => {
       "recommendation outside the options",
       (f) => (f.get("flow.json").choices[0].recommend = [{ pick: ["calling.herbalist"] }]),
       'flow.json choices[0].recommend[0].pick[0]: "calling.herbalist" is not one of this choice\'s options',
+    ],
+    [
+      "badge outside the options",
+      (f) => f.get("flow.json").choices[2].badges[0].things.push("folk.moorfolk"),
+      'flow.json choices[2].badges[0].things[1]: "folk.moorfolk" is not one of this choice\'s options',
+    ],
+    [
+      "two badges on one thing",
+      (f) =>
+        f.get("flow.json").choices[2].badges.push({
+          things: ["calling.lantern-bearer"],
+          text: "choice.calling.badge.gentle",
+        }),
+      'flow.json choices[2].badges[1].things[0]: "calling.lantern-bearer" already has a badge in this choice',
+    ],
+    [
+      "badge without text",
+      (f) => delete texts(f, "de")["choice.calling.badge.gentle"],
+      'texts/de/ choice.calling.badge.gentle: missing text (badge of choice "calling")',
     ],
     [
       "array method with wrong length",
