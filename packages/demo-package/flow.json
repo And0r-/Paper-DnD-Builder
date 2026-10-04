@@ -186,6 +186,15 @@
       },
       "count": 1,
       "recommend": [{ "pick": ["knack.warm-glow"] }]
+    },
+    {
+      "id": "handling-river-runner",
+      "kind": "pickMany",
+      "source": "mistland",
+      "options": { "kind": "handling" },
+      "count": 2,
+      "recommend": [{ "pick": ["handling.boat-hook", "handling.rope"] }],
+      "held": { "text": "choice.handling-river-runner.held" }
     }
   ],
   "characterName": "name",

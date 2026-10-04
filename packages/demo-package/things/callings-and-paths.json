@@ -28,6 +28,7 @@
       { "thing": "item.provisions" },
       { "choice": "talents-river-runner" },
       { "choice": "gear" },
+      { "choice": "handling-river-runner" },
       { "choice": "knacks-current" },
       { "thing": "trait.quick-feet", "atLevel": 2 },
       { "choice": "path", "atLevel": 3 }
