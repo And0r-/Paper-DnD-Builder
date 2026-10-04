@@ -317,6 +317,8 @@ export const sectionSchema = z.discriminatedUnion("kind", [
         z.strictObject({
           value: z.string(),
           style: z.enum(["number", "pencil", "circles"]),
+          /** Text key printed as the box label instead of `value.<value>.name`, e.g. a shorter word. */
+          label: textKey.optional(),
           /** Box is printed only while this expression is true; the other boxes close up. */
           when: expr.optional(),
         }),

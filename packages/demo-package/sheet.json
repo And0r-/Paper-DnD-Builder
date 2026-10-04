@@ -10,7 +10,7 @@
         { "value": "guard", "style": "number" },
         { "value": "pace", "style": "number" },
         { "value": "luck", "style": "circles" },
-        { "value": "nerve", "style": "number" }
+        { "value": "nerve", "style": "number", "label": "sheet.primary.nerve" }
       ]
     },
     {
