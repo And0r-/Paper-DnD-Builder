@@ -12,5 +12,6 @@ export {
   type PrintModel,
   type PrintSettings,
   type SheetSection,
+  type Uses,
 } from "./model.ts";
 export { renderPdf, type RenderedPdf } from "./render.ts";

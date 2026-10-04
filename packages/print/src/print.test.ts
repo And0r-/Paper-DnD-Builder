@@ -179,6 +179,50 @@ describe("printed character (demo package)", () => {
     expect(cards).toContain("Ende.");
   });
 
+  it("gives notes the whole page when they end the sheet alone on a new page", async () => {
+    const { pdf } = await print("de", {});
+    const last = pdf.sheetLayout.at(-1)!;
+    expect(last.map((p) => p.section.id)).toEqual(["notes"]);
+    const notes = last[0]!;
+    expect(notes.w).toBeCloseTo(186);
+    // Lines 6 mm apart down to the footer (A4: 297 mm, footer line about 15 mm above the edge).
+    expect(notes.section.kind === "notes" && notes.section.lines).toBeGreaterThan(35);
+
+    // With room on the first page, notes keep their width and shrink to the space left.
+    const short = {
+      ...pkg,
+      sheet: { ...pkg.sheet, sections: pkg.sheet.sections.filter((s) => s.id !== "gear") },
+    };
+    const { pdf: onePage } = await print("de", {}, short);
+    expect(onePage.sheetPages).toBe(1);
+    const placed = onePage.sheetLayout[0]!.find((p) => p.section.id === "notes")!;
+    expect(placed.w).toBeLessThan(100);
+  });
+
+  it("prints use boxes and check list notes from the stats the package names", async () => {
+    const { model, extracted } = await print("de", {});
+    const byId = (id: string) => model.sections.find((s) => s.id === id)!;
+    const knacks = byId("knacks");
+    const talents = byId("talents");
+    if (knacks.kind !== "featureTable" || talents.kind !== "checkList") throw new Error("demo sheet changed");
+    for (const row of knacks.rows) expect(row.uses).toMatchObject({ boxes: expect.any(Number) });
+    for (const card of model.cards) expect(card.uses).toMatchObject({ boxes: expect.any(Number) });
+    expect(knacks.hint).toContain("□");
+    expect(talents.items.every((i) => i.note !== "")).toBe(true);
+    expect(extracted.text).toContain(talents.items[0]!.note);
+    expect(extracted.text).toContain(pkg.texts["de"]!["stat-value.always"]);
+
+    // A legend for boxes is only printed where there are boxes (print layout 2.1).
+    const noUses: ContentPackage = {
+      ...pkg,
+      things: pkg.things.map((t) => (t.kind === "knack" ? { ...t, stats: { ...t.stats, uses: 0 } } : t)),
+    };
+    const plain = buildPrintModel(noUses, doc, { language: "de", createdAt });
+    const plainKnacks = plain.sections.find((s) => s.id === "knacks")!;
+    expect(plainKnacks.hint).toBe("");
+    expect(plain.cards.every((c) => c.uses === null)).toBe(true);
+  });
+
   it("refuses a language without texts instead of mixing in another one", () => {
     expect(() => buildPrintModel(pkg, doc, { language: "fr" })).toThrow(PrintError);
   });

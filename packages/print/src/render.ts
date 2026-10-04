@@ -11,7 +11,7 @@
 import { fileURLToPath } from "node:url";
 import PDFDocument from "pdfkit";
 import type { Messages } from "./messages.ts";
-import type { Card, PrintModel, SheetSection, StatBox } from "./model.ts";
+import type { Card, PrintModel, SheetSection, StatBox, Uses } from "./model.ts";
 
 const PT_PER_MM = 72 / 25.4;
 /** Size of one typographic point in millimetres. */
@@ -286,6 +286,25 @@ function hint(pen: Pen, text: string, x: number, y: number, w: number): number {
   return pen.paragraph(text, x, y + 1, w, S.hint);
 }
 
+const USE_BOX = 3;
+const USE_BOX_GAP = 1.2;
+
+/** Width of a thing's use boxes (or its word, like "always"), in mm. */
+function usesWidth(pen: Pen, uses: Uses, s: TextStyle): number {
+  if (uses === null) return 0;
+  if ("text" in uses) return pen.width(uses.text, s);
+  return uses.boxes * USE_BOX + (uses.boxes - 1) * USE_BOX_GAP;
+}
+
+/** Use boxes to tick, or the word, right-aligned at `right`; `y` is the text baseline. */
+function drawUses(pen: Pen, uses: Uses, right: number, y: number, s: TextStyle): void {
+  if (uses === null) return;
+  if ("text" in uses) return pen.text(uses.text, right, y, s, "right");
+  const top = y - USE_BOX + 0.4;
+  for (let i = 0; i < uses.boxes; i++)
+    pen.rect(right - USE_BOX - i * (USE_BOX + USE_BOX_GAP), top, USE_BOX, USE_BOX, { width: 0.5 });
+}
+
 /** Draws one section (or only measures it, if the pen is dry). Returns its height. */
 function drawSection(pen: Pen, s: SheetSection, x: number, top: number, w: number): number {
   if (s.kind === "header") return drawHeader(pen, s, x, top, w);
@@ -318,7 +337,9 @@ function drawSection(pen: Pen, s: SheetSection, x: number, top: number, w: numbe
         const cx = x + (i % columns) * (cw + 4);
         const cy = y + 4.5 + Math.floor(i / columns) * 7;
         pen.circle(cx + 2, cy - 1.3, 1.6, { fill: item.marked });
-        pen.text(item.name, cx + 5.5, cy, pen.fit(item.name, S.body, cw - 15));
+        const noteW = item.note === "" ? 0 : Math.min(pen.width(item.note, S.hint), (cw - 15) / 2);
+        pen.text(item.name, cx + 5.5, cy, pen.fit(item.name, S.body, cw - 15 - (noteW > 0 ? noteW + 2 : 0)));
+        pen.text(item.note, cx + cw - 9.5, cy, pen.fit(item.note, S.hint, noteW), "right");
         pen.rect(cx + cw - 7.5, cy - 4.2, 7, 5.5, { width: 0.5, radius: 0.8 });
       });
       y += rows * 7;
@@ -326,11 +347,15 @@ function drawSection(pen: Pen, s: SheetSection, x: number, top: number, w: numbe
     }
     case "featureTable": {
       const nameW = Math.min(36, w * 0.36);
+      // A column for the use boxes, as wide as the widest row needs.
+      const usesW = Math.max(0, ...s.rows.map((r) => usesWidth(pen, r.uses, S.small)));
+      const textW = w - nameW - (usesW > 0 ? usesW + 3 : 0);
       for (const row of s.rows) {
         const nameLines = pen.wrap(row.name, S.fieldName, nameW - 2);
-        const textLines = pen.wrap(row.text, S.small, w - nameW);
+        const textLines = pen.wrap(row.text, S.small, textW);
         const nameBottom = pen.lines(nameLines, x, y + 0.8, S.fieldName, 1.2);
         const textBottom = pen.lines(textLines, x + nameW, y + 0.9, S.small, 1.25);
+        drawUses(pen, row.uses, x + w, y + 0.9 + S.small.size * 0.8 * MM_PER_PT, S.small);
         y = Math.max(nameBottom, textBottom) + 1.4;
         pen.line(x, y, x + w, y, 0.3, "#BBB");
         y += 0.6;
@@ -431,7 +456,7 @@ function drawStatBoxes(pen: Pen, boxes: StatBox[], x: number, y: number, w: numb
   return y + h;
 }
 
-interface Placed {
+export interface Placed {
   section: SheetSection;
   x: number;
   /** Top on its page. */
@@ -461,9 +486,10 @@ function placeSections(pen: Pen, sections: SheetSection[], bottom: number): Plac
     pen.dry = false;
     return height;
   };
-  for (let section of sections) {
-    const span = Math.min(12, section.span);
-    const w = span * COLUMN_W + (span - 1) * COLUMN_GAP;
+  for (const [i, next] of sections.entries()) {
+    let section = next;
+    let span = Math.min(12, section.span);
+    let w = span * COLUMN_W + (span - 1) * COLUMN_GAP;
     let height = measure(section, w);
     const place = () => {
       let best = { col: 0, y: Infinity };
@@ -486,6 +512,18 @@ function placeSections(pen: Pen, sections: SheetSection[], bottom: number): Plac
       pages.push([]);
       floor = new Array<number>(12).fill(pageTop(pages.length - 1));
       previousY = pageTop(pages.length - 1);
+      // Notes that end the sheet alone on a new page take the whole page
+      // (print layout 2.1): a small box on an empty page looks broken.
+      if (section.kind === "notes" && i === sections.length - 1) {
+        span = 12;
+        w = CONTENT_W;
+        const frame = measure({ ...section, lines: 0 }, w);
+        section = {
+          ...section,
+          lines: Math.max(MIN_NOTE_LINES, Math.floor((bottom - previousY - frame) / 6)),
+        };
+        height = measure(section, w);
+      }
       spot = place();
     }
     pages.at(-1)!.push({ section, x: MARGIN + spot.col * (COLUMN_W + COLUMN_GAP), y: spot.y, w });
@@ -506,6 +544,7 @@ interface CardFace {
   rulesSize: number;
   /** Rules continue on the next card. */
   continues: boolean;
+  uses: Uses;
 }
 
 const CARD_INNER_W = CARD_W - 2 * CARD_PAD;
@@ -563,6 +602,7 @@ function cardFaces(pen: Pen, card: Card, messages: Messages): CardFace[] {
           rules: chunk,
           rulesSize: 7,
           continues: i < n - 1,
+          uses: null,
         },
   );
 }
@@ -598,7 +638,10 @@ function drawCard(pen: Pen, face: CardFace, model: PrintModel, x: number, y: num
   const footY = y + CARD_H - CARD_PAD - 5;
   pen.line(left, footY, x + CARD_W - CARD_PAD, footY, 0.3, "#BBB");
   const owner = `${model.name} · ${model.levelLabel}`;
-  pen.text(owner, left, y + CARD_H - CARD_PAD - 1, pen.fit(owner, S.footer, CARD_INNER_W));
+  const footBase = y + CARD_H - CARD_PAD - 1;
+  const usesW = usesWidth(pen, face.uses, S.footer);
+  drawUses(pen, face.uses, x + CARD_W - CARD_PAD, footBase, S.footer);
+  pen.text(owner, left, footBase, pen.fit(owner, S.footer, CARD_INNER_W - (usesW > 0 ? usesW + 2 : 0)));
 }
 
 /** Crop marks outside the grid, only as far as there are cards (print layout 3.1). */
@@ -628,6 +671,8 @@ export interface RenderedPdf {
   pages: number;
   sheetPages: number;
   cardPages: number;
+  /** Where each sheet section ended up, per sheet page, in mm. */
+  sheetLayout: Placed[][];
 }
 
 /** The character sheet followed by the cards, as one A4 PDF. */
@@ -709,5 +754,6 @@ export async function renderPdf(model: PrintModel): Promise<RenderedPdf> {
     pages: total,
     sheetPages: sheetPages.length,
     cardPages,
+    sheetLayout: sheetPages,
   };
 }

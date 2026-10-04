@@ -39,6 +39,9 @@ export interface StatBox {
   hint: string;
 }
 
+/** Use boxes (SPEC 13 `uses`): n boxes to tick, a word like "always", or nothing. */
+export type Uses = { boxes: number } | { text: string } | null;
+
 export type SheetSection = { id: string; span: number; title: string; hint: string } & (
   | { kind: "header"; name: string; summary: string; packageName: string }
   | { kind: "statBoxes"; boxes: StatBox[] }
@@ -46,8 +49,8 @@ export type SheetSection = { id: string; span: number; title: string; hint: stri
       kind: "scoreColumn";
       scores: { label: string; value: string; derivedLabel: string; derived: string | null }[];
     }
-  | { kind: "checkList"; items: { name: string; marked: boolean }[] }
-  | { kind: "featureTable"; rows: { name: string; text: string }[] }
+  | { kind: "checkList"; items: { name: string; marked: boolean; note: string }[] }
+  | { kind: "featureTable"; rows: { name: string; text: string; uses: Uses }[] }
   | { kind: "list"; items: string[]; blankLines: number }
   | { kind: "answers"; rows: { label: string; text: string }[] }
   | { kind: "helpBox"; paragraphs: string[] }
@@ -60,6 +63,7 @@ export interface Card {
   fields: { label: string; value: string }[];
   table: string;
   rules: string[];
+  uses: Uses;
 }
 
 export interface PrintModel {
@@ -160,6 +164,12 @@ export function buildPrintModel(
     if ("text" in v) return text(v.text) || "—";
     return formatMeasure(measure, v, "short");
   };
+  const uses = (t: Thing, key: string | undefined): Uses => {
+    const v = key === undefined ? undefined : t.stats?.[key];
+    if (typeof v === "number") return v > 0 ? { boxes: Math.min(12, Math.round(v)) } : null;
+    if (typeof v === "object" && "text" in v) return { text: text(v.text) };
+    return null;
+  };
   const heldOf = (source: Parameters<typeof selectThings>[1]): Thing[] => {
     const selected = new Set(selectThings(pkg, source).map((t) => t.id));
     return ev.things.filter((h) => selected.has(h.id)).map((h) => things.get(h.id)!);
@@ -224,14 +234,25 @@ export function buildPrintModel(
         return {
           ...base,
           kind: "checkList",
-          items: selectThings(pkg, s.things).map((t) => ({ name: thingName(t.id), marked: held.has(t.id) })),
+          items: selectThings(pkg, s.things).map((t) => {
+            const note = s.note === undefined ? undefined : t.stats?.[s.note];
+            return {
+              name: thingName(t.id),
+              marked: held.has(t.id),
+              note: note === undefined ? "" : statText(note),
+            };
+          }),
         };
-      case "featureTable":
-        return {
-          ...base,
-          kind: "featureTable",
-          rows: heldOf(s.things).map((t) => ({ name: thingName(t.id), text: text(`${t.id}.short`) })),
-        };
+      case "featureTable": {
+        const rows = heldOf(s.things).map((t) => ({
+          name: thingName(t.id),
+          text: text(`${t.id}.short`),
+          uses: uses(t, s.uses),
+        }));
+        // The hint explains the boxes (SPEC 13); without boxes it would point at nothing.
+        const boxes = rows.some((r) => r.uses !== null && "boxes" in r.uses);
+        return { ...base, hint: s.uses !== undefined && !boxes ? "" : base.hint, kind: "featureTable", rows };
+      }
       case "list":
         return {
           ...base,
@@ -292,6 +313,7 @@ export function buildPrintModel(
       })),
       table: text(`${t.id}.explain.table`) || text(`${t.id}.short`),
       rules: paragraphs(`${t.id}.rules`),
+      uses: uses(t, pkg.sheet.cards[t.kind]!.uses),
     }));
 
   return {

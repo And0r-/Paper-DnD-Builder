@@ -25,8 +25,8 @@
       ]
     },
     { "id": "talents", "kind": "checkList", "span": 8, "things": { "kind": "talent" }, "note": "score" },
-    { "id": "traits", "kind": "featureTable", "span": 6, "things": { "kind": "trait" }, "uses": "uses" },
-    { "id": "knacks", "kind": "featureTable", "span": 6, "things": { "kind": "knack" }, "uses": "uses" },
+    { "id": "traits", "kind": "featureTable", "span": 8, "things": { "kind": "trait" }, "uses": "uses" },
+    { "id": "knacks", "kind": "featureTable", "span": 8, "things": { "kind": "knack" }, "uses": "uses" },
     { "id": "gear", "kind": "list", "span": 6, "things": { "kind": "item" }, "blankLines": 4 },
     { "id": "how-to-play", "kind": "helpBox", "span": 6 },
     { "id": "about", "kind": "answers", "span": 6, "choices": ["age", "looks"] },
