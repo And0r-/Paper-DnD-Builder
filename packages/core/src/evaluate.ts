@@ -225,6 +225,25 @@ export function selectThings(pkg: ContentPackage, source: OptionSource): Thing[]
   );
 }
 
+/**
+ * What an expression sees of the finished character: every value, every held
+ * thing. For conditions evaluated after the walk (sheet sections, SPEC 13).
+ */
+export function evaluationScope(pkg: ContentPackage, ev: Evaluation): ExprScope {
+  const ix = indexes(pkg);
+  const held = new Set(ev.things.map((h) => h.id));
+  return {
+    value: (name) => {
+      if (name === "level") return ev.level;
+      const v = ev.values[name];
+      if (v === undefined) throw new RuleError(`unknown value "${name}"`);
+      return v;
+    },
+    has: (id) => held.has(id),
+    count: (tag) => ev.things.filter((h) => ix.things.get(h.id)?.tags?.includes(tag)).length,
+  };
+}
+
 /** Things referenced by `has()` in an expression. */
 function thingsIn(src: string | undefined): string[] {
   if (src === undefined) return [];

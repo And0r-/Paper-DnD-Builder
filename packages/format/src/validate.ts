@@ -581,10 +581,12 @@ export function validatePackageFiles(files: PackageFiles): ValidationResult {
   };
   sheet.sections.forEach((s, i) => {
     const p = `sections[${i}]`;
+    if (s.when !== undefined) checkExpr(S, `${p}.when`, s.when);
     switch (s.kind) {
       case "statBoxes":
         s.boxes.forEach((b, j) => {
           if (!isValueRef(b.value)) err(S, `${p}.boxes[${j}].value`, `unknown value ${lit(b.value)}`);
+          if (b.when !== undefined) checkExpr(S, `${p}.boxes[${j}].when`, b.when);
         });
         break;
       case "scoreColumn":

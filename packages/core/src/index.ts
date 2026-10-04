@@ -26,6 +26,7 @@ export { evaluate, evaluateCondition, evaluateNumber, RuleError, type ExprScope 
 export { judgeAnswer, type Problem } from "./judge.ts";
 export {
   evaluateDraft,
+  evaluationScope,
   selectThings,
   type ChoiceState,
   type ChoiceStatus,

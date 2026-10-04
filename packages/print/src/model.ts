@@ -8,7 +8,9 @@
  * "no other language on the page" is decided in this one file.
  */
 import {
+  evaluateCondition,
   evaluateDraft,
+  evaluationScope,
   effectiveUnits,
   formatMeasure,
   renderText,
@@ -170,6 +172,10 @@ export function buildPrintModel(
     if (typeof v === "object" && "text" in v) return { text: text(v.text) };
     return null;
   };
+  // SPEC 13 `when`: a section or box whose condition is false is not printed at all.
+  const scope = evaluationScope(pkg, ev);
+  const shown = (x: { when?: string | undefined }) =>
+    x.when === undefined || evaluateCondition(x.when, scope);
   const heldOf = (source: Parameters<typeof selectThings>[1]): Thing[] => {
     const selected = new Set(selectThings(pkg, source).map((t) => t.id));
     return ev.things.filter((h) => selected.has(h.id)).map((h) => things.get(h.id)!);
@@ -211,7 +217,7 @@ export function buildPrintModel(
         return {
           ...base,
           kind: "statBoxes",
-          boxes: s.boxes.map((b) => ({
+          boxes: s.boxes.filter(shown).map((b) => ({
             label: valueLabel(b.value),
             style: b.style,
             text: valueText(b.value),
@@ -328,7 +334,11 @@ export function buildPrintModel(
     createdOn: messages.createdOn(
       new Intl.DateTimeFormat(language, { dateStyle: "medium" }).format(createdAt),
     ),
-    sections: pkg.sheet.sections.map(section),
+    // A box row whose boxes are all hidden would be a bare title.
+    sections: pkg.sheet.sections
+      .filter(shown)
+      .map(section)
+      .filter((s) => s.kind !== "statBoxes" || s.boxes.length > 0),
     cards,
   };
 }
