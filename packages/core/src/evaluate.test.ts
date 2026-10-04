@@ -145,6 +145,44 @@ describe("options", () => {
     });
     expect(ev.choices["folk"]!.badges).toBeUndefined();
   });
+
+  describe("held", () => {
+    const riverRunner = (answers: Record<string, unknown>) =>
+      evaluateDraft(pkg, draft(1, { calling: { pick: "calling.river-runner" }, ...answers }));
+
+    it("names what the character has and recommends the options about it first", () => {
+      const ev = riverRunner({
+        upbringing: { pick: "upbringing.bell-tower" },
+        gear: { pick: "item.trail-boots" },
+      });
+      const handling = ev.choices["handling-river-runner"]!;
+      // In option order, not in the order the things were gained.
+      expect(handling.held).toEqual(["item.boat-hook", "item.small-bell", "item.trail-boots"]);
+      // Three fit, but only two are asked for: "choose for me" must give a valid answer.
+      expect(handling.recommended).toEqual(["handling.boat-hook", "handling.small-bell"]);
+    });
+
+    it("fills the remaining places with the package's recommendation", () => {
+      const handling = riverRunner({}).choices["handling-river-runner"]!;
+      expect(handling.held).toEqual(["item.boat-hook"]);
+      expect(handling.recommended).toEqual(["handling.boat-hook", "handling.rope"]);
+    });
+
+    it("depends on the steps that brought the things", () => {
+      const ev = riverRunner({
+        upbringing: { pick: "upbringing.bell-tower" },
+        gear: { pick: "item.trail-boots" },
+      });
+      const ids = ev.steps.map((s) => s.id);
+      expect(ids.indexOf("handling-river-runner")).toBe(ids.indexOf("gear") + 1);
+      const step = ev.steps.find((s) => s.id === "handling-river-runner")!;
+      expect(new Set(step.dependsOn)).toEqual(new Set(["calling", "upbringing", "gear"]));
+    });
+
+    it("is left out on choices without it", () => {
+      expect(riverRunner({}).choices["talents-river-runner"]!.held).toBeUndefined();
+    });
+  });
 });
 
 describe("a complete level 3 character", () => {
