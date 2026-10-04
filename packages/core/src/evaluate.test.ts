@@ -54,15 +54,16 @@ describe("steps", () => {
   it("lists the flow's steps for a new level 1 draft and hides steps whose condition is false", () => {
     const ev = evaluateDraft(pkg, draft(1));
     expect(ev.steps.map((s) => s.id)).toEqual([
-      "folk",
-      "upbringing",
+      "character",
       "calling",
       "calling-gifts",
+      "upbringing",
+      "folk",
       "scores",
-      "identity",
+      "looks",
     ]);
     expect(ev.complete).toBe(false);
-    expect(ev.open).toEqual(["folk", "upbringing", "calling", "scores", "name", "age"]);
+    expect(ev.open).toEqual(["name", "calling", "upbringing", "folk", "scores", "age"]);
   });
 
   it("shows level-dependent steps from their level on", () => {
@@ -72,22 +73,25 @@ describe("steps", () => {
   it("inserts granted choices right after the step that granted them, in grant order", () => {
     const ev = evaluateDraft(pkg, draft(3, { calling: { pick: "calling.lantern-bearer" } }));
     expect(ev.steps.map((s) => s.id)).toEqual([
-      "folk",
-      "upbringing",
+      "character",
       "calling",
-      "talents-lantern-bearer",
       "gear",
       "knacks-lantern",
       "path",
       "calling-gifts",
+      "upbringing",
+      "folk",
+      "talents-lantern-bearer",
       "scores",
       "extra-talent",
-      "identity",
+      "looks",
     ]);
-    const talents = ev.steps.find((s) => s.id === "talents-lantern-bearer")!;
-    expect(talents.origin).toBe("granted");
-    expect(talents.grantedBy).toEqual(["calling.lantern-bearer"]);
-    expect(talents.dependsOn).toEqual(["calling"]);
+    const gear = ev.steps.find((s) => s.id === "gear")!;
+    expect(gear.origin).toBe("granted");
+    expect(gear.grantedBy).toEqual(["calling.lantern-bearer"]);
+    expect(gear.dependsOn).toEqual(["calling"]);
+    // The talents are a flow step after the folk, so the folk can add one.
+    expect(ev.steps.find((s) => s.id === "talents-lantern-bearer")!.origin).toBe("flow");
   });
 
   it("asks a choice granted at a higher level only from that level on", () => {
@@ -100,17 +104,19 @@ describe("options", () => {
   it("does not offer things the character already has from elsewhere", () => {
     const ev = evaluateDraft(
       pkg,
-      draft(1, {
-        upbringing: { pick: "upbringing.ferry-child" },
+      draft(2, {
         calling: { pick: "calling.lantern-bearer" },
+        "talents-lantern-bearer": { picks: ["talent.climbing", "talent.mending"] },
+        upbringing: { pick: "upbringing.ferry-child" },
       }),
     );
-    // Haggling comes with the upbringing, so it is not offered again.
-    expect(ev.choices["talents-lantern-bearer"]!.options).toEqual([
-      "talent.climbing",
-      "talent.mending",
-      "talent.legends",
-    ]);
+    // Climbing and mending come with the calling, weather sense and haggling
+    // with the upbringing, so the extra talent does not offer them again.
+    const options = ev.choices["extra-talent"]!.options;
+    expect(options).toContain("talent.legends");
+    for (const had of ["talent.climbing", "talent.mending", "talent.weather-sense", "talent.haggling"]) {
+      expect(options).not.toContain(had);
+    }
   });
 
   it("offers only things whose condition holds", () => {
@@ -138,6 +144,17 @@ describe("options", () => {
     });
   });
 
+  it("counts a tag from an earlier answer and switches to the text variant whose condition holds", () => {
+    const calling = { pick: "calling.river-runner" };
+    const moor = evaluateDraft(pkg, draft(1, { folk: { pick: "folk.moorfolk" }, calling }));
+    const hill = evaluateDraft(pkg, draft(1, { folk: { pick: "folk.hillfolk" }, calling }));
+    expect(moor.choices["talents-river-runner"]).toMatchObject({ count: 2 });
+    expect(moor.choices["talents-river-runner"]!.textVariant).toBeUndefined();
+    expect(moor.choices["talents-river-runner"]!.recommended).toHaveLength(2);
+    expect(hill.choices["talents-river-runner"]).toMatchObject({ count: 3, textVariant: "hillfolk" });
+    expect(hill.choices["talents-river-runner"]!.recommended).toHaveLength(3);
+  });
+
   it("resolves badges to text keys by offered option", () => {
     const ev = evaluateDraft(pkg, draft(1, {}));
     expect(ev.choices["calling"]!.badges).toEqual({
@@ -147,19 +164,17 @@ describe("options", () => {
   });
 
   describe("held", () => {
-    const riverRunner = (answers: Record<string, unknown>) =>
-      evaluateDraft(pkg, draft(1, { calling: { pick: "calling.river-runner" }, ...answers }));
+    const riverRunner = (answers: Record<string, unknown>, p: ContentPackage = pkg) =>
+      evaluateDraft(p, draft(1, { calling: { pick: "calling.river-runner" }, ...answers }));
 
     it("names what the character has and recommends the options about it first", () => {
-      const ev = riverRunner({
-        upbringing: { pick: "upbringing.bell-tower" },
-        gear: { pick: "item.trail-boots" },
-      });
+      const ev = riverRunner({ gear: { pick: "item.trail-boots" } });
       const handling = ev.choices["handling-river-runner"]!;
-      // In option order, not in the order the things were gained.
-      expect(handling.held).toEqual(["item.boat-hook", "item.small-bell", "item.trail-boots"]);
-      // Three fit, but only two are asked for: "choose for me" must give a valid answer.
-      expect(handling.recommended).toEqual(["handling.boat-hook", "handling.small-bell"]);
+      expect(handling.held).toEqual(["item.boat-hook", "item.trail-boots"]);
+      expect(handling.recommended).toEqual(["handling.boat-hook", "handling.trail-boots"]);
+      // Changing the gear changes this step.
+      const step = ev.steps.find((s) => s.id === "handling-river-runner")!;
+      expect(new Set(step.dependsOn)).toEqual(new Set(["calling", "gear"]));
     });
 
     it("fills the remaining places with the package's recommendation", () => {
@@ -168,15 +183,31 @@ describe("options", () => {
       expect(handling.recommended).toEqual(["handling.boat-hook", "handling.rope"]);
     });
 
-    it("depends on the steps that brought the things", () => {
-      const ev = riverRunner({
-        upbringing: { pick: "upbringing.bell-tower" },
-        gear: { pick: "item.trail-boots" },
-      });
+    it("recommends no more than are asked for, in option order", () => {
+      // Three fit, but only two are asked for: "choose for me" must give a valid answer.
+      const withBell: ContentPackage = {
+        ...pkg,
+        things: pkg.things.map((t) =>
+          t.id === "calling.river-runner"
+            ? { ...t, grants: [...(t.grants ?? []), { thing: "item.small-bell" }] }
+            : t,
+        ),
+      };
+      const handling = riverRunner({ gear: { pick: "item.trail-boots" } }, withBell).choices[
+        "handling-river-runner"
+      ]!;
+      expect(handling.held).toEqual(["item.boat-hook", "item.small-bell", "item.trail-boots"]);
+      expect(handling.recommended).toEqual(["handling.boat-hook", "handling.small-bell"]);
+    });
+
+    it("counts only what earlier steps brought", () => {
+      // The upbringing's bell comes in a later step than the calling's choices.
+      const ev = riverRunner({ upbringing: { pick: "upbringing.bell-tower" } });
+      expect(ev.choices["handling-river-runner"]!.held).toEqual(["item.boat-hook"]);
       const ids = ev.steps.map((s) => s.id);
       expect(ids.indexOf("handling-river-runner")).toBe(ids.indexOf("gear") + 1);
       const step = ev.steps.find((s) => s.id === "handling-river-runner")!;
-      expect(new Set(step.dependsOn)).toEqual(new Set(["calling", "upbringing", "gear"]));
+      expect(step.dependsOn).toEqual(["calling"]);
     });
 
     it("is left out on choices without it", () => {
@@ -233,7 +264,7 @@ describe("a complete level 3 character", () => {
       thing: "calling.lantern-bearer",
       things: ["item.lantern-staff", "item.provisions", "trait.steady-flame"],
       values: [{ value: "stamina", add: 18 }],
-      choices: ["talents-lantern-bearer", "gear", "knacks-lantern", "path"],
+      choices: ["gear", "knacks-lantern", "path"],
     });
   });
 

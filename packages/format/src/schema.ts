@@ -202,6 +202,14 @@ const choiceBase = {
   license: id.optional(),
   /** Player may finish the character without answering. */
   optional: z.boolean().optional(),
+  /**
+   * Other texts while a condition holds. The first entry whose `when` is true
+   * is the active variant; its texts are `choice.<choice>.variant.<id>.*`.
+   */
+  textVariants: z
+    .array(z.strictObject({ id, when: expr }))
+    .min(1)
+    .optional(),
 };
 
 const pickRecommendation = z.strictObject({ when: expr.optional(), pick: z.array(id).min(1) });

@@ -70,16 +70,16 @@ describe("building a character over the API", () => {
     }
 
     expect(answered).toEqual([
-      "folk",
-      "upbringing",
+      "name",
       "calling",
-      "talents-lantern-bearer",
       "gear",
       "knacks-lantern",
       "path",
+      "upbringing",
+      "folk",
+      "talents-lantern-bearer",
       "scores",
       "extra-talent",
-      "name",
       "age",
     ]);
     expect(view.evaluation.complete).toBe(true);
@@ -113,7 +113,7 @@ describe("building a character over the API", () => {
     expect(res.status).toBe(422);
     expect(res.json.error).toEqual({
       code: "incomplete",
-      open: ["folk", "upbringing", "calling", "scores", "name", "age"],
+      open: ["name", "calling", "upbringing", "folk", "scores", "age"],
     });
   });
 

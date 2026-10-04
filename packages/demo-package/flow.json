@@ -1,13 +1,25 @@
 {
   "level": { "min": 1, "max": 3, "default": 1 },
   "steps": [
-    { "id": "folk", "choices": ["folk"] },
-    { "id": "upbringing", "choices": ["upbringing"] },
+    { "id": "character", "choices": ["name", "concept"] },
     { "id": "calling", "choices": ["calling"] },
     { "id": "calling-gifts", "choices": ["calling-gifts"] },
+    { "id": "upbringing", "choices": ["upbringing"] },
+    { "id": "folk", "choices": ["folk"] },
+    {
+      "id": "talents-lantern-bearer",
+      "choices": ["talents-lantern-bearer"],
+      "when": "has('calling.lantern-bearer')"
+    },
+    {
+      "id": "talents-river-runner",
+      "choices": ["talents-river-runner"],
+      "when": "has('calling.river-runner')"
+    },
+    { "id": "talents-herbalist", "choices": ["talents-herbalist"], "when": "has('calling.herbalist')" },
     { "id": "scores", "choices": ["scores"] },
     { "id": "extra-talent", "choices": ["extra-talent"], "when": "level >= 2" },
-    { "id": "identity", "choices": ["name", "age", "looks"] }
+    { "id": "looks", "choices": ["age", "looks"] }
   ],
   "choices": [
     {
@@ -38,24 +50,45 @@
       "kind": "pickMany",
       "source": "mistland",
       "options": { "kind": "talent", "tags": ["for-lantern-bearer"] },
-      "count": 2,
-      "recommend": [{ "pick": ["talent.mending", "talent.climbing"] }]
+      "count": "2 + count('bonus-talent')",
+      "recommend": [
+        {
+          "when": "count('bonus-talent') > 0",
+          "pick": ["talent.mending", "talent.climbing", "talent.legends"]
+        },
+        { "pick": ["talent.mending", "talent.climbing"] }
+      ],
+      "textVariants": [{ "id": "hillfolk", "when": "has('folk.hillfolk')" }]
     },
     {
       "id": "talents-river-runner",
       "kind": "pickMany",
       "source": "mistland",
       "options": { "kind": "talent", "tags": ["for-river-runner"] },
-      "count": 2,
-      "recommend": [{ "pick": ["talent.climbing", "talent.sneaking"] }]
+      "count": "2 + count('bonus-talent')",
+      "recommend": [
+        {
+          "when": "count('bonus-talent') > 0",
+          "pick": ["talent.climbing", "talent.sneaking", "talent.tracking"]
+        },
+        { "pick": ["talent.climbing", "talent.sneaking"] }
+      ],
+      "textVariants": [{ "id": "hillfolk", "when": "has('folk.hillfolk')" }]
     },
     {
       "id": "talents-herbalist",
       "kind": "pickMany",
       "source": "mistland",
       "options": { "kind": "talent", "tags": ["for-herbalist"] },
-      "count": 2,
-      "recommend": [{ "pick": ["talent.mending", "talent.tracking"] }]
+      "count": "2 + count('bonus-talent')",
+      "recommend": [
+        {
+          "when": "count('bonus-talent') > 0",
+          "pick": ["talent.mending", "talent.tracking", "talent.legends"]
+        },
+        { "pick": ["talent.mending", "talent.tracking"] }
+      ],
+      "textVariants": [{ "id": "hillfolk", "when": "has('folk.hillfolk')" }]
     },
     {
       "id": "gear",
@@ -144,6 +177,14 @@
       "source": "mistland",
       "maxLength": 40,
       "suggestions": "names.suggestions"
+    },
+    {
+      "id": "concept",
+      "kind": "text",
+      "source": "mistland",
+      "maxLength": 200,
+      "multiline": true,
+      "optional": true
     },
     {
       "id": "age",

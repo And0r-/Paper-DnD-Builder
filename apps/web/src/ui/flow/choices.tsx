@@ -56,6 +56,7 @@ function Stats({ lp, thing }: { lp: LoadedPackage; thing: Thing }) {
 
 function Grants({ lp, thing, level }: { lp: LoadedPackage; thing: Thing; level: number }) {
   const { t } = useApp();
+  const { ev } = useDraft();
   const ctx = useMeasure(lp);
   const items: ReactNode[] = [];
   // Changes of one value over several levels count as one line ("Stamina +15").
@@ -72,7 +73,11 @@ function Grants({ lp, thing, level }: { lp: LoadedPackage; thing: Thing; level: 
     if ((g.atLevel ?? 1) > level) continue;
     if (g.thing) items.push(<li key={i}>{thingName(lp, g.thing)}</li>);
     else if (g.choice)
-      items.push(<li key={i}>{t("option.youChoose", { title: choiceTexts(lp, g.choice).title })}</li>);
+      items.push(
+        <li key={i}>
+          {t("option.youChoose", { title: choiceTexts(lp, g.choice, ev.choices[g.choice], ctx).title })}
+        </li>,
+      );
   }
   if (items.length === 0) return null;
   return (
@@ -138,6 +143,7 @@ function OptionCard({
   name,
   checked,
   recommended,
+  badge,
   level,
   onToggle,
 }: {
@@ -147,6 +153,8 @@ function OptionCard({
   name: string;
   checked: boolean;
   recommended: boolean;
+  /** Package text key of this option's badge; shown instead of "recommended". */
+  badge: string | undefined;
   level: number;
   onToggle: () => void;
 }) {
@@ -155,6 +163,7 @@ function OptionCard({
   const id = useId();
   const input = useRef<HTMLInputElement>(null);
   const goodIf = ptext(lp, `${thing.id}.goodIf`);
+  const badgeText = badge ? ptext(lp, badge) : undefined;
   const details = <OptionDetails lp={lp} thing={thing} level={level} />;
   const showExplain = () =>
     explain(
@@ -193,7 +202,11 @@ function OptionCard({
         <label className="option__name" htmlFor={id}>
           {thingName(lp, thing.id)}
         </label>
-        {recommended && <span className="badge">{t("common.recommended")}</span>}
+        {badgeText ? (
+          <span className="badge badge--neutral">{badgeText}</span>
+        ) : (
+          recommended && <span className="badge">{t("common.recommended")}</span>
+        )}
       </div>
       <p className="option__short" id={`${id}-short`}>
         <RichText lp={lp} text={ptext(lp, `${thing.id}.short`)} />
@@ -349,6 +362,7 @@ export function PickChoice({
                 name={name}
                 checked={picked.includes(th.id)}
                 recommended={recommended.includes(th.id)}
+                badge={state.badges?.[th.id]}
                 level={ev.level}
                 onToggle={() => toggle(th.id)}
               />
@@ -380,12 +394,28 @@ export function DistributeChoice({
   const m = choice.methods[method]!;
   const stepName = stepTitle(lp, ev, state.step);
 
-  const save = (assign: Record<string, number>) =>
-    guard.request({ type: "answer", choice: choice.id, answer: { method, assign } }, () => ({
+  // The rows keep their own numbers while you type. An answer that comes
+  // from elsewhere ("Choose for me", a refused change) starts them afresh,
+  // so the screen always shows what is saved.
+  const sign = (a: { method: number; assign: Record<string, number> }) =>
+    JSON.stringify([a.method, ...choice.targets.map((v) => a.assign[v] ?? null)]);
+  const mine = useRef(stored ? sign(stored) : undefined);
+  const [round, setRound] = useState(0);
+  useEffect(() => {
+    if (!stored || sign(stored) === mine.current) return;
+    mine.current = sign(stored);
+    setMethod(stored.method);
+    setRound((r) => r + 1);
+  }, [stored]);
+
+  const save = (assign: Record<string, number>) => {
+    mine.current = sign({ method, assign });
+    return guard.request({ type: "answer", choice: choice.id, answer: { method, assign } }, () => ({
       title: t("change.title", { step: stepName }),
       lead: t("change.textGeneric"),
       after: t("change.afterGeneric"),
     }));
+  };
 
   return (
     <fieldset className="distribute" aria-labelledby={labelledBy}>
@@ -402,7 +432,7 @@ export function DistributeChoice({
       )}
       {m.method === "pointBuy" ? (
         <PointBuy
-          key={`pb-${method}`}
+          key={`pb-${method}-${round}`}
           lp={lp}
           targets={choice.targets}
           costs={m.costs}
@@ -413,7 +443,7 @@ export function DistributeChoice({
         />
       ) : (
         <ArrayAssign
-          key={`ar-${method}`}
+          key={`ar-${method}-${round}`}
           lp={lp}
           targets={choice.targets}
           values={m.values}
@@ -600,6 +630,7 @@ export function NumberChoice({
 }) {
   const { t } = useApp();
   const { lp, change } = useDraft();
+  const ctx = useMeasure(lp);
   const min = state.min ?? 0;
   const max = state.max ?? min;
   const stored = (state.answer as { value?: number } | undefined)?.value;
@@ -625,7 +656,7 @@ export function NumberChoice({
   if (max - min <= 4) {
     return (
       <Segmented
-        legend={choiceTexts(lp, choice.id).question}
+        legend={choiceTexts(lp, choice.id, state, ctx).question}
         legendHidden
         options={Array.from({ length: max - min + 1 }, (_, i) => ({
           value: min + i,
@@ -802,7 +833,7 @@ export function InfoChoice({ state }: { state: ChoiceState }) {
           <p className="gifts__choices-title">{t("info.choices")}</p>
           <ul>
             {info.choices.map((c) => (
-              <li key={c}>{choiceTexts(lp, c).title}</li>
+              <li key={c}>{choiceTexts(lp, c, ev.choices[c], ctx).title}</li>
             ))}
           </ul>
         </div>

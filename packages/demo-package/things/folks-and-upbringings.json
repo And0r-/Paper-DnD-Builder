@@ -9,6 +9,7 @@
     "id": "folk.hillfolk",
     "kind": "folk",
     "source": "mistland",
+    "tags": ["bonus-talent"],
     "grants": [
       { "value": "pace", "add": 20 },
       { "value": "stamina", "add": 2 },

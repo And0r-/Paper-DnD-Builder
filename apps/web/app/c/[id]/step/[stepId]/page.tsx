@@ -19,7 +19,7 @@ import {
   TextChoice,
 } from "../../../../../src/ui/flow/choices.tsx";
 import { useDraft } from "../../../../../src/ui/flow/draft-state.tsx";
-import { LaterLink, StepFooter, StepFrame, usePageTitle } from "../../../../../src/ui/flow/frame.tsx";
+import { StepFooter, StepFrame, StepShortcuts, usePageTitle } from "../../../../../src/ui/flow/frame.tsx";
 import { firstOpen, missingText } from "../../../../../src/ui/flow/model.ts";
 import { choiceTexts, plist, stepTexts } from "../../../../../src/ui/package-text.ts";
 import { useMeasure } from "../../../../../src/ui/components/RichText.tsx";
@@ -48,7 +48,7 @@ export default function StepPage() {
     );
   }
 
-  const texts = stepTexts(lp, { id: entry.key, choices: entry.choices });
+  const texts = stepTexts(lp, { id: entry.key, choices: entry.choices }, ev, ctx);
   const choices = entry.choices
     .map((id) => ({ def: lp.pkg.flow.choices.find((c) => c.id === id), state: ev.choices[id] }))
     .filter((x): x is { def: Choice; state: ChoiceState } => x.def !== undefined && x.state !== undefined);
@@ -117,7 +117,8 @@ export default function StepPage() {
       headingId={headingId}
       question={texts.question}
       introText={texts.intro}
-      laterLink={open.length > 0 ? <LaterLink entry={entry} /> : undefined}
+      introVars={texts.vars}
+      laterLink={<StepShortcuts entry={entry} open={open.length > 0} onChooseForMe={chooseForMe} />}
       footer={
         <StepFooter
           entry={entry}
@@ -129,7 +130,7 @@ export default function StepPage() {
       }
     >
       {choices.map(({ def, state }) => {
-        const ct = choiceTexts(lp, def.id);
+        const ct = choiceTexts(lp, def.id, state, ctx);
         if (single) {
           return (
             <div id={`block-${def.id}`} key={def.id}>
@@ -152,7 +153,7 @@ export default function StepPage() {
             )}
             {ct.intro && (
               <p className="subquestion__intro">
-                <RichText lp={lp} text={ct.intro} />
+                <RichText lp={lp} text={ct.intro} vars={ct.vars} />
               </p>
             )}
             {render(def, state, subId, ct.question)}

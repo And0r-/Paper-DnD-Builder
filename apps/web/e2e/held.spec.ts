@@ -13,7 +13,6 @@ test("a step names what the character carries and recommends it", async ({ page,
   let view = (await created.json()) as { draft: { id: string; version: number } };
   const id = view.draft.id;
   const answers: [string, unknown][] = [
-    ["upbringing", { pick: "upbringing.bell-tower" }],
     ["calling", { pick: "calling.river-runner" }],
     ["gear", { pick: "item.trail-boots" }],
   ];
@@ -30,14 +29,14 @@ test("a step names what the character carries and recommends it", async ({ page,
     "Mit welchen Dingen kennst du jeden Handgriff?",
   );
   await expect(page.locator("[data-held]")).toHaveText(
-    "In deinem Gepäck hast du: Bootshaken, Kleine Glocke und Wanderstiefel.",
+    "In deinem Gepäck hast du: Bootshaken und Wanderstiefel.",
   );
   await expectOneLanguage(page, "de");
   await shot(page, "60-handgriffe-was-du-hast");
 
-  // Three things on hand, two to pick: the first two in list order.
+  // "Choose for me" takes exactly the things on hand.
   await page.getByRole("button", { name: m["flow.chooseForMe"] }).click();
   await expect(page.getByRole("checkbox", { name: "Bootshaken" })).toBeChecked();
-  await expect(page.getByRole("checkbox", { name: "Kleine Glocke" })).toBeChecked();
-  await expect(page.getByRole("checkbox", { name: "Wanderstiefel" })).not.toBeChecked();
+  await expect(page.getByRole("checkbox", { name: "Wanderstiefel" })).toBeChecked();
+  await expect(page.getByRole("checkbox", { name: "Seil" })).not.toBeChecked();
 });

@@ -95,7 +95,7 @@ export default function OverviewPage() {
               : s.choices.map((c) => {
                   const state = ev.choices[c]!;
                   const text = describeAnswer(lp, ctx, state, list);
-                  const prefix = s.choices.length > 1 ? `${choiceTexts(lp, c).title}: ` : "";
+                  const prefix = s.choices.length > 1 ? `${choiceTexts(lp, c, state, ctx).title}: ` : "";
                   return (
                     prefix +
                     (text ??
