@@ -137,6 +137,17 @@ describe("options", () => {
       assign: { might: 8, grace: 7, wit: 9, heart: 11 },
     });
   });
+
+  it("counts a tag from an earlier answer and switches to the text variant whose condition holds", () => {
+    const calling = { pick: "calling.river-runner" };
+    const moor = evaluateDraft(pkg, draft(1, { folk: { pick: "folk.moorfolk" }, calling }));
+    const hill = evaluateDraft(pkg, draft(1, { folk: { pick: "folk.hillfolk" }, calling }));
+    expect(moor.choices["talents-river-runner"]).toMatchObject({ count: 2 });
+    expect(moor.choices["talents-river-runner"]!.textVariant).toBeUndefined();
+    expect(moor.choices["talents-river-runner"]!.recommended).toHaveLength(2);
+    expect(hill.choices["talents-river-runner"]).toMatchObject({ count: 3, textVariant: "hillfolk" });
+    expect(hill.choices["talents-river-runner"]!.recommended).toHaveLength(3);
+  });
 });
 
 describe("a complete level 3 character", () => {

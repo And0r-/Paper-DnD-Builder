@@ -10,7 +10,7 @@ pnpm validate-package packages/demo-package
 
 ## What it covers
 
-Every feature of format 0.4 is used at least once (see
+Every feature of format 0.6 is used at least once (see
 [`packages/format/SPEC.md`](../format/SPEC.md)):
 
 | Feature                 | Where                                                                                          |
@@ -29,6 +29,7 @@ Every feature of format 0.4 is used at least once (see
 | Print hints             | `sheet.json`: every section kind, card layout for knacks                                       |
 | Sheet conditions        | `sheet.json`: section `path` has `when: level >= 3`                                            |
 | Box labels              | `sheet.json`: box `nerve` in `primary` has its own `label`                                     |
+| Text variants           | `talents-*`: hillfolk (tag `bonus-talent`) pick one more; `textVariants` and `{{var:count}}`   |
 
 ## Layout
 

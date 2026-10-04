@@ -421,6 +421,10 @@ export function validatePackageFiles(files: PackageFiles): ValidationResult {
   flow.choices.forEach((c, i) => {
     const p = `choices[${i}]`;
     checkProvenance(F, p, c.source, c.license);
+    c.textVariants?.forEach((v, j) => checkExpr(F, `${p}.textVariants[${j}].when`, v.when));
+    duplicates((c.textVariants ?? []).map((v) => v.id)).forEach((v) =>
+      err(F, `${p}.textVariants`, `text variant ${lit(v)} is declared twice`),
+    );
     switch (c.kind) {
       case "pickOne":
       case "pickMany": {
@@ -667,6 +671,15 @@ export function validatePackageFiles(files: PackageFiles): ValidationResult {
     need(`choice.${c.id}.intro`, `introduction of choice ${lit(c.id)}`);
     optional.add(`choice.${c.id}.missing`);
   }
+  // A variant replaces any of the four texts; which ones it replaces is up to the package.
+  const variantTexts = flow.choices.flatMap((c) =>
+    (c.textVariants ?? []).map((v) => ({
+      choice: c.id,
+      variant: v.id,
+      keys: ["title", "question", "intro", "missing"].map((f) => `choice.${c.id}.variant.${v.id}.${f}`),
+    })),
+  );
+  for (const v of variantTexts) for (const k of v.keys) optional.add(k);
   for (const s of flow.steps) {
     if (s.choices.length > 1) {
       need(`step.${s.id}.title`, `title of step ${lit(s.id)}`);
@@ -720,6 +733,20 @@ export function validatePackageFiles(files: PackageFiles): ValidationResult {
       bucket[key] = value;
       origins[key] = { file, source: data.source, license };
     }
+  }
+  // A variant text one language has, every language needs: the screen must not fall back to
+  // the base text in one language only.
+  for (const v of variantTexts) {
+    const present = v.keys.filter((k) => Object.values(texts).some((bucket) => k in bucket));
+    if (present.length === 0) {
+      const i = flow.choices.findIndex((c) => c.id === v.choice);
+      warn(
+        F,
+        `choices[${i}].textVariants`,
+        `text variant ${lit(v.variant)} has no texts and changes nothing`,
+      );
+    }
+    for (const k of present) need(k, `text of variant ${lit(v.variant)} of choice ${lit(v.choice)}`);
   }
 
   // Unit words written as text next to a number, e.g. "9 m" instead of {{length:30}}.
