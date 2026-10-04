@@ -64,6 +64,8 @@ function send(id: string, version: number, next: Pending): Promise<DraftView> {
 export interface StepNotice {
   added: string[];
   removed: string[];
+  /** Steps that were there before and now ask more (a gather step got a new choice). */
+  grown: string[];
 }
 
 export interface DraftApi {
@@ -297,10 +299,11 @@ function ReadyDraft({
       const before = evaluateDraft(pkg, docRef.current);
       const after = evaluateDraft(pkg, r.doc);
       const diff = stepDiff(before, after);
-      if (diff.added.length > 0 || diff.removed.length > 0) {
+      if (diff.added.length > 0 || diff.removed.length > 0 || diff.grown.length > 0) {
         setNotice({
           added: diff.added.map((s) => stepTitle(lp, after, s)),
           removed: diff.removed.map((s) => stepTitle(lp, before, s)),
+          grown: diff.grown.map((s) => stepTitle(lp, after, s)),
         });
       }
       setDoc(r.doc);

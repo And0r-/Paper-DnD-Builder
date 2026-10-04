@@ -35,7 +35,8 @@ export default defineConfig({
     timeout: 60_000,
     env: {
       DATABASE_URL: "pglite:memory",
-      PACKAGES_DIR: DEMO,
+      // E2E_PACKAGES_DIR runs the same tests against another package locally.
+      PACKAGES_DIR: process.env["E2E_PACKAGES_DIR"] ?? DEMO,
       MAIL_OUTBOX_DIR: OUTBOX,
       NEXT_TELEMETRY_DISABLED: "1",
     },

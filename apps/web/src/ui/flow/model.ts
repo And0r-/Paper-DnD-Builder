@@ -118,13 +118,26 @@ export function consequences(
   return out;
 }
 
-/** Steps that appear or disappear between two evaluations (for the "a step was added" note). */
-export function stepDiff(before: Evaluation, after: Evaluation): { added: string[]; removed: string[] } {
-  const was = new Set(before.steps.map((s) => s.id));
+/**
+ * Steps that appear or disappear between two evaluations, and steps that
+ * stay but ask more than before: a gather step that got a choice from a
+ * later step (for the "a step was added" note).
+ */
+export function stepDiff(
+  before: Evaluation,
+  after: Evaluation,
+): { added: string[]; removed: string[]; grown: string[] } {
+  const was = new Map(before.steps.map((s) => [s.id, s]));
   const is = new Set(after.steps.map((s) => s.id));
   return {
     added: after.steps.filter((s) => !was.has(s.id)).map((s) => s.id),
     removed: before.steps.filter((s) => !is.has(s.id)).map((s) => s.id),
+    grown: after.steps
+      .filter((s) => {
+        const old = was.get(s.id);
+        return old !== undefined && s.choices.some((c) => !old.choices.includes(c));
+      })
+      .map((s) => s.id),
   };
 }
 

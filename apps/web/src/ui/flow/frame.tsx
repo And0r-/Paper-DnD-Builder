@@ -189,6 +189,11 @@ export function StepNotice() {
           {tc("flow.stepRemoved", notice.removed.length, { steps: list(notice.removed) })}
         </Callout>
       )}
+      {notice && notice.grown.length > 0 && (
+        <Callout tone="info">
+          {tc("flow.stepGrown", notice.grown.length, { steps: list(notice.grown) })}
+        </Callout>
+      )}
     </div>
   );
 }

@@ -136,7 +136,7 @@ export function OptionDetails({ lp, thing, level }: { lp: LoadedPackage; thing: 
 
 // ---------------------------------------------------------------- options
 
-function OptionCard({
+export function OptionCard({
   lp,
   thing,
   type,
@@ -145,6 +145,7 @@ function OptionCard({
   recommended,
   badge,
   level,
+  blocked,
   onToggle,
 }: {
   lp: LoadedPackage;
@@ -156,6 +157,8 @@ function OptionCard({
   /** Package text key of this option's badge; shown instead of "recommended". */
   badge: string | undefined;
   level: number;
+  /** Why this option cannot be picked right now; it stays readable and focusable. */
+  blocked?: string | undefined;
   onToggle: () => void;
 }) {
   const { t } = useApp();
@@ -174,7 +177,7 @@ function OptionCard({
     );
   return (
     <div
-      className={`option${checked ? " option--checked" : ""}`}
+      className={`option${checked ? " option--checked" : ""}${blocked ? " option--blocked" : ""}`}
       onClick={(e) => {
         // The whole card picks the option, except its own buttons and links.
         if ((e.target as HTMLElement).closest("button, a, input, label, select, textarea")) return;
@@ -193,8 +196,11 @@ function OptionCard({
           name={name}
           value={thing.id}
           checked={checked}
-          onChange={onToggle}
-          aria-describedby={`${id}-short`}
+          onChange={() => {
+            if (!blocked) onToggle();
+          }}
+          aria-disabled={blocked ? true : undefined}
+          aria-describedby={blocked ? `${id}-blocked ${id}-short` : `${id}-short`}
         />
         <span className="option__mark" aria-hidden="true">
           {checked && <Icon name={type === "radio" ? "dot" : "check"} size={type === "radio" ? 14 : 18} />}
@@ -208,6 +214,12 @@ function OptionCard({
           recommended && <span className="badge">{t("common.recommended")}</span>
         )}
       </div>
+      {blocked && (
+        <p className="option__blocked" id={`${id}-blocked`}>
+          <Icon name="info" size={18} />
+          <span>{blocked}</span>
+        </p>
+      )}
       <p className="option__short" id={`${id}-short`}>
         <RichText lp={lp} text={ptext(lp, `${thing.id}.short`)} />
       </p>
@@ -223,7 +235,7 @@ function OptionCard({
   );
 }
 
-function groupOptions(things: Thing[]): { group: string | undefined; things: Thing[] }[] {
+export function groupOptions(things: Thing[]): { group: string | undefined; things: Thing[] }[] {
   if (!things.some((th) => th.group)) return [{ group: undefined, things }];
   const groups: { group: string | undefined; things: Thing[] }[] = [];
   for (const th of things) {
@@ -237,7 +249,7 @@ function groupOptions(things: Thing[]): { group: string | undefined; things: Thi
   return groups;
 }
 
-const SEARCH_FROM = 12;
+export const SEARCH_FROM = 12;
 
 export function PickChoice({
   choice,
@@ -801,6 +813,11 @@ export function InfoChoice({ state }: { state: ChoiceState }) {
     .map((id) => lp.pkg.things.find((th) => th.id === id))
     .filter((x): x is Thing => !!x);
   const chosen = info.choices.filter((c) => ev.choices[c]?.status === "answered");
+  const order = ev.steps.map((s) => s.id);
+  const here = order.indexOf(state.step);
+  const later = info.choices.filter(
+    (c) => !chosen.includes(c) && order.indexOf(ev.choices[c]?.step ?? "") > here,
+  );
   if (things.length === 0 && info.values.length === 0 && info.choices.length === 0) {
     return <p>{t("info.nothing")}</p>;
   }
@@ -829,11 +846,16 @@ export function InfoChoice({ state }: { state: ChoiceState }) {
           </li>
         ))}
       </ul>
-      {/* Granted choices sit right after the step that grants them, so by the
-          info step they are usually answered already: say so, never "next". */}
+      {/* Granted choices usually sit right after the step that grants them,
+          so by the info step they are answered: say so, never "next". A
+          choice gathered at a later step (SPEC 9.4) is named with that step. */}
       {[
         { title: t("info.chosen"), ids: chosen },
-        { title: t("info.choices"), ids: info.choices.filter((c) => !chosen.includes(c)) },
+        { title: t("info.later"), ids: later },
+        {
+          title: t("info.choices"),
+          ids: info.choices.filter((c) => !chosen.includes(c) && !later.includes(c)),
+        },
       ].map(
         (group) =>
           group.ids.length > 0 && (
@@ -841,7 +863,15 @@ export function InfoChoice({ state }: { state: ChoiceState }) {
               <p className="gifts__choices-title">{group.title}</p>
               <ul>
                 {group.ids.map((c) => (
-                  <li key={c}>{choiceTexts(lp, c, ev.choices[c], ctx).title}</li>
+                  <li key={c}>
+                    {choiceTexts(lp, c, ev.choices[c], ctx).title}
+                    {later.includes(c) && (
+                      <span className="gifts__where">
+                        {" "}
+                        ({t("info.laterAt", { step: stepTitle(lp, ev, ev.choices[c]!.step) })})
+                      </span>
+                    )}
+                  </li>
                 ))}
               </ul>
             </div>
