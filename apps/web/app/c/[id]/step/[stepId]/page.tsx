@@ -6,7 +6,7 @@
 import type { ChoiceState, DraftChange } from "@builder/core";
 import type { Choice } from "@builder/format/pure";
 import { useParams } from "next/navigation";
-import { useId } from "react";
+import { useId, useState } from "react";
 import { useApp } from "../../../../../src/ui/app-state.tsx";
 import { ButtonLink } from "../../../../../src/ui/components/Button.tsx";
 import { EmptyState } from "../../../../../src/ui/components/Feedback.tsx";
@@ -35,6 +35,9 @@ export default function StepPage() {
   const { lp, ev, entries, change } = useDraft();
   const ctx = useMeasure(lp);
   const headingId = useId();
+  // The way of sharing out each distribute choice shows right now; the
+  // package's "missing" sentence speaks of points and fits only that way.
+  const [ways, setWays] = useState<Record<string, number>>({});
   const entry = entries.find((e) => e.kind === "step" && e.key === key);
   usePageTitle(entry ? [] : [t("flow.stepNotFound")]);
 
@@ -54,7 +57,13 @@ export default function StepPage() {
     .filter((x): x is { def: Choice; state: ChoiceState } => x.def !== undefined && x.state !== undefined);
   const single = choices.length === 1;
   const open = choices.filter((c) => !settled(c.state));
-  const problem = open[0] ? missingText(lp, ctx, open[0].state, t) : undefined;
+  const head = open[0];
+  const way = head?.def.kind === "distribute" ? head.def.methods[ways[head.def.id] ?? 0] : undefined;
+  const problem = !head
+    ? undefined
+    : way?.method === "array" && head.state.status !== "invalid"
+      ? t("dist.arrayMissing")
+      : missingText(lp, ctx, head.state, t);
   const isInfo = choices.length > 0 && choices.every((c) => c.def.kind === "info");
 
   // "Choose for me": the package's recommendation (or a good default) for every open choice.
@@ -88,6 +97,7 @@ export default function StepPage() {
   const focusTarget = () => {
     const block = open[0] && document.getElementById(`block-${open[0].def.id}`);
     return (
+      block?.querySelector<HTMLElement>("[data-open-target]") ??
       block?.querySelector<HTMLElement>("input:not([type='search']), select, textarea, button") ??
       block?.querySelector<HTMLElement>("input") ??
       null
@@ -100,7 +110,14 @@ export default function StepPage() {
       case "pickMany":
         return <PickChoice choice={def} state={state} labelledBy={labelledBy} />;
       case "distribute":
-        return <DistributeChoice choice={def} state={state} labelledBy={labelledBy} />;
+        return (
+          <DistributeChoice
+            choice={def}
+            state={state}
+            labelledBy={labelledBy}
+            onMethod={(m) => setWays((w) => (w[def.id] === m ? w : { ...w, [def.id]: m }))}
+          />
+        );
       case "number":
         return <NumberChoice choice={def} state={state} labelledBy={labelledBy} />;
       case "text":

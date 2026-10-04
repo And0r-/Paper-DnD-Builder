@@ -64,6 +64,11 @@ export function evaluateCondition(src: string, scope: ExprScope): boolean {
   return r;
 }
 
+/** Evaluates an already parsed numeric expression (one term of a formula). */
+export function evaluateParsed(expr: Expr, scope: ExprScope): number {
+  return num(evalNode(expr, scope), "term");
+}
+
 function num(v: ExprResult, what: string): number {
   if (typeof v !== "number") throw new RuleError(`${what} needs a number, got ${typeof v}`);
   return v;

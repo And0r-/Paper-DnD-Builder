@@ -26,7 +26,12 @@
     "id": "upbringing.ferry-child",
     "kind": "upbringing",
     "source": "mistland",
-    "grants": [{ "thing": "talent.weather-sense" }, { "thing": "talent.haggling" }, { "thing": "item.rope" }]
+    "grants": [
+      { "value": "grace", "add": 1 },
+      { "thing": "talent.weather-sense" },
+      { "thing": "talent.haggling" },
+      { "thing": "item.rope" }
+    ]
   },
   {
     "id": "upbringing.bell-tower",

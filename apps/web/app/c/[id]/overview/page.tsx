@@ -18,7 +18,9 @@ import {
   useFooterDock,
   usePageTitle,
 } from "../../../../src/ui/flow/frame.tsx";
-import { describeAnswer, OVERVIEW_KEY } from "../../../../src/ui/flow/model.ts";
+import { distributeLines, valueOrigin } from "../../../../src/ui/flow/explain.ts";
+import { describeAnswer, OVERVIEW_KEY, positionOf } from "../../../../src/ui/flow/model.ts";
+import { Origins } from "../../../../src/ui/flow/origins.tsx";
 import { choiceTexts, formatValue, ptext } from "../../../../src/ui/package-text.ts";
 
 export default function OverviewPage() {
@@ -32,7 +34,7 @@ export default function OverviewPage() {
   const dock = useFooterDock();
   const entry = entries.find((e) => e.key === OVERVIEW_KEY)!;
   const index = entries.indexOf(entry);
-  usePageTitle([t("overview.question"), t("flow.progress", { current: index + 1, total: entries.length })]);
+  usePageTitle([t("overview.question"), t("flow.progress", positionOf(entries, entry))]);
 
   const openSteps = entries.filter((e) => e.kind === "step" && e.status !== "done");
   const steps = entries.filter((e) => e.kind !== "overview");
@@ -72,10 +74,12 @@ export default function OverviewPage() {
         <ul className="values__list">
           {lp.pkg.flow.summary.fields.map((id) => {
             const shown = formatValue(lp, ctx, id, ev.values[id] ?? 0);
+            const origin = valueOrigin(lp, ctx, ev, id, { t, list });
             return (
               <li className="value" key={id}>
                 <span className="value__number">{shown}</span>
                 <span className="value__name">{ptext(lp, `value.${id}.name`)}</span>
+                {origin && <span className="value__from">{origin}</span>}
                 {ptext(lp, `value.${id}.explain`) && (
                   <span className="value__explain">
                     <RichText lp={lp} text={ptext(lp, `value.${id}.explain`)} />
@@ -87,22 +91,29 @@ export default function OverviewPage() {
         </ul>
       </section>
 
+      <Origins />
+
       <ul className="summary">
         {steps.map((s) => {
           const lines =
             s.kind === "level"
               ? [String(ev.level)]
-              : s.choices.map((c) => {
+              : s.choices.flatMap((c) => {
                   const state = ev.choices[c]!;
+                  const choice = lp.pkg.flow.choices.find((x) => x.id === c);
+                  const assign = (state.answer as { assign?: Record<string, number> } | undefined)?.assign;
+                  // Each score on its own line, with what else adds to it ("15 + 2 from … = 17").
+                  if (choice?.kind === "distribute" && assign && state.status !== "invalid")
+                    return distributeLines(lp, ctx, ev, state, choice.targets, assign, { t, list });
                   const text = describeAnswer(lp, ctx, state, list);
                   const prefix = s.choices.length > 1 ? `${choiceTexts(lp, c, state, ctx).title}: ` : "";
-                  return (
+                  return [
                     prefix +
-                    (text ??
-                      (state.optional && state.status === "missing"
-                        ? t("overview.leftEmpty")
-                        : t("overview.nothingChosen")))
-                  );
+                      (text ??
+                        (state.optional && state.status === "missing"
+                          ? t("overview.leftEmpty")
+                          : t("overview.nothingChosen"))),
+                  ];
                 });
           return (
             <li key={s.key} className={`summary__item summary__item--${s.status}`}>
