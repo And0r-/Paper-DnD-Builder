@@ -22,6 +22,7 @@ import {
 import type { DraftDocument } from "./draft.ts";
 import { evaluateCondition, evaluateNumber, RuleError, type ExprScope } from "./expr.ts";
 import { judgeAnswer, type ChoiceContext, type Problem } from "./judge.ts";
+import { assignPicks, fillPicks, type PoolSlot } from "./pool.ts";
 
 export type ChoiceStatus = "answered" | "incomplete" | "missing" | "invalid" | "info";
 
@@ -59,6 +60,8 @@ export interface ChoiceState {
   info?: InfoContent;
   /** Active text variant: its texts `choice.<id>.variant.<textVariant>.*` replace the base texts. */
   textVariant?: string;
+  /** Things that grant this choice (granted choices), in grant order. */
+  grantedBy?: string[];
 }
 
 export interface InfoContent {
@@ -81,6 +84,33 @@ export interface StepState {
   /** Earlier steps whose answers this step depends on. */
   dependsOn: string[];
   status: "done" | "open" | "needsAttention";
+  /** Gather steps that show their choices together: the gather group and how. */
+  gather?: { group: string; together: "sections" | "list" };
+  /** Steps with `together: "list"`: the shared list of options. */
+  pool?: PoolState;
+}
+
+/**
+ * One list of options for all choices of a step (`together: "list"`).
+ * Options are offered as before the step, so every choice offers its full list;
+ * a pick counts for one choice only.
+ */
+export interface PoolState {
+  /** Every option of every choice, without things the character had before the step; in choice order, then option order. */
+  options: string[];
+  /** The choices, in step order: how many each takes and which picks count for it. */
+  choices: { choice: string; count: number; upTo: boolean; picks: string[]; remaining: number }[];
+  /** All picks, in choice order. */
+  picks: string[];
+  /** Sum of the counts, and how many of them are still open. */
+  count: number;
+  remaining: number;
+  /** Options that cannot be added to the current picks: no choice left that offers them. */
+  blocked: string[];
+  /** Things the character had before the step, of the kinds the choices offer ("you already have"). */
+  held: HeldThing[];
+  /** A full set of picks: the choices' recommendations first, filled up from the list. */
+  recommended: string[];
 }
 
 export interface HeldThing {
@@ -222,9 +252,13 @@ interface PendingStep {
   when?: string;
   origin: "flow" | "granted";
   grantedBy: string[];
+  /** Gather steps: the group, how they are shown, and the choices gathered so far. */
+  gather?: { group: string; together?: "sections" | "list"; gathered: { choice: string; by: string[] }[] };
 }
 
 /** Things matching an option source, in package order. */
+type PickChoice = Extract<Choice, { kind: "pickOne" | "pickMany" }>;
+
 export function selectThings(pkg: ContentPackage, source: OptionSource): Thing[] {
   return pkg.things.filter(
     (t) =>
@@ -269,26 +303,76 @@ export function evaluateDraft(pkg: ContentPackage, doc: DraftDocument): Evaluati
   const choices: Record<string, ChoiceState> = {};
   const steps: StepState[] = [];
   const scheduled = new Set<string>();
+  /** Gather steps not reached yet, by group. */
+  const gatherAhead = new Map<string, PendingStep>();
 
-  const queue: PendingStep[] = pkg.flow.steps.map((s) => ({
-    id: s.id,
-    choices: s.choices,
-    ...(s.when !== undefined ? { when: s.when } : {}),
-    origin: "flow",
-    grantedBy: [],
-  }));
-  for (const s of pkg.flow.steps) for (const c of s.choices) scheduled.add(c);
+  const queue: PendingStep[] = pkg.flow.steps.map((s) => {
+    const pending: PendingStep = {
+      id: s.id,
+      choices: "gather" in s ? [] : s.choices,
+      ...(s.when !== undefined ? { when: s.when } : {}),
+      origin: "flow",
+      grantedBy: [],
+    };
+    if ("gather" in s) {
+      pending.gather = {
+        group: s.gather,
+        ...(s.together !== undefined ? { together: s.together } : {}),
+        gathered: [],
+      };
+      if (!gatherAhead.has(s.gather)) gatherAhead.set(s.gather, pending);
+    } else for (const c of s.choices) scheduled.add(c);
+    return pending;
+  });
 
   while (queue.length > 0) {
     const step = queue.shift()!;
-    if (step.when !== undefined && !evaluateCondition(step.when, character.scope)) continue;
+    const shown = step.when === undefined || evaluateCondition(step.when, character.scope);
+    if (step.gather) {
+      const { group, together, gathered } = step.gather;
+      if (gatherAhead.get(group) === step) gatherAhead.delete(group);
+      if (gathered.length === 0) continue;
+      // Without `together`, and also if the step is hidden, each gathered
+      // choice becomes its own step here: a granted choice is never lost.
+      if (together === undefined || !shown) {
+        queue.unshift(
+          ...gathered.map((g): PendingStep => ({
+            id: g.choice,
+            choices: [g.choice],
+            origin: "granted",
+            grantedBy: g.by,
+          })),
+        );
+        continue;
+      }
+      step.choices = gathered.map((g) => g.choice);
+      step.grantedBy = [...new Set(gathered.flatMap((g) => g.by))];
+    } else if (!shown) continue;
 
     const granted: Grant[] = [];
     const refs = new Set<string>(thingsIn(step.when));
+    const before = [...character.held.values()];
+    // Granted choices on a gathered step: the things that granted each one.
+    const grantedByChoice = new Map((step.gather?.gathered ?? []).map((g) => [g.choice, g.by]));
+    if (step.origin === "granted") grantedByChoice.set(step.id, step.grantedBy);
+    const prepared: Prepared[] = [];
     for (const choiceId of step.choices) {
       const choice = ix.choices.get(choiceId);
       if (!choice) continue;
-      choices[choiceId] = evaluateChoice(pkg, choice, step.id, doc, character, choices, granted, refs);
+      const p = prepareChoice(pkg, choice, step.id, doc, character, choices, refs);
+      const by = grantedByChoice.get(choiceId);
+      if (by) p.state.grantedBy = by;
+      choices[choiceId] = p.state;
+      prepared.push(p);
+      // On a list step every choice is offered as before the step; elsewhere
+      // a choice sees the answers of the choices above it.
+      if (step.gather?.together !== "list") answerChoice(p, character, step.id, granted);
+    }
+    let pool: PoolState | undefined;
+    if (step.gather?.together === "list") {
+      const taken = new Set<string>();
+      for (const p of prepared) answerChoice(p, character, step.id, granted, taken);
+      pool = poolFor(pkg, prepared, before);
     }
 
     const dependsOn = new Set<string>();
@@ -313,11 +397,23 @@ export function evaluateDraft(pkg: ContentPackage, doc: DraftDocument): Evaluati
         : states.every((c) => isSettled(c))
           ? "done"
           : "open",
+      ...(step.gather?.together !== undefined
+        ? { gather: { group: step.gather.group, together: step.gather.together } }
+        : {}),
+      ...(pool ? { pool } : {}),
     });
 
-    // SPEC 9.4: one step per newly granted choice, right after this step, in grant order.
+    // SPEC 9.4: one step per newly granted choice, right after this step, in
+    // grant order; a choice with a gather group whose step is still ahead waits there.
     const inserted: PendingStep[] = [];
     for (const g of granted) {
+      const group = ix.choices.get(g.choice)?.gather;
+      const gatherStep = group !== undefined ? gatherAhead.get(group) : undefined;
+      const waiting = gatherStep?.gather!.gathered.find((w) => w.choice === g.choice);
+      if (waiting) {
+        if (!waiting.by.includes(g.by)) waiting.by.push(g.by);
+        continue;
+      }
       const existing = inserted.find((p) => p.id === g.choice);
       if (existing) {
         existing.grantedBy.push(g.by);
@@ -325,7 +421,8 @@ export function evaluateDraft(pkg: ContentPackage, doc: DraftDocument): Evaluati
       }
       if (scheduled.has(g.choice)) continue;
       scheduled.add(g.choice);
-      inserted.push({ id: g.choice, choices: [g.choice], origin: "granted", grantedBy: [g.by] });
+      if (gatherStep) gatherStep.gather!.gathered.push({ choice: g.choice, by: [g.by] });
+      else inserted.push({ id: g.choice, choices: [g.choice], origin: "granted", grantedBy: [g.by] });
     }
     queue.unshift(...inserted);
   }
@@ -358,16 +455,25 @@ function isSettled(c: ChoiceState): boolean {
   return c.status === "answered" || c.status === "info" || (c.optional && c.status === "missing");
 }
 
-function evaluateChoice(
+/** A choice worked out against the character so far, before its answer counts. */
+interface Prepared {
+  choice: Choice;
+  state: ChoiceState;
+  ctx: ChoiceContext;
+  hasAnswer: boolean;
+  /** Picks of the answer that count for the character (pick choices). */
+  counted: string[];
+}
+
+function prepareChoice(
   pkg: ContentPackage,
   choice: Choice,
   stepId: string,
   doc: DraftDocument,
   character: Character,
   earlier: Record<string, ChoiceState>,
-  granted: Grant[],
   refs: Set<string>,
-): ChoiceState {
+): Prepared {
   const scope = character.scope;
   const state: ChoiceState = {
     id: choice.id,
@@ -381,6 +487,7 @@ function evaluateChoice(
   const hasAnswer = Object.hasOwn(doc.answers, choice.id) && doc.answers[choice.id] !== null;
   if (hasAnswer) state.answer = doc.answers[choice.id];
   const ctx: ChoiceContext = {};
+  const prepared: Prepared = { choice, state, ctx, hasAnswer, counted: [] };
 
   switch (choice.kind) {
     case "pickOne":
@@ -449,20 +556,84 @@ function evaluateChoice(
     case "info": {
       state.status = "info";
       state.info = infoFor(pkg, choice.of, earlier, character.level, scope);
-      return state;
+      prepared.hasAnswer = false;
+      break;
     }
   }
+  return prepared;
+}
 
-  if (!hasAnswer) return state;
+/**
+ * Judges the stored answer and gives the character what it picks. `taken`
+ * (list steps) holds the picks of the step's earlier choices: picking one
+ * of them again is a duplicate.
+ */
+function answerChoice(
+  p: Prepared,
+  character: Character,
+  stepId: string,
+  granted: Grant[],
+  taken?: Set<string>,
+): void {
+  const { choice, state } = p;
+  if (!p.hasAnswer) return;
+  const ctx =
+    taken && p.ctx.options ? { ...p.ctx, options: p.ctx.options.filter((o) => !taken.has(o)) } : p.ctx;
   const j = judgeAnswer(choice, state.answer, ctx);
   state.status = j.status;
   if (j.problem !== undefined) state.problem = j.problem;
+  if (
+    j.problem === "notOffered" &&
+    taken &&
+    judgeAnswer(choice, state.answer, p.ctx).problem !== "notOffered"
+  )
+    state.problem = "duplicate";
   if (j.remaining !== undefined) state.remaining = j.remaining;
   else if (j.status !== "incomplete") delete state.remaining;
+  p.counted = j.counted ?? [];
   // Picks that fit count even if others in the same answer do not; inputs only from a fitting answer.
-  for (const id of j.counted ?? []) character.give(id, { pickedIn: choice.id }, stepId, granted);
+  for (const id of p.counted) {
+    taken?.add(id);
+    character.give(id, { pickedIn: choice.id }, stepId, granted);
+  }
   if (j.status !== "invalid" && j.inputs) character.setInputs(j.inputs);
-  return state;
+}
+
+/** The shared list of a list step, after its answers counted. */
+function poolFor(pkg: ContentPackage, prepared: Prepared[], before: HeldThing[]): PoolState {
+  const picks = prepared.filter((p) => p.state.options);
+  const options = [...new Set(picks.flatMap((p) => p.state.options!))];
+  const slots: PoolSlot[] = picks.map((p) => ({
+    count: p.state.count ?? 1,
+    offers: new Set(p.state.options),
+  }));
+  const choices = picks.map((p, i) => ({
+    choice: p.choice.id,
+    count: slots[i]!.count,
+    upTo: p.state.upTo ?? false,
+    picks: p.counted,
+    remaining: slots[i]!.count - p.counted.length,
+  }));
+  const all = choices.flatMap((c) => c.picks);
+  const count = slots.reduce((n, s) => n + s.count, 0);
+  // Picks stay with the choice they count for; an option is blocked if no
+  // assignment of the picks plus this option exists.
+  const keep = new Map(choices.flatMap((c, i) => c.picks.map((pick) => [pick, i] as const)));
+  const blocked = options.filter((o) => !all.includes(o) && !assignPicks(slots, [...all, o], keep));
+  const kinds = new Set(
+    picks.flatMap((p) => selectThings(pkg, (p.choice as PickChoice).options).map((t) => t.kind)),
+  );
+  const recommended = picks.flatMap((p) => (Array.isArray(p.state.recommended) ? p.state.recommended : []));
+  return {
+    options,
+    choices,
+    picks: all,
+    count,
+    remaining: count - all.length,
+    blocked,
+    held: before.filter((h) => kinds.has(h.kind)),
+    recommended: fillPicks(slots, [...recommended, ...options]),
+  };
 }
 
 function infoFor(
