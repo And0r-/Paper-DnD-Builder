@@ -75,21 +75,23 @@ describe("steps", () => {
     expect(ev.steps.map((s) => s.id)).toEqual([
       "character",
       "calling",
-      "talents-lantern-bearer",
       "gear",
       "knacks-lantern",
       "path",
       "calling-gifts",
       "upbringing",
       "folk",
+      "talents-lantern-bearer",
       "scores",
       "extra-talent",
       "looks",
     ]);
-    const talents = ev.steps.find((s) => s.id === "talents-lantern-bearer")!;
-    expect(talents.origin).toBe("granted");
-    expect(talents.grantedBy).toEqual(["calling.lantern-bearer"]);
-    expect(talents.dependsOn).toEqual(["calling"]);
+    const gear = ev.steps.find((s) => s.id === "gear")!;
+    expect(gear.origin).toBe("granted");
+    expect(gear.grantedBy).toEqual(["calling.lantern-bearer"]);
+    expect(gear.dependsOn).toEqual(["calling"]);
+    // The talents are a flow step after the folk, so the folk can add one.
+    expect(ev.steps.find((s) => s.id === "talents-lantern-bearer")!.origin).toBe("flow");
   });
 
   it("asks a choice granted at a higher level only from that level on", () => {
@@ -210,7 +212,7 @@ describe("a complete level 3 character", () => {
       thing: "calling.lantern-bearer",
       things: ["item.lantern-staff", "item.provisions", "trait.steady-flame"],
       values: [{ value: "stamina", add: 18 }],
-      choices: ["talents-lantern-bearer", "gear", "knacks-lantern", "path"],
+      choices: ["gear", "knacks-lantern", "path"],
     });
   });
 

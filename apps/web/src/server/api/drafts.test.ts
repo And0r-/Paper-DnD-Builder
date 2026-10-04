@@ -72,12 +72,12 @@ describe("building a character over the API", () => {
     expect(answered).toEqual([
       "name",
       "calling",
-      "talents-lantern-bearer",
       "gear",
       "knacks-lantern",
       "path",
       "upbringing",
       "folk",
+      "talents-lantern-bearer",
       "scores",
       "extra-talent",
       "age",

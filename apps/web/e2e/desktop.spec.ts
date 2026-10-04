@@ -43,7 +43,7 @@ test("three columns, keyboard only, and only requests to the builder itself", as
   await page.getByRole("button", { name: m["common.next"], exact: true }).focus();
   await page.keyboard.press("Enter");
   await expect(
-    page.getByRole("heading", { level: 1, name: "Worin ist dein Charakter geübt?" }),
+    page.getByRole("heading", { level: 1, name: "Was nimmt dein Charakter zusätzlich mit?" }),
   ).toBeVisible();
   await expect(page.getByRole("heading", { level: 1 })).toBeFocused();
 

@@ -90,36 +90,6 @@ test("a newcomer builds a level-3 character from login to finished", async ({ pa
   await axe(page);
   await next(page);
 
-  // Talents: pick many with a counter.
-  await question(page, "Worin ist dein Charakter geübt?");
-  await expect(page.getByText("0 von 2 gewählt")).toBeVisible();
-  await next(page);
-  await expect(page.getByText("Wähle noch 2 Talent(e).")).toBeVisible();
-  // Pressed too early, the dock offers it right above Next as well.
-  await page.locator(".step-footer").getByRole("button", { name: m["flow.chooseForMe"] }).click();
-  await expect(page.getByText("2 von 2 gewählt")).toBeVisible();
-  await shot(page, "06-talente");
-  await axe(page);
-  await next(page);
-
-  // Going back to change the calling asks first and keeps everything on "no".
-  await page.getByRole("button", { name: m["menu.open"] }).click();
-  await page
-    .getByRole("dialog")
-    .getByRole("link", { name: /^Beruf/ })
-    .click();
-  await question(page, "Womit verdient dein Charakter sein Brot?");
-  await pick(page, "Flussläufer");
-  const dialog = page.getByRole("dialog", { name: "Beruf ändern?" });
-  await expect(dialog).toBeVisible();
-  await expect(dialog.getByText("Talente (2 gewählt)")).toBeVisible();
-  await shot(page, "07-fruehere-wahl-aendern");
-  await expect(dialog.getByRole("button", { name: m["change.keep"] })).toBeFocused();
-  await page.keyboard.press("Escape");
-  await expect(page.getByRole("radio", { name: "Laternenträgerin" })).toBeChecked();
-  // Browser back works like "Back"; we were on the next step before.
-  await page.goBack();
-
   await question(page, "Was nimmt dein Charakter zusätzlich mit?");
   await pick(page, "Schilfschild");
   await next(page);
@@ -167,6 +137,36 @@ test("a newcomer builds a level-3 character from login to finished", async ({ pa
   await shot(page, "10-herkunft-mehr-erfahren");
   await axe(page);
   await next(page);
+
+  // Talents come after the folk, which can add one: pick many with a counter.
+  await question(page, "Worin ist dein Charakter geübt?");
+  await expect(page.getByText("0 von 2 gewählt")).toBeVisible();
+  await next(page);
+  await expect(page.getByText("Wähle noch 2 Talent(e).")).toBeVisible();
+  // Pressed too early, the dock offers it right above Next as well.
+  await page.locator(".step-footer").getByRole("button", { name: m["flow.chooseForMe"] }).click();
+  await expect(page.getByText("2 von 2 gewählt")).toBeVisible();
+  await shot(page, "06-talente");
+  await axe(page);
+  await next(page);
+
+  // Going back to change the calling asks first and keeps everything on "no".
+  await page.getByRole("button", { name: m["menu.open"] }).click();
+  await page
+    .getByRole("dialog")
+    .getByRole("link", { name: /^Beruf/ })
+    .click();
+  await question(page, "Womit verdient dein Charakter sein Brot?");
+  await pick(page, "Flussläufer");
+  const dialog = page.getByRole("dialog", { name: "Beruf ändern?" });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByText("Talente (2 gewählt)")).toBeVisible();
+  await shot(page, "07-fruehere-wahl-aendern");
+  await expect(dialog.getByRole("button", { name: m["change.keep"] })).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("radio", { name: "Laternenträgerin" })).toBeChecked();
+  // Browser back works like "Back"; we were on the next step before.
+  await page.goBack();
 
   // Scores: spread points with − and +, then let the recommendation finish it.
   await question(page, "Worin ist dein Charakter stark?");
