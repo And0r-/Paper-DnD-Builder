@@ -38,7 +38,7 @@ export function draftView(row: DraftRow, pkg: ContentPackage | undefined) {
   };
 }
 
-async function loadDraft(ctx: RequestContext): Promise<{ row: DraftRow; accountId: string }> {
+export async function loadDraft(ctx: RequestContext): Promise<{ row: DraftRow; accountId: string }> {
   const { account } = await ctx.requireSession();
   const id = ctx.params["id"]!;
   const row = UUID.test(id) ? await ctx.app.store.findDraft(id, account.id) : undefined;
@@ -47,7 +47,7 @@ async function loadDraft(ctx: RequestContext): Promise<{ row: DraftRow; accountI
   return { row, accountId: account.id };
 }
 
-function packageOf(app: App, row: DraftRow): ContentPackage {
+export function packageOf(app: App, row: DraftRow): ContentPackage {
   const pkg = app.packages.get(row.package_id);
   if (!pkg) throw new HttpError(409, "packageUnavailable", { packageId: row.package_id });
   return pkg;

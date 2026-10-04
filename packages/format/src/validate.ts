@@ -547,6 +547,38 @@ export function validatePackageFiles(files: PackageFiles): ValidationResult {
     err(S, "sections", `section ${lit(s)} is declared twice`),
   );
   if (sheet.sections[0]?.kind !== "header") warn(S, "sections[0]", "the first section should be the header");
+  const thingPlace = new Map(thingsAt.map((at) => [at.thing.id, at]));
+  // A sheet field that names a stat ("uses", "note"): some selected thing must have it,
+  // and every value must be printable in that place.
+  const checkStatRef = (path: string, key: string, selected: Thing[], role: "uses" | "note") => {
+    const having = selected.filter((t) => t.stats?.[key] !== undefined);
+    if (having.length === 0) {
+      err(
+        S,
+        path,
+        statKeys.has(key)
+          ? `none of the things selected here has a stat ${lit(key)}`
+          : `no thing has a stat ${lit(key)}`,
+      );
+      return;
+    }
+    for (const t of having) {
+      const v = t.stats![key]!;
+      const ok =
+        role === "uses"
+          ? (typeof v === "number" && Number.isInteger(v) && v >= 0) || (typeof v === "object" && "text" in v)
+          : typeof v !== "boolean";
+      if (ok) continue;
+      const at = thingPlace.get(t.id)!;
+      err(
+        at.file,
+        `[${at.index}].stats.${key}`,
+        role === "uses"
+          ? `${path} draws use boxes from this stat; it must be a whole number ≥ 0 or {"text": …}`
+          : `${path} prints this stat next to the name; it cannot be true/false`,
+      );
+    }
+  };
   sheet.sections.forEach((s, i) => {
     const p = `sections[${i}]`;
     switch (s.kind) {
@@ -563,8 +595,16 @@ export function validatePackageFiles(files: PackageFiles): ValidationResult {
           }
         });
         break;
-      case "checkList":
-      case "featureTable":
+      case "checkList": {
+        const selected = checkOptionSource(S, `${p}.things`, s.things);
+        if (s.note !== undefined) checkStatRef(`${p}.note`, s.note, selected, "note");
+        break;
+      }
+      case "featureTable": {
+        const selected = checkOptionSource(S, `${p}.things`, s.things);
+        if (s.uses !== undefined) checkStatRef(`${p}.uses`, s.uses, selected, "uses");
+        break;
+      }
       case "list":
         checkOptionSource(S, `${p}.things`, s.things);
         break;
@@ -590,6 +630,10 @@ export function validatePackageFiles(files: PackageFiles): ValidationResult {
     layout.fields.forEach((f, j) => {
       if (!statKeys.has(f)) err(S, `cards.${kind}.fields[${j}]`, `no thing has a stat ${lit(f)}`);
     });
+    if (layout.uses !== undefined) {
+      const carded = [...thingById.values()].filter((t) => t.kind === kind && t.card);
+      checkStatRef(`cards.${kind}.uses`, layout.uses, carded, "uses");
+    }
   }
 
   // ------------------------------------------------------------------ texts

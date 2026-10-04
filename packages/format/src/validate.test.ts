@@ -125,8 +125,8 @@ describe("cross-file rules", () => {
   it.each<[string, (f: RawFiles) => void, string]>([
     [
       "format version",
-      (f) => (f.get("manifest.json").formatVersion = "0.2"),
-      "manifest.json formatVersion: package is written for format 0.2, this builder understands 0.1",
+      (f) => (f.get("manifest.json").formatVersion = "0.1"),
+      "manifest.json formatVersion: package is written for format 0.1, this builder understands 0.2",
     ],
     [
       "duplicate thing",
@@ -199,6 +199,36 @@ describe("cross-file rules", () => {
       "card field nobody has",
       (f) => (f.get("sheet.json").cards.knack.fields[3] = "colour"),
       'sheet.json cards.knack.fields[3]: no thing has a stat "colour"',
+    ],
+    [
+      "use boxes from a stat nobody has",
+      (f) => (f.get("sheet.json").cards.knack.uses = "charges"),
+      'sheet.json cards.knack.uses: no thing has a stat "charges"',
+    ],
+    [
+      "use boxes from a stat the selected things lack",
+      (f) => (f.get("sheet.json").sections.find((s: { id: string }) => s.id === "knacks").uses = "weight"),
+      'sheet.json sections[5].uses: none of the things selected here has a stat "weight"',
+    ],
+    [
+      "use boxes from a quantity",
+      (f) => (thing(f, "talents-and-traits", "trait.stone-steady").stats.uses = { amount: 5, unit: "ft" }),
+      'things/talents-and-traits.json [9].stats.uses: sections[4].uses draws use boxes from this stat; it must be a whole number ≥ 0 or {"text": …}',
+    ],
+    [
+      "use boxes from a fraction",
+      (f) => (thing(f, "knacks", "knack.spark-shower").stats.uses = 1.5),
+      'things/knacks.json [0].stats.uses: sections[5].uses draws use boxes from this stat; it must be a whole number ≥ 0 or {"text": …}',
+    ],
+    [
+      "check list note from true/false",
+      (f) => (thing(f, "talents-and-traits", "talent.climbing").stats.score = true),
+      "things/talents-and-traits.json [0].stats.score: sections[3].note prints this stat next to the name; it cannot be true/false",
+    ],
+    [
+      "check list note from a stat nobody has",
+      (f) => (f.get("sheet.json").sections.find((s: { id: string }) => s.id === "talents").note = "basis"),
+      'sheet.json sections[3].note: no thing has a stat "basis"',
     ],
     [
       "language without unit defaults",

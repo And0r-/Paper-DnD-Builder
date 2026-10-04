@@ -1,0 +1,24 @@
+{
+  "name": "@builder/print",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Printed character sheet and cards as PDF (A4), laid out from a package's sheet.json.",
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p ."
+  },
+  "dependencies": {
+    "@builder/core": "workspace:*",
+    "@builder/format": "workspace:*",
+    "pdfkit": "^0.20.2"
+  },
+  "devDependencies": {
+    "@builder/demo-package": "workspace:*",
+    "@types/pdfkit": "^0.17.6",
+    "pdfjs-dist": "^6.3.289"
+  }
+}

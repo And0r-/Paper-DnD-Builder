@@ -71,3 +71,12 @@ no answer. A partial `pickMany` answer is allowed; the choice stays open.
 
 A finished character stays finished while it is complete; a change that
 leaves something open makes it a draft again.
+
+## Print
+
+| Method & path                | Result                                                                                                                                                                                                                                                |
+| ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 🔒 `GET /api/drafts/:id/pdf` | The finished character as one A4 PDF: sheet, then cards. Language and units from the account settings. `409 notFinished` (with `open`), `422 languageNotSupported` (with the package's printable `languages`), `429 tooManyRequests` (`Retry-After`). |
+
+It is a plain `GET` so the screen can offer it as an ordinary download
+link. The PDF is made on every request and never stored.

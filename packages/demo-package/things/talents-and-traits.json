@@ -3,53 +3,154 @@
     "id": "talent.climbing",
     "kind": "talent",
     "source": "mistland",
-    "tags": ["for-lantern-bearer", "for-river-runner"]
+    "tags": ["for-lantern-bearer", "for-river-runner"],
+    "stats": {
+      "score": {
+        "text": "value.might.name"
+      }
+    }
   },
-  { "id": "talent.haggling", "kind": "talent", "source": "mistland", "tags": ["for-lantern-bearer"] },
+  {
+    "id": "talent.haggling",
+    "kind": "talent",
+    "source": "mistland",
+    "tags": ["for-lantern-bearer"],
+    "stats": {
+      "score": {
+        "text": "value.heart.name"
+      }
+    }
+  },
   {
     "id": "talent.tracking",
     "kind": "talent",
     "source": "mistland",
-    "tags": ["for-river-runner", "for-herbalist"]
+    "tags": ["for-river-runner", "for-herbalist"],
+    "stats": {
+      "score": {
+        "text": "value.wit.name"
+      }
+    }
   },
   {
     "id": "talent.mending",
     "kind": "talent",
     "source": "mistland",
-    "tags": ["for-lantern-bearer", "for-herbalist"]
+    "tags": ["for-lantern-bearer", "for-herbalist"],
+    "stats": {
+      "score": {
+        "text": "value.heart.name"
+      }
+    }
   },
-  { "id": "talent.listening", "kind": "talent", "source": "mistland", "tags": ["for-river-runner"] },
+  {
+    "id": "talent.listening",
+    "kind": "talent",
+    "source": "mistland",
+    "tags": ["for-river-runner"],
+    "stats": {
+      "score": {
+        "text": "value.wit.name"
+      }
+    }
+  },
   {
     "id": "talent.legends",
     "kind": "talent",
     "source": "mistland",
-    "tags": ["for-lantern-bearer", "for-herbalist"]
+    "tags": ["for-lantern-bearer", "for-herbalist"],
+    "stats": {
+      "score": {
+        "text": "value.wit.name"
+      }
+    }
   },
-  { "id": "talent.sneaking", "kind": "talent", "source": "mistland", "tags": ["for-river-runner"] },
+  {
+    "id": "talent.sneaking",
+    "kind": "talent",
+    "source": "mistland",
+    "tags": ["for-river-runner"],
+    "stats": {
+      "score": {
+        "text": "value.grace.name"
+      }
+    }
+  },
   {
     "id": "talent.weather-sense",
     "kind": "talent",
     "source": "mistland",
-    "tags": ["for-river-runner", "for-herbalist"]
+    "tags": ["for-river-runner", "for-herbalist"],
+    "stats": {
+      "score": {
+        "text": "value.wit.name"
+      }
+    }
   },
 
-  { "id": "trait.mist-sight", "kind": "trait", "source": "mistland" },
-  { "id": "trait.stone-steady", "kind": "trait", "source": "mistland" },
-  { "id": "trait.salt-blood", "kind": "trait", "source": "mistland" },
-  { "id": "trait.steady-flame", "kind": "trait", "source": "mistland" },
+  {
+    "id": "trait.mist-sight",
+    "kind": "trait",
+    "source": "mistland"
+  },
+  {
+    "id": "trait.stone-steady",
+    "kind": "trait",
+    "source": "mistland",
+    "stats": {
+      "uses": 1
+    }
+  },
+  {
+    "id": "trait.salt-blood",
+    "kind": "trait",
+    "source": "mistland"
+  },
+  {
+    "id": "trait.steady-flame",
+    "kind": "trait",
+    "source": "mistland",
+    "stats": {
+      "uses": {
+        "text": "stat-value.always"
+      }
+    }
+  },
   {
     "id": "trait.quick-feet",
     "kind": "trait",
     "source": "mistland",
-    "grants": [{ "value": "pace", "add": 5 }]
+    "grants": [
+      {
+        "value": "pace",
+        "add": 5
+      }
+    ]
   },
-  { "id": "trait.green-thumb", "kind": "trait", "source": "mistland" },
+  {
+    "id": "trait.green-thumb",
+    "kind": "trait",
+    "source": "mistland"
+  },
   {
     "id": "trait.warding-glow",
     "kind": "trait",
     "source": "mistland",
-    "grants": [{ "value": "guard", "add": 1 }]
+    "grants": [
+      {
+        "value": "guard",
+        "add": 1
+      }
+    ]
   },
-  { "id": "trait.ferry-sense", "kind": "trait", "source": "mistland" },
-  { "id": "trait.spore-friend", "kind": "trait", "source": "mistland" }
+  {
+    "id": "trait.ferry-sense",
+    "kind": "trait",
+    "source": "mistland"
+  },
+  {
+    "id": "trait.spore-friend",
+    "kind": "trait",
+    "source": "mistland"
+  }
 ]

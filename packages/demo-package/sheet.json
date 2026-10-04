@@ -24,15 +24,15 @@
         { "value": "heart", "derived": "heartBonus" }
       ]
     },
-    { "id": "talents", "kind": "checkList", "span": 8, "things": { "kind": "talent" } },
-    { "id": "traits", "kind": "featureTable", "span": 6, "things": { "kind": "trait" } },
-    { "id": "knacks", "kind": "featureTable", "span": 6, "things": { "kind": "knack" } },
+    { "id": "talents", "kind": "checkList", "span": 8, "things": { "kind": "talent" }, "note": "score" },
+    { "id": "traits", "kind": "featureTable", "span": 8, "things": { "kind": "trait" }, "uses": "uses" },
+    { "id": "knacks", "kind": "featureTable", "span": 8, "things": { "kind": "knack" }, "uses": "uses" },
     { "id": "gear", "kind": "list", "span": 6, "things": { "kind": "item" }, "blankLines": 4 },
     { "id": "how-to-play", "kind": "helpBox", "span": 6 },
     { "id": "about", "kind": "answers", "span": 6, "choices": ["age", "looks"] },
     { "id": "notes", "kind": "notes", "span": 6, "lines": 6 }
   ],
   "cards": {
-    "knack": { "fields": ["reach", "duration", "uses", "focus"] }
+    "knack": { "fields": ["reach", "duration", "uses", "focus"], "uses": "uses" }
   }
 }
