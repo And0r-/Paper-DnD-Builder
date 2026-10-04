@@ -191,6 +191,22 @@ describe("a complete level 3 character", () => {
     });
   });
 
+  it("works out an info step's value changes with the values of later steps", () => {
+    // The calling's grant uses heart, which is only set on the later scores step.
+    const withFormula: ContentPackage = {
+      ...pkg,
+      things: pkg.things.map((t) =>
+        t.id === "calling.lantern-bearer"
+          ? { ...t, grants: [...(t.grants ?? []), { value: "stamina", add: "heartBonus * level" }] }
+          : t,
+      ),
+    };
+    const ev = evaluateDraft(withFormula, build(3, LANTERN_BEARER_L3));
+    const bonus = ev.values["heartBonus"]!;
+    expect(bonus).not.toBe(evaluateDraft(withFormula, draft(3)).values["heartBonus"]);
+    expect(ev.choices["calling-gifts"]!.info!.values).toEqual([{ value: "stamina", add: 18 + bonus * 3 }]);
+  });
+
   it("summarizes name and summary line", () => {
     const doc = build(3, LANTERN_BEARER_L3);
     expect(summarize(pkg, doc, evaluateDraft(pkg, doc))).toEqual({
