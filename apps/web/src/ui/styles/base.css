@@ -1,0 +1,335 @@
+/* Base: reset, type, focus, page frame. Mobile first; values from tokens.css only. */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--color-bg);
+  color: var(--color-ink);
+  font-family: var(--font-body);
+  font-size: var(--text-md);
+  line-height: var(--text-md-lh);
+  font-weight: var(--weight-regular);
+}
+
+h1,
+h2,
+h3,
+p,
+ul,
+ol,
+dl,
+dd,
+figure,
+fieldset {
+  margin: 0;
+}
+
+ul,
+ol {
+  padding: 0;
+}
+
+fieldset {
+  border: 0;
+  padding: 0;
+  min-width: 0;
+}
+
+legend {
+  padding: 0;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+a {
+  color: var(--color-primary);
+  text-underline-offset: 0.2em;
+}
+
+a:hover {
+  color: var(--color-primary-hover);
+}
+
+:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/*
+ * Headings and the main area receive focus on screen change so screen
+ * readers start there. They are not controls, so they show no ring.
+ */
+h1[tabindex="-1"]:focus,
+[tabindex="-1"]:focus:not(:focus-visible) {
+  outline: none;
+}
+
+.visually-hidden {
+  position: absolute !important;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.skip-link {
+  position: absolute;
+  left: var(--space-4);
+  top: calc(-1 * var(--space-8));
+  z-index: 100;
+  background: var(--color-surface);
+  color: var(--color-primary);
+  padding: var(--space-3) var(--space-4);
+  border: 2px solid var(--color-primary);
+  border-radius: var(--radius-sm);
+  font-weight: var(--weight-semibold);
+}
+
+.skip-link:focus {
+  top: var(--space-2);
+}
+
+.icon {
+  flex: none;
+}
+
+/* ------------------------------------------------------------------ shell */
+
+.shell {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: var(--topbar-height);
+  padding: 0 var(--space-2);
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-line);
+}
+
+.topbar__menu {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--target-min);
+  min-width: var(--target-min);
+  padding: 0 var(--space-3);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  cursor: pointer;
+}
+
+.topbar__menu:hover {
+  background: var(--color-surface-sunk);
+}
+
+.topbar__title {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--text-sm);
+  line-height: var(--text-sm-lh);
+  font-weight: var(--weight-semibold);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: var(--space-1) 0;
+}
+
+.topbar__title a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.topbar__status {
+  flex: none;
+  max-width: 45%;
+  padding-right: var(--space-2);
+}
+
+.shell__body {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+}
+
+.shell__main {
+  flex: 1;
+  min-width: 0;
+  max-width: calc(var(--content-max) + 2 * var(--space-4));
+  padding: var(--space-5) var(--space-4)
+    calc(var(--footer-height) + var(--space-6) + env(safe-area-inset-bottom));
+}
+
+.shell__main:focus {
+  outline: none;
+}
+
+.shell__sidebar,
+.shell__aside {
+  display: none;
+}
+
+@media (min-width: 600px) {
+  .shell__main {
+    padding-top: var(--space-6);
+  }
+}
+
+@media (min-width: 1024px) {
+  .shell__main {
+    padding: var(--space-8) var(--space-7) var(--space-7);
+  }
+
+  .shell--columns .shell__body {
+    justify-content: center;
+    gap: var(--space-6);
+    padding: 0 var(--space-5);
+  }
+
+  .shell--columns .shell__main {
+    padding-left: 0;
+    padding-right: 0;
+    max-width: var(--content-max);
+  }
+
+  .shell__sidebar {
+    display: block;
+    flex: 0 0 var(--steplist-width);
+    padding-top: var(--space-8);
+  }
+
+  .shell__aside {
+    display: block;
+    flex: 0 0 var(--explain-width);
+    padding-top: var(--space-8);
+  }
+
+  .shell__sidebar > *,
+  .shell__aside > * {
+    position: sticky;
+    top: calc(var(--topbar-height) + var(--space-5));
+    max-height: calc(100vh - var(--topbar-height) - var(--space-7));
+    overflow: auto;
+  }
+}
+
+/* --------------------------------------------------------------- guests */
+
+.guest {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+
+.guest__head {
+  display: flex;
+  justify-content: flex-end;
+  padding: var(--space-3) var(--space-4);
+}
+
+.guest__main {
+  flex: 1;
+  padding: 0 var(--space-4) var(--space-7);
+}
+
+.guest__main:focus {
+  outline: none;
+}
+
+/* --------------------------------------------------------------- page */
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.page__title {
+  font-size: var(--text-xl);
+  line-height: var(--text-xl-lh);
+  font-weight: var(--weight-bold);
+}
+
+.page-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.page-loading {
+  max-width: var(--content-max);
+  margin: 0 auto;
+  padding: var(--space-7) var(--space-4);
+}
+
+.section-title {
+  font-size: var(--text-lg);
+  line-height: var(--text-lg-lh);
+  font-weight: var(--weight-semibold);
+}
+
+.note {
+  font-size: var(--text-sm);
+  line-height: var(--text-sm-lh);
+  color: var(--color-ink-muted);
+}
+
+.prose ul {
+  padding-left: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+@media (min-width: 1024px) {
+  .page__title {
+    font-size: var(--text-2xl);
+    line-height: var(--text-2xl-lh);
+  }
+}
+
+@media (forced-colors: active) {
+  .option,
+  .btn,
+  .segmented__label,
+  .field__input,
+  .callout {
+    border: 1px solid CanvasText;
+  }
+  .option--checked,
+  .segmented__input:checked + .segmented__label {
+    outline: 3px solid Highlight;
+  }
+}

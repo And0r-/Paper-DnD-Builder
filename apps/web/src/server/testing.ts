@@ -6,24 +6,13 @@
 import { loadMigrations, migrate, type SqlExecutor } from "@builder/db";
 import { DEMO_PACKAGE_DIR } from "@builder/demo-package";
 import { PGlite } from "@electric-sql/pglite";
-import { fileURLToPath } from "node:url";
 import { createApiHandler } from "./api/router.ts";
 import { createApp, type App } from "./app.ts";
+import { migrationsDir, pgliteExecutor } from "./local-backends.ts";
 import type { Mail, Mailer } from "./mail.ts";
 import { loadPackages } from "./packages/loader.ts";
 
 export const quietLog = { info: () => {}, error: () => {} };
-
-function pgliteExecutor(pg: PGlite): SqlExecutor {
-  return {
-    async exec(sql) {
-      await pg.exec(sql);
-    },
-    async query<Row extends Record<string, unknown>>(sql: string, params: readonly unknown[] = []) {
-      return (await pg.query<Row>(sql, [...params])).rows;
-    },
-  };
-}
 
 export interface TestServer {
   app: App;
@@ -41,8 +30,7 @@ let shared: Promise<SqlExecutor> | undefined;
 async function database(): Promise<SqlExecutor> {
   shared ??= (async () => {
     const db = pgliteExecutor(new PGlite());
-    const migrations = fileURLToPath(new URL("../../../../packages/db/migrations/", import.meta.url));
-    await migrate(db, await loadMigrations(migrations));
+    await migrate(db, await loadMigrations(migrationsDir()));
     return db;
   })();
   const db = await shared;
