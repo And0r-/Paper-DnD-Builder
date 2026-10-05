@@ -189,6 +189,7 @@
     "unit.kg.longOne": "kilogram",
 
     "card.knack.typeLine": "{{var:kind}} · Rank {{var:rank}}",
+    "card.knack.hint": "Tick one box per use. After a rest, all boxes are free again.",
 
     "sheet.primary.title": "At the table",
 

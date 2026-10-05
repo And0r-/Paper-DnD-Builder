@@ -746,12 +746,17 @@ interface CardFace {
   /** Rules continue on the next card. */
   continues: boolean;
   uses: Uses;
+  /** The kind's hint, as wrapped lines above the footer. */
+  hint: string[];
 }
 
 const CARD_INNER_W = CARD_W - 2 * CARD_PAD;
 const CARD_HEAD_BOTTOM = 16;
 const FIELD_ROW_H = 8.5;
 const CARD_RULES_BOTTOM = CARD_H - CARD_PAD - 6;
+/** A card hint longer than this many lines is cut with "…": it must never crowd out the rules. */
+const CARD_HINT_LINES = 2;
+const CARD_HINT_LEAD = 1.15;
 
 interface FieldLayout {
   label: { style: TextStyle; lines: string[] };
@@ -796,18 +801,38 @@ function cardBlocks(pen: Pen, face: Pick<CardFace, "fields" | "table">): { rules
   return { rulesTop: y + 4.2 };
 }
 
+/** The kind's hint in at most `CARD_HINT_LINES` lines; the last one ends in "…" if the text goes on. */
+function cardHint(pen: Pen, hint: string): string[] {
+  if (hint === "") return [];
+  const lines = pen.wrap(hint, S.hint, CARD_INNER_W);
+  if (lines.length <= CARD_HINT_LINES) return lines;
+  const kept = lines.slice(0, CARD_HINT_LINES);
+  let last = kept.at(-1)!;
+  while (last.length > 0 && pen.width(`${last}…`, S.hint) > CARD_INNER_W) last = last.slice(0, -1);
+  kept[kept.length - 1] = `${last.trimEnd()}…`;
+  return kept;
+}
+
+/** Height the hint takes above the footer line, gap included. */
+function cardHintHeight(pen: Pen, hint: string[]): number {
+  return hint.length === 0 ? 0 : hint.length * pen.lineHeight(S.hint, CARD_HINT_LEAD) + 1;
+}
+
 /**
  * One card per thing, or more if the rules text does not fit even at 7 pt
  * (print layout 3.3): the first card ends with "continues on the next
  * card", continuation cards carry only the rules. "At the table" is never
- * shortened or moved.
+ * shortened or moved. The kind's hint is on every card, continuations
+ * included, and takes its room from the rules.
  */
 function cardFaces(pen: Pen, card: Card, messages: Messages): CardFace[] {
-  const base: CardFace = { ...card, rules: [], rulesSize: RULES_SIZES[0]!, continues: false };
+  const hint = cardHint(pen, card.hint);
+  const base: CardFace = { ...card, hint, rules: [], rulesSize: RULES_SIZES[0]!, continues: false };
   const text = card.rules.join("\n");
   if (text === "") return [base];
   const { rulesTop } = cardBlocks(pen, card);
-  const room = CARD_RULES_BOTTOM - rulesTop;
+  const rulesBottom = CARD_RULES_BOTTOM - cardHintHeight(pen, hint);
+  const room = rulesBottom - rulesTop;
   for (const size of RULES_SIZES) {
     const style = { size };
     const lines = pen.wrap(text, style, CARD_INNER_W);
@@ -819,7 +844,7 @@ function cardFaces(pen: Pen, card: Card, messages: Messages): CardFace[] {
   const lines = pen.wrap(text, style, CARD_INNER_W);
   const first = Math.max(0, Math.floor((room - lh) / lh));
   // Every card that continues keeps one line free for "continues on the next card".
-  const later = Math.floor((CARD_RULES_BOTTOM - (CARD_HEAD_BOTTOM + 4.2) - lh) / lh);
+  const later = Math.floor((rulesBottom - (CARD_HEAD_BOTTOM + 4.2) - lh) / lh);
   const chunks = [lines.slice(0, first)];
   for (let i = first; i < lines.length; i += later) chunks.push(lines.slice(i, i + later));
   const n = chunks.length;
@@ -835,6 +860,7 @@ function cardFaces(pen: Pen, card: Card, messages: Messages): CardFace[] {
           rulesSize: 7,
           continues: i < n - 1,
           uses: null,
+          hint,
         },
   );
 }
@@ -872,6 +898,7 @@ function drawCard(pen: Pen, face: CardFace, model: PrintModel, x: number, y: num
     if (face.continues) pen.text(`→ ${m.continuesOnNextCard}`, left, yy + 2.8, S.hint);
   }
   const footY = y + CARD_H - CARD_PAD - 5;
+  pen.lines(face.hint, left, footY - cardHintHeight(pen, face.hint), S.hint, CARD_HINT_LEAD);
   pen.line(left, footY, x + CARD_W - CARD_PAD, footY, 0.3, "#BBB");
   const owner = `${model.name} · ${model.levelLabel}`;
   const footBase = y + CARD_H - CARD_PAD - 1;

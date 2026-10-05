@@ -829,8 +829,10 @@ export function validatePackageFiles(files: PackageFiles): ValidationResult {
           need(b.label, `label of box ${lit(b.value)} in sheet section ${lit(s.id)}`);
     optional.add(`sheet.${s.id}.hint`);
   }
-  for (const kind of Object.keys(sheet.cards))
+  for (const kind of Object.keys(sheet.cards)) {
     need(`card.${kind}.typeLine`, `type line of ${lit(kind)} cards`);
+    optional.add(`card.${kind}.hint`);
+  }
 
   const texts: Record<string, Record<string, TextValue>> = {};
   const textOrigins: Record<string, Record<string, TextOrigin>> = {};

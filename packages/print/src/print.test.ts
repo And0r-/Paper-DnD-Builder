@@ -217,6 +217,53 @@ describe("printed character (demo package)", () => {
     expect(cards).toContain("Ende.");
   });
 
+  it("prints the kind's hint on every card, above the footer, cut rather than crowding out the rules", async () => {
+    const hint = pkg.texts["de"]!["card.knack.hint"] as string;
+    const { model, pdf } = await print("de", {});
+    expect(model.cards.length).toBeGreaterThan(1);
+    for (const c of model.cards) expect(c.hint).toBe(hint);
+    const grid = { y: (297 - 3 * 88) / 2, h: 88, pad: 4 };
+    const footLine = (row: number) => grid.y + (row + 1) * grid.h - grid.pad - 5;
+    const cardPage = (await positions(pdf))[pdf.sheetPages]!;
+    // Every card prints the hint's first words, between its rules and its footer line.
+    const starts = cardPage.filter((p) => p.str.startsWith("Ein Kästchen pro Nutzung"));
+    expect(starts).toHaveLength(model.cards.length);
+    for (const p of starts) {
+      const row = Math.floor((p.y - grid.y) / grid.h);
+      expect(p.y).toBeLessThan(footLine(row));
+      expect(p.y).toBeGreaterThan(footLine(row) - 8);
+    }
+
+    // Without the text the card is as before.
+    const { [`card.knack.hint`]: _, ...withoutHint } = pkg.texts["de"]!;
+    const plain = buildPrintModel({ ...pkg, texts: { ...pkg.texts, de: withoutHint } }, doc, {
+      language: "de",
+      createdAt,
+    });
+    expect(plain.cards.every((c) => c.hint === "")).toBe(true);
+
+    // A hint too long for two lines is cut with "…"; long rules still all make it onto cards,
+    // and the continuation card carries the hint as well.
+    const first = demoCardThing();
+    const long = Array.from({ length: 40 }, (_, i) => `Satz ${i + 1}: Der Nebel weicht zurück.`).join(" ");
+    const texts: Record<string, Record<string, TextValue>> = {
+      ...pkg.texts,
+      de: {
+        ...pkg.texts["de"]!,
+        "card.knack.hint": `HINWEISANFANG ${"Kreuze an, wenn du sie nutzt. ".repeat(8)}HINWEISENDE`,
+        [`${first}.rules`]: `${long} Ende.`,
+      },
+    };
+    const { pdf: cut, extracted } = await print("de", {}, { ...pkg, texts });
+    const cards = extracted.pageTexts.slice(cut.sheetPages).join("\n");
+    expect(cards).not.toContain("HINWEISENDE");
+    expect(cards).toContain("…");
+    expect(cards).toContain("Satz 40:");
+    expect(cards).toContain("Ende.");
+    expect(countContinued(cards)).toBeGreaterThan(0);
+    expect(cards.match(/HINWEISANFANG/gu)).toHaveLength(model.cards.length + countContinued(cards));
+  });
+
   it("gives notes the whole page when they end the sheet alone on a new page", async () => {
     // Level 1: the level-3 "path" section is left out (`when`), so notes end up alone
     // on a sheet without the sections for higher levels.
@@ -656,6 +703,11 @@ describe("printed character (demo package)", () => {
     expect(() => buildPrintModel(pkg, doc, { language: "fr" })).toThrow(PrintError);
   });
 });
+
+/** How many continuation cards a card page text has ("(2/3)" and the like). */
+function countContinued(text: string): number {
+  return text.match(/\(\d+\/\d+\)/gu)?.length ?? 0;
+}
 
 function demoCardThing(): string {
   const ev = evaluateDraft(pkg, doc);
