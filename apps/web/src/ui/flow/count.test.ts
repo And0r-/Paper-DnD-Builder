@@ -71,7 +71,9 @@ function walk(lp: LoadedPackage, start: DraftDocument, picks: Record<string, str
       part: p.part,
       parts: p.parts,
       percent: Math.round(progressFraction(entries, entry) * 100),
-      grew: before !== undefined && (p.total > before.total || (p.current === before.current && p.parts > before.parts)),
+      grew:
+        before !== undefined &&
+        (p.total > before.total || (p.current === before.current && p.parts > before.parts)),
     };
     screens.push(screen);
     before = screen;
@@ -117,7 +119,8 @@ describe.skipIf(external !== undefined)("step count on the demo package", async 
       const screens = walk(lp, start(lp, level));
       expect(screens.filter((s) => s.grew).map(line)).toEqual([]);
       // The bar moves on every screen.
-      for (const [i, s] of screens.entries()) if (i > 0) expect(s.percent).toBeGreaterThan(screens[i - 1]!.percent);
+      for (const [i, s] of screens.entries())
+        if (i > 0) expect(s.percent).toBeGreaterThan(screens[i - 1]!.percent);
     });
   }
 });

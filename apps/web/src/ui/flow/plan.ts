@@ -83,7 +83,12 @@ export function plannedDraft(lp: LoadedPackage, doc: DraftDocument): DraftDocume
 }
 
 /** The suggestion for one open choice, leaving out what is held elsewhere or `taken` this round. */
-function suggestion(lp: LoadedPackage, ev: Evaluation, id: string, taken: ReadonlySet<string>): DraftChange | undefined {
+function suggestion(
+  lp: LoadedPackage,
+  ev: Evaluation,
+  id: string,
+  taken: ReadonlySet<string>,
+): DraftChange | undefined {
   const state = ev.choices[id];
   const def = choiceOf(lp, id);
   if (!state || !def || settled(state) || state.status === "invalid" || def.kind === "text") return undefined;
@@ -91,7 +96,13 @@ function suggestion(lp: LoadedPackage, ev: Evaluation, id: string, taken: Readon
   const known = Array.isArray(rec) ? rec.length > 0 : rec !== undefined;
   const away = heldElsewhere(lp, ev, new Set([id]));
   for (const t of taken) away.add(t);
-  return suggestedAnswer(lp, def, known ? state : { ...state, recommended: state.options ?? [] }, away, () => 0);
+  return suggestedAnswer(
+    lp,
+    def,
+    known ? state : { ...state, recommended: state.options ?? [] },
+    away,
+    () => 0,
+  );
 }
 
 /** The count of an entry: step and part as the planned flow numbers them, and the screen for the bar. */

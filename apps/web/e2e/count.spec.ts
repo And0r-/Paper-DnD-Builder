@@ -36,9 +36,13 @@ async function newDraft(page: Page, level: number): Promise<string> {
 
 async function read(page: Page, m: Messages): Promise<Screen> {
   const text = (await page.locator(".progress__text").innerText()).replace(/\s+/g, " ").trim();
-  const step = new RegExp(m["flow.progress"].replace("{current}", "(\\d+)").replace("{total}", "(\\d+)")).exec(text)!;
+  const step = new RegExp(
+    m["flow.progress"].replace("{current}", "(\\d+)").replace("{total}", "(\\d+)"),
+  ).exec(text)!;
   const part = new RegExp(m["flow.part"].replace("{part}", "(\\d+)").replace("{parts}", "(\\d+)")).exec(text);
-  const bar = await page.locator(".progress__fill").evaluate((el) => parseFloat((el as HTMLElement).style.width));
+  const bar = await page
+    .locator(".progress__fill")
+    .evaluate((el) => parseFloat((el as HTMLElement).style.width));
   const note = (await page.locator(".step-notice").allInnerTexts()).join(" ");
   return {
     text,
@@ -134,9 +138,14 @@ test("a pick that brings a step says so, and the total holds from then on", asyn
   await page.goto(`/c/${id}/step/character`);
   const first = await read(page, de);
   await shot(page, "count-01-erster-schritt");
-  const screens = await walk(page, de, { "Womit verdient dein Charakter sein Brot?": "Flussläufer" }, async (s) => {
-    if (s.note !== "") await shot(page, "count-02-hinweis-mehr-schritte");
-  });
+  const screens = await walk(
+    page,
+    de,
+    { "Womit verdient dein Charakter sein Brot?": "Flussläufer" },
+    async (s) => {
+      if (s.note !== "") await shot(page, "count-02-hinweis-mehr-schritte");
+    },
+  );
   expectHonest(screens);
   const grew = screens.find((s) => s.after.total > s.before.total)!;
   expect(grew.after.total).toBe(first.total + 1);

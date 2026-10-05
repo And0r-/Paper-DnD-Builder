@@ -34,8 +34,7 @@ export function flowOf(
   const planEv = plan === doc ? ev : evaluateDraft(lp.pkg, plan);
   const planAll = plan === doc ? all : buildFlow(draftId, lp, planEv, t);
   const from = doc.levelBefore;
-  if (from === undefined || from >= doc.level)
-    return { all, entries: counted(all, planAll), raise: null };
+  if (from === undefined || from >= doc.level) return { all, entries: counted(all, planAll), raise: null };
   const before = evaluateBefore(lp.pkg, doc, from);
   const ids = raiseStepIds(before, ev, from);
   const entries = raiseFlow(all, ids, from, doc.level);
