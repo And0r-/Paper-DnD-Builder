@@ -10,7 +10,7 @@ pnpm validate-package packages/demo-package
 
 ## What it covers
 
-Every feature of format 0.6 is used at least once (see
+Every feature of format 0.7 is used at least once (see
 [`packages/format/SPEC.md`](../format/SPEC.md)):
 
 | Feature                 | Where                                                                                          |
@@ -31,6 +31,7 @@ Every feature of format 0.6 is used at least once (see
 | Box labels              | `sheet.json`: box `nerve` in `primary` has its own `label`                                     |
 | Option badges           | `flow.json`: choice `calling` gives `calling.lantern-bearer` the badge "Gentle start"          |
 | Text variants           | `talents-*`: hillfolk (tag `bonus-talent`) pick one more; `textVariants` and `{{var:count}}`   |
+| What the character has  | `handling-river-runner` (`held`): `things/handling.json` are `about` items the character has   |
 
 ## Layout
 

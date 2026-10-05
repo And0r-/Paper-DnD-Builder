@@ -401,6 +401,10 @@ export function validatePackageFiles(files: PackageFiles): ValidationResult {
         warn(file, `${gp}.atLevel`, `level ${g.atLevel} is below the lowest level ${flow.level.min}`);
       }
     });
+    if (t.about !== undefined) {
+      if (!thingById.has(t.about)) err(file, `${p}.about`, `unknown thing ${lit(t.about)}`);
+      if (t.about === t.id) err(file, `${p}.about`, "a thing cannot be about itself");
+    }
     if (t.card && !(t.kind in sheet.cards)) {
       err(file, `${p}.card`, `card is set, but sheet.json has no card layout for kind ${lit(t.kind)}`);
     }
@@ -455,6 +459,8 @@ export function validatePackageFiles(files: PackageFiles): ValidationResult {
             badged.add(id);
           });
         });
+        if (c.held && !options.some((o) => o.about !== undefined))
+          err(F, `${p}.held`, 'none of this choice\'s options is "about" another thing');
         break;
       }
       case "distribute": {
@@ -679,8 +685,10 @@ export function validatePackageFiles(files: PackageFiles): ValidationResult {
     need(`choice.${c.id}.question`, `question of choice ${lit(c.id)}`);
     need(`choice.${c.id}.intro`, `introduction of choice ${lit(c.id)}`);
     optional.add(`choice.${c.id}.missing`);
-    if (c.kind === "pickOne" || c.kind === "pickMany")
+    if (c.kind === "pickOne" || c.kind === "pickMany") {
       for (const b of c.badges ?? []) need(b.text, `badge of choice ${lit(c.id)}`);
+      if (c.held) need(c.held.text, `line naming what the character has, in choice ${lit(c.id)}`);
+    }
   }
   // A variant replaces any of the four texts; which ones it replaces is up to the package.
   const variantTexts = flow.choices.flatMap((c) =>

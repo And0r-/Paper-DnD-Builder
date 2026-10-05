@@ -50,6 +50,12 @@ export interface ChoiceState {
   recommended?: string[] | { method: number; assign: Record<string, number> };
   /** Badge text key by offered option (pick choices); shown instead of "recommended". */
   badges?: Record<string, string>;
+  /**
+   * Choices with `held`: things the character already has that an offered
+   * option is `about`, in option order. Those options come first in `recommended`,
+   * the ones also in the package's `recommend` ahead of the rest.
+   */
+  held?: string[];
   /** For `info` choices: what the thing picked in choice `of` gives at this level. */
   info?: InfoContent;
   /** Active text variant: its texts `choice.<id>.variant.<textVariant>.*` replace the base texts. */
@@ -407,7 +413,28 @@ function evaluateChoice(
         state.remaining = state.count;
       }
       const rec = choice.recommend?.find((r) => r.when === undefined || evaluateCondition(r.when, scope));
-      if (rec) state.recommended = rec.pick.filter((p) => options.includes(p));
+      let recommended = rec?.pick.filter((p) => options.includes(p));
+      if (choice.held) {
+        // Options about something the character already has are the better
+        // pick; the package's own recommendation fills the remaining places.
+        const things = indexes(pkg).things;
+        const about = (id: string) => things.get(id)?.about;
+        for (const t of selectThings(pkg, choice.options)) if (t.about !== undefined) refs.add(t.about);
+        const onHand = options.filter((o) => {
+          const a = about(o);
+          return a !== undefined && character.held.has(a);
+        });
+        state.held = onHand.map((o) => about(o)!);
+        if (onHand.length > 0) {
+          // When more fit than are asked for, the ones the package also
+          // recommends are kept: they are its pick among what the character has.
+          const rec = recommended ?? [];
+          const first = [...onHand.filter((o) => rec.includes(o)), ...onHand.filter((o) => !rec.includes(o))];
+          const picks = [...new Set([...first, ...rec])];
+          recommended = picks.slice(0, choice.kind === "pickOne" ? 1 : state.count);
+        }
+      }
+      if (recommended) state.recommended = recommended;
       const badges: Record<string, string> = {};
       for (const b of choice.badges ?? [])
         for (const t of b.things) if (options.includes(t)) badges[t] ??= b.text;

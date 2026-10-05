@@ -162,6 +162,82 @@ describe("options", () => {
     });
     expect(ev.choices["folk"]!.badges).toBeUndefined();
   });
+
+  describe("held", () => {
+    const riverRunner = (answers: Record<string, unknown>, p: ContentPackage = pkg) =>
+      evaluateDraft(p, draft(1, { calling: { pick: "calling.river-runner" }, ...answers }));
+
+    it("names what the character has and recommends the options about it first", () => {
+      const ev = riverRunner({ gear: { pick: "item.trail-boots" } });
+      const handling = ev.choices["handling-river-runner"]!;
+      expect(handling.held).toEqual(["item.boat-hook", "item.trail-boots"]);
+      expect(handling.recommended).toEqual(["handling.boat-hook", "handling.trail-boots"]);
+      // Changing the gear changes this step.
+      const step = ev.steps.find((s) => s.id === "handling-river-runner")!;
+      expect(new Set(step.dependsOn)).toEqual(new Set(["calling", "gear"]));
+    });
+
+    it("fills the remaining places with the package's recommendation", () => {
+      const handling = riverRunner({}).choices["handling-river-runner"]!;
+      expect(handling.held).toEqual(["item.boat-hook"]);
+      expect(handling.recommended).toEqual(["handling.boat-hook", "handling.rope"]);
+    });
+
+    it("recommends no more than are asked for, in option order", () => {
+      // Three fit, but only two are asked for: "choose for me" must give a valid answer.
+      const withBell: ContentPackage = {
+        ...pkg,
+        things: pkg.things.map((t) =>
+          t.id === "calling.river-runner"
+            ? { ...t, grants: [...(t.grants ?? []), { thing: "item.small-bell" }] }
+            : t,
+        ),
+      };
+      const handling = riverRunner({ gear: { pick: "item.trail-boots" } }, withBell).choices[
+        "handling-river-runner"
+      ]!;
+      expect(handling.held).toEqual(["item.boat-hook", "item.small-bell", "item.trail-boots"]);
+      expect(handling.recommended).toEqual(["handling.boat-hook", "handling.small-bell"]);
+    });
+
+    it("keeps the package's own pick among them when more fit than are asked for", () => {
+      // Bell, boots and hook fit; the package recommends the boots, so they stay in.
+      const p: ContentPackage = {
+        ...pkg,
+        things: pkg.things.map((t) =>
+          t.id === "calling.river-runner"
+            ? { ...t, grants: [...(t.grants ?? []), { thing: "item.small-bell" }] }
+            : t,
+        ),
+        flow: {
+          ...pkg.flow,
+          choices: pkg.flow.choices.map((c) =>
+            c.id === "handling-river-runner" && c.kind === "pickMany"
+              ? { ...c, recommend: [{ pick: ["handling.trail-boots", "handling.rope"] }] }
+              : c,
+          ),
+        },
+      };
+      const handling = riverRunner({ gear: { pick: "item.trail-boots" } }, p).choices[
+        "handling-river-runner"
+      ]!;
+      expect(handling.recommended).toEqual(["handling.trail-boots", "handling.boat-hook"]);
+    });
+
+    it("counts only what earlier steps brought", () => {
+      // The upbringing's bell comes in a later step than the calling's choices.
+      const ev = riverRunner({ upbringing: { pick: "upbringing.bell-tower" } });
+      expect(ev.choices["handling-river-runner"]!.held).toEqual(["item.boat-hook"]);
+      const ids = ev.steps.map((s) => s.id);
+      expect(ids.indexOf("handling-river-runner")).toBe(ids.indexOf("gear") + 1);
+      const step = ev.steps.find((s) => s.id === "handling-river-runner")!;
+      expect(step.dependsOn).toEqual(["calling"]);
+    });
+
+    it("is left out on choices without it", () => {
+      expect(riverRunner({}).choices["talents-river-runner"]!.held).toBeUndefined();
+    });
+  });
 });
 
 describe("a complete level 3 character", () => {

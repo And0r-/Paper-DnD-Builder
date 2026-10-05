@@ -126,7 +126,7 @@ describe("cross-file rules", () => {
     [
       "format version",
       (f) => (f.get("manifest.json").formatVersion = "0.3"),
-      "manifest.json formatVersion: package is written for format 0.3, this builder understands 0.6",
+      "manifest.json formatVersion: package is written for format 0.3, this builder understands 0.7",
     ],
     [
       "duplicate thing",
@@ -136,7 +136,7 @@ describe("cross-file rules", () => {
     [
       "unknown kind",
       (f) => (thing(f, "items", "item.rope").kind = "tool"),
-      'things/items.json [3].kind: unknown kind "tool" (known: folk, upbringing, calling, path, talent, trait, knack, item)',
+      'things/items.json [3].kind: unknown kind "tool" (known: folk, upbringing, calling, path, talent, trait, knack, item, …)',
     ],
     [
       "unknown source",
@@ -176,6 +176,45 @@ describe("cross-file rules", () => {
       "recommendation outside the options",
       (f) => (f.get("flow.json").choices[0].recommend = [{ pick: ["calling.herbalist"] }]),
       'flow.json choices[0].recommend[0].pick[0]: "calling.herbalist" is not one of this choice\'s options',
+    ],
+    [
+      "badge outside the options",
+      (f) => f.get("flow.json").choices[2].badges[0].things.push("folk.moorfolk"),
+      'flow.json choices[2].badges[0].things[1]: "folk.moorfolk" is not one of this choice\'s options',
+    ],
+    [
+      "two badges on one thing",
+      (f) =>
+        f.get("flow.json").choices[2].badges.push({
+          things: ["calling.lantern-bearer"],
+          text: "choice.calling.badge.gentle",
+        }),
+      'flow.json choices[2].badges[1].things[0]: "calling.lantern-bearer" already has a badge in this choice',
+    ],
+    [
+      "badge without text",
+      (f) => delete texts(f, "de")["choice.calling.badge.gentle"],
+      'texts/de/ choice.calling.badge.gentle: missing text (badge of choice "calling")',
+    ],
+    [
+      "about an unknown thing",
+      (f) => (f.get("things/handling.json")[0].about = "item.lantern"),
+      'things/handling.json [0].about: unknown thing "item.lantern"',
+    ],
+    [
+      "about itself",
+      (f) => (f.get("things/handling.json")[0].about = "handling.lantern-staff"),
+      "things/handling.json [0].about: a thing cannot be about itself",
+    ],
+    [
+      "held on options that are about nothing",
+      (f) => (f.get("flow.json").choices[2].held = { text: "choice.calling.badge.gentle" }),
+      'flow.json choices[2].held: none of this choice\'s options is "about" another thing',
+    ],
+    [
+      "held without text",
+      (f) => delete texts(f, "en")["choice.handling-river-runner.held"],
+      'texts/en/ choice.handling-river-runner.held: missing text (line naming what the character has, in choice "handling-river-runner")',
     ],
     [
       "array method with wrong length",

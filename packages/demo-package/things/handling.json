@@ -1,0 +1,38 @@
+[
+  {
+    "id": "handling.lantern-staff",
+    "kind": "handling",
+    "source": "mistland",
+    "about": "item.lantern-staff"
+  },
+  {
+    "id": "handling.boat-hook",
+    "kind": "handling",
+    "source": "mistland",
+    "about": "item.boat-hook"
+  },
+  {
+    "id": "handling.rope",
+    "kind": "handling",
+    "source": "mistland",
+    "about": "item.rope"
+  },
+  {
+    "id": "handling.small-bell",
+    "kind": "handling",
+    "source": "mistland",
+    "about": "item.small-bell"
+  },
+  {
+    "id": "handling.reed-shield",
+    "kind": "handling",
+    "source": "mistland",
+    "about": "item.reed-shield"
+  },
+  {
+    "id": "handling.trail-boots",
+    "kind": "handling",
+    "source": "mistland",
+    "about": "item.trail-boots"
+  }
+]
