@@ -78,8 +78,12 @@ export interface DraftApi {
   ev: Evaluation;
   entries: FlowEntry[];
   saveState: SaveState;
-  /** Set when the server refused a change; the screen shows it once. */
-  rejected: boolean;
+  /**
+   * Set when a change was refused (by the server, or here because the
+   * numbers do not fit); the screen shows it once. `problem` is the rule
+   * core's reason, for words that say what to do.
+   */
+  rejected: { problem?: string } | null;
   clearRejected(): void;
   notice: StepNotice | null;
   /** Applies a change on screen at once and queues it for the server. False if it does not fit now. */
@@ -96,6 +100,8 @@ export function useDraft(): DraftApi {
   if (!ctx) throw new Error("useDraft outside DraftProvider");
   return ctx;
 }
+
+const NUMBER_PROBLEMS = new Set(["overBudget", "outOfRange", "badAssignment"]);
 
 const BACKOFF_MS = [2000, 5000, 10000, 30000];
 
@@ -193,7 +199,7 @@ function ReadyDraft({
     [onServer],
   );
   const [saveState, setSaveState] = useState<SaveState>("saved");
-  const [rejected, setRejected] = useState(false);
+  const [rejected, setRejected] = useState<{ problem?: string } | null>(null);
   const [notice, setNotice] = useState<StepNotice | null>(null);
 
   const serverRef = useRef(initial);
@@ -244,7 +250,8 @@ function ReadyDraft({
           ) {
             // Refused for good (does not fit, gone): drop it and show the server's state.
             queue.current.shift();
-            setRejected(true);
+            const reason = error.details["reason"] as { problem?: unknown } | undefined;
+            setRejected(typeof reason?.problem === "string" ? { problem: reason.problem } : {});
             setDoc(apply(pkg, docOf(serverRef.current), queue.current));
             continue;
           }
@@ -291,14 +298,21 @@ function ReadyDraft({
     if (lastPath.current !== pathname) {
       lastPath.current = pathname;
       setNotice(null);
-      setRejected(false);
+      setRejected(null);
     }
   }, [pathname]);
 
   const change = useCallback(
     (c: DraftChange): boolean => {
       const r = applyChange(pkg, docRef.current, c);
-      if (!r.ok) return false;
+      if (!r.ok) {
+        // Numbers that do not fit (too many points, a value over its limit)
+        // are said in words; other refusals stay with the screen that tried.
+        if (r.error.code === "answerDoesNotFit" && NUMBER_PROBLEMS.has(r.error.problem))
+          setRejected({ problem: r.error.problem });
+        return false;
+      }
+      setRejected(null);
       const before = evaluateDraft(pkg, docRef.current);
       const after = evaluateDraft(pkg, r.doc);
       const diff = stepDiff(before, after);
@@ -356,7 +370,7 @@ function ReadyDraft({
       entries,
       saveState,
       rejected,
-      clearRejected: () => setRejected(false),
+      clearRejected: () => setRejected(null),
       notice,
       change,
       flush,

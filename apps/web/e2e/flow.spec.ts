@@ -50,7 +50,8 @@ test("a newcomer builds a level-3 character from login to finished", async ({ pa
   // Level: one game is loaded, so the game question is skipped.
   await question(page, "Welche Stufe hat dein Charakter?");
   await expect(page.getByText("Schritt 1 von")).toBeVisible();
-  await pick(page, "3");
+  await page.getByRole("radio", { name: "Stufe 3" }).check();
+  await expect(page.locator(".topbar__character")).toContainText("Stufe 3");
   await shot(page, "03-stufe");
   await axe(page);
   await next(page);

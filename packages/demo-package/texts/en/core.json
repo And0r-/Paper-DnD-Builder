@@ -6,6 +6,10 @@
     "level.name": "Level",
     "level.intro": "Your level says how much your character has already lived through. A higher level means more knacks and more stamina.",
     "level.hint": "Not sure? Ask your game leader. Otherwise, pick level 1.",
+    "rank.name": "Rank",
+    "level.pick.1": "For starting out. You have little to choose and learn everything bit by bit.",
+    "level.pick.3": "For an adventure that lasts one evening. You can already do a fair amount.",
+    "level.pick.5": "For a one-evening adventure that gets dangerous. Building takes longer because there is more to choose.",
     "summary.line": "{{var:calling}} · Level {{var:level}}",
     "sheet.attribution": "Mistland is an invented demo world. License: GNU AGPL 3.0. Fishing net: community addition, CC0.",
 

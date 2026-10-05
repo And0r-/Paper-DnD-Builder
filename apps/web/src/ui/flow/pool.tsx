@@ -16,7 +16,8 @@ import { TextField } from "../components/Fields.tsx";
 import { useMeasure } from "../components/RichText.tsx";
 import { plain, ptext, thingName } from "../package-text.ts";
 import type { LoadedPackage } from "../packages.ts";
-import { groupOptions, OptionCard, SEARCH_FROM } from "./choices.tsx";
+import { OptionCard } from "./choices.tsx";
+import { longListGroups, SEARCH_FROM } from "./long-list.ts";
 import { useDraft } from "./draft-state.tsx";
 import { useGuardedChange } from "./guard.tsx";
 import { stepTitle } from "./model.ts";
@@ -220,9 +221,15 @@ export function PoolList({
       )}
       {options.length === 0 && <Callout tone="info">{t("pick.noOptions")}</Callout>}
       {options.length > 0 && shown.length === 0 && <p className="options__none">{t("pick.noResults")}</p>}
-      {groupOptions(shown).map((g) => (
+      {longListGroups(
+        lp,
+        shown,
+        options.length >= SEARCH_FROM,
+        query.trim() ? [] : [...recommended],
+        t("pick.recommendedGroup"),
+      ).map((g) => (
         <div className="options__group" key={g.group ?? "-"}>
-          {g.group && <h2 className="options__group-title">{ptext(lp, `group.${g.group}.name`)}</h2>}
+          {g.title && <h2 className="options__group-title">{g.title}</h2>}
           <div className="options__list">
             {g.things.map((th) => (
               <OptionCard

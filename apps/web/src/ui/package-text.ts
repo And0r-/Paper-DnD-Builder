@@ -42,6 +42,15 @@ export function plain(
     .join("");
 }
 
+/**
+ * The package's word for "level" inside a sentence: German nouns keep their
+ * capital, other languages write it small ("from level 4").
+ */
+export function levelWord(lp: LoadedPackage): string {
+  const name = ptext(lp, "level.name") ?? "";
+  return lp.lang === "de" ? name : name.toLocaleLowerCase(lp.lang);
+}
+
 export function thingName(lp: LoadedPackage, id: string): string {
   return ptext(lp, `${id}.name`) ?? "";
 }

@@ -21,7 +21,7 @@ import { Callout } from "../components/Feedback.tsx";
 import { Icon } from "../components/Icon.tsx";
 import { RichText } from "../components/RichText.tsx";
 import { AppShell } from "../components/Shell.tsx";
-import { ptext } from "../package-text.ts";
+import { levelWord, ptext } from "../package-text.ts";
 import { useDraft } from "./draft-state.tsx";
 import { OVERVIEW_KEY, positionOf, progressFraction, type FlowEntry } from "./model.ts";
 
@@ -64,7 +64,16 @@ export function SaveStatus() {
   );
 }
 
-function StepLink({ entry, current }: { entry: FlowEntry; current: string | undefined }) {
+function StepLink({
+  entry,
+  current,
+  note,
+}: {
+  entry: FlowEntry;
+  current: string | undefined;
+  /** A short line under the name ("Levels 4 to 19"). */
+  note?: string | undefined;
+}) {
   const { t } = useApp();
   const here = entry.key === current;
   const state = here ? "current" : entry.status;
@@ -85,35 +94,105 @@ function StepLink({ entry, current }: { entry: FlowEntry; current: string | unde
           <Icon name="circle" size={18} />
         )}
       </span>
-      <span className="steplist__name">{entry.title}</span>
+      <span className="steplist__name">
+        {entry.title}
+        {note && <span className="steplist__note">{note}</span>}
+      </span>
       <span className="visually-hidden">, {t(`flow.status.${state}`)}</span>
     </Link>
   );
 }
 
-/** The counted steps; the parts a choice brought along are listed inside their step. */
+/** One status for a whole step with parts: the worst of its parts. */
+function sectionStatus(all: FlowEntry[]): FlowEntry["status"] {
+  if (all.some((e) => e.status === "needsAttention")) return "needsAttention";
+  return all.every((e) => e.status === "done") ? "done" : "open";
+}
+
+/**
+ * Entries of one section with a heading wherever the level they come at
+ * changes ("From level 8"), so a long run of look-alike steps (each boon
+ * with its raise) reads as levels, not as a list of repeats.
+ */
+function LevelRuns({
+  items,
+  current,
+  from,
+}: {
+  items: FlowEntry[];
+  current: string | undefined;
+  from: number;
+}) {
+  const { t } = useApp();
+  const { lp } = useDraft();
+  const word = levelWord(lp);
+  return (
+    <ol className="steplist__parts">
+      {items.map((e, i) => {
+        const prev = i === 0 ? from : items[i - 1]!.atLevel;
+        return (
+          <li key={e.key} className="steplist__item">
+            {e.atLevel !== prev && e.atLevel > lp.pkg.flow.level.min && (
+              <p className="steplist__level">{t("flow.fromLevel", { levelName: word, level: e.atLevel })}</p>
+            )}
+            <StepLink entry={e} current={current} />
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
+/**
+ * The counted steps. The parts of a step (what a choice brought along, or
+ * the steps of a gathered group such as one boon per level) show only
+ * while the player is in that step: with 40 steps at a high level the list
+ * stays as short as the count above the question.
+ */
 export function StepList({ current }: { current: string | undefined }) {
   const { t } = useApp();
-  const { entries } = useDraft();
+  const { lp, entries } = useDraft();
+  const list = useRef<HTMLDivElement>(null);
+  const here = entries.find((e) => e.key === current);
   const heads = entries.filter((e) => e.part === 1);
+  const word = levelWord(lp);
+  // Keep the current step in view inside the scrolling column.
+  useEffect(() => {
+    list.current?.querySelector("[aria-current='step']")?.scrollIntoView({ block: "nearest" });
+  }, [current]);
   return (
-    <div className="steplist">
+    <div className="steplist" ref={list}>
       <p className="steplist__title">{t("flow.steps")}</p>
       <ol className="steplist__items">
         {heads.map((head) => {
-          const parts = entries.filter((e) => e.section === head.section && e.part > 1);
+          const all = entries.filter((e) => e.section === head.section);
+          const parts = all.slice(1);
+          const open = here !== undefined && here.section === head.section;
+          if (head.sectionTitle === undefined || all.length === 1) {
+            return (
+              <li key={head.key} className="steplist__item">
+                <StepLink entry={head} current={current} />
+                {open && parts.length > 0 && (
+                  <LevelRuns items={parts} current={current} from={head.atLevel} />
+                )}
+              </li>
+            );
+          }
+          // A gathered group: its own name, the levels it spans, and its steps inside.
+          const levels = [...new Set(all.map((e) => e.atLevel))];
+          const span =
+            levels.length > 1
+              ? t("flow.levelSpan", { levelName: word, from: levels[0]!, to: levels.at(-1)! })
+              : undefined;
+          const target = all.find((e) => e.status !== "done") ?? head;
           return (
             <li key={head.key} className="steplist__item">
-              <StepLink entry={head} current={current} />
-              {parts.length > 0 && (
-                <ol className="steplist__parts">
-                  {parts.map((e) => (
-                    <li key={e.key} className="steplist__item">
-                      <StepLink entry={e} current={current} />
-                    </li>
-                  ))}
-                </ol>
-              )}
+              <StepLink
+                entry={{ ...target, title: head.sectionTitle, status: sectionStatus(all) }}
+                current={open ? undefined : current}
+                note={span}
+              />
+              {open && <LevelRuns items={all} current={current} from={lp.pkg.flow.level.min} />}
             </li>
           );
         })}
@@ -168,12 +247,17 @@ export function FlowLayout({ current, children }: { current: string | undefined;
 
 export function ProgressHeader({ entry }: { entry: FlowEntry }) {
   const { t } = useApp();
-  const { entries } = useDraft();
+  const { lp, entries } = useDraft();
   const pos = positionOf(entries, entry);
   const text = t("flow.progress", pos);
   const part = pos.parts > 1 ? t("flow.part", pos) : undefined;
+  // A step a higher level brings says which level: the boons of levels 4 and 8 look alike.
+  const level =
+    entry.atLevel > lp.pkg.flow.level.min
+      ? t("flow.atLevel", { levelName: ptext(lp, "level.name") ?? "", level: entry.atLevel })
+      : undefined;
   const percent = Math.round(progressFraction(entries, entry) * 100);
-  const full = [text, pos.sectionTitle, part].filter(Boolean).join(" · ");
+  const full = [text, pos.sectionTitle, part, level].filter(Boolean).join(" · ");
   return (
     <div className="progress">
       <div
@@ -191,12 +275,12 @@ export function ProgressHeader({ entry }: { entry: FlowEntry }) {
         <span>{text}</span>
         <span aria-hidden="true"> · </span>
         <span className="progress__step">{pos.sectionTitle}</span>
-        {part && (
-          <>
+        {[part, level].filter(Boolean).map((x) => (
+          <span key={x}>
             <span aria-hidden="true"> · </span>
-            <span>{part}</span>
-          </>
-        )}
+            <span>{x}</span>
+          </span>
+        ))}
       </p>
     </div>
   );
@@ -258,6 +342,20 @@ export function usePageTitle(parts: string[]) {
   }, [title]);
 }
 
+/** The rule core's reason for a refused change, in words that say what to do. */
+function rejectedText(problem: string | undefined, t: ReturnType<typeof useApp>["t"]): string {
+  switch (problem) {
+    case "outOfRange":
+      return t("flow.rejectedOutOfRange");
+    case "overBudget":
+      return t("flow.rejectedOverBudget");
+    case "badAssignment":
+      return t("flow.rejectedBadAssignment");
+    default:
+      return t("flow.rejected");
+  }
+}
+
 export function StepFrame({
   entry,
   question,
@@ -300,7 +398,7 @@ export function StepFrame({
       <StepNotice />
       {rejected && (
         <Callout tone="danger" role="alert">
-          {t("flow.rejected")}
+          {rejectedText(rejected.problem, t)}
         </Callout>
       )}
       <div className="step__content">{children}</div>

@@ -15,7 +15,10 @@ test("a level-20 character with nothing but choose for me, down to the PDF", asy
   await expect(
     page.getByRole("heading", { level: 1, name: "Welche Stufe hat dein Charakter?" }),
   ).toBeVisible();
-  await page.getByRole("main").getByText("20", { exact: true }).click();
+  await page.getByRole("radio", { name: "Andere Stufe" }).check();
+  await page.getByRole("spinbutton", { name: "Stufe" }).fill("20");
+  await page.getByRole("spinbutton", { name: "Stufe" }).press("Enter");
+  await expect(page.locator(".topbar__character")).toContainText("Stufe 20");
   await shot(page, "69-stufe-20-wahl");
   await page.getByRole("button", { name: m["common.next"], exact: true }).click();
 

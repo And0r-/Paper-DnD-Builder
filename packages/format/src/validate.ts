@@ -749,6 +749,12 @@ export function validatePackageFiles(files: PackageFiles): ValidationResult {
   need("level.name", "word for level");
   need("level.intro", "introduction on the level screen");
   need("level.hint", "hint on the level screen");
+  // Common levels, shown as big cards on the level screen with this text.
+  for (let n = flow.level.min; n <= flow.level.max; n++) optional.add(`level.pick.${n}`);
+  // Headings of long option lists grouped by rank: "Rank 3", or a name of its own per rank.
+  optional.add("rank.name");
+  for (const r of new Set([...thingById.values()].flatMap((t) => (t.rank !== undefined ? [t.rank] : []))))
+    optional.add(`rank.${r}.name`);
   need("summary.line", "summary line in the character list");
   need("sheet.attribution", "source and license line on the sheet");
   for (const k of manifest.kinds) need(`kind.${k}.name`, `name of kind ${lit(k)}`);
