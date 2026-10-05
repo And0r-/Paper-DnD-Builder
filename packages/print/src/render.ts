@@ -326,6 +326,7 @@ const S = {
   summary: { size: 11 },
   sectionTitle: { font: "bold", size: 8, caps: true, spacing: 0.06 },
   bigValue: { font: "bold", size: 22 },
+  circlesValue: { font: "bold", size: 15 },
   scoreValue: { font: "bold", size: 20 },
   fieldName: { font: "bold", size: 9 },
   boxValue: { font: "bold", size: 9 },
@@ -611,13 +612,20 @@ function drawStatBoxes(pen: Pen, boxes: StatBox[], x: number, y: number, w: numb
     label.lines.forEach((l, j) => pen.text(l, mid, y + 5 + j * labelLh, label.style, "center"));
     const top = y + extra;
     if (b.style === "pencil") {
-      pen.rect(bx + 5, top + 8, bw - 10, 11, { stroke: "#777", width: 0.4, radius: 1 });
-      pen.text(pen.messages.pencil, mid, top + 14.8, { size: 7, color: "#555" }, "center");
+      // The field says what goes in it, small in its corner: a word in the
+      // middle read as a value that had been left out.
+      const fx = bx + 5;
+      const fw = bw - 10;
+      pen.rect(fx, top + 8, fw, 11, { stroke: "#777", width: 0.4, radius: 1 });
+      const what = pen.label(pen.messages.pencil, { size: 7, color: "#555" }, fw - 2);
+      what.lines.forEach((l, j) => pen.text(l, fx + 1, top + 10.6 + j * 2.6, what.style));
     } else if (b.style === "circles") {
-      const step = Math.min(8, (bw - 6) / Math.max(1, b.circles));
-      const r = Math.min(2.8, step * 0.38);
+      // The number as well as the circles: how many is read at a glance, the circles are for ticking.
+      pen.text(b.text, mid, top + 13.2, pen.fit(b.text, S.circlesValue, bw - 4, 12), "center");
+      const step = Math.min(5.5, (bw - 6) / Math.max(1, b.circles));
+      const r = Math.min(1.9, step * 0.38);
       for (let c = 0; c < b.circles; c++)
-        pen.circle(mid + (c - (b.circles - 1) / 2) * step, top + 13.5, r, { width: 0.7 });
+        pen.circle(mid + (c - (b.circles - 1) / 2) * step, top + 17.9, r, { width: 0.6 });
     } else {
       pen.text(b.text, mid, top + 18, pen.fit(b.text, S.bigValue, bw - 4, 12), "center");
     }
@@ -638,6 +646,12 @@ const CONTINUATION_HEADER_H = 9;
 const MIN_NOTE_LINES = 3;
 /** Fewest rows a split section leaves at the bottom of a page; fewer start the next page. */
 const MIN_SPLIT_ROWS = 2;
+/**
+ * Free space at the bottom of a page, in mm, above which a section that does
+ * not fit is split rather than moved whole to the next page: a third of a
+ * page left white reads as the end of the sheet.
+ */
+const MAX_PAGE_GAP = 85;
 
 /** How many rows a section can be split between; 0 for a section that is one box. */
 function partCount(s: SheetSection): number {
@@ -728,8 +742,9 @@ function splitSection(s: SheetSection, n: number, m: Messages): [SheetSection, S
  * order; a short section next to a tall one moves up into the free space
  * instead of leaving a gap. A section that does not fit the page starts the
  * next one: pages break between sections, never inside a box. Only a section
- * taller than a whole page is split, between its rows, and goes on on the
- * next page under its title marked as continued; nothing is ever cut off.
+ * taller than a whole page, or one whose move would leave more than
+ * MAX_PAGE_GAP white, is split, between its rows, and goes on on the next
+ * page under its title marked as continued; nothing is ever cut off.
  */
 function placeSections(pen: Pen, sections: SheetSection[], bottom: number): Placed[][] {
   const pages: Placed[][] = [[]];
@@ -778,15 +793,19 @@ function placeSections(pen: Pen, sections: SheetSection[], bottom: number): Plac
         height = measure(section, w);
       }
     }
-    // Taller than a whole page: what fits here stays (at least a few rows,
-    // else it starts the next page), the rest goes on after it.
+    // Taller than a whole page, or moving it would leave a large part of
+    // this page white: what fits here stays (at least a few rows, else it
+    // starts the next page), the rest goes on after it.
     const keep = (split: [SheetSection, SheetSection] | null) => {
       if (!split) return;
       section = split[0];
       height = measure(section, w);
       queue.unshift(split[1]);
     };
-    if (spot.y + height > bottom && height > bottom - pageTop(1))
+    if (
+      spot.y + height > bottom &&
+      (height > bottom - pageTop(1) || (section.kind !== "notes" && bottom - spot.y > MAX_PAGE_GAP))
+    )
       keep(splitToFit(section, w, bottom - spot.y, MIN_SPLIT_ROWS));
     if (spot.y + height > bottom && pages.at(-1)!.length > 0) {
       pages.push([]);
@@ -843,27 +862,47 @@ interface FieldLayout {
   value: { style: TextStyle; lines: string[] };
   /** Top of its row, relative to the top of the fields block. */
   top: number;
+  /** Left edge, relative to the card's inner left edge. */
+  left: number;
 }
+
+/** Lines a value may take in half the card before it gets the whole width. */
+const HALF_FIELD_LINES = 2;
 
 /**
  * The fields in two columns. A value too long for its column is wrapped in
  * it, not shrunk below 8 pt and never run into the next column or card; its
- * row grows instead.
+ * row grows instead. A value that would need more than HALF_FIELD_LINES
+ * lines there takes a row of its own across the card: a sentence squeezed
+ * into half the width grew the card's head so much that "at the table" ran
+ * into the footer.
  */
 function cardFields(pen: Pen, fields: Card["fields"]): { fields: FieldLayout[]; height: number } {
-  const cw = CARD_INNER_W / 2 - 1;
-  const laid = fields.map((f) => ({
-    label: pen.label(f.label, S.cardLabel, cw),
-    value: pen.label(f.value, S.cardValue, cw, 8),
-  }));
+  const half = CARD_INNER_W / 2;
+  const cw = half - 1;
+  const laid = fields.map((f) => {
+    const narrow = pen.label(f.value, S.cardValue, cw, 8);
+    const wide = narrow.lines.length > HALF_FIELD_LINES;
+    const w = wide ? CARD_INNER_W : cw;
+    return {
+      label: pen.label(f.label, S.cardLabel, w),
+      value: wide ? pen.label(f.value, S.cardValue, w, 8) : narrow,
+      wide,
+    };
+  });
   const extra = (l: (typeof laid)[number]) =>
     (l.label.lines.length - 1) * pen.lineHeight(l.label.style, 1.15) +
     (l.value.lines.length - 1) * pen.lineHeight(l.value.style, 1.15);
+  const rows: (typeof laid)[] = [];
+  for (const l of laid) {
+    const last = rows.at(-1);
+    if (last && last.length === 1 && !last[0]!.wide && !l.wide) last.push(l);
+    else rows.push([l]);
+  }
   const out: FieldLayout[] = [];
   let top = 0;
-  for (let r = 0; r * 2 < laid.length; r++) {
-    const row = laid.slice(r * 2, r * 2 + 2);
-    for (const l of row) out.push({ ...l, top });
+  for (const row of rows) {
+    row.forEach(({ wide: _, ...l }, i) => out.push({ ...l, top, left: i * half }));
     top += FIELD_ROW_H + Math.max(...row.map(extra));
   }
   return { fields: out, height: fields.length === 0 ? 0 : top + 4 };
@@ -907,11 +946,20 @@ function cardHintHeight(pen: Pen, hint: string[]): number {
  */
 function cardFaces(pen: Pen, card: Card, messages: Messages): CardFace[] {
   const hint = cardHint(pen, card.hint);
-  const base: CardFace = { ...card, hint, rules: [], rulesSize: RULES_SIZES[0]!, continues: false };
+  const { rulesTop } = cardBlocks(pen, card);
+  // "At the table" is never cut or moved; where it reaches down to the
+  // hint, the hint gives way on this card (continuation cards still have it).
+  const firstHint = rulesTop - 4.2 > CARD_RULES_BOTTOM - cardHintHeight(pen, hint) ? [] : hint;
+  const base: CardFace = {
+    ...card,
+    hint: firstHint,
+    rules: [],
+    rulesSize: RULES_SIZES[0]!,
+    continues: false,
+  };
   const text = card.rules.join("\n");
   if (text === "") return [base];
-  const { rulesTop } = cardBlocks(pen, card);
-  const rulesBottom = CARD_RULES_BOTTOM - cardHintHeight(pen, hint);
+  const rulesBottom = CARD_RULES_BOTTOM - cardHintHeight(pen, firstHint);
   const room = rulesBottom - rulesTop;
   for (const size of RULES_SIZES) {
     const style = { size };
@@ -924,7 +972,8 @@ function cardFaces(pen: Pen, card: Card, messages: Messages): CardFace[] {
   const lines = pen.wrap(text, style, CARD_INNER_W);
   const first = Math.max(0, Math.floor((room - lh) / lh));
   // Every card that continues keeps one line free for "continues on the next card".
-  const later = Math.floor((rulesBottom - (CARD_HEAD_BOTTOM + 4.2) - lh) / lh);
+  const laterBottom = CARD_RULES_BOTTOM - cardHintHeight(pen, hint);
+  const later = Math.floor((laterBottom - (CARD_HEAD_BOTTOM + 4.2) - lh) / lh);
   const chunks = [lines.slice(0, first)];
   for (let i = first; i < lines.length; i += later) chunks.push(lines.slice(i, i + later));
   const n = chunks.length;
@@ -954,10 +1003,9 @@ function drawCard(pen: Pen, face: CardFace, model: PrintModel, x: number, y: num
   pen.line(left, y + CARD_HEAD_BOTTOM, x + CARD_W - CARD_PAD, y + CARD_HEAD_BOTTOM, 0.6);
   let yy = y + CARD_HEAD_BOTTOM;
   if (face.fields.length > 0) {
-    const cw = CARD_INNER_W / 2;
     const { fields, height } = cardFields(pen, face.fields);
-    fields.forEach((f, j) => {
-      const fx = left + (j % 2) * cw;
+    fields.forEach((f) => {
+      const fx = left + f.left;
       const fy = yy + 4 + f.top;
       const labelLh = pen.lineHeight(f.label.style, 1.15);
       const valueLh = pen.lineHeight(f.value.style, 1.15);

@@ -529,6 +529,78 @@ describe("printed character (demo package)", () => {
     expect(h.pdf.pages).toBe(h.pdf.sheetPages + 2);
   });
 
+  it("prints the number above the circles to tick, so how many is read at a glance", async () => {
+    const { model, pdf } = await print("de", {}, pkg, demoCharacter(pkg, 20));
+    const row = model.sections.find((x) => x.id === "lantern-slots");
+    if (row?.kind !== "statBoxes") throw new Error("no lantern slot row");
+    const page = (await positions(pdf))
+      .slice(0, pdf.sheetPages)
+      .find((p) => p.some((i) => i.str === "RANG 1"))!;
+    for (const box of row.boxes) {
+      expect(box.style).toBe("circles");
+      const label = page.find((p) => p.str === box.label.toLocaleUpperCase("de"))!;
+      const mid = label.x + label.w / 2;
+      // The number sits in the box, under its label and centred on it.
+      const number = page.filter(
+        (p) => p.str === box.text && Math.abs(p.x + p.w / 2 - mid) < 2 && p.y > label.y && p.y < label.y + 12,
+      );
+      expect(number, box.label).toHaveLength(1);
+    }
+  });
+
+  it("says what goes into a pencil field, in its corner, so it does not read as a missing number", async () => {
+    const { model, pdf, extracted } = await print("de", {});
+    const primary = model.sections.find((x) => x.id === "primary");
+    if (primary?.kind !== "statBoxes") throw new Error("no primary row");
+    const pencil = primary.boxes.find((b) => b.style === "pencil")!;
+    expect(pencil.hint).toBe(`Startwert ${pencil.text}`);
+    const page = (await positions(pdf))[0]!;
+    // The field's words, starting at its left edge rather than standing alone in the middle.
+    const words = page.filter((p) => p.str.startsWith("Aktuell"));
+    expect(words).toHaveLength(1);
+    const hint = page.find((p) => p.str === pencil.hint)!;
+    expect(words[0]!.x + words[0]!.w / 2).toBeLessThan(hint.x + hint.w / 2);
+    expect(words[0]!.y).toBeLessThan(hint.y);
+    expect(page.some((p) => p.str === "Bleistift")).toBe(false);
+    expect(extracted.text).toContain("Bleistift");
+    // The same in English.
+    const en = await print("en", {});
+    expect(en.extracted.pageTexts[0]).toMatch(/Current, in\s+pencil:/u);
+  });
+
+  it("does not leave most of a page white: a section that does not fit is split, not moved", async () => {
+    const model = buildPrintModel(pkg, doc, { language: "de", createdAt });
+    const rows = (n: number, prefix: string) =>
+      Array.from({ length: n }, (_, i) => ({
+        name: `${prefix} ${i + 1}`,
+        text: "Ein kurzer Text.",
+        uses: null,
+      }));
+    const base = { span: 12, hint: "" };
+    // About a third of a page used, then a table of about two thirds of a page:
+    // it does not fit under it, and is not taller than a page either.
+    const sheet = (filler: number): PrintModel => ({
+      ...model,
+      sections: [
+        model.sections[0]!,
+        { ...base, id: "filler", kind: "featureTable", title: "Vorher", rows: rows(filler, "Vorher") },
+        { ...base, id: "table", kind: "featureTable", title: "Tabelle", rows: rows(28, "Zeile") },
+      ],
+    });
+    const gap = await renderPdf(sheet(8));
+    const first = gap.sheetLayout[0]!;
+    expect(first.map((p) => p.section.id)).toEqual(["header", "filler", "table"]);
+    expect(gap.sheetLayout[1]![0]!.section.title).toBe("Tabelle (Fortsetzung)");
+    const text = (await extract(gap)).pageTexts;
+    expect(text[0]).toContain("Zeile 1 ");
+    for (let i = 1; i <= 28; i++) expect(text.slice(0, gap.sheetPages).join(" ")).toContain(`Zeile ${i}`);
+
+    // With only a little room left, the table starts the next page whole, as before.
+    const full = await renderPdf(sheet(22));
+    expect(full.sheetLayout[0]!.map((p) => p.section.id)).toEqual(["header", "filler"]);
+    expect(full.sheetLayout[1]![0]!.section.title).toBe("Tabelle");
+  });
+
   it("reads each font file once per PDF, however often the text switches fonts", async () => {
     // Every font pdfkit opens gets a new number; re-reading a font file on
     // each switch made a level-20 PDF take half a minute.
@@ -685,10 +757,8 @@ describe("printed character (demo package)", () => {
     const card = model.cards[0]!;
     expect(card.fields.length).toBeGreaterThanOrEqual(2);
     const long = "V, M (eine Laternenscherbe und ein Faden aus gesponnenem Nebelgarn)";
-    const fields = card.fields.map((f, i) => ({
-      ...f,
-      value: i % 2 === 0 ? "Gebündelte Aufmerksamkeit, bis zu 1 Minute" : long,
-    }));
+    const short = "Gebündelt, bis 1 Minute";
+    const fields = card.fields.map((f, i) => ({ ...f, value: i % 2 === 0 ? short : long }));
     const attribution = Array.from(
       { length: 6 },
       (_, i) => `Satz ${i + 1} der Quellenangabe, frei erfunden.`,
@@ -713,18 +783,47 @@ describe("printed character (demo package)", () => {
     expect(text).toContain("Satz 6 der Quellenangabe");
     for (const item of cards.flat()) expect(item.x + item.w).toBeLessThanOrEqual(210 - 10.5 + 0.2);
 
-    // Card texts stay in their half of the card: grid starts 10.5 mm from the left, cards are 63 mm wide.
+    // Card texts stay on their card: grid starts 10.5 mm from the left, cards are 63 mm wide.
     const grid = { x: 10.5, y: (297 - 3 * 88) / 2, w: 63, pad: 4 };
-    for (const item of cards[0]!.filter((p) => p.y > grid.y && p.y < grid.y + 3 * 88)) {
-      const col = Math.floor((item.x - grid.x) / grid.w);
-      const left = grid.x + col * grid.w + grid.pad;
-      const half = (grid.w - 2 * grid.pad) / 2;
-      const inSecondHalf = item.x >= left + half - 0.2;
+    const half = (grid.w - 2 * grid.pad) / 2;
+    const first = cards[0]!.filter((p) => p.y > grid.y && p.y < grid.y + 88 && p.x < grid.x + grid.w);
+    for (const item of first) {
+      const left = grid.x + grid.w * Math.floor((item.x - grid.x) / grid.w) + grid.pad;
       expect(item.x + item.w, item.str).toBeLessThanOrEqual(left + 2 * half + 0.2);
-      // A value in the first column never runs into the second one.
-      const isValue = fields.some((f) => f.value.includes(item.str));
-      if (!inSecondHalf && isValue) expect(item.x + item.w, item.str).toBeLessThanOrEqual(left + half);
+      // A short value in the first column never runs into the second one.
+      if (short.includes(item.str) && item.x < left + half - 0.2)
+        expect(item.x + item.w, item.str).toBeLessThanOrEqual(left + half);
     }
+    // A value that would take more than two lines in half the card gets a row
+    // of its own across it: some of its lines are wider than half the card.
+    const longLines = first.filter((p) => long.includes(p.str) && p.str.length > 3);
+    expect(longLines.length).toBeGreaterThan(0);
+    expect(longLines.some((p) => p.w > half)).toBe(true);
+  });
+
+  it("keeps a card's head above its footer when a field is a whole sentence", async () => {
+    // A casting time like a sentence, in half the card, used to push "at the
+    // table" over the hint and the footer.
+    const model = buildPrintModel(pkg, doc, { language: "de", createdAt });
+    const card = model.cards[0]!;
+    const sentence =
+      "Reaktion, die du ausführst, wenn eine Laterne im Abstand von bis zu zwölf Schritten von dir erlischt und du es sehen kannst";
+    const fields = card.fields.map((f, i) => (i === 0 ? { ...f, value: sentence } : f));
+    const table = "Kostet eine Reaktion. Der Nebel weicht drei Schritte zurück, und du siehst wieder klar.";
+    const pdf = await renderPdf({
+      ...model,
+      cards: [{ ...card, fields, table, hint: "HINWEIS am Fuss." }, ...model.cards.slice(1)],
+    });
+    const grid = { x: 10.5, y: (297 - 3 * 88) / 2, w: 63, pad: 4 };
+    const footLine = grid.y + 88 - grid.pad - 5;
+    const page = (await positions(pdf))[pdf.sheetPages]!;
+    const onFirst = page.filter((p) => p.x < grid.x + grid.w && p.y > grid.y && p.y < grid.y + 88);
+    const tableEnd = onFirst.filter((p) => p.str.includes("klar."));
+    expect(tableEnd).toHaveLength(1);
+    expect(tableEnd[0]!.y).toBeLessThan(footLine);
+    // The hint gives way where it would be printed over "at the table"; if it is there, it is below it.
+    const hint = onFirst.find((p) => p.str.startsWith("HINWEIS"));
+    if (hint) expect(hint.y).toBeGreaterThan(tableEnd[0]!.y + 2);
   });
 
   it("wraps labels too long for their box instead of running out of it", async () => {
