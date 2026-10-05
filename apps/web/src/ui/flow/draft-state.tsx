@@ -31,7 +31,8 @@ import {
 import { useApp } from "../app-state.tsx";
 import { api, ApiError, type DraftInfo, type DraftView } from "../api.ts";
 import { usePackage, type LoadedPackage } from "../packages.ts";
-import { isPart, stepDiff, stepTitle, type FlowEntry } from "./model.ts";
+import { buildFlow, stepDiff, stepTitle, type FlowEntry } from "./model.ts";
+import { planDiff, plannedDraft } from "./plan.ts";
 import { flowOf, type Raise } from "./raise.ts";
 
 export type SaveState = "saved" | "saving" | "error" | "offline";
@@ -325,20 +326,20 @@ function ReadyDraft({
         return false;
       }
       setRejected(null);
-      const before = evaluateDraft(pkg, docRef.current);
-      const after = evaluateDraft(pkg, r.doc);
-      const diff = stepDiff(before, after);
-      if (diff.added.length > 0 || diff.removed.length > 0 || diff.grown.length > 0) {
-        const titles = (e: Evaluation, ids: string[], parts: boolean) =>
-          ids.filter((id) => isPart(lp, e, id) === parts).map((id) => stepTitle(lp, e, id));
-        setNotice({
-          added: titles(after, diff.added, false),
-          removed: titles(before, diff.removed, false),
-          addedParts: titles(after, diff.added, true),
-          removedParts: titles(before, diff.removed, true),
-          grown: diff.grown.map((s) => stepTitle(lp, after, s)),
-        });
-      }
+      // The count follows the planned flow (plan.ts), so the note compares the plans:
+      // it speaks exactly when "Step x of y" or "Part x of y" changes.
+      const before = evaluateDraft(pkg, plannedDraft(lp, docRef.current));
+      const after = evaluateDraft(pkg, plannedDraft(lp, r.doc));
+      const diff = planDiff(buildFlow("", lp, before, t), buildFlow("", lp, after, t));
+      const grown = stepDiff(before, after).grown.map((s) => stepTitle(lp, after, s));
+      if (
+        diff.added.length > 0 ||
+        diff.removed.length > 0 ||
+        diff.addedParts.length > 0 ||
+        diff.removedParts.length > 0 ||
+        grown.length > 0
+      )
+        setNotice({ ...diff, grown });
       setDoc(r.doc);
       const item: Pending = c;
       // Typing sends many changes to one choice: keep only the newest one that is not on its way yet.
@@ -349,7 +350,7 @@ function ReadyDraft({
       void pump();
       return true;
     },
-    [pkg, lp, pump, setDoc],
+    [pkg, lp, t, pump, setDoc],
   );
 
   const flush = useCallback((): Promise<boolean> => {

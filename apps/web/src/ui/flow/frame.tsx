@@ -317,7 +317,11 @@ export function StepNotice() {
   if (notice?.removed.length) lines.push(tc(`flow.stepRemoved${too}`, notice.removed.length));
   if (notice?.grown.length)
     lines.push(tc("flow.stepGrown", notice.grown.length, { steps: list(notice.grown) }));
-  return <div aria-live="polite">{lines.length > 0 && <Callout tone="info">{lines.join(" ")}</Callout>}</div>;
+  return (
+    <div aria-live="polite" className="step-notice">
+      {lines.length > 0 && <Callout tone="info">{lines.join(" ")}</Callout>}
+    </div>
+  );
 }
 
 /**
