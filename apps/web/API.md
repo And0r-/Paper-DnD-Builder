@@ -29,15 +29,15 @@ it, so the file and the server cannot drift apart.
 
 ## Login and account
 
-| Method & path                    | Body                    | Result                                                                                                                                  |
-| -------------------------------- | ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| `POST /api/auth/password`        | `{ email, language? }`  | `202`. Makes a password and mails it: new account, or new password for an existing one (old one stops working). Same answer either way. |
-| `POST /api/auth/login`           | `{ email, password }`   | `200 { account }` + session cookie. `401 wrongMailOrPassword`, `429 tooManyAttempts` (`Retry-After`).                                   |
-| `POST /api/auth/logout`          | —                       | `204`, cookie cleared.                                                                                                                  |
-| 🔒 `GET /api/account`            | —                       | `{ account: { email, language, units, createdAt } }`                                                                                    |
-| 🔒 `PATCH /api/account/settings` | `{ language?, units? }` | `units` is `{ dimension: unit or null }`; null follows the language again. Units must exist in a loaded package (`422 unknownUnit`).    |
-| 🔒 `POST /api/account/password`  | —                       | `202`. New password by mail; every other session ends.                                                                                  |
-| 🔒 `DELETE /api/account`         | `{ confirm: true }`     | `204`. Deletes account, sessions, access keys and every draft.                                                                          |
+| Method & path                    | Body                    | Result                                                                                                                                                |
+| -------------------------------- | ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `POST /api/auth/password`        | `{ email, language? }`  | `202`. Makes a password and mails it: new account, or new password for an existing one (old one stops working). Same answer either way.               |
+| `POST /api/auth/login`           | `{ email, password }`   | `200 { account }` + session cookie. `401 wrongMailOrPassword`, `429 tooManyAttempts` (`Retry-After`).                                                 |
+| `POST /api/auth/logout`          | —                       | `204`, cookie cleared.                                                                                                                                |
+| 🔒 `GET /api/account`            | —                       | `{ account: { email, language, units, createdAt } }`                                                                                                  |
+| 🔒 `PATCH /api/account/settings` | `{ language?, units? }` | `units` is `{ dimension: unit or null }`; null follows the language again. Units must exist in a loaded package (`422 unknownUnit`).                  |
+| 🔒 `POST /api/account/password`  | —                       | `202`. New password by mail; every other session ends.                                                                                                |
+| 🔒 `DELETE /api/account`         | `{ confirm: true }`     | `204`. Deletes account, sessions, access keys, every draft, the campaigns it leads (players keep their characters) and its places in other campaigns. |
 
 ## Access keys
 
@@ -77,7 +77,7 @@ else is derived by the rule core and returned with every response:
 
 ```json
 {
-  "draft": { "id", "packageId", "version", "status": "draft|finished", "level", "levelBefore", "answers", ... },
+  "draft": { "id", "packageId", "version", "status": "draft|finished", "level", "levelBefore", "answers", "owner": { "email" }, "access": "owner|gameMaster", ... },
   "packageAvailable": true,
   "evaluation": { "level", "steps", "choices", "things", "values", "inputs", "raises", "open", "complete", "inactiveAnswers" },
   "summary": { "name", "level", "complete", "line" },
@@ -91,7 +91,7 @@ the answer is `409 versionConflict` with the current state in
 
 | Method & path                            | Body                    | Result                                                                                                      |
 | ---------------------------------------- | ----------------------- | ----------------------------------------------------------------------------------------------------------- |
-| 🔒 `GET /api/drafts`                     | —                       | The account's drafts with summaries.                                                                        |
+| 🔒 `GET /api/drafts`                     | —                       | The account's own drafts with summaries (a game master finds the players' in the campaign).                 |
 | 🔒 `POST /api/drafts`                    | `{ packageId, level? }` | `201`, new draft at version 1.                                                                              |
 | 🔒 `GET /api/drafts/:id`                 | —                       | The draft.                                                                                                  |
 | 🔒 `PATCH /api/drafts/:id`               | `{ version, level }`    | Changes the level.                                                                                          |
@@ -297,11 +297,58 @@ using the texts from step 3 above. The same walk is a test:
 [`access-keys.test.ts`](src/server/api/access-keys.test.ts) builds a
 level-3 character of the demo package this way, from empty to the PDF.
 
+## Campaigns
+
+Whoever makes a campaign leads it (the game master); there is no role on
+the account. The game master adds players by mail address and then reaches
+**every character of those players**: open, change, raise, print, and make
+a new one for a player. The characters stay the players' (`draft.owner`);
+only the owner deletes one. A player sees their own characters and the
+campaigns they are in, not the other players. Anyone else gets `404`, as
+for something that does not exist. Every route checks this on the server;
+access keys have the same rights as the screens.
+
+| Method & path                                         | Body                    | Who                       | Result                                                                                                                                                                                                                                                      |
+| ----------------------------------------------------- | ----------------------- | ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 🔒 `GET /api/campaigns`                               | —                       | everyone                  | `{ campaigns: [Campaign] }`: the ones you lead or play in, oldest first.                                                                                                                                                                                    |
+| 🔒 `POST /api/campaigns`                              | `{ name }`              | everyone                  | `201 { campaign, players: [] }`. You lead it. `422 tooManyCampaigns` (`max`, 50).                                                                                                                                                                           |
+| 🔒 `GET /api/campaigns/:id`                           | —                       | game master, player       | `{ campaign, players }`. Game master: `players: [{ id, email, addedAt, characters: [draft list entries] }]`. Player: `players: null`.                                                                                                                       |
+| 🔒 `PATCH /api/campaigns/:id`                         | `{ name }`              | game master               | `{ campaign }`.                                                                                                                                                                                                                                             |
+| 🔒 `DELETE /api/campaigns/:id`                        | —                       | game master               | `204`. Campaign and player list go; the characters stay with the players.                                                                                                                                                                                   |
+| 🔒 `POST /api/campaigns/:id/players`                  | `{ email, language? }`  | game master               | `201 { player: { id, email, addedAt } }`. New address: account made, password mail. Existing account: short mail, password unchanged. Same answer either way. `409 alreadyPlayer`, `422 cannotAddYourself`, `422 tooManyPlayers` (50), `429`, `502`, `503`. |
+| 🔒 `DELETE /api/campaigns/:id/players/:playerId`      | —                       | game master; player: `me` | `204`. The game master removes a player; a player leaves with `me`. The characters stay; the game master's reach ends at once. `404 playerNotFound`.                                                                                                        |
+| 🔒 `POST /api/campaigns/:id/players/:playerId/drafts` | `{ packageId, level? }` | game master               | `201`, a new draft that belongs to the player (`access: "gameMaster"`). Then build it with the draft routes.                                                                                                                                                |
+
+`Campaign` is `{ id, name, role: "gameMaster|player", gameMaster: { email }, playerCount, createdAt }`.
+A player of the campaign gets `403 gameMasterOnly` on the game master's
+routes (they know the campaign exists); anyone else `404 campaignNotFound`.
+
+**Who may do what**
+
+| Call                                                                                          | Game master            | Player                 | Anyone else     |
+| --------------------------------------------------------------------------------------------- | ---------------------- | ---------------------- | --------------- |
+| `GET /api/campaigns`                                                                          | sees it (`gameMaster`) | sees it (`player`)     | does not see it |
+| `GET /api/campaigns/:id`                                                                      | `200`, with players    | `200`, `players: null` | `404`           |
+| `PATCH`, `DELETE /api/campaigns/:id`                                                          | `200` / `204`          | `403`                  | `404`           |
+| `POST /api/campaigns/:id/players`                                                             | `201`                  | `403`                  | `404`           |
+| `DELETE /api/campaigns/:id/players/:playerId`                                                 | `204` (any player)     | `204` (`me` only)      | `404`           |
+| `POST /api/campaigns/:id/players/:playerId/drafts`                                            | `201`                  | `403`                  | `404`           |
+| `GET /api/drafts`                                                                             | own only               | own only               | own only        |
+| `GET`, `PATCH /api/drafts/:id`, answers, pools, finish, level-up, pdf of a player's character | `200`                  | `200` (owner)          | `404`           |
+| `DELETE /api/drafts/:id` of a player's character                                              | `403 ownerOnly`        | `204` (owner)          | `404`           |
+| any draft route on the game master's own character                                            | `200` (owner)          | `404`                  | `404`           |
+
+A game master prints a player's character in the game master's own
+language and units. Deleting a player's account removes their characters
+and places; the campaign stays. Deleting the game master's account removes
+their campaigns and player lists; the players keep their characters.
+Tests: [`campaigns.test.ts`](src/server/api/campaigns.test.ts).
+
 ## Print
 
-| Method & path                | Result                                                                                                                                                                                                                                                |
-| ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 🔒 `GET /api/drafts/:id/pdf` | The finished character as one A4 PDF: sheet, then cards. Language and units from the account settings. `409 notFinished` (with `open`), `422 languageNotSupported` (with the package's printable `languages`), `429 tooManyRequests` (`Retry-After`). |
+| Method & path                | Result                                                                                                                                                                                                                                                                                         |
+| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 🔒 `GET /api/drafts/:id/pdf` | The finished character as one A4 PDF: sheet, then cards. Language and units from the settings of whoever asks (a game master prints in theirs). `409 notFinished` (with `open`), `422 languageNotSupported` (with the package's printable `languages`), `429 tooManyRequests` (`Retry-After`). |
 
 It is a plain `GET` so the screen can offer it as an ordinary download
 link. The PDF is made on every request and never stored.
@@ -323,27 +370,35 @@ link. The PDF is made on every request and never stored.
 | `401`  | `wrongMailOrPassword`  | Login failed.                                                                                 |
 | `403`  | `crossSite`            | A change sent from another site.                                                              |
 | `403`  | `keyCannotMakeKeys`    | Making an access key with an access key.                                                      |
+| `403`  | `gameMasterOnly`       | A player of the campaign calls a game master's route.                                         |
+| `403`  | `ownerOnly`            | A game master deletes a player's character; only the owner does.                              |
 | `404`  | `notFound`             | No such API path.                                                                             |
-| `404`  | `draftNotFound`        | No draft with this id in this account (someone else's looks the same).                        |
+| `404`  | `draftNotFound`        | No draft with this id that you may reach (someone else's looks the same).                     |
+| `404`  | `campaignNotFound`     | No campaign with this id that you lead or play in.                                            |
+| `404`  | `playerNotFound`       | No such player in this campaign.                                                              |
 | `404`  | `keyNotFound`          | No access key with this id in this account.                                                   |
 | `404`  | `packageNotFound`      | No loaded package with this id.                                                               |
 | `404`  | `languageNotFound`     | The package has no texts in this language.                                                    |
 | `405`  | `methodNotAllowed`     | The path exists, the method does not.                                                         |
 | `409`  | `versionConflict`      | The draft moved on; `current` holds its state now.                                            |
 | `409`  | `notFinished`          | PDF of a draft, or raising a draft that is not in a raise; `open` lists the open choices.     |
+| `409`  | `alreadyPlayer`        | The address is already a player of this campaign.                                             |
 | `409`  | `packageUnavailable`   | The draft's package is not loaded right now; `packageId` names it.                            |
 | `413`  | `bodyTooLarge`         | Body over 64 KiB.                                                                             |
 | `415`  | `jsonRequired`         | Body not `application/json`.                                                                  |
 | `422`  | `changeRejected`       | The rule core refused the change; `reason` is a `ChangeError` (below).                        |
 | `422`  | `incomplete`           | Finishing with open choices; `open` lists them.                                               |
 | `422`  | `languageNotSupported` | The account's language cannot be printed with this package; `languages` lists those that can. |
+| `422`  | `cannotAddYourself`    | A game master adds their own address as a player.                                             |
+| `422`  | `tooManyCampaigns`     | The account leads 50 campaigns (`max`).                                                       |
+| `422`  | `tooManyPlayers`       | The campaign has 50 players (`max`).                                                          |
 | `422`  | `tooManyKeys`          | The account has 20 access keys (`max`).                                                       |
 | `422`  | `unknownUnit`          | No loaded package offers this unit (`dimension`, `unit`).                                     |
-| `429`  | `tooManyAttempts`      | Too many logins or password mails; `retryAfter`, also `Retry-After`.                          |
+| `429`  | `tooManyAttempts`      | Too many logins, password mails or invitations; `retryAfter`, also `Retry-After`.             |
 | `429`  | `tooManyRequests`      | Too many PDFs; `Retry-After`.                                                                 |
 | `500`  | `internal`             | A bug in the builder.                                                                         |
 | `500`  | `packageRuleError`     | The package's rules could not be worked out (a bug in the package); `message`.                |
-| `502`  | `mailFailed`           | The mail server refused the password mail; nothing changed.                                   |
+| `502`  | `mailFailed`           | The mail server refused the mail (password or invitation); nothing changed.                   |
 | `503`  | `mailNotConfigured`    | The server has no mail set up.                                                                |
 
 `changeRejected` reasons (`error.reason.code`): `levelOutOfRange` (`min`,

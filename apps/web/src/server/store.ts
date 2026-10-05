@@ -44,10 +44,54 @@ export type AccessKeyRow = {
   created_at: Date;
 };
 
+/** A draft with whose it is and why the viewer may see it. */
+export type ReachableDraftRow = DraftRow & {
+  owner_email: string;
+  /** "owner": the viewer's own; "gameMaster": a character of a player in a campaign the viewer leads. */
+  access: "owner" | "gameMaster";
+};
+
+export type CampaignRow = {
+  id: string;
+  name: string;
+  created_at: Date;
+  game_master_email: string;
+  /** Whether the viewer leads it; else the viewer plays in it. */
+  leading: boolean;
+  player_count: number;
+};
+
+export type PlayerRow = {
+  /** The player's account id. */
+  id: string;
+  email: string;
+  added_at: Date;
+};
+
 const ACCESS_KEY_COLUMNS = "id, hint, created_at";
 const ACCOUNT_COLUMNS = "id, email, password_hash, language, units, created_at";
 const DRAFT_COLUMNS =
   "id, account_id, package_id, package_version, version, document, finished_at, created_at, updated_at";
+const DRAFT_COLUMNS_D = DRAFT_COLUMNS.split(", ")
+  .map((c) => `d.${c}`)
+  .join(", ");
+
+/**
+ * The one rule of who may reach whose characters: the owner, and the game
+ * master of a campaign the owner plays in. `$viewer` is the viewer's
+ * account id, `d` the drafts row.
+ */
+const reachable = (viewer: string) => `(d.account_id = ${viewer} OR EXISTS (
+  SELECT 1 FROM campaign_players p JOIN campaigns c ON c.id = p.campaign_id
+  WHERE p.account_id = d.account_id AND c.account_id = ${viewer}))`;
+
+/** A campaign as the viewer `$1` sees it; `c` the campaigns row. */
+const CAMPAIGN_SELECT = `SELECT c.id, c.name, c.created_at, gm.email AS game_master_email,
+  c.account_id = $1 AS leading,
+  (SELECT count(*) FROM campaign_players n WHERE n.campaign_id = c.id)::int AS player_count
+  FROM campaigns c JOIN accounts gm ON gm.id = c.account_id`;
+const VISIBLE_CAMPAIGN = `(c.account_id = $1 OR EXISTS (
+  SELECT 1 FROM campaign_players p WHERE p.campaign_id = c.id AND p.account_id = $1))`;
 
 export class Store {
   private readonly db: SqlExecutor;
@@ -93,7 +137,11 @@ export class Store {
     return rows[0]!;
   }
 
-  /** Removes the account and, by cascade, its sessions, access keys and drafts. */
+  /**
+   * Removes the account and, by cascade, its sessions, access keys and drafts,
+   * the campaigns it leads (with their player lists; the players' characters
+   * stay with the players) and its places in other campaigns.
+   */
   async deleteAccount(accountId: string): Promise<void> {
     await this.db.query("DELETE FROM accounts WHERE id = $1", [accountId]);
   }
@@ -196,10 +244,14 @@ export class Store {
     return rows[0]!;
   }
 
-  async findDraft(id: string, accountId: string): Promise<DraftRow | undefined> {
-    const rows = await this.db.query<DraftRow>(
-      `SELECT ${DRAFT_COLUMNS} FROM drafts WHERE id = $1 AND account_id = $2`,
-      [id, accountId],
+  /** A draft the viewer may reach (see {@link reachable}); undefined for anyone else's. */
+  async findReachableDraft(id: string, viewerId: string): Promise<ReachableDraftRow | undefined> {
+    const rows = await this.db.query<ReachableDraftRow>(
+      `SELECT ${DRAFT_COLUMNS_D}, o.email AS owner_email,
+         CASE WHEN d.account_id = $2 THEN 'owner' ELSE 'gameMaster' END AS access
+       FROM drafts d JOIN accounts o ON o.id = d.account_id
+       WHERE d.id = $1 AND ${reachable("$2")}`,
+      [id, viewerId],
     );
     return rows[0];
   }
@@ -237,5 +289,106 @@ export class Store {
       accountId,
     ]);
     return rows.length > 0;
+  }
+
+  // --------------------------------------------------------------- campaigns
+
+  /** Inserts a campaign unless the account already leads `max`; returns false then. */
+  async createCampaign(
+    c: { id: string; account_id: string; name: string; created_at: Date },
+    max: number,
+  ): Promise<boolean> {
+    const rows = await this.db.query(
+      `INSERT INTO campaigns (id, account_id, name, created_at)
+       SELECT $1, $2, $3, $4
+       WHERE (SELECT count(*) FROM campaigns WHERE account_id = $2) < $5
+       RETURNING id`,
+      [c.id, c.account_id, c.name, c.created_at, max],
+    );
+    return rows.length > 0;
+  }
+
+  /** The campaigns an account leads or plays in. */
+  async listCampaigns(viewerId: string): Promise<CampaignRow[]> {
+    return this.db.query<CampaignRow>(
+      `${CAMPAIGN_SELECT} WHERE ${VISIBLE_CAMPAIGN} ORDER BY c.created_at, c.id`,
+      [viewerId],
+    );
+  }
+
+  /** A campaign the viewer leads or plays in; undefined for any other. */
+  async findCampaign(id: string, viewerId: string): Promise<CampaignRow | undefined> {
+    const rows = await this.db.query<CampaignRow>(
+      `${CAMPAIGN_SELECT} WHERE c.id = $2 AND ${VISIBLE_CAMPAIGN}`,
+      [viewerId, id],
+    );
+    return rows[0];
+  }
+
+  async renameCampaign(id: string, gameMasterId: string, name: string): Promise<void> {
+    await this.db.query("UPDATE campaigns SET name = $3 WHERE id = $1 AND account_id = $2", [
+      id,
+      gameMasterId,
+      name,
+    ]);
+  }
+
+  /** Removes the campaign and its player list; the players' characters stay. */
+  async deleteCampaign(id: string, gameMasterId: string): Promise<void> {
+    await this.db.query("DELETE FROM campaigns WHERE id = $1 AND account_id = $2", [id, gameMasterId]);
+  }
+
+  async listPlayers(campaignId: string): Promise<PlayerRow[]> {
+    return this.db.query<PlayerRow>(
+      `SELECT a.id, a.email, p.added_at
+       FROM campaign_players p JOIN accounts a ON a.id = p.account_id
+       WHERE p.campaign_id = $1 ORDER BY p.added_at, a.email`,
+      [campaignId],
+    );
+  }
+
+  async findPlayer(campaignId: string, accountId: string): Promise<PlayerRow | undefined> {
+    const rows = await this.db.query<PlayerRow>(
+      `SELECT a.id, a.email, p.added_at
+       FROM campaign_players p JOIN accounts a ON a.id = p.account_id
+       WHERE p.campaign_id = $1 AND p.account_id = $2`,
+      [campaignId, accountId],
+    );
+    return rows[0];
+  }
+
+  /**
+   * Adds a player unless the campaign already has `max`. Adding someone who
+   * is already a player changes nothing. Returns false only when full.
+   */
+  async addPlayer(campaignId: string, accountId: string, now: Date, max: number): Promise<boolean> {
+    const rows = await this.db.query(
+      `INSERT INTO campaign_players (campaign_id, account_id, added_at)
+       SELECT $1, $2, $3
+       WHERE (SELECT count(*) FROM campaign_players WHERE campaign_id = $1) < $4
+       ON CONFLICT DO NOTHING
+       RETURNING account_id`,
+      [campaignId, accountId, now, max],
+    );
+    return rows.length > 0 || (await this.findPlayer(campaignId, accountId)) !== undefined;
+  }
+
+  async removePlayer(campaignId: string, accountId: string): Promise<boolean> {
+    const rows = await this.db.query(
+      "DELETE FROM campaign_players WHERE campaign_id = $1 AND account_id = $2 RETURNING account_id",
+      [campaignId, accountId],
+    );
+    return rows.length > 0;
+  }
+
+  /** Every character of the campaign's players, newest first. */
+  async listCampaignDrafts(campaignId: string): Promise<ReachableDraftRow[]> {
+    return this.db.query<ReachableDraftRow>(
+      `SELECT ${DRAFT_COLUMNS_D}, o.email AS owner_email, 'gameMaster' AS access
+       FROM drafts d JOIN campaign_players p ON p.account_id = d.account_id
+       JOIN accounts o ON o.id = d.account_id
+       WHERE p.campaign_id = $1 ORDER BY d.updated_at DESC, d.id`,
+      [campaignId],
+    );
   }
 }

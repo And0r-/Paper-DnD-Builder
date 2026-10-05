@@ -17,7 +17,7 @@ import type { ContentPackage } from "@builder/format";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import type { App } from "../../app.ts";
-import type { DraftRow } from "../../store.ts";
+import type { AccountRow, DraftRow, ReachableDraftRow } from "../../store.ts";
 import { HttpError, json, readJson } from "../http.ts";
 import type { RequestContext, Route } from "../router.ts";
 
@@ -29,7 +29,7 @@ const version = z.number().int().min(1);
  * started from when the draft no longer keeps it (a raise that finished the
  * character at once), so the level-up answer always says what it brought.
  */
-export function draftView(row: DraftRow, pkg: ContentPackage | undefined, raisedFrom?: number) {
+export function draftView(row: ReachableDraftRow, pkg: ContentPackage | undefined, raisedFrom?: number) {
   const evaluation = pkg ? evaluateDraft(pkg, row.document) : null;
   const from = row.document.levelBefore ?? raisedFrom;
   return {
@@ -46,6 +46,10 @@ export function draftView(row: DraftRow, pkg: ContentPackage | undefined, raised
       createdAt: row.created_at.toISOString(),
       updatedAt: row.updated_at.toISOString(),
       finishedAt: row.finished_at?.toISOString() ?? null,
+      /** Whose character it is. A game master's view shows the player here. */
+      owner: { email: row.owner_email },
+      /** Why the viewer may see it: their own, or a player's in a campaign they lead. */
+      access: row.access,
     },
     /** False if the draft's package is not loaded right now; the draft is kept and shown again once it is. */
     packageAvailable: pkg !== undefined,
@@ -56,13 +60,30 @@ export function draftView(row: DraftRow, pkg: ContentPackage | undefined, raised
   };
 }
 
-export async function loadDraft(ctx: RequestContext): Promise<{ row: DraftRow; accountId: string }> {
+/** One's own drafts, in the shape `draftView` takes. */
+export function ownDraft(row: DraftRow, account: AccountRow): ReachableDraftRow {
+  return { ...row, owner_email: account.email, access: "owner" };
+}
+
+/**
+ * The draft of the URL, if the viewer may reach it: their own, or a
+ * player's in a campaign they lead (see `Store.findReachableDraft`).
+ */
+/** A draft in a list: the draft's fields with `packageAvailable` and `summary`. */
+export function listEntry(app: App, row: ReachableDraftRow) {
+  const { draft, packageAvailable, summary } = draftView(row, app.packages.get(row.package_id));
+  return { ...draft, packageAvailable, summary };
+}
+
+export async function loadDraft(
+  ctx: RequestContext,
+): Promise<{ row: ReachableDraftRow; viewer: AccountRow }> {
   const { account } = await ctx.requireSession();
   const id = ctx.params["id"]!;
-  const row = UUID.test(id) ? await ctx.app.store.findDraft(id, account.id) : undefined;
+  const row = UUID.test(id) ? await ctx.app.store.findReachableDraft(id, account.id) : undefined;
   // Someone else's draft looks exactly like a missing one.
   if (!row) throw new HttpError(404, "draftNotFound");
-  return { row, accountId: account.id };
+  return { row, viewer: account };
 }
 
 export function packageOf(app: App, row: DraftRow): ContentPackage {
@@ -71,7 +92,7 @@ export function packageOf(app: App, row: DraftRow): ContentPackage {
   return pkg;
 }
 
-function conflict(row: DraftRow, pkg: ContentPackage): HttpError {
+function conflict(row: ReachableDraftRow, pkg: ContentPackage): HttpError {
   return new HttpError(409, "versionConflict", { current: draftView(row, pkg) });
 }
 
@@ -88,7 +109,9 @@ async function change(
     row: DraftRow,
   ) => { doc: DraftRow["document"]; finish?: boolean; raisedFrom?: number | undefined },
 ): Promise<Response> {
-  const { row, accountId } = await loadDraft(ctx);
+  const { row, viewer } = await loadDraft(ctx);
+  // The draft stays its owner's, whoever changes it.
+  const accountId = row.account_id;
   const pkg = packageOf(ctx.app, row);
   if (row.version !== expectedVersion) throw conflict(row, pkg);
   const edited = edit(pkg, row);
@@ -106,18 +129,47 @@ async function change(
   });
   if (!updated) {
     // Changed between our read and our write.
-    const current = await ctx.app.store.findDraft(row.id, accountId);
+    const current = await ctx.app.store.findReachableDraft(row.id, viewer.id);
     if (!current) throw new HttpError(404, "draftNotFound");
     throw conflict(current, pkg);
   }
   ctx.app.draftEvents.publish({ draftId: updated.id, accountId, version: updated.version });
-  return json(200, draftView(updated, pkg, edited.raisedFrom));
+  const who = { owner_email: row.owner_email, access: row.access };
+  return json(200, draftView({ ...updated, ...who }, pkg, edited.raisedFrom));
 }
 
 function applyOrReject(pkg: ContentPackage, row: DraftRow, c: DraftChange) {
   const r = applyChange(pkg, row.document, c);
   if (!r.ok) throw new HttpError(422, "changeRejected", { reason: r.error });
   return { doc: r.doc };
+}
+
+export const newDraftSchema = z.strictObject({
+  packageId: z.string().max(100),
+  level: z.number().int().optional(),
+});
+
+/** A new character for `owner`; a game master makes one for a player this way, too. */
+export async function createDraft(
+  ctx: RequestContext,
+  owner: { id: string; email: string },
+  access: ReachableDraftRow["access"],
+): Promise<Response> {
+  const body = await readJson(ctx.req, newDraftSchema);
+  const pkg = ctx.app.packages.get(body.packageId);
+  if (!pkg) throw new HttpError(404, "packageNotFound");
+  const r = newDraft(pkg, body.level);
+  if (!r.ok) throw new HttpError(422, "changeRejected", { reason: r.error });
+  const row = await ctx.app.store.createDraft({
+    id: randomUUID(),
+    account_id: owner.id,
+    package_id: pkg.manifest.id,
+    package_version: pkg.manifest.version,
+    version: 1,
+    document: r.doc,
+    created_at: ctx.app.now(),
+  });
+  return json(201, draftView({ ...row, owner_email: owner.email, access }, pkg));
 }
 
 export const draftRoutes: Route[] = [
@@ -127,11 +179,7 @@ export const draftRoutes: Route[] = [
     handler: async (ctx) => {
       const { account } = await ctx.requireSession();
       const rows = await ctx.app.store.listDrafts(account.id);
-      const drafts = rows.map((row) => {
-        const { draft, packageAvailable, summary } = draftView(row, ctx.app.packages.get(row.package_id));
-        return { ...draft, packageAvailable, summary };
-      });
-      return json(200, { drafts });
+      return json(200, { drafts: rows.map((row) => listEntry(ctx.app, ownDraft(row, account))) });
     },
   },
   {
@@ -139,24 +187,7 @@ export const draftRoutes: Route[] = [
     path: "/api/drafts",
     handler: async (ctx) => {
       const { account } = await ctx.requireSession();
-      const body = await readJson(
-        ctx.req,
-        z.strictObject({ packageId: z.string().max(100), level: z.number().int().optional() }),
-      );
-      const pkg = ctx.app.packages.get(body.packageId);
-      if (!pkg) throw new HttpError(404, "packageNotFound");
-      const r = newDraft(pkg, body.level);
-      if (!r.ok) throw new HttpError(422, "changeRejected", { reason: r.error });
-      const row = await ctx.app.store.createDraft({
-        id: randomUUID(),
-        account_id: account.id,
-        package_id: pkg.manifest.id,
-        package_version: pkg.manifest.version,
-        version: 1,
-        document: r.doc,
-        created_at: ctx.app.now(),
-      });
-      return json(201, draftView(row, pkg));
+      return createDraft(ctx, { id: account.id, email: account.email }, "owner");
     },
   },
   {
@@ -241,11 +272,13 @@ export const draftRoutes: Route[] = [
     },
   },
   {
+    // Only the owner deletes: a game master may change a character, not take it away.
     method: "DELETE",
     path: "/api/drafts/:id",
     handler: async (ctx) => {
-      const { row, accountId } = await loadDraft(ctx);
-      await ctx.app.store.deleteDraft(row.id, accountId);
+      const { row } = await loadDraft(ctx);
+      if (row.access !== "owner") throw new HttpError(403, "ownerOnly");
+      await ctx.app.store.deleteDraft(row.id, row.account_id);
       return json(204, null);
     },
   },

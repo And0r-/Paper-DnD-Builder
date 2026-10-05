@@ -10,7 +10,13 @@ import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import type { App } from "../app.ts";
 import { HttpError } from "../api/http.ts";
-import { MailNotConfiguredError, passwordMail } from "../mail.ts";
+import {
+  addedToCampaignMail,
+  MailNotConfiguredError,
+  passwordMail,
+  type Invitation,
+  type Mail,
+} from "../mail.ts";
 import type { AccountRow } from "../store.ts";
 import {
   dummyPasswordHash,
@@ -35,7 +41,7 @@ export const emailSchema = z
 
 export const passwordInputSchema = z.string().min(1).max(MAX_PASSWORD_INPUT);
 
-function limited(app: App, key: string, limit: Limit, take: boolean): void {
+export function limited(app: App, key: string, limit: Limit, take: boolean): void {
   const r = take ? app.limiter.take(key, limit) : app.limiter.check(key, limit);
   if (!r.ok) {
     throw new HttpError(
@@ -61,20 +67,24 @@ async function serialized<T>(key: string, fn: () => Promise<T>): Promise<T> {
   }
 }
 
+async function deliver(app: App, mail: Mail) {
+  try {
+    await app.mailer.send(mail);
+  } catch (error) {
+    if (error instanceof MailNotConfiguredError) throw new HttpError(503, "mailNotConfigured");
+    // The error text of the mail library never contains the mail body.
+    console.error("Mail: sending failed:", (error as Error).message);
+    throw new HttpError(502, "mailFailed");
+  }
+}
+
 async function sendPassword(
   app: App,
   account: { email: string; language: string },
   password: string,
   isNew: boolean,
 ) {
-  try {
-    await app.mailer.send(passwordMail(account.language, account.email, password, app.config.baseUrl, isNew));
-  } catch (error) {
-    if (error instanceof MailNotConfiguredError) throw new HttpError(503, "mailNotConfigured");
-    // The error text of the mail library never contains the mail body.
-    console.error("Mail: sending a password failed:", (error as Error).message);
-    throw new HttpError(502, "mailFailed");
-  }
+  await deliver(app, passwordMail(account.language, account.email, password, app.config.baseUrl, isNew));
 }
 
 /**
@@ -109,6 +119,56 @@ export async function requestPassword(app: App, email: string, language: string 
       const other = await app.store.findAccountByEmail(email);
       if (other) await app.store.setPasswordHash(other.id, hash);
     }
+  });
+}
+
+/**
+ * The account a game master adds to a campaign, by mail address. An
+ * address without an account gets one, and the password mail names who
+ * invited it; an existing account keeps its password and gets a short
+ * mail. Either way the person learns who can now see their characters.
+ * As with `requestPassword`, the mail goes out before anything is stored.
+ *
+ * `add` puts the account into the campaign; it runs inside the same
+ * per-address queue, so the account cannot be made twice meanwhile.
+ */
+export async function inviteAccount(
+  app: App,
+  email: string,
+  language: string | undefined,
+  invitation: Invitation,
+  add: (account: AccountRow) => Promise<void>,
+): Promise<AccountRow> {
+  limited(app, `invite:address:${email}`, LIMITS.invitationMailsPerAddress, false);
+  return serialized(email, async () => {
+    const existing = await app.store.findAccountByEmail(email);
+    if (existing) {
+      app.limiter.record(`invite:address:${email}`, LIMITS.invitationMailsPerAddress);
+      await deliver(app, addedToCampaignMail(existing.language, email, app.config.baseUrl, invitation));
+      await add(existing);
+      return existing;
+    }
+    limited(app, `password:account:${email}`, LIMITS.passwordMailsPerAccount, true);
+    app.limiter.record(`invite:address:${email}`, LIMITS.invitationMailsPerAddress);
+    const lang = UI_LANGUAGES.includes(language as never) ? language! : DEFAULT_LANGUAGE;
+    const password = generatePassword(lang);
+    const hash = await hashPassword(password);
+    await deliver(app, passwordMail(lang, email, password, app.config.baseUrl, true, invitation));
+    let account = await app.store.createAccount({
+      id: randomUUID(),
+      email,
+      password_hash: hash,
+      language: lang,
+      created_at: app.now(),
+    });
+    // Another server process created it in the meantime: the mailed password wins.
+    if (!account) {
+      account = await app.store.findAccountByEmail(email);
+      if (!account) throw new Error("account vanished while being made");
+      await app.store.setPasswordHash(account.id, hash);
+    }
+    await add(account);
+    return account;
   });
 }
 

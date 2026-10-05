@@ -226,6 +226,12 @@ describe("openapi.json", () => {
         "incomplete",
         "unknownUnit",
         "mailFailed",
+        "campaignNotFound",
+        "gameMasterOnly",
+        "playerNotFound",
+        "alreadyPlayer",
+        "cannotAddYourself",
+        "ownerOnly",
       ]) {
         expect(codes, code).toContain(code);
       }
@@ -364,6 +370,38 @@ async function walk(server: TestServer): Promise<void> {
   view = (await call("POST", `/api/drafts/${id}/level-up`, { version: view.draft.version, level: 4 }, k))
     .json;
   await call("DELETE", `/api/drafts/${id}`, undefined, k);
+
+  // A campaign, led by the walker, with a player who has a character.
+  const campaign = (await call("POST", "/api/campaigns", { name: "Runde" })).json.campaign;
+  const cp = `/api/campaigns/${campaign.id}`;
+  await call("POST", "/api/campaigns", { name: "" });
+  await call("GET", "/api/campaigns");
+  await call("PATCH", cp, { name: "Die Runde" });
+  await call("GET", "/api/campaigns/00000000-0000-4000-8000-000000000000");
+  await call("POST", `${cp}/players`, { email: "walker@example.org" });
+  server.failMail.on = true;
+  await call("POST", `${cp}/players`, { email: "late@example.org" });
+  server.failMail.on = false;
+  const added = (await call("POST", `${cp}/players`, { email: "mate@example.org", language: "en" })).json
+    .player;
+  await call("POST", `${cp}/players`, { email: "mate@example.org" });
+  const mate = new Client(server, "198.51.100.20");
+  await mate.call("POST", "/api/auth/login", {
+    email: "mate@example.org",
+    password: passwordFromMail(server.mails, "mate@example.org"),
+  });
+  const theirs = (await mate.call("POST", "/api/drafts", { packageId: "demo" })).json.draft.id;
+  await mate.call("GET", "/api/campaigns");
+  await mate.call("GET", cp);
+  await mate.call("PATCH", cp, { name: "Meine" });
+  await call("GET", cp);
+  await call("GET", `/api/drafts/${theirs}`, undefined, k);
+  await call("DELETE", `/api/drafts/${theirs}`, undefined, k);
+  await call("POST", `${cp}/players/${added.id}/drafts`, { packageId: "demo", level: 2 }, k);
+  await call("POST", `${cp}/players/00000000-0000-4000-8000-000000000000/drafts`, { packageId: "demo" });
+  await call("DELETE", `${cp}/players/00000000-0000-4000-8000-000000000000`);
+  await mate.call("DELETE", `${cp}/players/me`);
+  await call("DELETE", cp);
 
   await call("POST", "/api/auth/logout");
   // The password renewed above is the newest in the mailbox.

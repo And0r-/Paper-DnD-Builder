@@ -314,6 +314,7 @@
   "privacy.settings": "Your settings: language and units.",
   "privacy.characters": "Your characters.",
   "privacy.keys": "Your access keys, if you make any: only as a check value, with the date. We do not record when or what for a key is used.",
+  "privacy.campaigns": "Your campaigns: their name, who leads them and who plays in them. Whoever leads a campaign sees the players' characters and can change them. If someone adds you, the mail says who it was.",
   "privacy.cookies": "One cookie so you stay logged in. And one that remembers your language before you log in.",
   "privacy.notStored": "What we never do",
   "privacy.noTracking": "No tracking, no ads, no statistics about you.",

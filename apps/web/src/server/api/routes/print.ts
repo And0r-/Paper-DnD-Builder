@@ -29,8 +29,8 @@ export const printRoutes: Route[] = [
     method: "GET",
     path: "/api/drafts/:id/pdf",
     handler: async (ctx) => {
-      const { row, accountId } = await loadDraft(ctx);
-      const { account } = await ctx.requireSession();
+      // A game master prints a player's character in the game master's own language and units.
+      const { row, viewer: account } = await loadDraft(ctx);
       const pkg = packageOf(ctx.app, row);
       const ev = evaluateDraft(pkg, row.document);
       if (!row.finished_at || !ev.complete) throw new HttpError(409, "notFinished", { open: ev.open });
@@ -39,7 +39,7 @@ export const printRoutes: Route[] = [
       if (!languages.includes(account.language)) {
         throw new HttpError(422, "languageNotSupported", { language: account.language, languages });
       }
-      const limit = ctx.app.limiter.take(`pdf:account:${accountId}`, PDF_LIMIT);
+      const limit = ctx.app.limiter.take(`pdf:account:${account.id}`, PDF_LIMIT);
       if (!limit.ok) {
         throw new HttpError(429, "tooManyRequests", {}, { "Retry-After": String(limit.retryAfter) });
       }
