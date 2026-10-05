@@ -1,7 +1,7 @@
 "use client";
 /**
- * Settings (flow spec 4.8): language, units, new password, log out, what
- * we store, delete account. Language and units apply at once, everywhere.
+ * Settings (flow spec 4.8): language, units, new password, access keys,
+ * log out, what we store, delete account. Language and units apply at once, everywhere.
  */
 import { effectiveUnits, formatMeasure } from "@builder/core";
 import Link from "next/link";
@@ -10,6 +10,7 @@ import { useEffect, useState } from "react";
 import { isUiLanguage, UI_LANGUAGES, type UiLanguage } from "../../src/i18n/index.ts";
 import { useApp } from "../../src/ui/app-state.tsx";
 import { api, type Account } from "../../src/ui/api.ts";
+import { AccessKeys } from "../../src/ui/components/AccessKeys.tsx";
 import { Button } from "../../src/ui/components/Button.tsx";
 import { ConfirmDialog, TypedConfirmDialog } from "../../src/ui/components/Dialog.tsx";
 import { Callout, ErrorState, Loading } from "../../src/ui/components/Feedback.tsx";
@@ -154,6 +155,8 @@ function Settings({ account }: { account: Account }) {
             {t("settings.passwordButton")}
           </Button>
         </section>
+
+        <AccessKeys />
 
         <section className="settings__section" aria-labelledby="s-logout">
           <h2 className="section-title" id="s-logout">

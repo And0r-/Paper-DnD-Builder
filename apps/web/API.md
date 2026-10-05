@@ -1,18 +1,30 @@
 # HTTP API
 
-JSON over HTTP, same origin only. All routes live in
+JSON over HTTP. All routes live in
 [`src/server/api/routes`](src/server/api/routes); the router works on
 standard `Request`/`Response`, and Next.js hands it every `/api/*` request
 ([`app/api/[...path]/route.ts`](app/api/[...path]/route.ts)).
+
+Every route, body, answer and error code is also described in
+[`openapi.json`](openapi.json) (OpenAPI 3.1). A test
+([`openapi.test.ts`](src/server/api/openapi.test.ts)) compares it with the
+router and walks the whole API checking each request and answer against
+it, so the file and the server cannot drift apart.
 
 **Conventions**
 
 - Bodies are `application/json` (anything else: `415`). Changes from other
   sites are refused (`403`, `Origin` / `Sec-Fetch-Site` check).
-- Login state is an httpOnly session cookie. Routes marked 🔒 answer `401`
-  without it.
+- Two ways to log in. The browser holds an httpOnly session cookie. A
+  program (a script, later a language model) sends an
+  [access key](#access-keys): `Authorization: Bearer cbk_...`. Routes
+  marked 🔒 answer `401` without either: `notLoggedIn` with neither,
+  `keyNotValid` for a key that is unknown, withdrawn or malformed.
+- A request with an `Authorization` header is judged by the key alone,
+  never by a cookie it also carries.
 - Errors: `{ "error": { "code": "...", ...details } }`. Codes are stable and
-  English; the screen words them in the player's language.
+  English; the screen words them in the player's language. All codes:
+  [Error codes](#error-codes).
 - Responses are never cached (`Cache-Control: no-store`).
 
 ## Login and account
@@ -25,7 +37,30 @@ standard `Request`/`Response`, and Next.js hands it every `/api/*` request
 | 🔒 `GET /api/account`            | —                       | `{ account: { email, language, units, createdAt } }`                                                                                    |
 | 🔒 `PATCH /api/account/settings` | `{ language?, units? }` | `units` is `{ dimension: unit or null }`; null follows the language again. Units must exist in a loaded package (`422 unknownUnit`).    |
 | 🔒 `POST /api/account/password`  | —                       | `202`. New password by mail; every other session ends.                                                                                  |
-| 🔒 `DELETE /api/account`         | `{ confirm: true }`     | `204`. Deletes account, sessions and every draft.                                                                                       |
+| 🔒 `DELETE /api/account`         | `{ confirm: true }`     | `204`. Deletes account, sessions, access keys and every draft.                                                                          |
+
+## Access keys
+
+A person makes a key on the settings screen and gives it to a program they
+trust. The key can do everything the screens can, in this account only.
+
+| Method & path                     | Body | Result                                                                                                                   |
+| --------------------------------- | ---- | ------------------------------------------------------------------------------------------------------------------------ |
+| 🔒 `GET /api/account/keys`        | —    | `{ keys: [{ id, hint, createdAt }] }`, oldest first. `hint` is the first 10 characters of the key.                       |
+| 🔒 `POST /api/account/keys`       | `{}` | `201 { key: { id, hint, createdAt, secret } }`. `secret` is the key, in this answer only. `422 tooManyKeys` (`max`, 20). |
+| 🔒 `DELETE /api/account/keys/:id` | —    | `204`. Withdrawn at once: the next request with the key gets `401 keyNotValid`. `404 keyNotFound`.                       |
+
+- A key is `cbk_` and 43 random characters (256 bits). The server stores
+  only its SHA-256, the hint and the date; nothing about when or what for
+  it is used. A leaked database holds no usable key.
+- **Making a key needs the browser session.** A request with a key gets
+  `403 keyCannotMakeKeys`, so a leaked key cannot make itself a successor
+  that outlives withdrawing it. Listing and withdrawing work with a key.
+- Deleting the account deletes its keys.
+- Same-origin and CSRF rules are unchanged: a program is not a browser and
+  sends no `Origin` header; a page on another site cannot set
+  `Authorization` without a CORS preflight, which the builder does not
+  answer.
 
 ## Packages
 
@@ -60,6 +95,7 @@ the answer is `409 versionConflict` with the current state in
 | 🔒 `POST /api/drafts`                    | `{ packageId, level? }` | `201`, new draft at version 1.                                                                              |
 | 🔒 `GET /api/drafts/:id`                 | —                       | The draft.                                                                                                  |
 | 🔒 `PATCH /api/drafts/:id`               | `{ version, level }`    | Changes the level.                                                                                          |
+| 🔒 `PUT /api/drafts/:id/pools/:step`     | `{ version, picks }`    | All picks of a step with a shared list (`steps[].pool`); the core spreads them over the step's choices.     |
 | 🔒 `PUT /api/drafts/:id/answers/:choice` | `{ version, answer }`   | Answers one choice; `answer: null` removes it. `422 changeRejected` with the reason if it does not fit now. |
 | 🔒 `POST /api/drafts/:id/level-up`       | `{ version, level }`    | Raises a finished character; see [Raising a character](#raising-a-character).                               |
 | 🔒 `POST /api/drafts/:id/finish`         | `{ version }`           | Marks the character finished; `422 incomplete` with the open choices.                                       |
@@ -162,6 +198,105 @@ Errors:
 | `409`  | `versionConflict`                                                 | The draft moved on (see above).                                                                      |
 | `400`  | `badRequest`                                                      | `level` is not a whole number.                                                                       |
 
+### Reading `evaluation`: what to answer next
+
+This is how a program (and the screen) goes through a character. Every
+draft answer has the full `evaluation`; nothing needs to be worked out on
+the client.
+
+1. **`evaluation.open`** lists the choice ids that still need an answer, in
+   step order: not answered, not complete, or answered with something that
+   no longer fits. Optional choices are never in it. Empty means
+   `evaluation.complete` is `true` and `POST /finish` works.
+2. **`evaluation.choices[id]`** says how to answer one choice:
+
+   ```json
+   {
+     "id": "folk",
+     "kind": "pickOne",
+     "step": "folk",
+     "optional": false,
+     "status": "missing",
+     "atLevel": 1,
+     "options": ["folk.moorfolk", "folk.hillfolk", "folk.coastfolk"],
+     "recommended": ["folk.moorfolk"]
+   }
+   ```
+
+   | Field                   | Meaning                                                                                                                |
+   | ----------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+   | `kind`                  | The answer shape (see above): `pickOne`, `pickMany`, `distribute`, `number`, `text`; `info` takes no answer.           |
+   | `status`                | `missing`, `incomplete` (fits, more needed; `remaining`), `invalid` (`problem` says why), `answered`, `info`.          |
+   | `options`               | Pick choices: the thing keys that may be picked now. Anything else is refused (`notOffered`).                          |
+   | `count`, `upTo`         | `pickMany`: how many to pick; with `upTo`, fewer is complete too.                                                      |
+   | `recommended`           | Pick choices: good picks, best first. `distribute`: a full answer `{ method, assign }` that can be sent as it is.      |
+   | `min`, `max`            | `number`: the allowed range.                                                                                           |
+   | `raise`                 | `distribute` with `raise`: points to give and the most each value can take (see above).                                |
+   | `badges`                | Pick choices: a text key per option, a short label such as "gentle start".                                             |
+   | `held`                  | Things the character already has that an option is about.                                                              |
+   | `copyOf`, `textVariant` | Which texts to use (below).                                                                                            |
+   | `step`                  | The step the choice is on. If that step has a `pool` in `evaluation.steps`, its choices can also be answered together. |
+
+3. **Words and explanations** come from the package texts in one language,
+   `GET /api/packages/:id/texts/:lang` (key list: package format SPEC,
+   section 10.2):
+
+   | For             | Keys                                                                                                                              |
+   | --------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+   | the question    | `choice.<id>.title`, `.question`, `.intro`; for a copy the `copyOf` id; with `textVariant` v, `choice.<id>.variant.<v>.*` first.  |
+   | each option `o` | `<o>.name`, `<o>.short`, `<o>.explain.what` (what it is), `<o>.explain.table` (what you do with it), `<o>.goodIf` (who it suits). |
+   | a badge         | the key in `badges[o]`.                                                                                                           |
+   | a value         | `value.<id>.name`, `value.<id>.explain`.                                                                                          |
+
+   A missing text is `null`; it is never filled from another language.
+
+4. **Answer** with `PUT /api/drafts/:id/answers/:choice` and the draft's
+   current `version`. The answer is the new state: read `open` again.
+   Answering a choice can change what comes after it (new steps, other
+   options), never what comes before.
+
+### Example: from nothing to the PDF with a key
+
+Everything below needs only the key (made under Settings → Access keys).
+The commands use `curl` and `jq`; any HTTP client works.
+
+```sh
+BASE=https://builder.example.org
+KEY=cbk_...                       # from the settings screen
+H=(-H "Authorization: Bearer $KEY" -H "Content-Type: application/json")
+
+# 1. What can be built?
+curl -s "${H[@]}" "$BASE/api/packages?lang=en" | jq '.packages[] | {id, name}'
+
+# 2. Start a level-3 character.
+VIEW=$(curl -s "${H[@]}" -X POST "$BASE/api/drafts" -d '{"packageId":"demo","level":3}')
+ID=$(jq -r .draft.id <<<"$VIEW")
+
+# 3. Answer the first open choice until nothing is open.
+while [ "$(jq '.evaluation.open | length' <<<"$VIEW")" -gt 0 ]; do
+  CHOICE=$(jq -r '.evaluation.open[0]' <<<"$VIEW")
+  ANSWER=$(jq --arg c "$CHOICE" '.evaluation.choices[$c] as $s |
+    if   $s.kind == "pickOne"    then {pick: ($s.recommended[0] // $s.options[0])}
+    elif $s.kind == "pickMany"   then {picks: (if ($s.recommended | length) == $s.count
+                                               then $s.recommended else $s.options[:$s.count] end)}
+    elif $s.kind == "distribute" then $s.recommended
+    elif $s.kind == "number"     then {value: $s.min}
+    else {text: "Mira Fennwick"} end' <<<"$VIEW")
+  VERSION=$(jq .draft.version <<<"$VIEW")
+  VIEW=$(curl -s "${H[@]}" -X PUT "$BASE/api/drafts/$ID/answers/$(jq -rn --arg c "$CHOICE" '$c|@uri')" \
+    -d "{\"version\":$VERSION,\"answer\":$ANSWER}")
+done
+
+# 4. Finish and print.
+curl -s "${H[@]}" -X POST "$BASE/api/drafts/$ID/finish" -d "{\"version\":$(jq .draft.version <<<"$VIEW")}" >/dev/null
+curl -s -H "Authorization: Bearer $KEY" "$BASE/api/drafts/$ID/pdf" -o character.pdf
+```
+
+A real helper would ask the player instead of taking the recommendation,
+using the texts from step 3 above. The same walk is a test:
+[`access-keys.test.ts`](src/server/api/access-keys.test.ts) builds a
+level-3 character of the demo package this way, from empty to the PDF.
+
 ## Print
 
 | Method & path                | Result                                                                                                                                                                                                                                                |
@@ -170,6 +305,54 @@ Errors:
 
 It is a plain `GET` so the screen can offer it as an ordinary download
 link. The PDF is made on every request and never stored.
+
+## Server
+
+| Method & path     | Result                                                                          |
+| ----------------- | ------------------------------------------------------------------------------- |
+| `GET /api/health` | `{ "status": "ok" }` while the process serves requests. Public; used by Docker. |
+
+## Error codes
+
+| Status | Code                   | When                                                                                          |
+| ------ | ---------------------- | --------------------------------------------------------------------------------------------- |
+| `400`  | `badJson`              | The body is not JSON.                                                                         |
+| `400`  | `badRequest`           | The body has the wrong shape; `issues` lists `{ path, message }`.                             |
+| `401`  | `notLoggedIn`          | No session cookie and no `Authorization` header.                                              |
+| `401`  | `keyNotValid`          | The access key is unknown, withdrawn or not `Bearer cbk_...`.                                 |
+| `401`  | `wrongMailOrPassword`  | Login failed.                                                                                 |
+| `403`  | `crossSite`            | A change sent from another site.                                                              |
+| `403`  | `keyCannotMakeKeys`    | Making an access key with an access key.                                                      |
+| `404`  | `notFound`             | No such API path.                                                                             |
+| `404`  | `draftNotFound`        | No draft with this id in this account (someone else's looks the same).                        |
+| `404`  | `keyNotFound`          | No access key with this id in this account.                                                   |
+| `404`  | `packageNotFound`      | No loaded package with this id.                                                               |
+| `404`  | `languageNotFound`     | The package has no texts in this language.                                                    |
+| `405`  | `methodNotAllowed`     | The path exists, the method does not.                                                         |
+| `409`  | `versionConflict`      | The draft moved on; `current` holds its state now.                                            |
+| `409`  | `notFinished`          | PDF of a draft, or raising a draft that is not in a raise; `open` lists the open choices.     |
+| `409`  | `packageUnavailable`   | The draft's package is not loaded right now; `packageId` names it.                            |
+| `413`  | `bodyTooLarge`         | Body over 64 KiB.                                                                             |
+| `415`  | `jsonRequired`         | Body not `application/json`.                                                                  |
+| `422`  | `changeRejected`       | The rule core refused the change; `reason` is a `ChangeError` (below).                        |
+| `422`  | `incomplete`           | Finishing with open choices; `open` lists them.                                               |
+| `422`  | `languageNotSupported` | The account's language cannot be printed with this package; `languages` lists those that can. |
+| `422`  | `tooManyKeys`          | The account has 20 access keys (`max`).                                                       |
+| `422`  | `unknownUnit`          | No loaded package offers this unit (`dimension`, `unit`).                                     |
+| `429`  | `tooManyAttempts`      | Too many logins or password mails; `retryAfter`, also `Retry-After`.                          |
+| `429`  | `tooManyRequests`      | Too many PDFs; `Retry-After`.                                                                 |
+| `500`  | `internal`             | A bug in the builder.                                                                         |
+| `500`  | `packageRuleError`     | The package's rules could not be worked out (a bug in the package); `message`.                |
+| `502`  | `mailFailed`           | The mail server refused the password mail; nothing changed.                                   |
+| `503`  | `mailNotConfigured`    | The server has no mail set up.                                                                |
+
+`changeRejected` reasons (`error.reason.code`): `levelOutOfRange` (`min`,
+`max`), `levelNotHigher` (`level`), `unknownChoice`, `notAsked` (the choice
+is not asked now), `unknownStep` (pools: no shared list on that step),
+`noAnswerNeeded` (an `info` choice), `answerDoesNotFit` with `problem`:
+`badShape`, `duplicate`, `notOffered`, `tooMany`, `badMethod`,
+`badAssignment`, `overBudget`, `outOfRange`, `empty`, `tooLong`,
+`badCharacters`.
 
 ## Screens and browser tests
 

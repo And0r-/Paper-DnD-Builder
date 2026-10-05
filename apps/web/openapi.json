@@ -1,0 +1,3389 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Character builder HTTP API",
+    "version": "1",
+    "description": "JSON over HTTP. Everything the screens do, a tool can do with an access key (`Authorization: Bearer <key>`, made in the settings). See API.md for the conventions and an example from an empty character to the PDF.",
+    "license": {
+      "name": "AGPL-3.0-only",
+      "identifier": "AGPL-3.0-only"
+    }
+  },
+  "servers": [
+    {
+      "url": "/"
+    }
+  ],
+  "security": [
+    {
+      "accessKey": []
+    },
+    {
+      "sessionCookie": []
+    }
+  ],
+  "tags": [
+    {
+      "name": "Login"
+    },
+    {
+      "name": "Account"
+    },
+    {
+      "name": "Access keys"
+    },
+    {
+      "name": "Packages"
+    },
+    {
+      "name": "Characters"
+    },
+    {
+      "name": "Print"
+    },
+    {
+      "name": "Server"
+    }
+  ],
+  "paths": {
+    "/api/health": {
+      "get": {
+        "operationId": "health",
+        "summary": "Liveness probe",
+        "tags": ["Server"],
+        "description": "Answers as long as the process serves requests. Not part of the router; used by Docker.",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Running.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "const": "ok"
+                    }
+                  },
+                  "required": ["status"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/api/auth/password": {
+      "post": {
+        "operationId": "requestPassword",
+        "summary": "Mail a new password",
+        "tags": ["Login"],
+        "description": "Sign-up and \"forgot password\" in one: the server makes a password (four words and a number) and mails it. For an existing account the old password stops working. The answer is the same whether the address has an account or not.",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "maxLength": 254
+                  },
+                  "language": {
+                    "type": "string",
+                    "maxLength": 10,
+                    "description": "Language of the mail for a new account (`de`, `en`)."
+                  }
+                },
+                "required": ["email"],
+                "additionalProperties": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "The mail is on its way.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Sent"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadBody"
+          },
+          "403": {
+            "$ref": "#/components/responses/CrossSite"
+          },
+          "413": {
+            "$ref": "#/components/responses/BodyTooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/JsonRequired"
+          },
+          "429": {
+            "description": "`tooManyAttempts`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "enum": ["tooManyAttempts"]
+                        },
+                        "retryAfter": {
+                          "type": "integer"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds to wait.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "`mailFailed`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "enum": ["mailFailed"]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "`mailNotConfigured`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "enum": ["mailNotConfigured"]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/api/auth/login": {
+      "post": {
+        "operationId": "login",
+        "summary": "Log in with the mailed password",
+        "tags": ["Login"],
+        "description": "Sets the session cookie. Tools use an access key instead.",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "type": "string"
+                  },
+                  "password": {
+                    "type": "string"
+                  }
+                },
+                "required": ["email", "password"],
+                "additionalProperties": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Logged in.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "account": {
+                      "$ref": "#/components/schemas/Account"
+                    }
+                  },
+                  "required": ["account"],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "headers": {
+              "Set-Cookie": {
+                "description": "The session cookie (httpOnly).",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadBody"
+          },
+          "401": {
+            "description": "`wrongMailOrPassword`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "enum": ["wrongMailOrPassword"]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/CrossSite"
+          },
+          "413": {
+            "$ref": "#/components/responses/BodyTooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/JsonRequired"
+          },
+          "429": {
+            "description": "`tooManyAttempts`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "enum": ["tooManyAttempts"]
+                        },
+                        "retryAfter": {
+                          "type": "integer"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds to wait.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/api/auth/logout": {
+      "post": {
+        "operationId": "logout",
+        "summary": "Log out",
+        "tags": ["Login"],
+        "description": "Ends the session of the cookie and clears it. With an access key there is nothing to end.",
+        "security": [],
+        "responses": {
+          "204": {
+            "description": "Done. No body."
+          },
+          "403": {
+            "$ref": "#/components/responses/CrossSite"
+          },
+          "default": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/api/account": {
+      "get": {
+        "operationId": "getAccount",
+        "summary": "The account",
+        "tags": ["Account"],
+        "responses": {
+          "200": {
+            "description": "The account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "account": {
+                      "$ref": "#/components/schemas/Account"
+                    }
+                  },
+                  "required": ["account"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "default": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteAccount",
+        "summary": "Delete the account",
+        "tags": ["Account"],
+        "description": "Deletes the account with its sessions, access keys and every character. Cannot be undone.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "confirm": {
+                    "const": true
+                  }
+                },
+                "required": ["confirm"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Done. No body."
+          },
+          "400": {
+            "$ref": "#/components/responses/BadBody"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/CrossSite"
+          },
+          "413": {
+            "$ref": "#/components/responses/BodyTooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/JsonRequired"
+          },
+          "default": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/api/account/settings": {
+      "patch": {
+        "operationId": "updateSettings",
+        "summary": "Change language or units",
+        "tags": ["Account"],
+        "description": "`units` maps a dimension to a unit; `null` follows the language's default again.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "language": {
+                    "enum": ["de", "en"]
+                  },
+                  "units": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  }
+                },
+                "required": [],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The account with the new settings.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "account": {
+                      "$ref": "#/components/schemas/Account"
+                    }
+                  },
+                  "required": ["account"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadBody"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/CrossSite"
+          },
+          "413": {
+            "$ref": "#/components/responses/BodyTooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/JsonRequired"
+          },
+          "422": {
+            "description": "`unknownUnit`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "enum": ["unknownUnit"]
+                        },
+                        "dimension": {
+                          "type": "string"
+                        },
+                        "unit": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/api/account/password": {
+      "post": {
+        "operationId": "renewPassword",
+        "summary": "Mail a new password",
+        "tags": ["Account"],
+        "description": "The old password stops working and every other browser session ends.",
+        "responses": {
+          "202": {
+            "description": "The mail is on its way.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Sent"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/CrossSite"
+          },
+          "429": {
+            "description": "`tooManyAttempts`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "enum": ["tooManyAttempts"]
+                        },
+                        "retryAfter": {
+                          "type": "integer"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds to wait.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "`mailFailed`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "enum": ["mailFailed"]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "`mailNotConfigured`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "enum": ["mailNotConfigured"]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/api/account/keys": {
+      "get": {
+        "operationId": "listKeys",
+        "summary": "List the account's access keys",
+        "tags": ["Access keys"],
+        "description": "Oldest first. The keys themselves are not stored and never shown again; `hint` is their first characters.",
+        "responses": {
+          "200": {
+            "description": "The keys.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "keys": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/AccessKey"
+                      }
+                    }
+                  },
+                  "required": ["keys"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "default": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      },
+      "post": {
+        "operationId": "createKey",
+        "summary": "Make an access key",
+        "tags": ["Access keys"],
+        "description": "Only with the session cookie (the settings screen); a request with a key gets `403 keyCannotMakeKeys`. `key.secret` is in this answer only.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {},
+                "required": [],
+                "additionalProperties": false
+              }
+            }
+          },
+          "description": "An empty object."
+        },
+        "responses": {
+          "201": {
+            "description": "The new key, shown this once.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "key": {
+                      "$ref": "#/components/schemas/NewAccessKey"
+                    }
+                  },
+                  "required": ["key"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadBody"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "description": "`keyCannotMakeKeys`, `crossSite`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "enum": ["keyCannotMakeKeys", "crossSite"]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "$ref": "#/components/responses/BodyTooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/JsonRequired"
+          },
+          "422": {
+            "description": "`tooManyKeys`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "enum": ["tooManyKeys"]
+                        },
+                        "max": {
+                          "type": "integer"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/api/account/keys/{id}": {
+      "delete": {
+        "operationId": "deleteKey",
+        "summary": "Withdraw an access key",
+        "tags": ["Access keys"],
+        "description": "Takes effect at once: the next request with the key gets `401 keyNotValid`.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Key id from the list.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Done. No body."
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/CrossSite"
+          },
+          "404": {
+            "description": "`keyNotFound`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "enum": ["keyNotFound"]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/api/packages": {
+      "get": {
+        "operationId": "listPackages",
+        "summary": "Loaded packages",
+        "tags": ["Packages"],
+        "description": "Name and description in one language: `lang` if the package has it, else the account's language, else the package's first.",
+        "parameters": [
+          {
+            "name": "lang",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "The packages.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "packages": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/PackageEntry"
+                      }
+                    }
+                  },
+                  "required": ["packages"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/api/packages/{id}": {
+      "get": {
+        "operationId": "getPackage",
+        "summary": "A package's structure, without texts",
+        "tags": ["Packages"],
+        "description": "The parts of the package as the package format specification (SPEC.md) describes them.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Package id.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The package.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "package": {
+                      "$ref": "#/components/schemas/Package"
+                    }
+                  },
+                  "required": ["package"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "description": "`packageNotFound`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "enum": ["packageNotFound"]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/api/packages/{id}/texts/{lang}": {
+      "get": {
+        "operationId": "getTexts",
+        "summary": "All texts of one language",
+        "tags": ["Packages"],
+        "description": "Text keys follow SPEC.md section 10.2, for example `<thing>.name`, `<thing>.short`, `<thing>.explain.what`, `choice.<id>.question`. A missing text is `null`, never filled from another language.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Package id.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "lang",
+            "in": "path",
+            "required": true,
+            "description": "Language, e.g. `de`.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The texts by key.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "language": {
+                      "type": "string"
+                    },
+                    "texts": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      }
+                    }
+                  },
+                  "required": ["language", "texts"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "description": "`packageNotFound`, `languageNotFound`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "enum": ["packageNotFound", "languageNotFound"]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/api/drafts": {
+      "get": {
+        "operationId": "listDrafts",
+        "summary": "The account's characters",
+        "tags": ["Characters"],
+        "description": "Newest change first.",
+        "responses": {
+          "200": {
+            "description": "The characters.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "drafts": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/DraftListEntry"
+                      }
+                    }
+                  },
+                  "required": ["drafts"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "default": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      },
+      "post": {
+        "operationId": "createDraft",
+        "summary": "Start a character",
+        "tags": ["Characters"],
+        "description": "An empty draft at version 1. Without `level`, the package's default level.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "packageId": {
+                    "type": "string",
+                    "maxLength": 100
+                  },
+                  "level": {
+                    "type": "integer"
+                  }
+                },
+                "required": ["packageId"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The new draft.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DraftView"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadBody"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/CrossSite"
+          },
+          "404": {
+            "description": "`packageNotFound`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "enum": ["packageNotFound"]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "$ref": "#/components/responses/BodyTooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/JsonRequired"
+          },
+          "422": {
+            "description": "`changeRejected`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "enum": ["changeRejected"]
+                        },
+                        "reason": {
+                          "$ref": "#/components/schemas/ChangeError"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/api/drafts/{id}": {
+      "get": {
+        "operationId": "getDraft",
+        "summary": "A character",
+        "tags": ["Characters"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Draft id (a UUID).",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The draft.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DraftView"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "description": "`draftNotFound`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "enum": ["draftNotFound"]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      },
+      "patch": {
+        "operationId": "setLevel",
+        "summary": "Change the level",
+        "tags": ["Characters"],
+        "description": "Answers stay; what the level no longer asks is kept in `inactiveAnswers`. During a raise, a level at or below `levelBefore` ends the raise.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Draft id (a UUID).",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "version": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "The draft version the change was made on (optimistic locking)."
+                  },
+                  "level": {
+                    "type": "integer"
+                  }
+                },
+                "required": ["version", "level"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The draft.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DraftView"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadBody"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/CrossSite"
+          },
+          "404": {
+            "description": "`draftNotFound`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "enum": ["draftNotFound"]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`versionConflict`, `packageUnavailable`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "enum": ["versionConflict", "packageUnavailable"]
+                        },
+                        "current": {
+                          "$ref": "#/components/schemas/DraftView"
+                        },
+                        "packageId": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "$ref": "#/components/responses/BodyTooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/JsonRequired"
+          },
+          "422": {
+            "description": "`changeRejected`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "enum": ["changeRejected"]
+                        },
+                        "reason": {
+                          "$ref": "#/components/schemas/ChangeError"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteDraft",
+        "summary": "Delete a character",
+        "tags": ["Characters"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Draft id (a UUID).",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Done. No body."
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/CrossSite"
+          },
+          "404": {
+            "description": "`draftNotFound`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "enum": ["draftNotFound"]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/api/drafts/{id}/answers/{choice}": {
+      "put": {
+        "operationId": "answer",
+        "summary": "Answer one choice",
+        "tags": ["Characters"],
+        "description": "The answer's shape depends on the choice's `kind` (see `Answer`). `answer: null` removes the answer. An answer that does not fit now is refused with `changeRejected`; a partial `pickMany` answer is stored and the choice stays open.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Draft id (a UUID).",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "choice",
+            "in": "path",
+            "required": true,
+            "description": "Choice id from `evaluation.choices`, URL-encoded (`@` as `%40`).",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "version": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "The draft version the change was made on (optimistic locking)."
+                  },
+                  "answer": {
+                    "anyOf": [
+                      {
+                        "$ref": "#/components/schemas/Answer"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": ["version", "answer"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The draft with the answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DraftView"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadBody"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/CrossSite"
+          },
+          "404": {
+            "description": "`draftNotFound`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "enum": ["draftNotFound"]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`versionConflict`, `packageUnavailable`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "enum": ["versionConflict", "packageUnavailable"]
+                        },
+                        "current": {
+                          "$ref": "#/components/schemas/DraftView"
+                        },
+                        "packageId": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "$ref": "#/components/responses/BodyTooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/JsonRequired"
+          },
+          "422": {
+            "description": "`changeRejected`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "enum": ["changeRejected"]
+                        },
+                        "reason": {
+                          "$ref": "#/components/schemas/ChangeError"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/api/drafts/{id}/pools/{step}": {
+      "put": {
+        "operationId": "answerPool",
+        "summary": "Answer a step with one shared list",
+        "tags": ["Characters"],
+        "description": "For steps with `pool`: all picks of the step at once; the server spreads them over the step's choices.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Draft id (a UUID).",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "step",
+            "in": "path",
+            "required": true,
+            "description": "Step id with a `pool`.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "version": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "The draft version the change was made on (optimistic locking)."
+                  },
+                  "picks": {
+                    "type": "array",
+                    "maxItems": 200,
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 200
+                    }
+                  }
+                },
+                "required": ["version", "picks"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The draft with the picks.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DraftView"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadBody"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/CrossSite"
+          },
+          "404": {
+            "description": "`draftNotFound`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "enum": ["draftNotFound"]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`versionConflict`, `packageUnavailable`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "enum": ["versionConflict", "packageUnavailable"]
+                        },
+                        "current": {
+                          "$ref": "#/components/schemas/DraftView"
+                        },
+                        "packageId": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "$ref": "#/components/responses/BodyTooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/JsonRequired"
+          },
+          "422": {
+            "description": "`changeRejected`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "enum": ["changeRejected"]
+                        },
+                        "reason": {
+                          "$ref": "#/components/schemas/ChangeError"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/api/drafts/{id}/level-up": {
+      "post": {
+        "operationId": "levelUp",
+        "summary": "Raise a finished character",
+        "tags": ["Characters"],
+        "description": "Every answer stays; only what the new levels add is asked (`levelUp`). With nothing to answer the character is finished again at once.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Draft id (a UUID).",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "version": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "The draft version the change was made on (optimistic locking)."
+                  },
+                  "level": {
+                    "type": "integer"
+                  }
+                },
+                "required": ["version", "level"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The raised character.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DraftView"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadBody"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/CrossSite"
+          },
+          "404": {
+            "description": "`draftNotFound`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "enum": ["draftNotFound"]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`versionConflict`, `packageUnavailable`, `notFinished`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "enum": ["versionConflict", "packageUnavailable", "notFinished"]
+                        },
+                        "current": {
+                          "$ref": "#/components/schemas/DraftView"
+                        },
+                        "packageId": {
+                          "type": "string"
+                        },
+                        "open": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "$ref": "#/components/responses/BodyTooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/JsonRequired"
+          },
+          "422": {
+            "description": "`changeRejected`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "enum": ["changeRejected"]
+                        },
+                        "reason": {
+                          "$ref": "#/components/schemas/ChangeError"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/api/drafts/{id}/finish": {
+      "post": {
+        "operationId": "finish",
+        "summary": "Finish the character",
+        "tags": ["Characters"],
+        "description": "Only when `evaluation.complete` is true.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Draft id (a UUID).",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "version": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "The draft version the change was made on (optimistic locking)."
+                  }
+                },
+                "required": ["version"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The finished character.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DraftView"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadBody"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/CrossSite"
+          },
+          "404": {
+            "description": "`draftNotFound`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "enum": ["draftNotFound"]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`versionConflict`, `packageUnavailable`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "enum": ["versionConflict", "packageUnavailable"]
+                        },
+                        "current": {
+                          "$ref": "#/components/schemas/DraftView"
+                        },
+                        "packageId": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "$ref": "#/components/responses/BodyTooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/JsonRequired"
+          },
+          "422": {
+            "description": "`incomplete`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "enum": ["incomplete"]
+                        },
+                        "open": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/api/drafts/{id}/pdf": {
+      "get": {
+        "operationId": "pdf",
+        "summary": "The printed character",
+        "tags": ["Print"],
+        "description": "A4 PDF: sheet, then cards; language and units from the account settings. Made on every request, never stored.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Draft id (a UUID).",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The PDF.",
+            "headers": {
+              "Content-Disposition": {
+                "description": "`attachment` with the character's name.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/pdf": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "description": "`draftNotFound`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "enum": ["draftNotFound"]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`notFinished`, `packageUnavailable`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "enum": ["notFinished", "packageUnavailable"]
+                        },
+                        "open": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "packageId": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "`languageNotSupported`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "enum": ["languageNotSupported"]
+                        },
+                        "language": {
+                          "type": "string"
+                        },
+                        "languages": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "`tooManyRequests`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "enum": ["tooManyRequests"]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds to wait.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "accessKey": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "An access key from the settings. A request with an `Authorization` header is judged by the key alone."
+      },
+      "sessionCookie": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "__Host-session",
+        "description": "The browser's session cookie after login (`session` on plain-HTTP trial setups)."
+      }
+    },
+    "responses": {
+      "Unauthorized": {
+        "description": "`notLoggedIn` without cookie or key; `keyNotValid` with a key that is unknown or withdrawn.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error",
+              "properties": {
+                "error": {
+                  "properties": {
+                    "code": {
+                      "enum": ["notLoggedIn", "keyNotValid"]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "CrossSite": {
+        "description": "A change sent from another site.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error",
+              "properties": {
+                "error": {
+                  "properties": {
+                    "code": {
+                      "enum": ["crossSite"]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "BadBody": {
+        "description": "`badJson`, `badRequest`",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error",
+              "properties": {
+                "error": {
+                  "properties": {
+                    "code": {
+                      "enum": ["badJson", "badRequest"]
+                    },
+                    "issues": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          }
+                        },
+                        "required": ["path", "message"],
+                        "additionalProperties": false
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "BodyTooLarge": {
+        "description": "`bodyTooLarge`",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error",
+              "properties": {
+                "error": {
+                  "properties": {
+                    "code": {
+                      "enum": ["bodyTooLarge"]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "JsonRequired": {
+        "description": "`jsonRequired`",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error",
+              "properties": {
+                "error": {
+                  "properties": {
+                    "code": {
+                      "enum": ["jsonRequired"]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "ServerError": {
+        "description": "A bug in the builder (`internal`) or in the package (`packageRuleError`).",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error",
+              "properties": {
+                "error": {
+                  "properties": {
+                    "code": {
+                      "enum": ["internal", "packageRuleError"]
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "schemas": {
+      "ErrorCode": {
+        "description": "Every error code the API answers with. Stable and English; screens word them in the player's language.\n\n- `badJson`: 400. The body is not JSON.\n- `badRequest`: 400. The body has the wrong shape; `issues` lists `{ path, message }`.\n- `notLoggedIn`: 401. No session cookie and no `Authorization` header.\n- `keyNotValid`: 401. The `Authorization` header holds no valid access key (unknown, withdrawn, or not `Bearer <key>`).\n- `wrongMailOrPassword`: 401. Login failed.\n- `crossSite`: 403. A change sent from another site (`Origin` or `Sec-Fetch-Site`).\n- `keyCannotMakeKeys`: 403. Access keys are made on the settings screen only, never with a key.\n- `notFound`: 404. No such API path.\n- `draftNotFound`: 404. No draft with this id in this account.\n- `keyNotFound`: 404. No access key with this id in this account.\n- `packageNotFound`: 404. No loaded package with this id.\n- `languageNotFound`: 404. The package has no texts in this language.\n- `methodNotAllowed`: 405. The path exists, the method does not.\n- `versionConflict`: 409. The draft moved on; `current` holds its state now.\n- `notFinished`: 409. The character is not finished (PDF) or not finished and not in a raise (level-up); `open` lists the open choices.\n- `packageUnavailable`: 409. The draft's package is not loaded right now; `packageId` names it.\n- `bodyTooLarge`: 413. The body is larger than 64 KiB.\n- `jsonRequired`: 415. The body is not `application/json`.\n- `changeRejected`: 422. The rule core refused the change; `reason` says why (see `ChangeError`).\n- `incomplete`: 422. Finishing with open choices; `open` lists them.\n- `languageNotSupported`: 422. The account's language cannot be printed with this package; `languages` lists those that can.\n- `tooManyKeys`: 422. The account has the most access keys allowed (`max`).\n- `unknownUnit`: 422. No loaded package offers this unit for this dimension.\n- `tooManyAttempts`: 429. Too many logins or password mails; `retryAfter` seconds, also in `Retry-After`.\n- `tooManyRequests`: 429. Too many PDFs; see `Retry-After`.\n- `internal`: 500. A bug in the builder.\n- `packageRuleError`: 500. The package's rules could not be worked out (a bug in the package); `message` says where.\n- `mailFailed`: 502. The mail server refused the password mail; nothing was changed.\n- `mailNotConfigured`: 503. The server has no mail set up; nobody can get a password.",
+        "enum": [
+          "badJson",
+          "badRequest",
+          "notLoggedIn",
+          "keyNotValid",
+          "wrongMailOrPassword",
+          "crossSite",
+          "keyCannotMakeKeys",
+          "notFound",
+          "draftNotFound",
+          "keyNotFound",
+          "packageNotFound",
+          "languageNotFound",
+          "methodNotAllowed",
+          "versionConflict",
+          "notFinished",
+          "packageUnavailable",
+          "bodyTooLarge",
+          "jsonRequired",
+          "changeRejected",
+          "incomplete",
+          "languageNotSupported",
+          "tooManyKeys",
+          "unknownUnit",
+          "tooManyAttempts",
+          "tooManyRequests",
+          "internal",
+          "packageRuleError",
+          "mailFailed",
+          "mailNotConfigured"
+        ]
+      },
+      "Error": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "$ref": "#/components/schemas/ErrorCode"
+              }
+            },
+            "required": ["code"],
+            "additionalProperties": true
+          }
+        },
+        "required": ["error"],
+        "additionalProperties": false,
+        "description": "`{ \"error\": { \"code\": ..., ...details } }`. Details depend on the code."
+      },
+      "Sent": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "const": "sent"
+          }
+        },
+        "required": ["status"],
+        "additionalProperties": false
+      },
+      "Account": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string"
+          },
+          "language": {
+            "type": "string",
+            "description": "Language of screens, mails and the PDF."
+          },
+          "units": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Chosen unit per dimension; a missing dimension follows the language."
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": ["email", "language", "units", "createdAt"],
+        "additionalProperties": false
+      },
+      "AccessKey": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "hint": {
+            "type": "string",
+            "description": "The first characters of the key, to tell keys apart."
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": ["id", "hint", "createdAt"],
+        "additionalProperties": false
+      },
+      "NewAccessKey": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "hint": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "secret": {
+            "type": "string",
+            "pattern": "^cbk_[A-Za-z0-9_-]{43}$",
+            "description": "The key. Send it as `Authorization: Bearer <secret>`. Shown only in this answer."
+          }
+        },
+        "required": ["id", "hint", "createdAt", "secret"],
+        "additionalProperties": false
+      },
+      "PackageEntry": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          },
+          "formatVersion": {
+            "type": "string"
+          },
+          "languages": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "language": {
+            "type": "string",
+            "description": "The language of `name` and `short`."
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "short": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": ["id", "version", "formatVersion", "languages", "language", "name", "short"],
+        "additionalProperties": false
+      },
+      "Package": {
+        "type": "object",
+        "properties": {
+          "manifest": {
+            "type": "object"
+          },
+          "units": {
+            "type": "object"
+          },
+          "values": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "things": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "flow": {
+            "type": "object"
+          },
+          "sheet": {
+            "type": "object"
+          },
+          "glossary": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          }
+        },
+        "required": ["manifest", "units", "values", "things", "flow", "sheet", "glossary"],
+        "additionalProperties": false,
+        "description": "A loaded package without its texts. The shape of each part is the package format (SPEC.md sections 5 to 13)."
+      },
+      "Draft": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "packageId": {
+            "type": "string"
+          },
+          "packageVersion": {
+            "type": "string",
+            "description": "Package version the draft was last changed with."
+          },
+          "version": {
+            "type": "integer",
+            "description": "Grows with every change; send it with the next change."
+          },
+          "status": {
+            "enum": ["draft", "finished"]
+          },
+          "level": {
+            "type": "integer"
+          },
+          "levelBefore": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The level a raise started from, until the character is finished again."
+          },
+          "answers": {
+            "type": "object",
+            "description": "Stored answers by choice id; see `Answer`."
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "finishedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "packageId",
+          "packageVersion",
+          "version",
+          "status",
+          "level",
+          "levelBefore",
+          "answers",
+          "createdAt",
+          "updatedAt",
+          "finishedAt"
+        ],
+        "additionalProperties": false
+      },
+      "DraftListEntry": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "packageId": {
+            "type": "string"
+          },
+          "packageVersion": {
+            "type": "string",
+            "description": "Package version the draft was last changed with."
+          },
+          "version": {
+            "type": "integer",
+            "description": "Grows with every change; send it with the next change."
+          },
+          "status": {
+            "enum": ["draft", "finished"]
+          },
+          "level": {
+            "type": "integer"
+          },
+          "levelBefore": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The level a raise started from, until the character is finished again."
+          },
+          "answers": {
+            "type": "object",
+            "description": "Stored answers by choice id; see `Answer`."
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "finishedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "packageAvailable": {
+            "type": "boolean"
+          },
+          "summary": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Summary"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "packageId",
+          "packageVersion",
+          "version",
+          "status",
+          "level",
+          "levelBefore",
+          "answers",
+          "createdAt",
+          "updatedAt",
+          "finishedAt",
+          "packageAvailable",
+          "summary"
+        ],
+        "additionalProperties": false,
+        "description": "The fields of `Draft`, with `packageAvailable` and `summary`."
+      },
+      "DraftView": {
+        "type": "object",
+        "properties": {
+          "draft": {
+            "$ref": "#/components/schemas/Draft"
+          },
+          "packageAvailable": {
+            "type": "boolean",
+            "description": "False if the draft's package is not loaded now; `evaluation` and `summary` are null then."
+          },
+          "evaluation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Evaluation"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "summary": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Summary"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "levelUp": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LevelUpState"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "While a raise lasts (and in the answer of the raise): what it brought."
+          }
+        },
+        "required": ["draft", "packageAvailable", "evaluation", "summary", "levelUp"],
+        "additionalProperties": false,
+        "description": "What every draft route answers: the stored draft and everything the rule core derives from it."
+      },
+      "Summary": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "level": {
+            "type": "integer"
+          },
+          "complete": {
+            "type": "boolean"
+          },
+          "line": {
+            "type": "object",
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "description": "Arguments of the package text `summary.line`: a thing key or a number per variable."
+          }
+        },
+        "required": ["name", "level", "complete", "line"],
+        "additionalProperties": false
+      },
+      "LevelUpState": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "integer"
+          },
+          "to": {
+            "type": "integer"
+          },
+          "newSteps": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Steps with `atLevel > from`, in step order."
+          },
+          "newChoices": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Choices with `atLevel > from`, in step order."
+          },
+          "openSteps": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Every step not `done`, in step order."
+          }
+        },
+        "required": ["from", "to", "newSteps", "newChoices", "openSteps"],
+        "additionalProperties": false
+      },
+      "Evaluation": {
+        "type": "object",
+        "properties": {
+          "level": {
+            "type": "integer"
+          },
+          "steps": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StepState"
+            },
+            "description": "The steps asked now, in order."
+          },
+          "choices": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/ChoiceState"
+            },
+            "description": "Every choice asked now, by id."
+          },
+          "things": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HeldThing"
+            },
+            "description": "Everything the character has, in the order it was gained."
+          },
+          "values": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "number"
+            },
+            "description": "Every value of the package, worked out."
+          },
+          "inputs": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "properties": {
+                "amount": {
+                  "type": "number"
+                },
+                "choice": {
+                  "type": "string"
+                }
+              },
+              "required": ["amount", "choice"],
+              "additionalProperties": false
+            },
+            "description": "Values set directly by an answer, with the choice that set them."
+          },
+          "raises": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "amount": {
+                    "type": "number"
+                  },
+                  "choice": {
+                    "type": "string"
+                  },
+                  "atLevel": {
+                    "type": "integer"
+                  }
+                },
+                "required": ["amount", "choice"],
+                "additionalProperties": false
+              }
+            },
+            "description": "Points added to values by `raise` answers, per value in step order."
+          },
+          "marks": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "description": "Format 0.10: things picked again in a choice with `options.owned`, with those choices."
+          },
+          "open": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Choices that still need an answer (missing, incomplete or invalid, not optional), in step order. Empty when `complete`."
+          },
+          "complete": {
+            "type": "boolean"
+          },
+          "inactiveAnswers": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Stored answers of choices not asked now (kept for going back)."
+          }
+        },
+        "required": [
+          "level",
+          "steps",
+          "choices",
+          "things",
+          "values",
+          "inputs",
+          "raises",
+          "open",
+          "complete",
+          "inactiveAnswers"
+        ],
+        "additionalProperties": false,
+        "description": "Everything the rule core derives from the package and the answers. A tool reads `open` for what to answer next, `choices[id]` for how, and the package texts for the words."
+      },
+      "StepState": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "choices": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Choice ids of the step, in order."
+          },
+          "origin": {
+            "enum": ["flow", "granted"]
+          },
+          "grantedBy": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "dependsOn": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "status": {
+            "enum": ["done", "open", "needsAttention"]
+          },
+          "gather": {
+            "type": "object",
+            "properties": {
+              "group": {
+                "type": "string"
+              },
+              "together": {
+                "enum": ["sections", "list"]
+              }
+            },
+            "required": ["group", "together"],
+            "additionalProperties": false
+          },
+          "pool": {
+            "$ref": "#/components/schemas/PoolState"
+          },
+          "atLevel": {
+            "type": "integer",
+            "description": "Character level from which the step is asked."
+          }
+        },
+        "required": ["id", "choices", "origin", "grantedBy", "dependsOn", "status", "atLevel"],
+        "additionalProperties": false
+      },
+      "PoolState": {
+        "type": "object",
+        "properties": {
+          "options": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "choices": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "choice": {
+                  "type": "string"
+                },
+                "count": {
+                  "type": "integer"
+                },
+                "upTo": {
+                  "type": "boolean"
+                },
+                "picks": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "remaining": {
+                  "type": "integer"
+                }
+              },
+              "required": ["choice", "count", "upTo", "picks", "remaining"],
+              "additionalProperties": false
+            }
+          },
+          "picks": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "count": {
+            "type": "integer"
+          },
+          "remaining": {
+            "type": "integer"
+          },
+          "blocked": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "held": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HeldThing"
+            }
+          },
+          "recommended": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": ["options", "choices", "picks", "count", "remaining", "blocked", "held", "recommended"],
+        "additionalProperties": false,
+        "description": "One shared list for all choices of a step; answer it with `PUT /api/drafts/{id}/pools/{step}`."
+      },
+      "HeldThing": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "pickedIn": {
+            "type": "string"
+          },
+          "grantedBy": {
+            "type": "string"
+          },
+          "step": {
+            "type": "string"
+          },
+          "atLevel": {
+            "type": "integer"
+          }
+        },
+        "required": ["id", "kind", "step", "atLevel"],
+        "additionalProperties": false
+      },
+      "ChoiceState": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The choice id; a copy is `<choice>@<where picked>`."
+          },
+          "copyOf": {
+            "type": "string",
+            "description": "Copies only: the declared choice whose rules and texts it uses."
+          },
+          "kind": {
+            "enum": ["pickOne", "pickMany", "distribute", "number", "text", "info"]
+          },
+          "step": {
+            "type": "string"
+          },
+          "optional": {
+            "type": "boolean"
+          },
+          "status": {
+            "enum": ["answered", "incomplete", "missing", "invalid", "info"],
+            "description": "`missing`: no answer; `incomplete`: fits, more needed; `invalid`: the stored answer does not fit now (`problem`); `answered`; `info`: nothing to answer."
+          },
+          "problem": {
+            "$ref": "#/components/schemas/Problem"
+          },
+          "answer": {
+            "description": "The stored answer, if any."
+          },
+          "options": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "pickOne, pickMany: the thing keys that may be picked now."
+          },
+          "count": {
+            "type": "integer",
+            "description": "pickMany: how many to pick."
+          },
+          "upTo": {
+            "type": "boolean",
+            "description": "pickMany: fewer than `count` is complete too."
+          },
+          "remaining": {
+            "type": "integer",
+            "description": "Picks or points still open."
+          },
+          "min": {
+            "type": "number",
+            "description": "number: smallest allowed."
+          },
+          "max": {
+            "type": "number",
+            "description": "number: largest allowed."
+          },
+          "recommended": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "method": {
+                    "type": "integer"
+                  },
+                  "assign": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "number"
+                    }
+                  }
+                },
+                "required": ["method", "assign"],
+                "additionalProperties": false
+              }
+            ],
+            "description": "pick choices: recommended picks, best first. distribute: a full recommended answer `{ method, assign }`."
+          },
+          "badges": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "pick choices: badge text key by option."
+          },
+          "held": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Things the character has that an offered option is about."
+          },
+          "info": {
+            "$ref": "#/components/schemas/InfoContent"
+          },
+          "textVariant": {
+            "type": "string"
+          },
+          "grantedBy": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Things that grant this choice."
+          },
+          "atLevel": {
+            "type": "integer"
+          },
+          "raise": {
+            "$ref": "#/components/schemas/RaiseState"
+          }
+        },
+        "required": ["id", "kind", "step", "optional", "status", "atLevel"],
+        "additionalProperties": false,
+        "description": "One choice as it stands. Words come from the package texts in one language: the question is `choice.<id>.title`, `.question`, `.intro` (for a copy, of `copyOf`; with `textVariant`, `choice.<id>.variant.<v>.*`), each option `o` has `<o>.name`, `<o>.short`, `<o>.explain.what`, `<o>.explain.table` and maybe `<o>.goodIf`."
+      },
+      "RaiseState": {
+        "type": "object",
+        "properties": {
+          "points": {
+            "type": "integer"
+          },
+          "before": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "number"
+            }
+          },
+          "most": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer"
+            }
+          }
+        },
+        "required": ["points", "before", "most"],
+        "additionalProperties": false
+      },
+      "InfoContent": {
+        "type": "object",
+        "properties": {
+          "of": {
+            "type": "string"
+          },
+          "thing": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "things": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "values": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "value": {
+                  "type": "string"
+                },
+                "add": {
+                  "type": "number"
+                }
+              },
+              "required": ["value", "add"],
+              "additionalProperties": false
+            }
+          },
+          "choices": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": ["of", "thing", "things", "values", "choices"],
+        "additionalProperties": false
+      },
+      "Problem": {
+        "enum": [
+          "badShape",
+          "duplicate",
+          "notOffered",
+          "tooMany",
+          "badMethod",
+          "badAssignment",
+          "overBudget",
+          "outOfRange",
+          "empty",
+          "tooLong",
+          "badCharacters"
+        ],
+        "description": "Why an answer does not fit."
+      },
+      "ChangeError": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "code": {
+                "const": "levelOutOfRange"
+              },
+              "min": {
+                "type": "integer"
+              },
+              "max": {
+                "type": "integer"
+              }
+            },
+            "required": ["code", "min", "max"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "code": {
+                "const": "levelNotHigher"
+              },
+              "level": {
+                "type": "integer"
+              }
+            },
+            "required": ["code", "level"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "code": {
+                "const": "unknownChoice"
+              }
+            },
+            "required": ["code"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "code": {
+                "const": "notAsked"
+              }
+            },
+            "required": ["code"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "code": {
+                "const": "unknownStep"
+              }
+            },
+            "required": ["code"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "code": {
+                "const": "noAnswerNeeded"
+              }
+            },
+            "required": ["code"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "code": {
+                "const": "answerDoesNotFit"
+              },
+              "problem": {
+                "$ref": "#/components/schemas/Problem"
+              }
+            },
+            "required": ["code", "problem"],
+            "additionalProperties": false
+          }
+        ],
+        "description": "Why the rule core refused a change."
+      },
+      "Answer": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "pick": {
+                "type": "string"
+              }
+            },
+            "required": ["pick"],
+            "additionalProperties": false,
+            "description": "pickOne"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "picks": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": ["picks"],
+            "additionalProperties": false,
+            "description": "pickMany"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "method": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "assign": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "integer"
+                }
+              }
+            },
+            "required": ["method", "assign"],
+            "additionalProperties": false,
+            "description": "distribute: `method` is an index into the choice's `methods`; `assign` gives a number per value. For the method `raise`, the points added on top."
+          },
+          {
+            "type": "object",
+            "properties": {
+              "value": {
+                "type": "number"
+              }
+            },
+            "required": ["value"],
+            "additionalProperties": false,
+            "description": "number"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "text": {
+                "type": "string"
+              }
+            },
+            "required": ["text"],
+            "additionalProperties": false,
+            "description": "text"
+          }
+        ],
+        "description": "An answer; its shape follows the choice's `kind`."
+      }
+    }
+  }
+}

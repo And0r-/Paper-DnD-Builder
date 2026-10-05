@@ -37,6 +37,14 @@ export interface SessionAccount {
   account: AccountRow;
 }
 
+/** An access key as its owner sees it; the hash never leaves the store. */
+export type AccessKeyRow = {
+  id: string;
+  hint: string;
+  created_at: Date;
+};
+
+const ACCESS_KEY_COLUMNS = "id, hint, created_at";
 const ACCOUNT_COLUMNS = "id, email, password_hash, language, units, created_at";
 const DRAFT_COLUMNS =
   "id, account_id, package_id, package_version, version, document, finished_at, created_at, updated_at";
@@ -85,7 +93,7 @@ export class Store {
     return rows[0]!;
   }
 
-  /** Removes the account and, by cascade, its sessions and drafts. */
+  /** Removes the account and, by cascade, its sessions, access keys and drafts. */
   async deleteAccount(accountId: string): Promise<void> {
     await this.db.query("DELETE FROM accounts WHERE id = $1", [accountId]);
   }
@@ -131,6 +139,49 @@ export class Store {
 
   async deleteExpiredSessions(now: Date): Promise<void> {
     await this.db.query("DELETE FROM sessions WHERE expires_at <= $1", [now]);
+  }
+
+  // ------------------------------------------------------------- access keys
+
+  /** Inserts a key unless the account already has `max`; returns undefined then. */
+  async createAccessKey(k: AccessKeyRow & { account_id: string; key_hash: string }, max: number) {
+    const rows = await this.db.query<AccessKeyRow>(
+      `INSERT INTO access_keys (id, account_id, key_hash, hint, created_at)
+       SELECT $1, $2, $3, $4, $5
+       WHERE (SELECT count(*) FROM access_keys WHERE account_id = $2) < $6
+       RETURNING ${ACCESS_KEY_COLUMNS}`,
+      [k.id, k.account_id, k.key_hash, k.hint, k.created_at, max],
+    );
+    return rows[0];
+  }
+
+  async listAccessKeys(accountId: string): Promise<AccessKeyRow[]> {
+    return this.db.query<AccessKeyRow>(
+      `SELECT ${ACCESS_KEY_COLUMNS} FROM access_keys WHERE account_id = $1 ORDER BY created_at, id`,
+      [accountId],
+    );
+  }
+
+  /** The account a key belongs to. */
+  async findAccountByKey(keyHash: string): Promise<{ key_id: string; account: AccountRow } | undefined> {
+    const rows = await this.db.query<AccountRow & { key_id: string }>(
+      `SELECT k.id AS key_id, a.id, a.email, a.password_hash, a.language, a.units, a.created_at
+       FROM access_keys k JOIN accounts a ON a.id = k.account_id
+       WHERE k.key_hash = $1`,
+      [keyHash],
+    );
+    const row = rows[0];
+    if (!row) return undefined;
+    const { key_id, ...account } = row;
+    return { key_id, account };
+  }
+
+  async deleteAccessKey(id: string, accountId: string): Promise<boolean> {
+    const rows = await this.db.query(
+      "DELETE FROM access_keys WHERE id = $1 AND account_id = $2 RETURNING id",
+      [id, accountId],
+    );
+    return rows.length > 0;
   }
 
   // ------------------------------------------------------------------ drafts
