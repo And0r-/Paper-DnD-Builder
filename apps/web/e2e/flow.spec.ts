@@ -51,7 +51,6 @@ test("a newcomer builds a level-3 character from login to finished", async ({ pa
   await question(page, "Welche Stufe hat dein Charakter?");
   await expect(page.getByText("Schritt 1 von")).toBeVisible();
   await pick(page, "3");
-  await expect(page.getByText(/^Deine Wahl bringt (einen|\d+) Schritte? dazu\.$/)).toBeVisible();
   await shot(page, "03-stufe");
   await axe(page);
   await next(page);
@@ -83,20 +82,18 @@ test("a newcomer builds a level-3 character from login to finished", async ({ pa
   // A package badge replaces "recommended" on the same option.
   await expect(page.locator('[data-option="calling.lantern-bearer"] .badge')).toHaveText("Sanfter Einstieg");
   await expect(page.getByRole("main").getByText(m["common.recommended"], { exact: true })).toHaveCount(0);
-  // Calling brings parts of its own; they belong to this step, which keeps its number.
+  // The calling's choices are asked later, each at its own step; the count never changes without a word.
   await pick(page, "Laternenträgerin");
-  await expect(
-    page.getByText("Deine Wahl bringt 3 eigene Teile mit. Dazu kommt ein Schritt.", { exact: true }),
-  ).toBeVisible();
-  await expect(page.locator(".progress__text")).toHaveText(/^Schritt 3 von \d+ · Beruf · Teil 1 von 4$/);
+  await expect(page.getByText("Deine Wahl bringt 4 Schritte dazu.", { exact: true })).toBeVisible();
+  await expect(page.locator(".progress__text")).toHaveText(/^Schritt 3 von \d+ · Beruf$/);
   await shot(page, "05-beruf");
   await axe(page);
   await next(page);
 
   // Info step: nothing to choose, only what you get; the details come later.
   await question(page, "Das bekommst du durch deinen Beruf");
-  // Granted choices came right after the calling: they read as done, not as "next".
-  await expect(page.getByText(m["info.chosen"]!)).toBeVisible();
+  // The calling's choices come later, at their own steps: said so, never "next".
+  await expect(page.getByText(m["info.later"]!)).toBeVisible();
   await expect(page.getByText(m["info.choices"]!)).toHaveCount(0);
   await shot(page, "09-geschenke");
   await page.getByRole("button", { name: m["info.continue"] }).click();
@@ -139,13 +136,14 @@ test("a newcomer builds a level-3 character from login to finished", async ({ pa
 
   // Talents: the calling's and the one of level 2 on one step (format 0.8 gather).
   await question(page, "Worin ist dein Charakter geübt?");
-  await expect(page.getByText("0 von 2 gewählt")).toBeVisible();
+  const sources = "2 aus deinem Beruf und 1 aus Stufe 2";
+  await expect(page.locator("[data-pool-total]")).toHaveText(`Du wählst 3: ${sources}.`);
   await next(page);
-  await expect(page.getByText("Wähle noch 2 Talent(e).")).toBeVisible();
+  await expect(page.locator(".step-footer")).toContainText(`Noch 3 offen: ${sources}.`);
   // Pressed too early, the dock offers it right above Next as well.
   await page.locator(".step-footer").getByRole("button", { name: m["flow.chooseForMe"] }).click();
-  await expect(page.getByText("2 von 2 gewählt")).toBeVisible();
-  await expect(page.getByRole("radio", { name: "Lauschen" })).toBeChecked();
+  await expect(page.locator("[data-pool-counter]")).toHaveText("Fertig: alle 3 gewählt.");
+  await expect(page.getByRole("checkbox", { name: "Lauschen" })).toBeChecked();
   await shot(page, "06-talente");
   await axe(page);
   await next(page);

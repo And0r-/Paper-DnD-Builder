@@ -28,9 +28,10 @@ async function riverRunner(page: Page, folk: string): Promise<string> {
   return view.draft.id;
 }
 
-async function intro(page: Page, id: string, lang: "de" | "en", text: string, name: string) {
+async function intro(page: Page, id: string, lang: "de" | "en", text: RegExp, name: string) {
   await page.goto(`/c/${id}/step/talents`);
-  await expect(page.getByText(text)).toBeVisible();
+  // The shared list words the count; the step's own texts stand above it.
+  await expect(page.locator("[data-pool-total]")).toHaveText(text);
   await expectOneLanguage(page, lang);
   await shot(page, name);
 }
@@ -41,13 +42,13 @@ test("the talents step counts one more talent for hillfolk", async ({ page, fore
   const hill = await riverRunner(page, "folk.hillfolk");
   const moor = await riverRunner(page, "folk.moorfolk");
 
-  await intro(page, hill, "de", "0 von 3 gewählt", "31-talente-bergvolk");
-  await intro(page, moor, "de", "0 von 2 gewählt", "32-talente-moorvolk");
+  await intro(page, hill, "de", /^Du wählst 3: /, "31-talente-bergvolk");
+  await intro(page, moor, "de", /^Du wählst 2: /, "32-talente-moorvolk");
 
   await page.goto("/settings");
   await page.getByText("English", { exact: true }).click();
   await expect(page.getByRole("heading", { level: 1, name: en["settings.title"] })).toBeVisible();
 
-  await intro(page, hill, "en", "0 of 3 chosen", "33-talents-hillfolk-en");
-  await intro(page, moor, "en", "0 of 2 chosen", "34-talents-moorfolk-en");
+  await intro(page, hill, "en", /^You choose 3: /, "33-talents-hillfolk-en");
+  await intro(page, moor, "en", /^You choose 2: /, "34-talents-moorfolk-en");
 });

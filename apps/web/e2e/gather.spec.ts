@@ -1,7 +1,7 @@
 /**
  * Gather steps (SPEC 9.4): one shared list for the talents of several
  * sources, with a counter per source, what the character already has on
- * top, and greyed options with the reason in words. And the equipment of
+ * top, and greyed options with the reason in words. And the knacks of
  * two sources on one screen.
  */
 import AxeBuilder from "@axe-core/playwright";
@@ -18,8 +18,8 @@ async function axe(page: Page) {
   );
 }
 
-/** A level-3 lantern bearer of the hillfolk, raised as a ferry child, made through the API. */
-async function hillfolkLanternBearer(page: Page): Promise<string> {
+/** A level-3 character of the coastfolk, raised as a ferry child, made through the API. */
+async function coastfolk(page: Page, calling: string): Promise<string> {
   const req = page.request;
   const created = await req.post("/api/drafts", { data: { packageId: "demo" } });
   let view = (await created.json()) as { draft: { id: string; version: number } };
@@ -29,8 +29,8 @@ async function hillfolkLanternBearer(page: Page): Promise<string> {
   ).json();
   const answers: [string, unknown][] = [
     ["name", { text: "Mira" }],
-    ["calling", { pick: "calling.lantern-bearer" }],
-    ["folk", { pick: "folk.hillfolk" }],
+    ["calling", { pick: calling }],
+    ["folk", { pick: "folk.coastfolk" }],
     ["upbringing", { pick: "upbringing.ferry-child" }],
   ];
   for (const [choice, answer] of answers) {
@@ -48,14 +48,13 @@ const option = (page: Page, id: string) => page.locator(`[data-option="${id}"]`)
 test("one list for the talents of three sources", async ({ page, foreign }) => {
   void foreign;
   await login(page, uniqueEmail("gather"));
-  const id = await hillfolkLanternBearer(page);
+  const id = await coastfolk(page, "calling.lantern-bearer");
 
   await page.goto(`/c/${id}/step/talents`);
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Worin ist dein Charakter geübt?");
   // Three sources, each named by the package's words.
-  await expect(page.locator("[data-pool-total]")).toHaveText(
-    "Du wählst 4: 2 aus deiner Berufung, 1 aus deiner Erfahrung und 1 aus deinem Volk.",
-  );
+  const sources = "2 aus deinem Beruf, 1 aus Stufe 2 und 1 aus deiner Herkunft";
+  await expect(page.locator("[data-pool-total]")).toHaveText(`Du wählst 4: ${sources}.`);
   // What the upbringing gave is on top, not in the list.
   await expect(page.locator("[data-pool-held]")).toHaveText("Wetterkunde und Feilschen (von Fährkind)");
   await expect(option(page, "talent.weather-sense")).toHaveCount(0);
@@ -66,25 +65,23 @@ test("one list for the talents of three sources", async ({ page, foreign }) => {
 
   // Next too early: the footer names the open sources.
   await page.getByRole("button", { name: m["common.next"], exact: true }).click();
-  await expect(page.locator(".step-footer")).toContainText(
-    "Noch 4 offen: 2 aus deiner Berufung, 1 aus deiner Erfahrung und 1 aus deinem Volk.",
-  );
+  await expect(page.locator(".step-footer")).toContainText(`Noch 4 offen: ${sources}.`);
 
-  // Two talents only the folk and the experience offer fill those two.
-  await page.getByRole("checkbox", { name: "Spurenlesen" }).check();
+  // Listening (folk or level) and tracking (level only) fill those two.
   await page.getByRole("checkbox", { name: "Lauschen" }).check();
-  await expect(page.locator("[data-pool-counter]")).toHaveText("Noch offen: 2 aus deiner Berufung");
-  // Sneaking is offered by those two only: greyed, with the reason in words, still focusable.
+  await page.getByRole("checkbox", { name: "Spurenlesen" }).check();
+  await expect(page.locator("[data-pool-counter]")).toHaveText("Noch offen: 2 aus deinem Beruf");
+  // Sneaking comes from the level only: greyed, with the reason in words, still focusable.
   const sneaking = option(page, "talent.sneaking");
   await expect(sneaking).toHaveClass(/option--blocked/);
   await expect(sneaking).toContainText(
-    "Dafür ist keine Wahl mehr frei. Das gibt es nur aus deiner Erfahrung und aus deinem Volk, und dort ist schon alles gewählt.",
+    "Dafür ist keine Wahl mehr frei. Das gibt es nur aus Stufe 2, und dort ist schon alles gewählt.",
   );
   await page.getByRole("checkbox", { name: "Schleichen" }).click({ force: true });
   await expect(page.getByRole("checkbox", { name: "Schleichen" })).not.toBeChecked();
   // Climbing is offered by the calling too, so it stays open.
   await expect(option(page, "talent.climbing")).not.toHaveClass(/option--blocked/);
-  await expect(page.locator(".step-footer")).toContainText("Noch 2 offen: aus deiner Berufung.");
+  await expect(page.locator(".step-footer")).toContainText("Noch 2 offen: aus deinem Beruf.");
   await shot(page, "71-talente-grau-mit-grund");
   await axe(page);
 
@@ -110,38 +107,39 @@ test("one list for the talents of three sources", async ({ page, foreign }) => {
     draft: { answers: Record<string, unknown> };
   };
   expect(Object.keys(saved.draft.answers)).toEqual(
-    expect.arrayContaining(["talents-lantern-bearer", "folk-talent", "extra-talent"]),
+    expect.arrayContaining(["talents-lantern-bearer", "coastfolk-talent", "extra-talent"]),
   );
 });
 
-test("the equipment of two sources on one screen", async ({ page, foreign }) => {
+test("the knacks of two sources on one screen", async ({ page, foreign }) => {
   void foreign;
-  await login(page, uniqueEmail("gather-gear"));
-  const id = await hillfolkLanternBearer(page);
+  await login(page, uniqueEmail("gather-knacks"));
+  const id = await coastfolk(page, "calling.herbalist");
 
-  await page.goto(`/c/${id}/step/equipment`);
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Was nimmst du mit?");
+  await page.goto(`/c/${id}/step/knacks`);
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Welche Kniffe kann dein Charakter?");
+  // Each choice keeps its own question under the step's.
   const sections = page.locator(".subquestion");
   await expect(sections).toHaveCount(2);
-  await expect(sections.nth(0).getByRole("heading", { level: 2 })).toHaveText(
-    "Was nimmt dein Charakter zusätzlich mit?",
+  await expect(sections.nth(0).locator(".subquestion__title")).toHaveText(
+    "Welche Kniffe kann dein Charakter?",
   );
-  await expect(sections.nth(1).getByRole("heading", { level: 2 })).toHaveText(
-    "Was gibt dir deine Herkunft mit?",
+  await expect(sections.nth(1).locator(".subquestion__title")).toHaveText(
+    "Welchen Kniff hast du dir bei anderen abgeschaut?",
   );
   await expectOneLanguage(page, "de");
-  await shot(page, "72-ausruestung-ein-bildschirm");
+  await shot(page, "72-kniffe-ein-bildschirm");
   await axe(page);
-  // "Choose for me" answers both sections.
+  // "Choose for me" answers both sections: 3 plus 1.
   await page.getByRole("button", { name: m["flow.chooseForMe"] }).first().click();
   await expect(page.getByText(m["flow.choseForMe"])).toBeVisible();
-  await expect(page.locator(".subquestion input:checked")).toHaveCount(2);
+  await expect(page.locator(".subquestion input:checked")).toHaveCount(4);
 });
 
 test("the calling's gifts name the choices that come later", async ({ page, foreign }) => {
   void foreign;
   await login(page, uniqueEmail("gather-later"));
-  const id = await hillfolkLanternBearer(page);
+  const id = await coastfolk(page, "calling.lantern-bearer");
 
   await page.goto(`/c/${id}/step/calling-gifts`);
   const later = page.locator(".gifts__choices").filter({ hasText: m["info.later"] });

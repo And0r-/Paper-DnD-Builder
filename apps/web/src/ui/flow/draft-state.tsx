@@ -31,7 +31,7 @@ import {
 import { useApp } from "../app-state.tsx";
 import { api, ApiError, type DraftInfo, type DraftView } from "../api.ts";
 import { usePackage, type LoadedPackage } from "../packages.ts";
-import { buildFlow, stepDiff, stepTitle, type FlowEntry } from "./model.ts";
+import { buildFlow, isPart, stepDiff, stepTitle, type FlowEntry } from "./model.ts";
 
 export type SaveState = "saved" | "saving" | "error" | "offline";
 
@@ -303,9 +303,8 @@ function ReadyDraft({
       const after = evaluateDraft(pkg, r.doc);
       const diff = stepDiff(before, after);
       if (diff.added.length > 0 || diff.removed.length > 0 || diff.grown.length > 0) {
-        const isPart = (e: Evaluation, id: string) => e.steps.find((s) => s.id === id)?.origin === "granted";
         const titles = (e: Evaluation, ids: string[], parts: boolean) =>
-          ids.filter((id) => isPart(e, id) === parts).map((id) => stepTitle(lp, e, id));
+          ids.filter((id) => isPart(lp, e, id) === parts).map((id) => stepTitle(lp, e, id));
         setNotice({
           added: titles(after, diff.added, false),
           removed: titles(before, diff.removed, false),

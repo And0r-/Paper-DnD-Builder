@@ -70,11 +70,14 @@ export function buildFlow(
   ];
   let section = 0;
   let sectionKey = LEVEL_KEY;
+  let group: string | undefined;
   for (const s of ev.steps) {
-    if (s.origin === "flow") {
+    const gathered = gatherGroupOf(lp, s);
+    if (s.origin === "flow" || (gathered !== undefined && gathered !== group)) {
       section++;
       sectionKey = s.id;
     }
+    group = gathered;
     entries.push({
       key: s.id,
       kind: "step",
@@ -106,6 +109,25 @@ export function buildFlow(
     e.parts = same.length;
   }
   return entries;
+}
+
+/**
+ * The gather group that placed a granted step, if the flow has a step for
+ * that group. Such a step stands where the flow asks it, far from the
+ * choice that brought it, so it counts on its own instead of as a part of
+ * whatever step happens to come before it.
+ */
+export function gatherGroupOf(lp: LoadedPackage, step: Evaluation["steps"][number]): string | undefined {
+  if (step.origin !== "granted") return undefined;
+  const group = lp.pkg.flow.choices.find((c) => c.id === step.choices[0])?.gather;
+  if (group === undefined) return undefined;
+  return lp.pkg.flow.steps.some((f) => "gather" in f && f.gather === group) ? group : undefined;
+}
+
+/** A step a choice brought along right behind it: a part of that step, not a step of its own. */
+export function isPart(lp: LoadedPackage, ev: Evaluation, id: string): boolean {
+  const step = ev.steps.find((s) => s.id === id);
+  return step?.origin === "granted" && gatherGroupOf(lp, step) === undefined;
 }
 
 // A type, not an interface: it fills message placeholders ({current}, {part}).

@@ -1,6 +1,6 @@
 /**
- * Numbers never change without a reason (AND-32): the step count stays put
- * when a choice brings parts of its own, a score shows what adds to it, a
+ * Numbers never change without a reason (AND-32): a choice asked at a
+ * gather point counts as its own step, a score shows what adds to it, a
  * gift shows the number on the sheet, and things nobody picked say where
  * they come from. In German and in English.
  */
@@ -36,14 +36,14 @@ const WORDS = {
     origin: "Aus Herkunft Moorvolk",
     onSheet: /^Auf deinem Bogen: 21 = 3 aus .+ \+ 18 aus Beruf Laternenträgerin$/,
     later: "Diese Zahl ändert sich noch. Sie hängt auch von deiner Wahl im Schritt Grundwerte ab.",
-    progress: /^Schritt \d+ von \d+ · Beruf · Teil 2 von 4$/,
+    progress: /^Schritt \d+ von \d+ · Ausrüstung$/,
   },
   en: {
     score: /Grace: 7 \+ 1 from Ferry Child \(Upbringing\) = 8/,
     origin: "From Moorfolk (Folk)",
     onSheet: /^On your sheet: 21 = 3 from .+ \+ 18 from Lantern Bearer \(Calling\)$/,
     later: "This number still changes. It also depends on what you choose in the step Scores.",
-    progress: /^Step \d+ of \d+ · Calling · Part 2 of 4$/,
+    progress: /^Step \d+ of \d+ · Gear$/,
   },
 } as const;
 
@@ -51,11 +51,12 @@ async function checkAll(page: Page, id: string, early: string, lang: Lang) {
   const m = lang === "de" ? de : en;
   const w = WORDS[lang];
 
-  // A part the calling brought: same step number as the calling, with its part.
+  // A choice the calling brought, asked at its gather point far later: a step of its own,
+  // never a part of whatever step comes before it.
   await page.goto(`/c/${id}/step/gear`);
   await expect(page.locator(".progress__text")).toHaveText(w.progress);
   await expectOneLanguage(page, lang);
-  await shot(page, `50-teil-eines-schritts-${lang}`);
+  await shot(page, `50-gesammelt-eigener-schritt-${lang}`);
 
   // A gift before the scores are chosen: it says the number still changes.
   await page.goto(`/c/${early}/step/calling-gifts`);
