@@ -222,7 +222,10 @@ describe("printed character (demo package)", () => {
     // on a sheet without the sections for higher levels.
     const level1 = demoCharacter(pkg, 1);
     const lower = new Set(["rolls", "lantern-slots", "lantern-slots-high"]);
-    const early = { ...pkg, sheet: { ...pkg.sheet, sections: pkg.sheet.sections.filter((s) => !lower.has(s.id)) } };
+    const early = {
+      ...pkg,
+      sheet: { ...pkg.sheet, sections: pkg.sheet.sections.filter((s) => !lower.has(s.id)) },
+    };
     const { pdf } = await print("de", {}, early, level1);
     const last = pdf.sheetLayout.at(-1)!;
     expect(last.map((p) => p.section.id)).toEqual(["notes"]);

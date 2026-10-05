@@ -119,7 +119,10 @@ export function explainValue(
     const input = ev.inputs[id];
     if (def.formula !== undefined) out.push(...terms(parseExpr(def.formula), { kind: "start" }, seen));
     else if (def.byLevel !== undefined)
-      out.push({ amount: byLevel(pkg, def.byLevel, ev.level), source: { kind: "values", values: ["level"] } });
+      out.push({
+        amount: byLevel(pkg, def.byLevel, ev.level),
+        source: { kind: "values", values: ["level"] },
+      });
     else if (input) out.push({ amount: input.amount, source: { kind: "choice", choice: input.choice } });
     else out.push({ amount: def.default ?? 0, source: { kind: "start" } });
     for (const held of ev.things) {
@@ -134,7 +137,8 @@ export function explainValue(
         out.push(...terms(add, owner, seen));
       }
     }
-    for (const r of ev.raises[id] ?? []) out.push({ amount: r.amount, source: { kind: "choice", choice: r.choice } });
+    for (const r of ev.raises[id] ?? [])
+      out.push({ amount: r.amount, source: { kind: "choice", choice: r.choice } });
     return out;
   };
 

@@ -242,7 +242,11 @@ class Character {
       const from = Math.max(atLevel, g.atLevel ?? 1);
       if (g.thing !== undefined && !again) this.give(g.thing, { grantedBy: id }, step, from, choices);
       else if (g.choice !== undefined)
-        choices.push({ choice: copy ? `${g.choice}${COPY_SEPARATOR}${copy}` : g.choice, by: id, atLevel: from });
+        choices.push({
+          choice: copy ? `${g.choice}${COPY_SEPARATOR}${copy}` : g.choice,
+          by: id,
+          atLevel: from,
+        });
     }
   }
 
@@ -258,7 +262,9 @@ class Character {
 
   /** A number, an expression or a table by level, worked out for this character. */
   amount(src: Amount): number {
-    return typeof src === "object" ? byLevel(this.pkg, src.byLevel, this.level) : evaluateNumber(src, this.scope);
+    return typeof src === "object"
+      ? byLevel(this.pkg, src.byLevel, this.level)
+      : evaluateNumber(src, this.scope);
   }
 
   setInputs(inputs: Record<string, number>, choice: string): void {
