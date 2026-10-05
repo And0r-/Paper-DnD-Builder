@@ -234,20 +234,38 @@ export async function makeLeveled(
 ): Promise<string> {
   const req = page.request;
   const created = await req.post("/api/drafts", { data: { packageId: "demo" } });
-  let view = (await created.json()) as DraftView;
-  const id = view.draft.id;
+  const id = ((await created.json()) as DraftView).draft.id;
+  await answerRecommended(page, id, { level, calling }, stopAt);
+  return id;
+}
+
+/**
+ * Sets the level and gives `answers` (choice id → answer) in that order,
+ * then answers everything still open with the package's recommendations,
+ * as {@link makeLeveled} does.
+ */
+export async function answerRecommended(
+  page: Page,
+  id: string,
+  { level, calling, answers = [] }: { level: number; calling: string; answers?: [string, unknown][] },
+  stopAt?: string,
+): Promise<void> {
+  const req = page.request;
+  let view = (await (await req.get(`/api/drafts/${id}`)).json()) as DraftView;
   const send = async (r: Promise<APIResponse>, what: string) => {
     const res = await r;
     expect(res.status(), what).toBe(200);
     view = (await res.json()) as DraftView;
   };
   await send(req.patch(`/api/drafts/${id}`, { data: { version: view.draft.version, level } }), "level");
-  await send(
-    req.put(`/api/drafts/${id}/answers/calling`, {
-      data: { version: view.draft.version, answer: { pick: calling } },
-    }),
-    "calling",
-  );
+  for (const [choice, answer] of [["calling", { pick: calling }] as [string, unknown], ...answers]) {
+    await send(
+      req.put(`/api/drafts/${id}/answers/${encodeURIComponent(choice)}`, {
+        data: { version: view.draft.version, answer },
+      }),
+      choice,
+    );
+  }
   for (let guard = 0; guard < 200 && !view.evaluation.complete; guard++) {
     const ev = view.evaluation;
     const waits = (c: string) => ev.choices[c]!.kind !== "info" && ev.choices[c]!.status !== "answered";
@@ -281,5 +299,4 @@ export async function makeLeveled(
       open.id,
     );
   }
-  return id;
 }

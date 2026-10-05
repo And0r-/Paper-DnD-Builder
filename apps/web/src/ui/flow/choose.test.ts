@@ -110,6 +110,26 @@ describe("choose for me", () => {
     expect(asked).not.toContain("upbringing");
   });
 
+  it("picks among what the character has where a choice asks for that", () => {
+    const created = newDraft(pkg, 20);
+    if (!created.ok) throw new Error("newDraft");
+    let doc = apply(created.doc, {
+      type: "answer",
+      choice: "calling",
+      answer: { pick: "calling.lantern-bearer" },
+    });
+    doc = chooseAll(doc, new Set(["lantern-mastery"]));
+    const ev = evaluateDraft(pkg, doc);
+    const changes = chooseForMe(lp, doc, ev, "lantern-mastery", () => 0)!;
+    expect(changes).toEqual([
+      {
+        type: "answer",
+        choice: "lantern-mastery",
+        answer: { picks: ["knack.warm-glow", "knack.glow-thread"] },
+      },
+    ]);
+  });
+
   it("keeps the old picks of a shared list that grew", () => {
     const created = newDraft(pkg, 1);
     if (!created.ok) throw new Error("newDraft");

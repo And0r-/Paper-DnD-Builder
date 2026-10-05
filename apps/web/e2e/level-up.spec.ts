@@ -8,7 +8,16 @@ import AxeBuilder from "@axe-core/playwright";
 import { devices, type Page } from "@playwright/test";
 import de from "../src/i18n/messages/de.json" with { type: "json" };
 import en from "../src/i18n/messages/en.json" with { type: "json" };
-import { expect, expectOneLanguage, login, makeLeveled, shot, test, uniqueEmail } from "./helpers.ts";
+import {
+  answerRecommended,
+  expect,
+  expectOneLanguage,
+  login,
+  makeLeveled,
+  shot,
+  test,
+  uniqueEmail,
+} from "./helpers.ts";
 
 const m = de;
 
@@ -183,6 +192,76 @@ test("from level 1 to 20 in one go: exactly the questions of levels 2 to 20", as
   await expect(page.getByRole("heading", { level: 1, name: "Mira ist jetzt auf Stufe 20!" })).toBeVisible();
   // At the top there is no button to go higher.
   await expect(page.getByRole("link", { name: m["raise.button"] })).toHaveCount(0);
+});
+
+test("choose for me on a step that grew keeps the old picks, takes nothing twice, and Next runs to the overview", async ({
+  page,
+  foreign,
+}) => {
+  void foreign;
+  await login(page, uniqueEmail("level-up-keep"));
+  // A level-2 herbalist: three root knacks picked by hand, and a borrowed
+  // knack that the root knacks offer too (a second source of the same thing).
+  const created = await page.request.post("/api/drafts", { data: { packageId: "demo" } });
+  const id = ((await created.json()) as { draft: { id: string } }).draft.id;
+  const oldRoots = ["knack.mushroom-glow", "knack.thorn-ring", "knack.herb-scent"];
+  await answerRecommended(page, id, {
+    level: 2,
+    calling: "calling.herbalist",
+    answers: [
+      ["knacks-root", { picks: oldRoots }],
+      ["borrowed-knack", { picks: ["knack.quiet-word"] }],
+    ],
+  });
+  type View = { draft: { version: number; answers: Record<string, { picks?: string[] }> } };
+  let view = (await (await page.request.get(`/api/drafts/${id}`)).json()) as View;
+  expect(
+    (await page.request.post(`/api/drafts/${id}/finish`, { data: { version: view.draft.version } })).status(),
+  ).toBe(200);
+  const level2 = await stepIds(page, id);
+
+  await page.goto(`/c/${id}/raise`);
+  await page.getByRole("radio", { name: "Andere Stufe" }).check();
+  await page.getByRole("spinbutton", { name: "Stufe" }).fill("20");
+  await page.getByRole("spinbutton", { name: "Stufe" }).press("Enter");
+  await page.getByRole("button", { name: "Weiter zu Stufe 20" }).click();
+  await expect(page.locator(".progress__text")).toContainText("Schritt 1 von");
+  const counted = Number(/von (\d+)/.exec((await page.locator(".progress__text").textContent()) ?? "")![1]);
+
+  // Straight to the overview, and from there into the first open step: it is
+  // open, so it goes on with Next, not back to the overview.
+  await page.goto(`/c/${id}/overview`);
+  await expect(page.getByText(m["overview.openTitle"])).toBeVisible();
+  await page.locator(".summary__item:not(.summary__item--done)").first().getByRole("link").click();
+  await expect(page).toHaveURL(/\?from=overview$/);
+  await expect(page.getByRole("link", { name: m["flow.backToOverview"] })).toHaveCount(0);
+  const first = page.url();
+  await page.locator(".shortcuts").getByRole("button", { name: m["flow.chooseForMe"] }).click();
+  await expect(page.locator(".shortcuts__done")).toBeVisible();
+  await page.getByRole("button", { name: m["common.next"], exact: true }).click();
+  await expect(page).not.toHaveURL(first);
+
+  // The rest one after the other with Next, every one a new question.
+  const visited = await walk(page, counted);
+  expect(visited).toContain("knacks");
+  expect(visited.filter((k) => level2.includes(k) && k !== "knacks" && k !== "talents")).toEqual([]);
+  // Nothing open at the end: no earlier step had to be answered again.
+  await expect(page.getByText(m["overview.openTitle"])).toHaveCount(0);
+
+  // The old root knacks are still there, the borrowed knack too, nothing twice.
+  view = (await (await page.request.get(`/api/drafts/${id}`)).json()) as View;
+  const answers = view.draft.answers;
+  const roots = answers["knacks-root"]!.picks!;
+  expect(roots.slice(0, 3)).toEqual(oldRoots);
+  expect(roots).toHaveLength(8);
+  expect(roots).not.toContain("knack.quiet-word");
+  expect(answers["borrowed-knack"]).toEqual({ picks: ["knack.quiet-word"] });
+
+  // "Change" on a finished step still leads back to the overview.
+  await page.locator(".summary__item--done").last().getByRole("link").click();
+  await expect(page.getByRole("link", { name: m["flow.backToOverview"] })).toBeVisible();
+  await page.getByRole("link", { name: m["flow.backToOverview"] }).click();
+  await finishOnOverview(page, id, 2);
 });
 
 test("a level with no new questions goes straight to the end", async ({ page, foreign }) => {

@@ -53,10 +53,12 @@ export function suggestedAnswer(
   if ((def.kind === "pickOne" || def.kind === "pickMany") && Array.isArray(rec) && rec.length > 0) {
     const count = def.kind === "pickOne" ? 1 : (state.count ?? rec.length);
     const picks = keptPicks(state).slice(0, count);
+    // A pick among what the character has (`owned`) marks it; it is not given again.
+    const skip = def.options.owned ? new Set<string>() : away;
     // The package's picks first; when it named fewer than are free now, the list fills up.
     for (const id of [...rec, ...(state.options ?? [])]) {
       if (picks.length >= count) break;
-      if (!picks.includes(id) && !away.has(id)) picks.push(id);
+      if (!picks.includes(id) && !skip.has(id)) picks.push(id);
     }
     if (picks.length === 0) return undefined;
     return answer(def.kind === "pickOne" ? { pick: picks[0] } : { picks });
