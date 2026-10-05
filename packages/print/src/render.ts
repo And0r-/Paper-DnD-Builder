@@ -326,6 +326,7 @@ const S = {
   summary: { size: 11 },
   sectionTitle: { font: "bold", size: 8, caps: true, spacing: 0.06 },
   bigValue: { font: "bold", size: 22 },
+  circlesValue: { font: "bold", size: 15 },
   scoreValue: { font: "bold", size: 20 },
   fieldName: { font: "bold", size: 9 },
   boxValue: { font: "bold", size: 9 },
@@ -611,13 +612,20 @@ function drawStatBoxes(pen: Pen, boxes: StatBox[], x: number, y: number, w: numb
     label.lines.forEach((l, j) => pen.text(l, mid, y + 5 + j * labelLh, label.style, "center"));
     const top = y + extra;
     if (b.style === "pencil") {
-      pen.rect(bx + 5, top + 8, bw - 10, 11, { stroke: "#777", width: 0.4, radius: 1 });
-      pen.text(pen.messages.pencil, mid, top + 14.8, { size: 7, color: "#555" }, "center");
+      // The field says what goes in it, small in its corner: a word in the
+      // middle read as a value that had been left out.
+      const fx = bx + 5;
+      const fw = bw - 10;
+      pen.rect(fx, top + 8, fw, 11, { stroke: "#777", width: 0.4, radius: 1 });
+      const what = pen.label(pen.messages.pencil, { size: 7, color: "#555" }, fw - 2);
+      what.lines.forEach((l, j) => pen.text(l, fx + 1, top + 10.6 + j * 2.6, what.style));
     } else if (b.style === "circles") {
-      const step = Math.min(8, (bw - 6) / Math.max(1, b.circles));
-      const r = Math.min(2.8, step * 0.38);
+      // The number as well as the circles: how many is read at a glance, the circles are for ticking.
+      pen.text(b.text, mid, top + 13.2, pen.fit(b.text, S.circlesValue, bw - 4, 12), "center");
+      const step = Math.min(5.5, (bw - 6) / Math.max(1, b.circles));
+      const r = Math.min(1.9, step * 0.38);
       for (let c = 0; c < b.circles; c++)
-        pen.circle(mid + (c - (b.circles - 1) / 2) * step, top + 13.5, r, { width: 0.7 });
+        pen.circle(mid + (c - (b.circles - 1) / 2) * step, top + 17.9, r, { width: 0.6 });
     } else {
       pen.text(b.text, mid, top + 18, pen.fit(b.text, S.bigValue, bw - 4, 12), "center");
     }
@@ -638,6 +646,12 @@ const CONTINUATION_HEADER_H = 9;
 const MIN_NOTE_LINES = 3;
 /** Fewest rows a split section leaves at the bottom of a page; fewer start the next page. */
 const MIN_SPLIT_ROWS = 2;
+/**
+ * Free space at the bottom of a page, in mm, above which a section that does
+ * not fit is split rather than moved whole to the next page: a third of a
+ * page left white reads as the end of the sheet.
+ */
+const MAX_PAGE_GAP = 85;
 
 /** How many rows a section can be split between; 0 for a section that is one box. */
 function partCount(s: SheetSection): number {
@@ -728,8 +742,9 @@ function splitSection(s: SheetSection, n: number, m: Messages): [SheetSection, S
  * order; a short section next to a tall one moves up into the free space
  * instead of leaving a gap. A section that does not fit the page starts the
  * next one: pages break between sections, never inside a box. Only a section
- * taller than a whole page is split, between its rows, and goes on on the
- * next page under its title marked as continued; nothing is ever cut off.
+ * taller than a whole page, or one whose move would leave more than
+ * MAX_PAGE_GAP white, is split, between its rows, and goes on on the next
+ * page under its title marked as continued; nothing is ever cut off.
  */
 function placeSections(pen: Pen, sections: SheetSection[], bottom: number): Placed[][] {
   const pages: Placed[][] = [[]];
@@ -778,15 +793,19 @@ function placeSections(pen: Pen, sections: SheetSection[], bottom: number): Plac
         height = measure(section, w);
       }
     }
-    // Taller than a whole page: what fits here stays (at least a few rows,
-    // else it starts the next page), the rest goes on after it.
+    // Taller than a whole page, or moving it would leave a large part of
+    // this page white: what fits here stays (at least a few rows, else it
+    // starts the next page), the rest goes on after it.
     const keep = (split: [SheetSection, SheetSection] | null) => {
       if (!split) return;
       section = split[0];
       height = measure(section, w);
       queue.unshift(split[1]);
     };
-    if (spot.y + height > bottom && height > bottom - pageTop(1))
+    if (
+      spot.y + height > bottom &&
+      (height > bottom - pageTop(1) || (section.kind !== "notes" && bottom - spot.y > MAX_PAGE_GAP))
+    )
       keep(splitToFit(section, w, bottom - spot.y, MIN_SPLIT_ROWS));
     if (spot.y + height > bottom && pages.at(-1)!.length > 0) {
       pages.push([]);

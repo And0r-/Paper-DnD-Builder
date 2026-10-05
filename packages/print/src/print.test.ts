@@ -529,6 +529,78 @@ describe("printed character (demo package)", () => {
     expect(h.pdf.pages).toBe(h.pdf.sheetPages + 2);
   });
 
+  it("prints the number above the circles to tick, so how many is read at a glance", async () => {
+    const { model, pdf } = await print("de", {}, pkg, demoCharacter(pkg, 20));
+    const row = model.sections.find((x) => x.id === "lantern-slots");
+    if (row?.kind !== "statBoxes") throw new Error("no lantern slot row");
+    const page = (await positions(pdf))
+      .slice(0, pdf.sheetPages)
+      .find((p) => p.some((i) => i.str === "RANG 1"))!;
+    for (const box of row.boxes) {
+      expect(box.style).toBe("circles");
+      const label = page.find((p) => p.str === box.label.toLocaleUpperCase("de"))!;
+      const mid = label.x + label.w / 2;
+      // The number sits in the box, under its label and centred on it.
+      const number = page.filter(
+        (p) => p.str === box.text && Math.abs(p.x + p.w / 2 - mid) < 2 && p.y > label.y && p.y < label.y + 12,
+      );
+      expect(number, box.label).toHaveLength(1);
+    }
+  });
+
+  it("says what goes into a pencil field, in its corner, so it does not read as a missing number", async () => {
+    const { model, pdf, extracted } = await print("de", {});
+    const primary = model.sections.find((x) => x.id === "primary");
+    if (primary?.kind !== "statBoxes") throw new Error("no primary row");
+    const pencil = primary.boxes.find((b) => b.style === "pencil")!;
+    expect(pencil.hint).toBe(`Startwert ${pencil.text}`);
+    const page = (await positions(pdf))[0]!;
+    // The field's words, starting at its left edge rather than standing alone in the middle.
+    const words = page.filter((p) => p.str.startsWith("Aktuell"));
+    expect(words).toHaveLength(1);
+    const hint = page.find((p) => p.str === pencil.hint)!;
+    expect(words[0]!.x + words[0]!.w / 2).toBeLessThan(hint.x + hint.w / 2);
+    expect(words[0]!.y).toBeLessThan(hint.y);
+    expect(page.some((p) => p.str === "Bleistift")).toBe(false);
+    expect(extracted.text).toContain("Bleistift");
+    // The same in English.
+    const en = await print("en", {});
+    expect(en.extracted.pageTexts[0]).toMatch(/Current, in\s+pencil:/u);
+  });
+
+  it("does not leave most of a page white: a section that does not fit is split, not moved", async () => {
+    const model = buildPrintModel(pkg, doc, { language: "de", createdAt });
+    const rows = (n: number, prefix: string) =>
+      Array.from({ length: n }, (_, i) => ({
+        name: `${prefix} ${i + 1}`,
+        text: "Ein kurzer Text.",
+        uses: null,
+      }));
+    const base = { span: 12, hint: "" };
+    // About a third of a page used, then a table of about two thirds of a page:
+    // it does not fit under it, and is not taller than a page either.
+    const sheet = (filler: number): PrintModel => ({
+      ...model,
+      sections: [
+        model.sections[0]!,
+        { ...base, id: "filler", kind: "featureTable", title: "Vorher", rows: rows(filler, "Vorher") },
+        { ...base, id: "table", kind: "featureTable", title: "Tabelle", rows: rows(28, "Zeile") },
+      ],
+    });
+    const gap = await renderPdf(sheet(8));
+    const first = gap.sheetLayout[0]!;
+    expect(first.map((p) => p.section.id)).toEqual(["header", "filler", "table"]);
+    expect(gap.sheetLayout[1]![0]!.section.title).toBe("Tabelle (Fortsetzung)");
+    const text = (await extract(gap)).pageTexts;
+    expect(text[0]).toContain("Zeile 1 ");
+    for (let i = 1; i <= 28; i++) expect(text.slice(0, gap.sheetPages).join(" ")).toContain(`Zeile ${i}`);
+
+    // With only a little room left, the table starts the next page whole, as before.
+    const full = await renderPdf(sheet(22));
+    expect(full.sheetLayout[0]!.map((p) => p.section.id)).toEqual(["header", "filler"]);
+    expect(full.sheetLayout[1]![0]!.section.title).toBe("Tabelle");
+  });
+
   it("reads each font file once per PDF, however often the text switches fonts", async () => {
     // Every font pdfkit opens gets a new number; re-reading a font file on
     // each switch made a level-20 PDF take half a minute.

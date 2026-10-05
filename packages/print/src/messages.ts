@@ -7,7 +7,7 @@
 
 export interface Messages {
   playedBy: string;
-  /** Shown in a box the player fills in by hand. */
+  /** Small in the corner of a field the player fills in by hand: what goes there and with what. */
   pencil: string;
   /** Hint under a pencil box: the value to start with. */
   startValue: (n: string) => string;
@@ -30,7 +30,7 @@ export interface Messages {
 export const MESSAGES: Readonly<Record<string, Messages>> = {
   de: {
     playedBy: "Gespielt von",
-    pencil: "Bleistift",
+    pencil: "Aktuell, mit Bleistift:",
     startValue: (n) => `Startwert ${n}`,
     unnamed: "Ohne Namen",
     page: (n, of) => `Seite ${n} von ${of}`,
@@ -47,7 +47,7 @@ export const MESSAGES: Readonly<Record<string, Messages>> = {
   },
   en: {
     playedBy: "Played by",
-    pencil: "Pencil",
+    pencil: "Current, in pencil:",
     startValue: (n) => `Start at ${n}`,
     unnamed: "No name yet",
     page: (n, of) => `Page ${n} of ${of}`,

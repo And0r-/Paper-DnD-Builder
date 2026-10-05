@@ -995,7 +995,7 @@ kinds:
 | Kind           | Shows                                                                                                                                     | Fields                                       |
 | -------------- | ----------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------- |
 | `header`       | character name, `summary.line`, "played by", package name                                                                                 | —                                            |
-| `statBoxes`    | up to 6 large boxes; `number` = computed value, `pencil` = value as a starting number to overwrite, `circles` = that many circles to tick | `boxes[]: { value, style, label?, when? }`   |
+| `statBoxes`    | up to 6 large boxes; `number` = computed value, `pencil` = value as a starting number to overwrite, `circles` = number + tickable circles | `boxes[]: { value, style, label?, when? }`   |
 | `scoreColumn`  | stacked boxes: value large, `derived` value small                                                                                         | `scores[]: { value, derived? }`              |
 | `checkList`    | all things selected; marked if the character has them; `note` stat small next to the name; `total` value in the box                       | `things` (like `options`), `note?`, `total?` |
 | `statTable`    | the selected things the character has, one row each: name, then one column per stat                                                       | `things`, `columns[]: { stat, signed? }`     |
