@@ -863,6 +863,137 @@ textarea.field__input {
     justify-content: space-between;
     padding: var(--space-5);
   }
+
+  /* Name and line keep their room; the buttons wrap instead. */
+  .character__main {
+    flex: 1 1 14rem;
+    min-width: 0;
+  }
+
+  .character__actions {
+    flex: 0 1 auto;
+    justify-content: flex-end;
+  }
+}
+
+/* ------------------------------------------------------------- campaigns */
+
+.campaigns__new {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.campaigns__new .btn {
+  align-self: flex-start;
+}
+
+.campaigns__empty {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-5);
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.campaigns__group,
+.campaign-page__section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.campaign-list,
+.player-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.campaign {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-1);
+}
+
+.campaign__main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.campaign__name {
+  font-size: var(--text-lg);
+  line-height: var(--text-lg-lh);
+  font-weight: var(--weight-semibold);
+  overflow-wrap: anywhere;
+}
+
+.campaign__meta {
+  color: var(--color-ink-muted);
+  overflow-wrap: anywhere;
+}
+
+.campaign__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.campaign-page__back {
+  align-self: flex-start;
+  margin-left: calc(-1 * var(--space-3));
+}
+
+/* A player and their characters form one region; the cards inside sit on the sunk surface. */
+.player {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  background: var(--color-surface-sunk);
+  border-radius: var(--radius-md);
+}
+
+.player__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.player__name {
+  min-width: 0;
+  font-size: var(--text-md);
+  line-height: var(--text-md-lh);
+  font-weight: var(--weight-semibold);
+  overflow-wrap: anywhere;
+}
+
+.player__build {
+  align-self: flex-start;
+}
+
+.player .character-list {
+  gap: var(--space-3);
+}
+
+.settings__cases {
+  padding-left: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
 }
 
 /* -------------------------------------------------------------- settings */

@@ -97,6 +97,10 @@ export interface DraftInfo {
   createdAt: string;
   updatedAt: string;
   finishedAt: string | null;
+  /** Whose character it is; a game master sees the player here. */
+  owner: { email: string };
+  /** Opened as its owner, or as the game master of a campaign the owner plays in. */
+  access: "owner" | "gameMaster";
 }
 
 export interface DraftView {
@@ -108,3 +112,25 @@ export interface DraftView {
 }
 
 export type DraftListEntry = DraftInfo & { packageAvailable: boolean; summary: DraftSummary | null };
+
+export interface Campaign {
+  id: string;
+  name: string;
+  role: "gameMaster" | "player";
+  gameMaster: { email: string };
+  playerCount: number;
+  createdAt: string;
+}
+
+export interface CampaignPlayer {
+  id: string;
+  email: string;
+  addedAt: string;
+  characters: DraftListEntry[];
+}
+
+/** `players` is null for a player of the campaign: they see only its name and who leads it. */
+export interface CampaignView {
+  campaign: Campaign;
+  players: CampaignPlayer[] | null;
+}

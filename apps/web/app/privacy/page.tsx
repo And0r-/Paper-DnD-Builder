@@ -25,6 +25,8 @@ export default function PrivacyPage() {
             <li>{t("privacy.characters")}</li>
             <li>{t("privacy.keys")}</li>
             <li>{t("privacy.campaigns")}</li>
+            <li>{t("privacy.membership")}</li>
+            <li>{t("privacy.invitations")}</li>
             <li>{t("privacy.cookies")}</li>
           </ul>
           <h2 className="section-title">{t("privacy.notStored")}</h2>

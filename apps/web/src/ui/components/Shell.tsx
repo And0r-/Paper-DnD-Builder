@@ -1,7 +1,8 @@
 "use client";
 /**
  * The frame of every logged-in screen: skip link, top bar with menu, the
- * menu drawer (step list while building, characters, settings, log out).
+ * menu drawer (step list while building, characters, campaigns, settings,
+ * log out).
  */
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -132,6 +133,9 @@ function MenuDrawer({
           <ul className="drawer__links">
             <li>
               <Link href="/characters">{t("menu.characters")}</Link>
+            </li>
+            <li>
+              <Link href="/campaigns">{t("menu.campaigns")}</Link>
             </li>
             <li>
               <Link href="/settings">{t("menu.settings")}</Link>

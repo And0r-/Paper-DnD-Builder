@@ -2,7 +2,8 @@
 
 /* On narrow phones name and level wrap onto two lines instead of being cut off. */
 .topbar__character {
-  display: inline-flex;
+  display: flex;
+  max-width: 100%;
   flex-wrap: wrap;
   column-gap: var(--space-2);
   min-width: 0;
@@ -12,6 +13,22 @@
 .topbar__name {
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* The level never breaks inside; it moves to the next line as a whole. */
+.topbar__level {
+  flex: none;
+}
+
+/* "for <player>": its own line, so a long address never pushes name and level away. */
+.topbar__owner {
+  flex-basis: 100%;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: var(--weight-regular);
+  color: var(--color-ink-muted);
 }
 
 .save-status {
@@ -1143,6 +1160,11 @@
 
 .done__text {
   max-width: 40ch;
+}
+
+.done__owner {
+  max-width: 40ch;
+  overflow-wrap: anywhere;
 }
 
 .done__pdf {

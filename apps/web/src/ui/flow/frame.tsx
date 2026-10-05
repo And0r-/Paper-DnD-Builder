@@ -204,7 +204,7 @@ export function StepList({ current }: { current: string | undefined }) {
 /** The layout of /c/[id]: shell with step list in the menu and as a left column. */
 export function FlowLayout({ current, children }: { current: string | undefined; children: ReactNode }) {
   const { t } = useApp();
-  const { lp, ev } = useDraft();
+  const { lp, ev, draft } = useDraft();
   const [content, setContent] = useState<ReactNode>(null);
   const explain = useMemo<ExplainApi>(() => ({ content, show: setContent }), [content]);
   const nameState = ev.choices[lp.pkg.flow.characterName];
@@ -223,9 +223,13 @@ export function FlowLayout({ current, children }: { current: string | undefined;
           <span className="topbar__character">
             <span className="topbar__name">{name || t("common.unnamed")}</span>
             <span aria-hidden="true">·</span>
-            <span>
+            <span className="topbar__level">
               {ptext(lp, "level.name")} {ev.level}
             </span>
+            {/* A game master building for a player always sees whose character it is. */}
+            {draft.access === "gameMaster" && (
+              <span className="topbar__owner">{t("flow.forPlayer", { email: draft.owner.email })}</span>
+            )}
           </span>
         }
         status={<SaveStatus />}

@@ -188,6 +188,10 @@ function Settings({ account }: { account: Account }) {
             {t("settings.delete")}
           </h2>
           <p>{t("settings.deleteText")}</p>
+          <ul className="settings__cases">
+            <li>{t("settings.deletePlayer")}</li>
+            <li>{t("settings.deleteGameMaster")}</li>
+          </ul>
           <Button variant="danger" onClick={() => setAskDelete(true)}>
             {t("settings.delete")}
           </Button>
@@ -239,6 +243,8 @@ function Settings({ account }: { account: Account }) {
         }}
       >
         <p>{t("settings.deleteDialogText", { count: draftCount ?? "…" })}</p>
+        <p>{t("settings.deletePlayer")}</p>
+        <p>{t("settings.deleteGameMaster")}</p>
       </TypedConfirmDialog>
 
       {toast && <Toast message={toast} duration={6000} onDone={() => setToast(undefined)} />}
