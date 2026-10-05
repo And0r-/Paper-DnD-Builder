@@ -6,7 +6,7 @@
  * cards, any other level is one card with a number to step or type.
  */
 import { useRouter } from "next/navigation";
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { useApp } from "../../../../src/ui/app-state.tsx";
 import { RichText } from "../../../../src/ui/components/RichText.tsx";
 import { Callout } from "../../../../src/ui/components/Feedback.tsx";
@@ -15,7 +15,11 @@ import { useDraft } from "../../../../src/ui/flow/draft-state.tsx";
 import { StepFooter, StepFrame } from "../../../../src/ui/flow/frame.tsx";
 import { useGuardedChange } from "../../../../src/ui/flow/guard.tsx";
 import { LEVEL_KEY } from "../../../../src/ui/flow/model.ts";
+import { typedLevel } from "../../../../src/ui/flow/typed-level.ts";
 import { levelWord, ptext } from "../../../../src/ui/package-text.ts";
+
+/** How long a typed level that may still grow waits for the next digit. */
+const WAIT_MS = 700;
 
 export default function LevelPage() {
   const { t } = useApp();
@@ -38,6 +42,9 @@ export default function LevelPage() {
   const [other, setOther] = useState(!quick.includes(ev.level));
   const [text, setText] = useState(String(ev.level));
   const otherChosen = other || !quick.includes(ev.level);
+  // A typed level that may still grow by a digit ("1" on the way to "12") waits a moment.
+  const pending = useRef<ReturnType<typeof setTimeout>>(undefined);
+  useEffect(() => () => clearTimeout(pending.current), []);
   // During a level up the level is chosen on the level-up screen, only above the old one.
   useEffect(() => {
     if (raise) router.replace(`/c/${draft.id}/raise`);
@@ -45,6 +52,7 @@ export default function LevelPage() {
   if (!entry) return null;
 
   const setLevel = (level: number) => {
+    clearTimeout(pending.current);
     const clamped = Math.min(max, Math.max(min, Math.round(level)));
     setText(String(clamped));
     if (clamped === ev.level) return;
@@ -55,12 +63,25 @@ export default function LevelPage() {
     }));
   };
 
+  // A typed level counts as soon as it is complete, so the top bar shows what the field says.
+  const type = (value: string) => {
+    setText(value);
+    clearTimeout(pending.current);
+    const typed = typedLevel(value, min, max);
+    if (typed.level === undefined) return;
+    const level = typed.level;
+    if (typed.complete) setLevel(level);
+    else pending.current = setTimeout(() => setLevel(level), WAIT_MS);
+  };
+
   const commit = () => {
+    clearTimeout(pending.current);
     const n = Number(text);
     if (text.trim() !== "" && Number.isFinite(n)) setLevel(n);
     else setText(String(ev.level));
   };
 
+  const invalid = typedLevel(text, min, max).invalid;
   return (
     <StepFrame
       entry={entry}
@@ -148,9 +169,8 @@ export default function LevelPage() {
                     value={text}
                     aria-label={levelName}
                     aria-describedby={`${otherId}-range`}
-                    // A typed level counts once it is complete (on Enter or on leaving
-                    // the field): "12" must not pass through level 1 on the way.
-                    onChange={(e) => setText(e.target.value)}
+                    aria-invalid={invalid || undefined}
+                    onChange={(e) => type(e.target.value)}
                     onKeyDown={(e) => {
                       if (e.key === "Enter") commit();
                     }}
@@ -167,7 +187,7 @@ export default function LevelPage() {
                     <Icon name="plus" />
                   </button>
                 </div>
-                <p className="field__help" id={`${otherId}-range`}>
+                <p className={invalid ? "field__error" : "field__help"} id={`${otherId}-range`}>
                   {t("number.range", { min, max })}
                 </p>
               </div>
