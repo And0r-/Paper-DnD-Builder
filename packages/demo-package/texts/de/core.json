@@ -185,6 +185,7 @@
     "unit.kg.long": "Kilogramm",
 
     "card.knack.typeLine": "{{var:kind}} · Rang {{var:rank}}",
+    "card.knack.hint": "Ein Kästchen pro Nutzung ankreuzen. Nach einer Rast sind alle wieder frei.",
 
     "sheet.primary.title": "Am Tisch",
 

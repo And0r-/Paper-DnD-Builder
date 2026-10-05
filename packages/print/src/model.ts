@@ -72,6 +72,8 @@ export interface Card {
   table: string;
   rules: string[];
   uses: Uses;
+  /** The kind's hint (`card.<kind>.hint`), printed above the footer of every card; "" for none. */
+  hint: string;
 }
 
 export interface PrintModel {
@@ -365,6 +367,7 @@ export function buildPrintModel(
       table: text(`${t.id}.explain.table`) || text(`${t.id}.short`),
       rules: paragraphs(`${t.id}.rules`),
       uses: uses(t, pkg.sheet.cards[t.kind]!.uses),
+      hint: text(`card.${t.kind}.hint`),
     }));
 
   return {

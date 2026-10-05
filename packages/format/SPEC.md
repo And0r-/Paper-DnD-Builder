@@ -786,6 +786,7 @@ Text keys follow from the keys of the things they belong to.
 | `sheet.<section>.text`                                                   | for `helpBox`                                                       | help box content                                        |
 | `sheet.<section>.hint`                                                   | no                                                                  | one-line hint under a section                           |
 | `card.<kind>.typeLine`                                                   | yes, per card layout                                                | first line of a card                                    |
+| `card.<kind>.hint`                                                       | no                                                                  | short hint on every card of the kind, above the footer  |
 
 #### 10.2.1 Long builds
 
@@ -1007,6 +1008,11 @@ converted. A card shows `card.<kind>.typeLine`, the name, the four stats,
 `explain.table` ("at the table") and, below it, `rules` if present. The
 footer shows the character name and level and, if `cards.<kind>.uses` is
 set, the use boxes as described above.
+`card.<kind>.hint`, if present, is printed small above the footer of every
+card of the kind, continuation cards included: the place to explain what the
+card's abbreviations mean to someone holding only the cards. It gets at most
+two lines; a longer text is cut with "…". Its room comes from the rules,
+which move to a continuation card sooner.
 
 `sheet.attribution` is printed in the footer of the last page.
 
