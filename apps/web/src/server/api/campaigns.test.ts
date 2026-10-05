@@ -188,7 +188,7 @@ describe("who sees what", () => {
       ["DELETE", `${c}/players/${playerId}`, undefined, 204, 404],
       ["DELETE", c, undefined, 403, 404],
     ];
-    for (const [method, path, body, asPlayer, asStranger] of expectations) {
+    for (const [method, path, body, , asStranger] of expectations) {
       const s = await stranger.call(method, path, body);
       expect(s.status, `stranger ${method} ${path}`).toBe(asStranger);
       if (asStranger === 404) expect(s.json.error.code).toBe("campaignNotFound");

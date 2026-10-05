@@ -314,6 +314,7 @@
   "privacy.settings": "Deine Einstellungen: Sprache und Einheiten.",
   "privacy.characters": "Deine Charaktere.",
   "privacy.keys": "Deine Zugangsschlüssel, wenn du welche erstellst: nur als Prüfwert und mit dem Datum. Wir schreiben nicht mit, wann oder wofür ein Schlüssel benutzt wird.",
+  "privacy.campaigns": "Deine Kampagnen: ihr Name, wer sie leitet und wer mitspielt. Wer eine Kampagne leitet, sieht die Charaktere der Mitspieler und kann sie ändern. Fügt dich jemand hinzu, steht in der Mail, wer es war.",
   "privacy.cookies": "Ein Cookie, damit du angemeldet bleibst. Und eins, das sich deine Sprache merkt, bevor du dich anmeldest.",
   "privacy.notStored": "Das gibt es bei uns nicht",
   "privacy.noTracking": "Wir beobachten dich nicht: keine Werbung, keine Statistik über dich, kein Mitschreiben deiner Klicks.",
