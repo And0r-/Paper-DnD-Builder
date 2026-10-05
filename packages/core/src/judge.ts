@@ -30,6 +30,8 @@ export interface ChoiceContext {
   /** Allowed range (number choices). */
   min?: number;
   max?: number;
+  /** Distribute choices with `raise`: points in all and the most each target can take. */
+  raise?: { points: number; most: Record<string, number> };
 }
 
 export interface Judgement {
@@ -42,6 +44,8 @@ export interface Judgement {
   counted?: string[];
   /** Base values the answer sets (distribute and number choices). */
   inputs?: Record<string, number>;
+  /** Points the answer adds to values (distribute with `raise`). */
+  raises?: Record<string, number>;
 }
 
 const invalid = (problem: Problem, extra: Partial<Judgement> = {}): Judgement => ({
@@ -80,7 +84,7 @@ export function judgeAnswer(choice: Choice, raw: unknown, ctx: ChoiceContext): J
       return { status: "incomplete", counted, remaining: count - picks.length };
     }
     case "distribute":
-      return judgeDistribute(choice, answer as DistributeAnswer);
+      return judgeDistribute(choice, answer as DistributeAnswer, ctx);
     case "number": {
       const { value } = answer as { value: number };
       if (value < (ctx.min ?? -Infinity) || value > (ctx.max ?? Infinity)) return invalid("outOfRange");
@@ -101,9 +105,26 @@ export function judgeAnswer(choice: Choice, raw: unknown, ctx: ChoiceContext): J
 function judgeDistribute(
   choice: Extract<Choice, { kind: "distribute" }>,
   answer: DistributeAnswer,
+  ctx: ChoiceContext,
 ): Judgement {
   const method = choice.methods[answer.method];
   if (!method) return invalid("badMethod");
+  if (method.method === "raise") {
+    // Only the targets that get points need to be named.
+    const per = method.maxPerTarget ?? method.points;
+    const most = (t: string) => ctx.raise?.most[t] ?? per;
+    const entries = Object.entries(answer.assign);
+    if (entries.some(([t, n]) => !choice.targets.includes(t) || n < 0)) return invalid("badAssignment");
+    if (entries.some(([t, n]) => n > most(t))) return invalid("outOfRange");
+    const spent = entries.reduce((sum, [, n]) => sum + n, 0);
+    if (spent > method.points) return invalid("overBudget");
+    const raises = Object.fromEntries(entries.filter(([, n]) => n > 0));
+    // Fewer points are enough only when no target can take another one.
+    const room = choice.targets.some((t) => (answer.assign[t] ?? 0) < most(t));
+    if (spent < method.points && room)
+      return { status: "incomplete", raises, remaining: method.points - spent };
+    return { status: "answered", raises };
+  }
   const keys = Object.keys(answer.assign);
   if (keys.length !== choice.targets.length || !choice.targets.every((t) => t in answer.assign)) {
     return invalid("badAssignment");

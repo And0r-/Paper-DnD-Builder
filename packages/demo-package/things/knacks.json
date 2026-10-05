@@ -430,5 +430,149 @@
       }
     },
     "card": true
+  },
+  {
+    "id": "knack.dawn-flare",
+    "kind": "knack",
+    "source": "mistland",
+    "rank": 3,
+    "group": "daring",
+    "tags": ["lantern"],
+    "requires": "knackRank >= 3",
+    "stats": {
+      "reach": { "amount": 60, "unit": "ft" },
+      "duration": { "text": "stat-value.instant" },
+      "uses": 1,
+      "focus": { "text": "stat-value.lantern" }
+    },
+    "card": true
+  },
+  {
+    "id": "knack.star-lantern",
+    "kind": "knack",
+    "source": "mistland",
+    "rank": 4,
+    "group": "helping",
+    "tags": ["lantern"],
+    "requires": "knackRank >= 4",
+    "stats": {
+      "reach": { "amount": 30, "unit": "ft" },
+      "duration": { "text": "stat-value.hour" },
+      "uses": 1,
+      "focus": { "text": "stat-value.lantern" }
+    },
+    "card": true
+  },
+  {
+    "id": "knack.sunrise",
+    "kind": "knack",
+    "source": "mistland",
+    "rank": 5,
+    "group": "daring",
+    "tags": ["lantern"],
+    "requires": "knackRank >= 5",
+    "stats": {
+      "reach": { "amount": 120, "unit": "ft" },
+      "duration": { "text": "stat-value.minute" },
+      "uses": 1,
+      "focus": { "text": "stat-value.lantern" }
+    },
+    "card": true
+  },
+  {
+    "id": "knack.whirlpool",
+    "kind": "knack",
+    "source": "mistland",
+    "rank": 3,
+    "group": "daring",
+    "tags": ["current"],
+    "requires": "knackRank >= 3",
+    "stats": {
+      "reach": { "amount": 60, "unit": "ft" },
+      "duration": { "text": "stat-value.minute" },
+      "uses": 1,
+      "focus": { "text": "stat-value.water" }
+    },
+    "card": true
+  },
+  {
+    "id": "knack.tide-turn",
+    "kind": "knack",
+    "source": "mistland",
+    "rank": 4,
+    "group": "helping",
+    "tags": ["current"],
+    "requires": "knackRank >= 4",
+    "stats": {
+      "reach": { "amount": 30, "unit": "ft" },
+      "duration": { "text": "stat-value.instant" },
+      "uses": 1,
+      "focus": { "text": "stat-value.water" }
+    },
+    "card": true
+  },
+  {
+    "id": "knack.great-flood",
+    "kind": "knack",
+    "source": "mistland",
+    "rank": 5,
+    "group": "daring",
+    "tags": ["current"],
+    "requires": "knackRank >= 5",
+    "stats": {
+      "reach": { "amount": 120, "unit": "ft" },
+      "duration": { "text": "stat-value.minute" },
+      "uses": 1,
+      "focus": { "text": "stat-value.water" }
+    },
+    "card": true
+  },
+  {
+    "id": "knack.bramble-wall",
+    "kind": "knack",
+    "source": "mistland",
+    "rank": 3,
+    "group": "helping",
+    "tags": ["root"],
+    "requires": "knackRank >= 3",
+    "stats": {
+      "reach": { "amount": 30, "unit": "ft" },
+      "duration": { "text": "stat-value.hour" },
+      "uses": 1,
+      "focus": { "text": "stat-value.herbs" }
+    },
+    "card": true
+  },
+  {
+    "id": "knack.heartwood",
+    "kind": "knack",
+    "source": "mistland",
+    "rank": 4,
+    "group": "helping",
+    "tags": ["root"],
+    "requires": "knackRank >= 4",
+    "stats": {
+      "reach": { "amount": 5, "unit": "ft" },
+      "duration": { "text": "stat-value.hour" },
+      "uses": 1,
+      "focus": { "text": "stat-value.herbs" }
+    },
+    "card": true
+  },
+  {
+    "id": "knack.forest-wake",
+    "kind": "knack",
+    "source": "mistland",
+    "rank": 5,
+    "group": "daring",
+    "tags": ["root"],
+    "requires": "knackRank >= 5",
+    "stats": {
+      "reach": { "amount": 120, "unit": "ft" },
+      "duration": { "text": "stat-value.minute" },
+      "uses": 1,
+      "focus": { "text": "stat-value.herbs" }
+    },
+    "card": true
   }
 ]

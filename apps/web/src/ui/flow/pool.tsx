@@ -7,7 +7,7 @@
  * option no free source offers stays in the list, greyed, with the reason.
  */
 import type { ChoiceState, Evaluation, HeldThing, MeasureContext, PoolState, StepState } from "@builder/core";
-import type { Thing } from "@builder/format/pure";
+import { declaredChoiceId, type Thing } from "@builder/format/pure";
 import { useMemo, useState } from "react";
 import type { Translator } from "../../i18n/index.ts";
 import { useApp } from "../app-state.tsx";
@@ -35,7 +35,7 @@ export interface Source {
 
 export function sourceOf(lp: LoadedPackage, ctx: MeasureContext, state: ChoiceState | undefined): Source {
   if (!state) return {};
-  const from = ptext(lp, `choice.${state.id}.from`);
+  const from = ptext(lp, `choice.${declaredChoiceId(state.id)}.from`);
   if (from) return { from: plain(ctx, from) };
   const names = (state.grantedBy ?? []).map((id) => thingName(lp, id)).filter(Boolean);
   return names.length > 0

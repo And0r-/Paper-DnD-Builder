@@ -8,11 +8,11 @@
  * cut it), there is no explanation.
  */
 import { collectRefs, parseExpr, type ContentPackage, type Expr } from "@builder/format/pure";
-import { evaluationScope, type Evaluation } from "./evaluate.ts";
+import { byLevel, evaluationScope, type Evaluation } from "./evaluate.ts";
 import { evaluateParsed, evaluateParsedCondition } from "./expr.ts";
 
 export type PartSource =
-  /** Set by an answer to this choice. */
+  /** Set or raised by an answer to this choice (for a copy, the copy's id). */
   | { kind: "choice"; choice: string }
   /** Given by a thing the character has. */
   | { kind: "thing"; thing: string }
@@ -118,15 +118,27 @@ export function explainValue(
     const out: ValuePart[] = [];
     const input = ev.inputs[id];
     if (def.formula !== undefined) out.push(...terms(parseExpr(def.formula), { kind: "start" }, seen));
+    else if (def.byLevel !== undefined)
+      out.push({
+        amount: byLevel(pkg, def.byLevel, ev.level),
+        source: { kind: "values", values: ["level"] },
+      });
     else if (input) out.push({ amount: input.amount, source: { kind: "choice", choice: input.choice } });
     else out.push({ amount: def.default ?? 0, source: { kind: "start" } });
     for (const held of ev.things) {
       for (const g of things.get(held.id)?.grants ?? []) {
         if (g.value !== id || (g.atLevel ?? 1) > ev.level || g.add === undefined) continue;
+        const owner: PartSource = { kind: "thing", thing: held.id };
+        if (typeof g.add === "object") {
+          out.push({ amount: byLevel(pkg, g.add.byLevel, ev.level), source: owner });
+          continue;
+        }
         const add: Expr = typeof g.add === "number" ? { type: "num", value: g.add } : parseExpr(g.add);
-        out.push(...terms(add, { kind: "thing", thing: held.id }, seen));
+        out.push(...terms(add, owner, seen));
       }
     }
+    for (const r of ev.raises[id] ?? [])
+      out.push({ amount: r.amount, source: { kind: "choice", choice: r.choice } });
     return out;
   };
 

@@ -218,9 +218,15 @@ describe("printed character (demo package)", () => {
   });
 
   it("gives notes the whole page when they end the sheet alone on a new page", async () => {
-    // Level 1: the level-3 "path" section is left out (`when`), so notes end up alone.
+    // Level 1: the level-3 "path" section is left out (`when`), so notes end up alone
+    // on a sheet without the sections for higher levels.
     const level1 = demoCharacter(pkg, 1);
-    const { pdf } = await print("de", {}, pkg, level1);
+    const lower = new Set(["rolls", "lantern-slots", "lantern-slots-high"]);
+    const early = {
+      ...pkg,
+      sheet: { ...pkg.sheet, sections: pkg.sheet.sections.filter((s) => !lower.has(s.id)) },
+    };
+    const { pdf } = await print("de", {}, early, level1);
     const last = pdf.sheetLayout.at(-1)!;
     expect(last.map((p) => p.section.id)).toEqual(["notes"]);
     const notes = last[0]!;
@@ -230,8 +236,8 @@ describe("printed character (demo package)", () => {
 
     // With room on the first page, notes keep their width and shrink to the space left.
     const short = {
-      ...pkg,
-      sheet: { ...pkg.sheet, sections: pkg.sheet.sections.filter((s) => s.id !== "gear") },
+      ...early,
+      sheet: { ...early.sheet, sections: early.sheet.sections.filter((s) => s.id !== "gear") },
     };
     const { pdf: onePage } = await print("de", {}, short, level1);
     expect(onePage.sheetPages).toBe(1);
@@ -274,9 +280,12 @@ describe("printed character (demo package)", () => {
     expect(extracted.text).toContain(pathShort);
 
     // Level 2: no section, no title, no empty frame; every other section still placed.
+    // The high lantern slots are not printed either: all their boxes are 0 (`when` on each box).
     const level2 = demoCharacter(pkg, 2);
     const low = await print("de", {}, pkg, level2);
-    const ids = pkg.sheet.sections.map((s) => s.id).filter((id) => id !== "path");
+    const ids = pkg.sheet.sections
+      .map((s) => s.id)
+      .filter((id) => id !== "path" && id !== "lantern-slots-high");
     expect(low.model.sections.map((s) => s.id)).toEqual(ids);
     expect(low.pdf.sheetLayout.flat().map((p) => p.section.id)).toEqual(ids);
     expect(low.extracted.pageTexts.slice(0, low.pdf.sheetPages).join("\n")).not.toContain(title);
@@ -304,13 +313,55 @@ describe("printed character (demo package)", () => {
     const primary = noLuck.sections.find((s) => s.id === "primary")!;
     if (primary.kind !== "statBoxes") throw new Error("demo sheet changed");
     expect(primary.boxes.map((b) => b.label)).not.toContain(pkg.texts["de"]!["value.luck.name"]);
-    expect(primary.boxes).toHaveLength(4);
+    expect(primary.boxes).toHaveLength(5);
     const none = buildPrintModel(
       withBoxWhen(() => "level > 99"),
       doc,
       { language: "de", createdAt },
     );
     expect(none.sections.map((s) => s.id)).not.toContain("primary");
+  });
+
+  it("prints a level-20 character: every slot rank above 0, cards over several pages", async () => {
+    // Lantern bearer: slots of ranks 1 to 9, in a row of 5 and a row of 4.
+    const lantern = demoCharacter(pkg, 20);
+    const { model, pdf, extracted } = await print("de", {}, pkg, lantern);
+    const boxes = (id: string) => {
+      const s = model.sections.find((x) => x.id === id);
+      if (s?.kind !== "statBoxes") throw new Error(`no box row ${id}`);
+      return s.boxes.map((b) => [b.label, b.circles]);
+    };
+    expect(boxes("lantern-slots")).toEqual([
+      ["Rang 1", 3],
+      ["Rang 2", 2],
+      ["Rang 3", 2],
+      ["Rang 4", 2],
+      ["Rang 5", 2],
+    ]);
+    expect(boxes("lantern-slots-high")).toEqual([
+      ["Rang 6", 2],
+      ["Rang 7", 1],
+      ["Rang 8", 1],
+      ["Rang 9", 2],
+    ]);
+    const sheet = extracted.pageTexts.slice(0, pdf.sheetPages).join("\n");
+    expect(sheet).toContain("LATERNEN-PLÄTZE, HOHE RÄNGE");
+
+    // At level 5 only ranks 1 to 3 have slots; the high row is not printed at all.
+    const low = buildPrintModel(pkg, demoCharacter(pkg, 5), { language: "de", createdAt });
+    const row = low.sections.find((x) => x.id === "lantern-slots");
+    expect(row?.kind === "statBoxes" && row.boxes.map((b) => b.label)).toEqual([
+      "Rang 1",
+      "Rang 2",
+      "Rang 3",
+    ]);
+    expect(low.sections.map((x) => x.id)).not.toContain("lantern-slots-high");
+
+    // Herbalist: 8 root knacks, a borrowed one and the path's: 10 cards, two card pages.
+    const h = await print("de", {}, pkg, demoCharacter(pkg, 20, "Mira Fennwick", "calling.herbalist"));
+    expect(h.model.cards.length).toBe(10);
+    expect(h.pdf.cardPages).toBe(2);
+    expect(h.pdf.pages).toBe(h.pdf.sheetPages + 2);
   });
 
   it("goes on on the next page with a section longer than a page, for every kind of rows", async () => {
@@ -449,8 +500,11 @@ describe("printed character (demo package)", () => {
     const page = (await positions(pdf))[0]!;
     const primary = pdf.sheetLayout[0]!.find((p) => p.section.id === "primary")!;
     const scores = pdf.sheetLayout[0]!.find((p) => p.section.id === "scores")!;
-    const boxW = (primary.w - 4 * 4) / 5;
-    for (const item of page.filter((p) => /^NEBEL|STUFE$/u.test(p.str))) {
+    const boxes = primary.section.kind === "statBoxes" ? primary.section.boxes.length : 0;
+    const boxW = (primary.w - 4 * (boxes - 1)) / boxes;
+    // Only the boxes of the first row: other box sections lie below the scores.
+    const inPrimary = (p: { y: number }) => p.y < scores.y;
+    for (const item of page.filter((p) => /^NEBEL|STUFE$/u.test(p.str) && inPrimary(p))) {
       const box = Math.floor((item.x - primary.x) / (boxW + 4));
       const left = primary.x + box * (boxW + 4);
       expect(item.x).toBeGreaterThanOrEqual(left);

@@ -25,8 +25,10 @@ export {
 export { evaluate, evaluateCondition, evaluateNumber, RuleError, type ExprScope } from "./expr.ts";
 export { judgeAnswer, type Problem } from "./judge.ts";
 export {
+  byLevel,
   evaluateDraft,
   evaluationScope,
+  fillRaise,
   selectThings,
   type ChoiceState,
   type ChoiceStatus,
@@ -34,6 +36,7 @@ export {
   type HeldThing,
   type InfoContent,
   type PoolState,
+  type RaiseState,
   type StepState,
 } from "./evaluate.ts";
 export { explainValue, totalOf, type PartSource, type ValueExplanation, type ValuePart } from "./explain.ts";

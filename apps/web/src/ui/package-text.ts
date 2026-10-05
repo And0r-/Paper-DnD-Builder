@@ -10,7 +10,7 @@ import {
   type MeasureContext,
   type TextPart,
 } from "@builder/core";
-import type { Choice } from "@builder/format/pure";
+import { declaredChoiceId, type Choice } from "@builder/format/pure";
 import type { LoadedPackage } from "./packages.ts";
 
 export function ptext(lp: LoadedPackage, key: string): string | undefined {
@@ -46,8 +46,15 @@ export function thingName(lp: LoadedPackage, id: string): string {
   return ptext(lp, `${id}.name`) ?? "";
 }
 
+/**
+ * The definition of a choice as asked. A copy (`<choice>@<where>`, asked
+ * again for a repeatable thing) gets the declared choice under its own id,
+ * so answers go to the copy and texts come from the declared choice.
+ */
 export function choiceOf(lp: LoadedPackage, id: string): Choice | undefined {
-  return lp.pkg.flow.choices.find((c) => c.id === id);
+  const declared = declaredChoiceId(id);
+  const choice = lp.pkg.flow.choices.find((c) => c.id === declared);
+  return choice && choice.id !== id ? { ...choice, id } : choice;
 }
 
 export interface StepTexts {
@@ -74,9 +81,10 @@ function choiceText(
   state: ChoiceState | undefined,
 ): string | undefined {
   const variant = state?.textVariant;
+  const id = declaredChoiceId(choiceId);
   return (
-    (variant !== undefined ? ptext(lp, `choice.${choiceId}.variant.${variant}.${field}`) : undefined) ??
-    ptext(lp, `choice.${choiceId}.${field}`)
+    (variant !== undefined ? ptext(lp, `choice.${id}.variant.${variant}.${field}`) : undefined) ??
+    ptext(lp, `choice.${id}.${field}`)
   );
 }
 
@@ -168,15 +176,19 @@ export function grantedValue(lp: LoadedPackage, ctx: MeasureContext, valueId: st
  * Zeros are left out: giving 0 is giving nothing.
  */
 export function distributeMethodLabels(
-  methods: readonly ({ method: "pointBuy" } | { method: "array"; values: number[] })[],
+  methods: readonly ({ method: "pointBuy" } | { method: "raise" } | { method: "array"; values: number[] })[],
   lang: string,
-  t: (key: "dist.pointBuy" | "dist.array" | "dist.arrayOf", vars?: Record<string, string>) => string,
+  t: (
+    key: "dist.pointBuy" | "dist.array" | "dist.arrayOf" | "dist.raise",
+    vars?: Record<string, string>,
+  ) => string,
   list: (items: readonly string[]) => string,
 ): string[] {
   const arrays = methods.filter((m) => m.method === "array").length;
   const nf = new Intl.NumberFormat(lang);
   return methods.map((m) => {
     if (m.method === "pointBuy") return t("dist.pointBuy");
+    if (m.method === "raise") return t("dist.raise");
     if (arrays < 2) return t("dist.array");
     const shown = m.values.filter((n) => n !== 0);
     return t("dist.arrayOf", {

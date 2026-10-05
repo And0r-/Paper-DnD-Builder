@@ -209,8 +209,15 @@ describe("one list for the gathered choices", () => {
           kind: "talent",
           grantedBy: "upbringing.ferry-child",
           step: "upbringing",
+          atLevel: 1,
         },
-        { id: "talent.haggling", kind: "talent", grantedBy: "upbringing.ferry-child", step: "upbringing" },
+        {
+          id: "talent.haggling",
+          kind: "talent",
+          grantedBy: "upbringing.ferry-child",
+          step: "upbringing",
+          atLevel: 1,
+        },
       ],
       recommended: ["talent.mending", "talent.climbing", "talent.legends"],
     });

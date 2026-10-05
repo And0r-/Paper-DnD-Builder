@@ -1,6 +1,6 @@
 # Content package format — specification
 
-Format version **0.3**. This document describes everything a content
+Format version **0.9**. This document describes everything a content
 package contains and every rule a valid package follows. After reading it
 you should be able to write your own package. The demo package in
 [`packages/demo-package`](../demo-package) uses every feature and is the
@@ -122,7 +122,7 @@ people who distribute packages.
 
 ```json
 {
-  "formatVersion": "0.8",
+  "formatVersion": "0.9",
   "id": "demo",
   "version": "0.1.0",
   "languages": ["de", "en"],
@@ -197,19 +197,20 @@ Each `things/*.json` file is an array of things:
 }
 ```
 
-| Field      | Required | Meaning                                                                                                                                                                    |
-| ---------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `id`       | yes      | Thing key.                                                                                                                                                                 |
-| `kind`     | yes      | One of `manifest.kinds`.                                                                                                                                                   |
-| `source`   | yes      | Source key. `license` optional.                                                                                                                                            |
-| `rank`     | no       | The thing's own tier (for example a spell level). Shown on cards. Not the character level.                                                                                 |
-| `group`    | no       | Heading under which the thing appears in long option lists. Text: `group.<group>.name`.                                                                                    |
-| `tags`     | no       | Free labels for selecting things (`options`, `count()`).                                                                                                                   |
-| `requires` | no       | [Expression](#8-expressions). The thing is offered as an option only while it is true.                                                                                     |
-| `stats`    | no       | Fixed facts shown on cards and in details: number, `true`/`false`, quantity `{amount, unit}` or `{text}` (a text key, for words like "instant"). Label: `stat.<key>.name`. |
-| `grants`   | no       | What having this thing gives, see below.                                                                                                                                   |
-| `about`    | no       | Another thing this one is about, for example skill with one tool → that tool. Used by choices with `held` ([9.3](#93-choices)).                                            |
-| `card`     | no       | Print a card for this thing. Needs a card layout for its kind in `sheet.json`.                                                                                             |
+| Field        | Required | Meaning                                                                                                                                                                    |
+| ------------ | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`         | yes      | Thing key.                                                                                                                                                                 |
+| `kind`       | yes      | One of `manifest.kinds`.                                                                                                                                                   |
+| `source`     | yes      | Source key. `license` optional.                                                                                                                                            |
+| `rank`       | no       | The thing's own tier (for example a spell level). Shown on cards. Not the character level.                                                                                 |
+| `group`      | no       | Heading under which the thing appears in long option lists. Text: `group.<group>.name`.                                                                                    |
+| `tags`       | no       | Free labels for selecting things (`options`, `count()`).                                                                                                                   |
+| `requires`   | no       | [Expression](#8-expressions). The thing is offered as an option only while it is true.                                                                                     |
+| `stats`      | no       | Fixed facts shown on cards and in details: number, `true`/`false`, quantity `{amount, unit}` or `{text}` (a text key, for words like "instant"). Label: `stat.<key>.name`. |
+| `grants`     | no       | What having this thing gives, see below.                                                                                                                                   |
+| `about`      | no       | Another thing this one is about, for example skill with one tool → that tool. Used by choices with `held` ([9.3](#93-choices)).                                            |
+| `card`       | no       | Print a card for this thing. Needs a card layout for its kind in `sheet.json`.                                                                                             |
+| `repeatable` | no       | May be picked again in a later choice although the character has it; each pick asks the choices it grants anew (see below).                                                |
 
 ### Grants
 
@@ -219,7 +220,38 @@ A grant gives exactly one of three things, from `atLevel` on (default 1):
 | ------------------------------------ | ----------------------------------------------------------------------------------------------- |
 | `{ "thing": "item.rope" }`           | The character has that thing too (and everything it grants).                                    |
 | `{ "choice": "path", "atLevel": 3 }` | The player is asked that choice; it becomes a step (see [9.4](#94-building-the-list-of-steps)). |
-| `{ "value": "stamina", "add": 5 }`   | Adds a number or an expression result to a value (see [7](#7-values)).                          |
+| `{ "value": "stamina", "add": 5 }`   | Adds a number, an expression result or a table by level to a value (see [7](#7-values)).        |
+
+A value grant's `add` may be a **table by level** instead of a number:
+`{ "value": "lanternSlots1", "add": { "byLevel": [1, 2, 2, 3, ...] } }`
+adds the entry of the character's level (entry 0 at `flow.level.min`, one
+entry per level up to `flow.level.max`). Use it for numbers that only the
+characters with this thing have, such as slots per rank of one class.
+
+### Repeatable things
+
+Normally a thing counts once, and a pick choice does not offer a thing the
+character already has. A thing with `"repeatable": true` is offered again,
+for example a boon "raise two scores" that may be taken at levels 4, 8 and 12. It still counts once for `has()`, `count()` and its `thing` and
+`value` grants; what repeats are the **choices it grants**: each pick asks
+them again, as a copy with the id `<choice>@<where the thing was picked>`
+(the choice it was picked in, or the thing that granted it):
+
+```json
+{
+  "id": "boon.raise",
+  "kind": "boon",
+  "source": "mistland",
+  "repeatable": true,
+  "grants": [{ "choice": "boon-raise" }]
+}
+```
+
+Picked in `boon-4` and `boon-8`, it asks `boon-raise@boon-4` and
+`boon-raise@boon-8`. A copy follows every rule and uses every text of the
+declared choice (`choice.boon-raise.*`); its answer is stored under the
+copy's id, so changing the pick in `boon-4` leaves the answer of
+`boon-raise@boon-8` alone. The declared choice itself is never asked.
 
 ### What a character has
 
@@ -228,6 +260,10 @@ A character **has** a thing if
 1. the player picked it in a `pickOne` or `pickMany` choice that is currently
    asked, or
 2. a thing the character has grants it with `atLevel` ≤ the character's level.
+
+The character has it **from a level** on (`atLevel` in the evaluation): a
+picked thing from the level of the step it was picked in, a granted one
+from the higher of its granter's level and the grant's `atLevel`.
 
 This is evaluated after every change. If a pick stops being valid (its
 choice is no longer asked, or the picked thing's `requires` became false),
@@ -251,7 +287,8 @@ needing a new answer. Going back restores it if it becomes valid again.
 | ---------- | ------------------------------------------------------------------------------ |
 | `id`       | Value key (camelCase). Text: `value.<id>.name`, optional `value.<id>.explain`. |
 | `source`   | Source key. `license` optional.                                                |
-| `formula`  | Expression for the base value. Cannot be combined with `default`.              |
+| `formula`  | Expression for the base value. Cannot be combined with `default` or `byLevel`. |
+| `byLevel`  | The base value as a table by level: one number per level, see below.           |
 | `default`  | Base value if no formula and no player input. Default `0`.                     |
 | `unit`     | The value is a quantity in this unit (see [12](#12-units)).                    |
 | `min, max` | The final value is clamped to this range.                                      |
@@ -260,10 +297,12 @@ How the rule core computes a value:
 
 ```
 base  = formula result            if the value has a formula
+      = byLevel[level - min]      if the value has a table by level
       = the player's input        if a distribute or number choice sets it
       = default (or 0)            otherwise
 value = clamp(base + sum of all "add" grants of things the character has
-              whose atLevel <= level, min, max)
+              whose atLevel <= level
+            + sum of all points raise answers gave it, min, max)
 ```
 
 Formulas may refer to other values; circular formulas are rejected by the
@@ -272,10 +311,28 @@ validator. An `add` expression must not depend on the value it adds to.
 `level` is always available: the character level chosen by the player,
 between `flow.level.min` and `flow.level.max`.
 
+**Tables by level.** Many numbers follow a table with one row per level
+(slots per rank, how many things to prepare, a bonus). An `if()` chain
+can say that, but nobody can read twenty of them. `byLevel` is the table:
+entry 0 applies at `flow.level.min`, the last at `flow.level.max`, so it
+has exactly `max - min + 1` entries (the validator checks). The same form
+works for a grant's `add` and a `pickMany` choice's `count`.
+
+```json
+{
+  "id": "knackRank",
+  "source": "mistland",
+  "byLevel": [1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 5, 5, 5, 5]
+}
+```
+
+A bonus that grows by a rule is still a formula:
+`{ "id": "practice", "formula": "floor((level - 1) / 4) + 2" }`.
+
 ## 8. Expressions
 
 Conditions (`requires`, `when`) and formulas (`formula`, `add`, `count`,
-`min`, `max`) are short expressions in one small language. The rule core
+`min`, `max`, `cap`) are short expressions in one small language. The rule core
 evaluates them; the format defines their syntax.
 
 ```
@@ -337,9 +394,10 @@ carries is a warning.
 ### 9.1 Level
 
 The player chooses the level first (the builder shows this screen; its texts
-are `level.name`, `level.intro`, `level.hint`). `max` may be raised later
-without changing anything else; grants with `atLevel` above `max` are
-allowed and simply never apply until then.
+are `level.name`, `level.intro`, `level.hint`). `max` may be raised later;
+grants with `atLevel` above `max` are allowed and simply never apply until
+then. Tables by level (`byLevel`) have one entry per level, so raising
+`max` means adding entries to them.
 
 ### 9.2 Steps
 
@@ -441,8 +499,8 @@ There are six kinds:
 }
 ```
 
-**`pickMany`** — pick `count` things (a number or an expression); with
-`"upTo": true`, up to `count`.
+**`pickMany`** — pick `count` things (a number, an expression or a table by
+level, `{ "byLevel": [2, 3, 3, ...] }`); with `"upTo": true`, up to `count`.
 
 ```json
 {
@@ -465,7 +523,10 @@ character does not already have from somewhere else.
 
 `recommend` is a list; the first entry whose `when` is true (or that has
 no `when`) is the recommendation. It drives the "recommended" badge and
-the "choose for me" button. A `pickOne` recommends exactly one thing.
+the "choose for me" button. A `pickOne` recommends exactly one thing. For a
+`pickMany` the recommendation is the entry's offered picks, then the other
+options in order, cut to `count`: a count that grows with the level needs
+no recommendation per count, and "choose for me" always finishes.
 
 `badges` (optional, `pickOne` and `pickMany`) puts a short label of the
 package's own on some options, for example how easy they are to play.
@@ -527,8 +588,37 @@ and things like `{ "id": "handling.rope", "kind": "handling", "about": "item.rop
   target starts at the lowest score; the sum of costs may not exceed
   `budget`. Scores must be consecutive and costs may not fall.
 - `array`: each number is assigned to exactly one target.
+- `raise`: adds points **on top of** the targets as they are before this
+  choice, instead of setting their base. `points` in all, at most
+  `maxPerTarget` on one target (default: `points`), and no target above
+  `cap` (a number or an expression; the value's own `max` applies too).
+  The answer names only the targets that get points:
+  `{ "method": 0, "assign": { "heart": 2 } }`. Fewer points are complete
+  only when no target can take another one. Several raise choices (on
+  different levels) add up. A `raise` method cannot stand next to other
+  methods, and its targets may be any values, also ones with a formula.
 - With several methods the player picks one.
-- Targets must be values without a formula; the answer becomes their base.
+- Targets of `pointBuy` and `array` must be values without a formula or
+  table; the answer becomes their base.
+
+```json
+{
+  "id": "boon-raise",
+  "kind": "distribute",
+  "source": "mistland",
+  "targets": ["might", "grace", "wit", "heart"],
+  "methods": [{ "method": "raise", "points": 2, "maxPerTarget": 2, "cap": 15 }],
+  "recommend": [
+    { "when": "has('calling.lantern-bearer') and heart <= 13", "assign": { "heart": 2 } },
+    { "when": "has('calling.lantern-bearer')", "assign": { "wit": 2 } }
+  ]
+}
+```
+
+For a raise, the recommendation is always a full answer: the entry's
+assignment as far as it fits, the points left over to its targets and then
+to the others in order. Write it as "the most important score first", with
+a `when` that moves on once that score is near the cap.
 
 **`number`** — a number between `min` and `max` (numbers or expressions),
 stored as the base of value `target`. Optional `default`.
@@ -560,6 +650,18 @@ the character's name.
 5. A choice is either listed in `steps` or granted by things, never both.
    A choice that is neither is never asked (a warning).
 6. The builder adds its own overview step at the end.
+7. A choice granted by a repeatable thing is inserted once per pick, as a
+   copy `<choice>@<where picked>` (see [6](#6-things)); copies follow rules
+   2 to 4 like any granted choice.
+
+Every step has a **level** (`atLevel` in the evaluation): the steps of
+`steps` have `flow.level.min`; a granted step has the level at which its
+grant applies, following the grants back to the step where the player
+picked (a choice granted at level 1 by a thing granted at level 3 comes
+with level 3); a step granted by several things has the lowest. Raising a
+character from level n to a higher level adds exactly the steps with
+`atLevel > n`. A step listed in `steps` with a `when` on the level keeps
+`flow.level.min`; grant level-bound choices instead.
 
 Dependencies follow from the same data: a step depends on the steps whose
 answers gave the things that grant its choice, and on every thing named in
@@ -875,7 +977,10 @@ well-formed does the second stage check the rules between files:
   options; badges name options, at most one per thing, and their texts
   exist in every language; `about` names another existing thing; `held`
   needs options with `about`, and its text exists in every language; distribute and number targets take input; point-buy costs are
-  consecutive and do not fall; arrays fit the targets;
+  consecutive and do not fall; arrays fit the targets; a `raise` method
+  stands alone, its `cap` parses, and its recommendations stay within
+  `points` and `maxPerTarget`; every table by level has one entry per level;
+  a `count` table asks for no more than there are options;
 - each choice is asked exactly one way; `characterName` is a text choice;
   each gather group has at most one gather step; a `list` gather step
   gathers only `pickOne` and `pickMany` choices;
@@ -894,7 +999,8 @@ written as plain text; quantities that differ between languages; choices
 never asked; computed quantities without a conversion fallback; text
 variants without any text; a gather group without a gather step; a choice
 with `gather` that is listed in a fixed step; a gather step that no choice
-is gathered in.
+is gathered in; a repeatable thing that grants no choice; `maxPerTarget`
+above `points`.
 
 In code: `validatePackageDir(dir)` returns `{ ok, errors, warnings,
 package }`; `package` is the typed, loaded content including the origin of
@@ -921,16 +1027,17 @@ are removed (saved characters may lose picks). Keys are never renamed.
 
 ### Changelog
 
-| Version | Date       | Change                                                                                                                                                         | Migration                                                                                                                                                                |
-| ------- | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 0.1     | 2026-10-04 | First version.                                                                                                                                                 | —                                                                                                                                                                        |
-| 0.2     | 2026-10-04 | Optional `uses` on `featureTable` sections and card layouts (use boxes), optional `note` on `checkList` sections.                                              | Set `formatVersion` to `"0.2"`. Nothing else changes: both fields are optional, so every valid 0.1 package is a valid 0.2 package.                                       |
-| 0.3     | 2026-10-04 | Optional `when` (condition) on every sheet section and on each box of a `statBoxes` section: false means not printed.                                          | Set `formatVersion` to `"0.3"`. Nothing else changes: the field is optional, so every valid 0.2 package is a valid 0.3 package.                                          |
-| 0.4     | 2026-10-04 | Optional `label` (text key) on each box of a `statBoxes` section, printed instead of the value name.                                                           | Set `formatVersion` to `"0.4"`. Nothing else changes: the field is optional, so every valid 0.3 package is a valid 0.4 package.                                          |
-| 0.5     | 2026-10-04 | Optional `badges` on `pickOne` and `pickMany` choices: a package text shown on options instead of "recommended".                                               | Set `formatVersion` to `"0.5"`. Nothing else changes: the field is optional, so every valid 0.4 package is a valid 0.5 package.                                          |
-| 0.6     | 2026-10-04 | Optional `textVariants` on every choice (other texts while a condition holds); `{{var:count}}` in the title, question and intro of a `pickMany` choice.        | Set `formatVersion` to `"0.6"`. Nothing else changes: the field is optional and the variable is new, so every valid 0.5 package is a valid 0.6 package.                  |
-| 0.7     | 2026-10-04 | Optional `about` on things and `held` on `pickOne` and `pickMany` choices: recommend and name what the character has.                                          | Set `formatVersion` to `"0.7"`. Nothing else changes: both fields are optional, so every valid 0.6 package is a valid 0.7 package.                                       |
-| 0.8     | 2026-10-04 | Gather steps (`gather`, optional `together`: `sections` or one shared `list`) in `flow.steps`, optional `gather` on choices, optional text `choice.<id>.from`. | Set `formatVersion` to `"0.8"`. Nothing else changes: a package without gather steps builds the same steps as before, so every valid 0.7 package is a valid 0.8 package. |
+| Version | Date       | Change                                                                                                                                                                                                                                                                                                                                                                | Migration                                                                                                                                                                                          |
+| ------- | ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0.1     | 2026-10-04 | First version.                                                                                                                                                                                                                                                                                                                                                        | —                                                                                                                                                                                                  |
+| 0.2     | 2026-10-04 | Optional `uses` on `featureTable` sections and card layouts (use boxes), optional `note` on `checkList` sections.                                                                                                                                                                                                                                                     | Set `formatVersion` to `"0.2"`. Nothing else changes: both fields are optional, so every valid 0.1 package is a valid 0.2 package.                                                                 |
+| 0.3     | 2026-10-04 | Optional `when` (condition) on every sheet section and on each box of a `statBoxes` section: false means not printed.                                                                                                                                                                                                                                                 | Set `formatVersion` to `"0.3"`. Nothing else changes: the field is optional, so every valid 0.2 package is a valid 0.3 package.                                                                    |
+| 0.4     | 2026-10-04 | Optional `label` (text key) on each box of a `statBoxes` section, printed instead of the value name.                                                                                                                                                                                                                                                                  | Set `formatVersion` to `"0.4"`. Nothing else changes: the field is optional, so every valid 0.3 package is a valid 0.4 package.                                                                    |
+| 0.5     | 2026-10-04 | Optional `badges` on `pickOne` and `pickMany` choices: a package text shown on options instead of "recommended".                                                                                                                                                                                                                                                      | Set `formatVersion` to `"0.5"`. Nothing else changes: the field is optional, so every valid 0.4 package is a valid 0.5 package.                                                                    |
+| 0.6     | 2026-10-04 | Optional `textVariants` on every choice (other texts while a condition holds); `{{var:count}}` in the title, question and intro of a `pickMany` choice.                                                                                                                                                                                                               | Set `formatVersion` to `"0.6"`. Nothing else changes: the field is optional and the variable is new, so every valid 0.5 package is a valid 0.6 package.                                            |
+| 0.7     | 2026-10-04 | Optional `about` on things and `held` on `pickOne` and `pickMany` choices: recommend and name what the character has.                                                                                                                                                                                                                                                 | Set `formatVersion` to `"0.7"`. Nothing else changes: both fields are optional, so every valid 0.6 package is a valid 0.7 package.                                                                 |
+| 0.9     | 2026-10-05 | Levels up to 20: `distribute` method `raise` (points on top of values, `maxPerTarget`, `cap`); tables by level (`byLevel` on values, `{ "byLevel": [...] }` for a grant's `add` and a `pickMany` `count`); `repeatable` on things (choices asked again per pick as `<choice>@<where>`). A `pickMany` recommendation is cut to `count` and filled up from the options. | Set `formatVersion` to `"0.9"`. Nothing else changes: every field is optional, and a recommendation that already had `count` picks is the same, so every valid 0.8 package is a valid 0.9 package. |
+| 0.8     | 2026-10-04 | Gather steps (`gather`, optional `together`: `sections` or one shared `list`) in `flow.steps`, optional `gather` on choices, optional text `choice.<id>.from`.                                                                                                                                                                                                        | Set `formatVersion` to `"0.8"`. Nothing else changes: a package without gather steps builds the same steps as before, so every valid 0.7 package is a valid 0.8 package.                           |
 
 ## 16. A minimal package
 
@@ -941,7 +1048,7 @@ language. The validator accepts it as is.
 
 ```json
 {
-  "formatVersion": "0.8",
+  "formatVersion": "0.9",
   "id": "tiny",
   "version": "1.0.0",
   "languages": ["en"],
@@ -1038,13 +1145,13 @@ language. The validator accepts it as is.
 
 ## 17. Reserved for later versions
 
-Not part of 0.3; listed so nobody builds on a different idea:
+Not part of 0.9; listed so nobody builds on a different idea:
 
 - **Packages that extend other packages** (an expansion adding things to a
   base package). Planned: `manifest.dependsOn` and keys of the form
   `<package>:<key>`.
 - **Levelling up an existing character** needs no format change: it is
-  "raise the level, ask the newly granted choices".
+  "raise the level, ask the steps with a higher `atLevel`".
 - **Loading packages over HTTP** uses the same files.
 - **Showing original terms** next to translated ones (an optional later
   setting) would read the other language's `name`; no format change.

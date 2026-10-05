@@ -237,6 +237,23 @@ export function validatePackageFiles(files: PackageFiles): ValidationResult {
 
   const isValueRef = (v: string) => valueIds.has(v) || v === "level";
 
+  // A table by level has one number per level the flow offers.
+  const levels = flow.level.max - flow.level.min + 1;
+  const checkByLevel = (file: string, path: string, table: readonly number[]) => {
+    if (table.length !== levels) {
+      err(
+        file,
+        path,
+        `has ${table.length} numbers, but levels ${flow.level.min} to ${flow.level.max} need ${levels}`,
+      );
+    }
+  };
+  /** A number, an expression or a table by level. */
+  const checkAmountSource = (file: string, path: string, a: number | string | { byLevel: number[] }) => {
+    if (typeof a === "string") checkExpr(file, path, a);
+    else if (typeof a === "object") checkByLevel(file, `${path}.byLevel`, a.byLevel);
+  };
+
   // ------------------------------------------------------------------ units
   const unitDim = new Map<string, string>();
   for (const [dim, d] of Object.entries(units.dimensions)) {
@@ -326,6 +343,7 @@ export function validatePackageFiles(files: PackageFiles): ValidationResult {
       }
     }
     if (v.formula !== undefined) checkExpr("values.json", `${p}.formula`, v.formula);
+    if (v.byLevel !== undefined) checkByLevel("values.json", `${p}.byLevel`, v.byLevel);
     if (v.min !== undefined && v.max !== undefined && v.min > v.max)
       err("values.json", p, "min is greater than max");
   });
@@ -396,7 +414,7 @@ export function validatePackageFiles(files: PackageFiles): ValidationResult {
       if (g.value !== undefined) {
         if (!valueIds.has(g.value))
           err(file, `${gp}.value`, `unknown value ${lit(g.value)}${known(valueIds)}`);
-        if (typeof g.add === "string") checkExpr(file, `${gp}.add`, g.add);
+        if (g.add !== undefined) checkAmountSource(file, `${gp}.add`, g.add);
       }
       if (g.atLevel !== undefined && g.atLevel < flow.level.min) {
         warn(file, `${gp}.atLevel`, `level ${g.atLevel} is below the lowest level ${flow.level.min}`);
@@ -405,6 +423,13 @@ export function validatePackageFiles(files: PackageFiles): ValidationResult {
     if (t.about !== undefined) {
       if (!thingById.has(t.about)) err(file, `${p}.about`, `unknown thing ${lit(t.about)}`);
       if (t.about === t.id) err(file, `${p}.about`, "a thing cannot be about itself");
+    }
+    if (t.repeatable && !t.grants?.some((g) => g.choice !== undefined)) {
+      warn(
+        file,
+        `${p}.repeatable`,
+        "the thing grants no choice; picking it again changes nothing (a thing counts once)",
+      );
     }
     if (t.card && !(t.kind in sheet.cards)) {
       err(file, `${p}.card`, `card is set, but sheet.json has no card layout for kind ${lit(t.kind)}`);
@@ -436,9 +461,10 @@ export function validatePackageFiles(files: PackageFiles): ValidationResult {
         const options = checkOptionSource(F, `${p}.options`, c.options);
         const optionIds = new Set(options.map((o) => o.id));
         if (c.kind === "pickMany") {
-          if (typeof c.count === "string") checkExpr(F, `${p}.count`, c.count);
-          else if (c.count > options.length && options.length > 0) {
-            err(F, `${p}.count`, `asks for ${c.count} but only ${options.length} options exist`);
+          checkAmountSource(F, `${p}.count`, c.count);
+          const most = typeof c.count === "object" ? Math.max(...c.count.byLevel) : c.count;
+          if (typeof most === "number" && most > options.length && options.length > 0) {
+            err(F, `${p}.count`, `asks for ${most} but only ${options.length} options exist`);
           }
         }
         c.recommend?.forEach((r, j) => {
@@ -465,16 +491,25 @@ export function validatePackageFiles(files: PackageFiles): ValidationResult {
         break;
       }
       case "distribute": {
+        // Raising adds on top of any value; the other methods set a value's base.
+        const raise = c.methods.find((m) => m.method === "raise");
+        if (raise && c.methods.length > 1)
+          err(F, `${p}.methods`, '"raise" adds to values and cannot be offered next to other methods');
         c.targets.forEach((v, j) => {
           const value = valueById.get(v);
           if (!value) err(F, `${p}.targets[${j}]`, `unknown value ${lit(v)}`);
-          else if (value.formula !== undefined)
+          else if (!raise && (value.formula !== undefined || value.byLevel !== undefined))
             err(F, `${p}.targets[${j}]`, `value ${lit(v)} has a formula and cannot take input`);
         });
         c.methods.forEach((m, j) => {
           const mp = `${p}.methods[${j}]`;
           if (m.method === "array" && m.values.length !== c.targets.length) {
             err(F, `${mp}.values`, `has ${m.values.length} numbers for ${c.targets.length} targets`);
+          }
+          if (m.method === "raise") {
+            if (typeof m.cap === "string") checkExpr(F, `${mp}.cap`, m.cap);
+            if (m.maxPerTarget !== undefined && m.maxPerTarget > m.points)
+              warn(F, `${mp}.maxPerTarget`, `is more than the ${m.points} points there are`);
           }
           if (m.method === "pointBuy") {
             const scores = Object.keys(m.costs)
@@ -496,13 +531,21 @@ export function validatePackageFiles(files: PackageFiles): ValidationResult {
             if (!c.targets.includes(k))
               err(F, `${p}.recommend[${j}].assign.${k}`, `${lit(k)} is not a target of this choice`);
           }
+          if (raise) {
+            const most = raise.maxPerTarget ?? raise.points;
+            const amounts = Object.values(r.assign);
+            if (amounts.some((n) => n < 0 || n > most))
+              err(F, `${p}.recommend[${j}].assign`, `gives a target less than 0 or more than ${most} points`);
+            if (amounts.reduce((a, b) => a + b, 0) > raise.points)
+              err(F, `${p}.recommend[${j}].assign`, `gives more than the ${raise.points} points there are`);
+          }
         });
         break;
       }
       case "number": {
         const value = valueById.get(c.target);
         if (!value) err(F, `${p}.target`, `unknown value ${lit(c.target)}`);
-        else if (value.formula !== undefined)
+        else if (value.formula !== undefined || value.byLevel !== undefined)
           err(F, `${p}.target`, `value ${lit(c.target)} has a formula and cannot take input`);
         if (typeof c.min === "string") checkExpr(F, `${p}.min`, c.min);
         if (typeof c.max === "string") checkExpr(F, `${p}.max`, c.max);

@@ -65,15 +65,17 @@ describe("explainValue", () => {
   });
 
   it("gives no explanation when a maximum cut the value", () => {
+    // Grace 12 from the scores and 1 from the upbringing, cut to 12.
+    const capped = { ...pkg, values: pkg.values.map((v) => (v.id === "grace" ? { ...v, max: 12 } : v)) };
     const ev = evaluateDraft(
-      pkg,
-      build(pkg, 1, [
+      capped,
+      build(capped, 1, [
         ...LANTERN_BEARER.slice(0, 4),
         ["scores", { method: 0, assign: { might: 6, grace: 12, wit: 7, heart: 8 } }],
       ]),
     );
     expect(ev.values["grace"]).toBe(12);
-    expect(explainValue(pkg, ev, "grace")).toBeUndefined();
+    expect(explainValue(capped, ev, "grace")).toBeUndefined();
   });
 
   it("follows a base and a bonus set in two places to the value that adds them", () => {

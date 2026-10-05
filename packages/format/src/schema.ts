@@ -36,6 +36,15 @@ export const unitId = z.string().regex(UNIT_PATTERN, 'must be a short lowercase 
 /** An expression string; parsed and checked in validate.ts. */
 export const expr = z.string().min(1, "expression must not be empty");
 const level = z.number().int().min(1);
+
+/**
+ * A number per character level: entry 0 applies at `flow.level.min`, the
+ * last at `flow.level.max` (the validator checks the length). For tables
+ * like "slots per level" that would be long `if()` chains as a formula.
+ */
+export const byLevelSchema = z.strictObject({ byLevel: z.array(z.number()).min(1) });
+/** A number, an expression or a table by level. */
+export const amountSchema = z.union([z.number(), expr, byLevelSchema]);
 const span = z.union([z.literal(3), z.literal(4), z.literal(6), z.literal(8), z.literal(12)]);
 
 // ------------------------------------------------------------------ manifest
@@ -118,11 +127,13 @@ export const valueSchema = z
     default: z.number().optional(),
     /** Expression computing the value before modifiers are added. */
     formula: expr.optional(),
+    /** The value before modifiers, one number per character level (like a formula). */
+    byLevel: z.array(z.number()).min(1).optional(),
     min: z.number().optional(),
     max: z.number().optional(),
   })
-  .refine((v) => !(v.formula !== undefined && v.default !== undefined), {
-    message: "use either formula or default, not both",
+  .refine((v) => [v.formula, v.default, v.byLevel].filter((x) => x !== undefined).length <= 1, {
+    message: "use only one of formula, default and byLevel",
   });
 
 export const valuesSchema = z.array(valueSchema);
@@ -137,8 +148,8 @@ export const grantSchema = z
     choice: id.optional(),
     /** Add to this value ... */
     value: valueId.optional(),
-    /** ... this number or expression. */
-    add: z.union([z.number(), expr]).optional(),
+    /** ... this number, expression or table by level. */
+    add: amountSchema.optional(),
     /** Character level from which the grant applies. Default 1. */
     atLevel: level.optional(),
   })
@@ -179,6 +190,11 @@ export const thingSchema = z.strictObject({
   about: id.optional(),
   /** Print a card for this thing (layout from sheet.json "cards" by kind). */
   card: z.boolean().optional(),
+  /**
+   * May be picked again in another choice although the character has it.
+   * Each pick asks the choices it grants anew, as copies `<choice>@<where picked>`.
+   */
+  repeatable: z.boolean().optional(),
 });
 
 export const thingsFileSchema = z.array(thingSchema);
@@ -241,6 +257,19 @@ export const arraySchema = z.strictObject({
   values: z.array(z.number().int()).min(1),
 });
 
+/**
+ * Adds points on top of the targets' current values (not their base):
+ * `points` in all, at most `maxPerTarget` on one target, no target above `cap`.
+ */
+export const raiseSchema = z.strictObject({
+  method: z.literal("raise"),
+  points: z.number().int().positive(),
+  /** Default: `points`. */
+  maxPerTarget: z.number().int().positive().optional(),
+  /** Highest value a target may reach with these points: a number or an expression. */
+  cap: z.union([z.number(), expr]).optional(),
+});
+
 export const choiceSchema = z.discriminatedUnion("kind", [
   z.strictObject({
     ...choiceBase,
@@ -255,8 +284,12 @@ export const choiceSchema = z.discriminatedUnion("kind", [
     ...choiceBase,
     kind: z.literal("pickMany"),
     options: optionSourceSchema,
-    /** How many to pick: a number or an expression. */
-    count: z.union([z.number().int().positive(), expr]),
+    /** How many to pick: a number, an expression or a table by level. */
+    count: z.union([
+      z.number().int().positive(),
+      expr,
+      z.strictObject({ byLevel: z.array(z.number().int().positive()).min(1) }),
+    ]),
     /** If true, up to `count`; otherwise exactly `count`. */
     upTo: z.boolean().optional(),
     recommend: z.array(pickRecommendation).optional(),
@@ -267,7 +300,7 @@ export const choiceSchema = z.discriminatedUnion("kind", [
     ...choiceBase,
     kind: z.literal("distribute"),
     targets: z.array(valueId).min(1),
-    methods: z.array(z.discriminatedUnion("method", [pointBuySchema, arraySchema])).min(1),
+    methods: z.array(z.discriminatedUnion("method", [pointBuySchema, arraySchema, raiseSchema])).min(1),
     recommend: z
       .array(z.strictObject({ when: expr.optional(), assign: z.record(valueId, z.number().int()) }))
       .optional(),
@@ -296,6 +329,19 @@ export const choiceSchema = z.discriminatedUnion("kind", [
     of: id,
   }),
 ]);
+
+/**
+ * Choices granted by a repeatable thing are asked once per pick of it, as
+ * copies with the id `<choice>@<where the thing was picked>`. A copy uses
+ * the declared choice's rules and texts.
+ */
+export const COPY_SEPARATOR = "@";
+
+/** The declared choice of a choice id: itself, or for a copy the choice it copies. */
+export function declaredChoiceId(id: string): string {
+  const i = id.indexOf(COPY_SEPARATOR);
+  return i < 0 ? id : id.slice(0, i);
+}
 
 export const fixedStepSchema = z.strictObject({
   id,
@@ -434,6 +480,8 @@ export type Units = z.infer<typeof unitsSchema>;
 export type Quantity = z.infer<typeof quantitySchema>;
 export type Value = z.infer<typeof valueSchema>;
 export type Grant = z.infer<typeof grantSchema>;
+export type ByLevel = z.infer<typeof byLevelSchema>;
+export type Amount = z.infer<typeof amountSchema>;
 export type StatValue = z.infer<typeof statValueSchema>;
 export type Thing = z.infer<typeof thingSchema>;
 export type OptionSource = z.infer<typeof optionSourceSchema>;

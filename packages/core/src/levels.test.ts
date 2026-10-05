@@ -1,0 +1,353 @@
+/**
+ * Levels 1 to 20 with the demo package: raising scores with a cap, tables
+ * by level, repeatable things, the level of each step, and "choose for me"
+ * finishing a character at any level.
+ */
+import { DEMO_PACKAGE_DIR } from "@builder/demo-package";
+import { validatePackageDir, type ContentPackage } from "@builder/format";
+import { beforeAll, describe, expect, it } from "vitest";
+import {
+  applyChange,
+  evaluateDraft,
+  explainValue,
+  judgeAnswer,
+  newDraft,
+  type ChoiceState,
+  type DraftChange,
+  type DraftDocument,
+  type Evaluation,
+} from "./index.ts";
+
+let pkg: ContentPackage;
+beforeAll(async () => {
+  const r = await validatePackageDir(DEMO_PACKAGE_DIR);
+  if (!r.package) throw new Error("demo package is invalid");
+  pkg = r.package;
+});
+
+function apply(doc: DraftDocument, change: DraftChange): DraftDocument {
+  const r = applyChange(pkg, doc, change);
+  if (!r.ok) throw new Error(`${JSON.stringify(change)}: ${JSON.stringify(r.error)}`);
+  return r.doc;
+}
+
+/** What "choose for me" answers for one open choice (as the step screen does), or undefined. */
+function recommendation(s: ChoiceState): unknown {
+  const def = pkg.flow.choices.find((c) => c.id === (s.copyOf ?? s.id))!;
+  const rec = s.recommended;
+  if (def.kind === "pickOne" && Array.isArray(rec) && rec[0]) return { pick: rec[0] };
+  if (def.kind === "pickMany" && Array.isArray(rec) && rec.length > 0) return { picks: rec };
+  if (def.kind === "distribute" && rec && !Array.isArray(rec)) return rec;
+  if (def.kind === "number" && def.default !== undefined) return { value: def.default };
+  if (def.kind === "text" && def.suggestions) return { text: "Mira Fennwick" };
+  return undefined;
+}
+
+/**
+ * A character built with nothing but "choose for me", step by step; only
+ * the calling is picked by hand. Fails if a step has no recommendation.
+ */
+function chooseForMe(level: number, calling: string): DraftDocument {
+  const created = newDraft(pkg, level);
+  if (!created.ok) throw new Error(JSON.stringify(created.error));
+  let doc = apply(created.doc, { type: "answer", choice: "calling", answer: { pick: calling } });
+  for (let guard = 0; guard < 200; guard++) {
+    const ev = evaluateDraft(pkg, doc);
+    if (ev.complete) return doc;
+    const step = ev.steps.find((s) => s.status !== "done")!;
+    if (step.pool) {
+      doc = apply(doc, { type: "pool", step: step.id, picks: step.pool.recommended });
+      continue;
+    }
+    const open = step.choices.map((c) => ev.choices[c]!).find((c) => c.status !== "answered")!;
+    const answer = recommendation(open);
+    if (answer === undefined) throw new Error(`no recommendation for ${open.id} at level ${level}`);
+    doc = apply(doc, { type: "answer", choice: open.id, answer });
+  }
+  throw new Error(`level ${level} ${calling} did not complete`);
+}
+
+const CALLINGS = ["calling.lantern-bearer", "calling.river-runner", "calling.herbalist"];
+
+describe("choose for me at every level", () => {
+  it.each(CALLINGS.flatMap((c) => [1, 5, 11, 20].map((level) => [c, level] as const)))(
+    "builds a %s at level %i",
+    (calling, level) => {
+      const ev = evaluateDraft(pkg, chooseForMe(level, calling));
+      expect(ev.complete).toBe(true);
+      expect(ev.steps.every((s) => s.atLevel <= level)).toBe(true);
+      expect(ev.steps.filter((s) => s.id.startsWith("boon-") && !s.id.includes("@")).length).toBe(
+        [4, 8, 12, 16, 19].filter((l) => l <= level).length,
+      );
+    },
+  );
+
+  it("evaluates a level-20 character in well under 50 ms", () => {
+    const doc = chooseForMe(20, "calling.herbalist");
+    evaluateDraft(pkg, doc); // warm up: parsed expressions are cached
+    const times: number[] = [];
+    for (let i = 0; i < 20; i++) {
+      const start = performance.now();
+      evaluateDraft(pkg, doc);
+      times.push(performance.now() - start);
+    }
+    times.sort((a, b) => a - b);
+    expect(times[10]).toBeLessThan(50);
+  });
+});
+
+describe("a level-20 lantern bearer, worked out by hand", () => {
+  let doc: DraftDocument;
+  let ev: Evaluation;
+  beforeAll(() => {
+    doc = chooseForMe(20, "calling.lantern-bearer");
+    ev = evaluateDraft(pkg, doc);
+  });
+
+  it("has every value the hand calculation gives", () => {
+    // Scores (recommendation): might 8, grace 7, wit 9, heart 11; the ferry child gives grace 1.
+    // Boons 4 and 8 raise heart 11 → 13 → 15; then heart is above 13, so 12, 16 and 19 raise wit 9 → 15.
+    expect(ev.values).toEqual({
+      might: 8,
+      grace: 8,
+      wit: 15,
+      heart: 15,
+      mightBonus: 0, // floor(8 / 3) - 2
+      graceBonus: 0,
+      witBonus: 3, // floor(15 / 3) - 2
+      heartBonus: 3,
+      stamina: 103, // 0 * 20 + 8 + 5 + 5 + 5 * (20 - 3)
+      guard: 9, // 6 + 0 + reed shield 2 + warding glow 1
+      pace: 25, // moorfolk
+      luck: 3, // min(3, 1 + 3)
+      nerve: 14, // 1 + floor(20 / 2) + 3
+      carry: 40, // 8 * 5
+      practice: 6, // floor(19 / 4) + 2
+      sneakRoll: 0, // grace bonus 0, sneaking not trained
+      knackRank: 5,
+      lanternSlots1: 3,
+      lanternSlots2: 2,
+      lanternSlots3: 2,
+      lanternSlots4: 2,
+      lanternSlots5: 2,
+      lanternSlots6: 2,
+      lanternSlots7: 1,
+      lanternSlots8: 1,
+      lanternSlots9: 2,
+      age: 20,
+    });
+  });
+
+  it("asks the boons in level order, each raise right after the boon that brought it", () => {
+    const ids = ev.steps.map((s) => s.id);
+    const from = ids.indexOf("boon-4");
+    expect(ids.slice(from, from + 10)).toEqual([
+      "boon-4",
+      "boon-raise@boon-4",
+      "boon-8",
+      "boon-raise@boon-8",
+      "boon-12",
+      "boon-raise@boon-12",
+      "boon-16",
+      "boon-raise@boon-16",
+      "boon-19",
+      "boon-raise@boon-19",
+    ]);
+    expect(ids.indexOf("scores")).toBeLessThan(from);
+    expect(ev.steps.length).toBeGreaterThanOrEqual(20);
+  });
+
+  it("names the level each step comes from", () => {
+    const at = Object.fromEntries(ev.steps.map((s) => [s.id, s.atLevel]));
+    expect(at).toMatchObject({
+      character: 1,
+      calling: 1,
+      scores: 1,
+      path: 3,
+      "lantern-vow": 11,
+      "boon-4": 4,
+      "boon-raise@boon-4": 4,
+      "boon-19": 19,
+      "boon-raise@boon-19": 19,
+    });
+    // The list step holds choices from level 1 and 2: it is there from level 1.
+    expect(at["talents"]).toBe(1);
+    // Levelling up from 11 to 20 adds exactly these steps.
+    expect(ev.steps.filter((s) => s.atLevel > 11).map((s) => s.id)).toEqual([
+      "boon-12",
+      "boon-raise@boon-12",
+      "boon-16",
+      "boon-raise@boon-16",
+      "boon-19",
+      "boon-raise@boon-19",
+    ]);
+    expect(ev.choices["boon-raise@boon-12"]!.atLevel).toBe(12);
+    expect(ev.things.find((t) => t.id === "trait.undying-flame")?.atLevel).toBe(17);
+    expect(ev.things.find((t) => t.id === "knack.lantern-call")?.atLevel).toBe(3);
+  });
+
+  it("keeps a repeatable thing once, and asks its choice once per pick", () => {
+    expect(ev.things.filter((t) => t.id === "boon.raise")).toHaveLength(1);
+    expect(ev.choices["boon-8"]!.options).toContain("boon.raise");
+    expect(ev.choices["boon-raise@boon-8"]).toMatchObject({ copyOf: "boon-raise", kind: "distribute" });
+    expect(ev.choices["boon-raise"]).toBeUndefined();
+    expect(ev.raises["heart"]).toEqual([
+      { amount: 2, choice: "boon-raise@boon-4" },
+      { amount: 2, choice: "boon-raise@boon-8" },
+    ]);
+  });
+
+  it("explains a raised value by the answers that raised it", () => {
+    expect(explainValue(pkg, ev, "heart")?.parts).toEqual([
+      { amount: 11, source: { kind: "choice", choice: "scores" } },
+      { amount: 2, source: { kind: "choice", choice: "boon-raise@boon-4" } },
+      { amount: 2, source: { kind: "choice", choice: "boon-raise@boon-8" } },
+    ]);
+    // A table given by the calling is the calling's; a value's own table is the level's.
+    expect(explainValue(pkg, ev, "lanternSlots9")?.parts).toEqual([
+      { amount: 2, source: { kind: "thing", thing: "calling.lantern-bearer" } },
+    ]);
+    expect(explainValue(pkg, ev, "knackRank")?.parts).toEqual([
+      { amount: 5, source: { kind: "values", values: ["level"] } },
+    ]);
+  });
+
+  it("keeps the answers of higher levels when the level goes down, and uses them again when it goes up", () => {
+    const low = apply(doc, { type: "setLevel", level: 5 });
+    const ev5 = evaluateDraft(pkg, low);
+    // Level 5 asks 4 lantern knacks of rank 2 at most; the 8 picked at level 20 include
+    // higher ranks. Nothing else is open.
+    expect(ev5.open).toEqual(["knacks-lantern"]);
+    expect(ev5.choices["knacks-lantern"]).toMatchObject({
+      count: 4,
+      status: "invalid",
+      problem: "notOffered",
+    });
+    expect(ev5.inactiveAnswers).toEqual(
+      expect.arrayContaining(["boon-8", "boon-raise@boon-8", "boon-19", "boon-raise@boon-19", "lantern-vow"]),
+    );
+    expect(ev5.inactiveAnswers).not.toContain("boon-4");
+    expect(ev5.values["heart"]).toBe(13);
+    expect(ev5.values["wit"]).toBe(9);
+
+    const back = evaluateDraft(pkg, apply(low, { type: "setLevel", level: 20 }));
+    expect(back.complete).toBe(true);
+    expect(back.values).toEqual(ev.values);
+    expect(back.inactiveAnswers).toEqual([]);
+  });
+
+  it("keeps a later copy's answer when an earlier pick of the repeatable thing changes", () => {
+    const changed = apply(doc, { type: "answer", choice: "boon-4", answer: { pick: "boon.sure-step" } });
+    const ev2 = evaluateDraft(pkg, changed);
+    expect(ev2.inactiveAnswers).toContain("boon-raise@boon-4");
+    expect(ev2.choices["boon-raise@boon-8"]!.status).toBe("answered");
+    // Sure step: pace 5 more, stamina 1 more per level.
+    expect(ev2.values["pace"]).toBe(30);
+    expect(ev2.values["stamina"]).toBe(123);
+  });
+});
+
+describe("raising values", () => {
+  let doc: DraftDocument;
+  beforeAll(() => {
+    doc = chooseForMe(8, "calling.lantern-bearer");
+  });
+  const raise = (d: DraftDocument, choice: string, assign: Record<string, number>) =>
+    applyChange(pkg, d, { type: "answer", choice, answer: { method: 0, assign } });
+
+  it("adds points on top of the value, up to the cap", () => {
+    const ev = evaluateDraft(pkg, doc);
+    const state = ev.choices["boon-raise@boon-8"]!;
+    // Heart 13 before boon 8 (11 + 2 from boon 4): it can still take 2.
+    expect(state.raise).toEqual({
+      points: 2,
+      before: { might: 8, grace: 8, wit: 9, heart: 13 },
+      most: { might: 2, grace: 2, wit: 2, heart: 2 },
+    });
+    const r = raise(doc, "boon-raise@boon-8", { might: 1, grace: 1 });
+    expect(r.ok).toBe(true);
+    const after = evaluateDraft(pkg, r.ok ? r.doc : doc);
+    expect([after.values["might"], after.values["grace"], after.values["heart"]]).toEqual([9, 9, 13]);
+  });
+
+  it("refuses more than the points, more than one target may take, and values that are not targets", () => {
+    const problem = (assign: Record<string, number>) => {
+      const r = raise(doc, "boon-raise@boon-8", assign);
+      return r.ok ? "ok" : r.error;
+    };
+    expect(problem({ might: 2, grace: 1 })).toEqual({ code: "answerDoesNotFit", problem: "overBudget" });
+    expect(problem({ might: 3 })).toEqual({ code: "answerDoesNotFit", problem: "outOfRange" });
+    expect(problem({ luck: 1, might: 1 })).toEqual({ code: "answerDoesNotFit", problem: "badAssignment" });
+    expect(problem({ might: -1, grace: 2 })).toEqual({ code: "answerDoesNotFit", problem: "badAssignment" });
+  });
+
+  it("refuses to go over the cap, and is complete with fewer points only when no target can take more", () => {
+    // Keen senses: 1 point on wit or heart, cap 10 + practice (4 at level 8): 14.
+    const keen = (assign: Record<string, number>) =>
+      judgeAnswer(
+        pkg.flow.choices.find((c) => c.id === "keen-senses-raise")!,
+        { method: 0, assign },
+        { raise: { points: 1, most: { wit: 0, heart: 1 } } },
+      );
+    expect(keen({ wit: 1 })).toMatchObject({ status: "invalid", problem: "outOfRange" });
+    expect(keen({})).toMatchObject({ status: "incomplete", remaining: 1 });
+    expect(keen({ heart: 1 })).toEqual({ status: "answered", raises: { heart: 1 } });
+    const full = judgeAnswer(
+      pkg.flow.choices.find((c) => c.id === "keen-senses-raise")!,
+      { method: 0, assign: {} },
+      { raise: { points: 1, most: { wit: 0, heart: 0 } } },
+    );
+    expect(full).toEqual({ status: "answered", raises: {} });
+  });
+
+  it("recommends the package's assignment as far as it fits, the rest in order", () => {
+    // Boon 8 with heart already at 15: the package says wit 2.
+    const at15 = apply(doc, {
+      type: "answer",
+      choice: "boon-raise@boon-4",
+      answer: { method: 0, assign: { heart: 2 } },
+    });
+    const ev = evaluateDraft(pkg, at15);
+    expect(ev.choices["boon-raise@boon-8"]!.recommended).toEqual({ method: 0, assign: { heart: 2 } });
+    const high = {
+      ...at15,
+      answers: { ...at15.answers, scores: { method: 0, assign: { might: 8, grace: 7, wit: 9, heart: 12 } } },
+    };
+    // Heart 12 + 2 = 14: still at most 13 is false, so the package says wit; heart could take only 1.
+    const ev2 = evaluateDraft(pkg, high);
+    expect(ev2.values["heart"]).toBe(14);
+    expect(ev2.choices["boon-raise@boon-8"]!.recommended).toEqual({ method: 0, assign: { wit: 2 } });
+  });
+});
+
+describe("tables by level", () => {
+  it("takes a value's base, a grant's amount and a pick count from the row of the level", () => {
+    const at = (level: number) => evaluateDraft(pkg, chooseForMe(level, "calling.lantern-bearer"));
+    const l1 = at(1);
+    const l9 = at(9);
+    expect([l1.values["knackRank"], l9.values["knackRank"]]).toEqual([1, 3]);
+    expect([l1.values["lanternSlots1"], l9.values["lanternSlots5"]]).toEqual([1, 1]);
+    expect([l1.choices["knacks-lantern"]!.count, l9.choices["knacks-lantern"]!.count]).toEqual([2, 5]);
+    // knackRank 3 at level 9 offers the rank-3 knack, not yet the rank-4 one.
+    expect(l9.choices["knacks-lantern"]!.options).toContain("knack.dawn-flare");
+    expect(l9.choices["knacks-lantern"]!.options).not.toContain("knack.star-lantern");
+    // Without the calling that gives them, the slots stay 0.
+    const runner = evaluateDraft(pkg, chooseForMe(20, "calling.river-runner"));
+    expect(runner.values["lanternSlots9"]).toBe(0);
+  });
+
+  it("puts the practice bonus into the values that use it", () => {
+    const practice = [1, 4, 5, 8, 9, 13, 17, 20].map(
+      (level) => evaluateDraft(pkg, { level, answers: {} }).values["practice"],
+    );
+    expect(practice).toEqual([2, 2, 3, 3, 4, 5, 6, 6]);
+    // The river runner trains sneaking: grace bonus + practice.
+    const ev = evaluateDraft(pkg, chooseForMe(20, "calling.river-runner"));
+    expect(ev.things.some((t) => t.id === "talent.sneaking")).toBe(true);
+    expect(ev.values["sneakRoll"]).toBe(ev.values["graceBonus"]! + 6);
+    expect(explainValue(pkg, ev, "sneakRoll")?.parts).toContainEqual({
+      amount: 6,
+      source: { kind: "values", values: ["practice"] },
+    });
+  });
+});

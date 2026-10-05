@@ -33,11 +33,24 @@ function answerFor(c: ChoiceState, name: string): unknown {
   }
 }
 
-/** A complete character at `level`, every open choice answered in step order. */
-export function demoCharacter(pkg: ContentPackage, level = 3, name = "Mira Fennwick"): DraftDocument {
+/**
+ * A complete character at `level`, every open choice answered in step order;
+ * `calling` (a thing key) is picked first instead of the recommended one.
+ */
+export function demoCharacter(
+  pkg: ContentPackage,
+  level = 3,
+  name = "Mira Fennwick",
+  calling?: string,
+): DraftDocument {
   const created = newDraft(pkg, level);
   if (!created.ok) throw new Error(JSON.stringify(created.error));
   let doc = created.doc;
+  if (calling) {
+    const r = applyChange(pkg, doc, { type: "answer", choice: "calling", answer: { pick: calling } });
+    if (!r.ok) throw new Error(JSON.stringify(r.error));
+    doc = r.doc;
+  }
   for (let guard = 0; guard < 100; guard++) {
     const ev = evaluateDraft(pkg, doc);
     if (ev.complete) return doc;

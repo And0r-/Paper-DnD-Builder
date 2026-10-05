@@ -21,7 +21,7 @@ import {
 import { distributeLines, valueOrigin } from "../../../../src/ui/flow/explain.ts";
 import { describeAnswer, OVERVIEW_KEY, positionOf } from "../../../../src/ui/flow/model.ts";
 import { Origins } from "../../../../src/ui/flow/origins.tsx";
-import { choiceTexts, formatValue, ptext } from "../../../../src/ui/package-text.ts";
+import { choiceOf, choiceTexts, formatValue, ptext } from "../../../../src/ui/package-text.ts";
 
 export default function OverviewPage() {
   const { t, tc, list } = useApp();
@@ -100,11 +100,17 @@ export default function OverviewPage() {
               ? [String(ev.level)]
               : s.choices.flatMap((c) => {
                   const state = ev.choices[c]!;
-                  const choice = lp.pkg.flow.choices.find((x) => x.id === c);
+                  const choice = choiceOf(lp, c);
                   const assign = (state.answer as { assign?: Record<string, number> } | undefined)?.assign;
                   // Each score on its own line, with what else adds to it ("15 + 2 from … = 17").
-                  if (choice?.kind === "distribute" && assign && state.status !== "invalid")
-                    return distributeLines(lp, ctx, ev, state, choice.targets, assign, { t, list });
+                  if (choice?.kind === "distribute" && assign && state.status !== "invalid") {
+                    // Raised values: only those that got points.
+                    const raise = choice.methods[0]?.method === "raise";
+                    const targets = raise
+                      ? choice.targets.filter((v) => (assign[v] ?? 0) > 0)
+                      : choice.targets;
+                    return distributeLines(lp, ctx, ev, state, targets, assign, { t, list });
+                  }
                   const text = describeAnswer(lp, ctx, state, list);
                   const prefix = s.choices.length > 1 ? `${choiceTexts(lp, c, state, ctx).title}: ` : "";
                   return [

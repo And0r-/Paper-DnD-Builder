@@ -10,7 +10,8 @@
         { "value": "guard", "style": "number" },
         { "value": "pace", "style": "number" },
         { "value": "luck", "style": "circles" },
-        { "value": "nerve", "style": "number", "label": "sheet.primary.nerve" }
+        { "value": "nerve", "style": "number", "label": "sheet.primary.nerve" },
+        { "value": "practice", "style": "number" }
       ]
     },
     {
@@ -25,8 +26,83 @@
       ]
     },
     { "id": "talents", "kind": "checkList", "span": 8, "things": { "kind": "talent" }, "note": "score" },
+    {
+      "id": "rolls",
+      "kind": "statBoxes",
+      "span": 4,
+      "boxes": [{ "value": "sneakRoll", "style": "number", "label": "sheet.rolls.sneak" }]
+    },
     { "id": "traits", "kind": "featureTable", "span": 8, "things": { "kind": "trait" }, "uses": "uses" },
     { "id": "knacks", "kind": "featureTable", "span": 8, "things": { "kind": "knack" }, "uses": "uses" },
+    {
+      "id": "lantern-slots",
+      "kind": "statBoxes",
+      "span": 12,
+      "when": "has('calling.lantern-bearer')",
+      "boxes": [
+        {
+          "value": "lanternSlots1",
+          "style": "circles",
+          "label": "sheet.lantern-slots.rank1",
+          "when": "lanternSlots1 > 0"
+        },
+        {
+          "value": "lanternSlots2",
+          "style": "circles",
+          "label": "sheet.lantern-slots.rank2",
+          "when": "lanternSlots2 > 0"
+        },
+        {
+          "value": "lanternSlots3",
+          "style": "circles",
+          "label": "sheet.lantern-slots.rank3",
+          "when": "lanternSlots3 > 0"
+        },
+        {
+          "value": "lanternSlots4",
+          "style": "circles",
+          "label": "sheet.lantern-slots.rank4",
+          "when": "lanternSlots4 > 0"
+        },
+        {
+          "value": "lanternSlots5",
+          "style": "circles",
+          "label": "sheet.lantern-slots.rank5",
+          "when": "lanternSlots5 > 0"
+        }
+      ]
+    },
+    {
+      "id": "lantern-slots-high",
+      "kind": "statBoxes",
+      "span": 12,
+      "boxes": [
+        {
+          "value": "lanternSlots6",
+          "style": "circles",
+          "label": "sheet.lantern-slots.rank6",
+          "when": "lanternSlots6 > 0"
+        },
+        {
+          "value": "lanternSlots7",
+          "style": "circles",
+          "label": "sheet.lantern-slots.rank7",
+          "when": "lanternSlots7 > 0"
+        },
+        {
+          "value": "lanternSlots8",
+          "style": "circles",
+          "label": "sheet.lantern-slots.rank8",
+          "when": "lanternSlots8 > 0"
+        },
+        {
+          "value": "lanternSlots9",
+          "style": "circles",
+          "label": "sheet.lantern-slots.rank9",
+          "when": "lanternSlots9 > 0"
+        }
+      ]
+    },
     { "id": "path", "kind": "featureTable", "span": 4, "things": { "kind": "path" }, "when": "level >= 3" },
     { "id": "gear", "kind": "list", "span": 6, "things": { "kind": "item" }, "blankLines": 4 },
     { "id": "how-to-play", "kind": "helpBox", "span": 6 },
