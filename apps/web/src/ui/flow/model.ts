@@ -12,7 +12,7 @@ import {
 } from "@builder/core";
 import type { ContentPackage } from "@builder/format/pure";
 import type { Translator } from "../../i18n/index.ts";
-import { choiceTexts, grantedValue, plain, ptext, stepTexts, thingName } from "../package-text.ts";
+import { choiceOf, choiceTexts, grantedValue, plain, ptext, stepTexts, thingName } from "../package-text.ts";
 import type { LoadedPackage } from "../packages.ts";
 
 export type EntryStatus = "done" | "open" | "needsAttention";
@@ -127,7 +127,7 @@ export function buildFlow(
  */
 export function gatherGroupOf(lp: LoadedPackage, step: Evaluation["steps"][number]): string | undefined {
   if (step.origin !== "granted") return undefined;
-  const group = lp.pkg.flow.choices.find((c) => c.id === step.choices[0])?.gather;
+  const group = step.choices[0] !== undefined ? choiceOf(lp, step.choices[0])?.gather : undefined;
   if (group === undefined) return undefined;
   return lp.pkg.flow.steps.some((f) => "gather" in f && f.gather === group) ? group : undefined;
 }
@@ -258,7 +258,7 @@ export function describeAnswer(
   list: Translator["list"],
 ): string | undefined {
   const answer = state.answer as Record<string, unknown> | undefined;
-  const choice = lp.pkg.flow.choices.find((c) => c.id === state.id);
+  const choice = choiceOf(lp, state.id);
   if (!choice) return undefined;
   switch (state.kind) {
     case "info": {
@@ -279,6 +279,12 @@ export function describeAnswer(
     case "distribute": {
       const assign = answer?.["assign"] as Record<string, number> | undefined;
       if (!assign || choice.kind !== "distribute") return undefined;
+      // Raised values: only those that got points, as "+2".
+      if (choice.methods[0]?.method === "raise")
+        return choice.targets
+          .filter((v) => (assign[v] ?? 0) > 0)
+          .map((v) => `${ptext(lp, `value.${v}.name`) ?? v} +${assign[v]}`)
+          .join(" · ");
       return choice.targets
         .map((v) => `${ptext(lp, `value.${v}.name`) ?? v} ${assign[v] ?? "–"}`)
         .join(" · ");

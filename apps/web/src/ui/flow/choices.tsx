@@ -466,7 +466,17 @@ export function DistributeChoice({
           onChange={changeMethod}
         />
       )}
-      {m.method === "pointBuy" ? (
+      {m.method === "raise" ? (
+        <RaisePoints
+          key={`ra-${round}`}
+          lp={lp}
+          targets={choice.targets}
+          raise={state.raise ?? { points: m.points, before: {}, most: {} }}
+          initial={stored?.method === method ? stored.assign : undefined}
+          onSave={save}
+          tc={tc}
+        />
+      ) : m.method === "pointBuy" ? (
         <PointBuy
           key={`pb-${method}-${round}`}
           lp={lp}
@@ -584,6 +594,97 @@ function PointBuy({
                   aria-label={t("dist.increase", { name })}
                   aria-disabled={score >= high || !affordable || undefined}
                   onClick={() => score < high && set(v, score + 1)}
+                >
+                  <Icon name="plus" />
+                </button>
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
+/**
+ * Points added on top of the values the character already has (a boon on a
+ * higher level). Each row shows the value before and after; a row stops
+ * where the choice's cap or its most per value is reached.
+ */
+function RaisePoints({
+  lp,
+  targets,
+  raise,
+  initial,
+  onSave,
+  tc,
+}: {
+  lp: LoadedPackage;
+  targets: string[];
+  raise: NonNullable<ChoiceState["raise"]>;
+  initial: Record<string, number> | undefined;
+  onSave: (assign: Record<string, number>) => void;
+  tc: ReturnType<typeof useApp>["tc"];
+}) {
+  const { t } = useApp();
+  const [assign, setAssign] = useState<Record<string, number>>(() => initial ?? {});
+  const spent = targets.reduce((sum, v) => sum + (assign[v] ?? 0), 0);
+  const left = raise.points - spent;
+  const room = (v: string) => (raise.most[v] ?? 0) - (assign[v] ?? 0);
+  const stuck = left > 0 && targets.every((v) => room(v) <= 0);
+
+  const set = (v: string, added: number) => {
+    const next = { ...assign, [v]: added };
+    if (added === 0) delete next[v];
+    setAssign(next);
+    onSave(next);
+  };
+
+  return (
+    <div className="pointbuy">
+      <p className={left === 0 ? "pointbuy__left pointbuy__left--done" : "pointbuy__left"} aria-live="polite">
+        {left === 0 && <Icon name="check" size={20} />}
+        {left === 0 ? t("dist.allSpent") : stuck ? t("dist.noRoom") : tc("dist.left", left)}
+      </p>
+      <ul className="pointbuy__rows">
+        {targets.map((v) => {
+          const added = assign[v] ?? 0;
+          const before = raise.before[v] ?? 0;
+          const name = ptext(lp, `value.${v}.name`) ?? v;
+          return (
+            <li className="pointbuy__row" key={v}>
+              <div className="pointbuy__label">
+                <span className="pointbuy__name" id={`ra-${v}`}>
+                  {name}
+                </span>
+                <span className="pointbuy__explain">
+                  {t("dist.raiseValue", {
+                    name,
+                    before: String(before),
+                    added: String(added),
+                    value: String(before + added),
+                  })}
+                </span>
+              </div>
+              <div className="stepper">
+                <button
+                  type="button"
+                  className="stepper__btn"
+                  aria-label={t("dist.decrease", { name })}
+                  aria-disabled={added <= 0 || undefined}
+                  onClick={() => added > 0 && set(v, added - 1)}
+                >
+                  <Icon name="minus" />
+                </button>
+                <output className="stepper__value" aria-labelledby={`ra-${v}`} aria-live="polite">
+                  {before + added}
+                </output>
+                <button
+                  type="button"
+                  className="stepper__btn"
+                  aria-label={t("dist.increase", { name })}
+                  aria-disabled={left <= 0 || room(v) <= 0 || undefined}
+                  onClick={() => left > 0 && room(v) > 0 && set(v, added + 1)}
                 >
                   <Icon name="plus" />
                 </button>

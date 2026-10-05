@@ -22,7 +22,7 @@ import { useDraft } from "../../../../../src/ui/flow/draft-state.tsx";
 import { PoolList, poolMissingText } from "../../../../../src/ui/flow/pool.tsx";
 import { StepFooter, StepFrame, StepShortcuts, usePageTitle } from "../../../../../src/ui/flow/frame.tsx";
 import { firstOpen, missingText } from "../../../../../src/ui/flow/model.ts";
-import { choiceTexts, plist, stepTexts } from "../../../../../src/ui/package-text.ts";
+import { choiceOf, choiceTexts, plist, stepTexts } from "../../../../../src/ui/package-text.ts";
 import { useMeasure } from "../../../../../src/ui/components/RichText.tsx";
 
 function settled(c: ChoiceState): boolean {
@@ -56,7 +56,7 @@ export default function StepPage() {
   const texts = stepTexts(lp, step ?? { id: entry.key, choices: entry.choices }, ev, ctx);
   const pool = step?.pool;
   const choices = entry.choices
-    .map((id) => ({ def: lp.pkg.flow.choices.find((c) => c.id === id), state: ev.choices[id] }))
+    .map((id) => ({ def: choiceOf(lp, id), state: ev.choices[id] }))
     .filter((x): x is { def: Choice; state: ChoiceState } => x.def !== undefined && x.state !== undefined);
   // A gather step always shows its choices as sections under its own question.
   const single = choices.length === 1 && step?.gather === undefined;

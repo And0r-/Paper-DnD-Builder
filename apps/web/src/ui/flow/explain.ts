@@ -14,7 +14,7 @@ import {
 } from "@builder/core";
 import { collectRefs, parseExpr } from "@builder/format/pure";
 import type { Translator } from "../../i18n/index.ts";
-import { choiceTexts, formatValue, ptext, thingName } from "../package-text.ts";
+import { choiceOf, choiceTexts, formatValue, ptext, thingName } from "../package-text.ts";
 import type { LoadedPackage } from "../packages.ts";
 import { stepTitle } from "./model.ts";
 
@@ -147,11 +147,11 @@ export function laterSteps(lp: LoadedPackage, ev: Evaluation, valueId: string): 
   };
   walk(valueId);
   const steps: string[] = [];
-  for (const c of lp.pkg.flow.choices) {
+  for (const state of Object.values(ev.choices)) {
+    const c = choiceOf(lp, state.id);
     const sets =
-      c.kind === "distribute" ? c.targets : c.kind === "number" && c.target !== undefined ? [c.target] : [];
-    const state = ev.choices[c.id];
-    if (!state || state.status === "answered" || !sets.some((v) => seen.has(v))) continue;
+      c?.kind === "distribute" ? c.targets : c?.kind === "number" && c.target !== undefined ? [c.target] : [];
+    if (state.status === "answered" || !sets.some((v) => seen.has(v))) continue;
     if (!steps.includes(state.step)) steps.push(state.step);
   }
   const order = ev.steps.map((s) => s.id);

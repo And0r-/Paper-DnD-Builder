@@ -515,11 +515,12 @@ describe("formatVersionMismatch", () => {
 
 describe("levels 1 to 20 (format 0.9)", () => {
   /* eslint-disable @typescript-eslint/no-explicit-any -- tests poke into raw JSON */
-  const choiceIndex = (id: string) => demo.get("flow.json").choices.findIndex((c: any) => c.id === id);
+  const choiceIndex = (id: string) =>
+    (demo as RawFiles).get("flow.json").choices.findIndex((c: any) => c.id === id);
   const choice = (f: RawFiles, id: string) => f.get("flow.json").choices[choiceIndex(id)];
-  const valueIndex = (id: string) => demo.get("values.json").findIndex((v: any) => v.id === id);
+  const valueIndex = (id: string) => (demo as RawFiles).get("values.json").findIndex((v: any) => v.id === id);
   const thingIndex = (file: string, id: string) =>
-    demo.get(`things/${file}.json`).findIndex((t: any) => t.id === id);
+    (demo as RawFiles).get(`things/${file}.json`).findIndex((t: any) => t.id === id);
   /* eslint-enable @typescript-eslint/no-explicit-any */
 
   it("checks the shape of the new fields", () => {
@@ -550,7 +551,7 @@ describe("levels 1 to 20 (format 0.9)", () => {
       "a grant's table of the wrong length",
       (f) => (thing(f, "callings-and-paths", "calling.lantern-bearer").grants.at(-1).add = { byLevel: [1] }),
       () => {
-        const grants = demo.get("things/callings-and-paths.json")[0].grants.length;
+        const grants = (demo as RawFiles).get("things/callings-and-paths.json")[0].grants.length;
         return `things/callings-and-paths.json [0].grants[${grants - 1}].add.byLevel: has 1 numbers, but levels 1 to 20 need 20`;
       },
     ],
