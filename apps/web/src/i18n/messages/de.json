@@ -176,7 +176,7 @@
   "dist.arrayMissing": "Vergib noch die Zahlen: Tippe auf die Reihen.",
   "dist.raise": "Punkte dazugeben",
   "dist.noRoom": "Kein Wert kann weiter steigen. Die übrigen Punkte verfallen.",
-  "dist.raiseValue": "{name}: {before} + {added} = {value}",
+  "dist.raiseValue": "{before} + {added} = {value}",
   "number.decrease": "Weniger",
   "number.increase": "Mehr",
   "number.range": "Von {min} bis {max}",

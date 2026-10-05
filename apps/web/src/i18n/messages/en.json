@@ -176,7 +176,7 @@
   "dist.arrayMissing": "Give out the numbers first: tap the rows.",
   "dist.raise": "Add points",
   "dist.noRoom": "No value can go higher. The points left over are lost.",
-  "dist.raiseValue": "{name}: {before} + {added} = {value}",
+  "dist.raiseValue": "{before} + {added} = {value}",
   "number.decrease": "Less",
   "number.increase": "More",
   "number.range": "From {min} to {max}",

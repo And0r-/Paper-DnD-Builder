@@ -38,6 +38,7 @@ export default function LevelPage() {
           label: String(min + i),
         }))}
         value={ev.level}
+        grid={max - min + 1 > 6}
         onChange={(level) =>
           guard.request({ type: "setLevel", level }, () => ({
             title: t("level.changeTitle", { levelName }),

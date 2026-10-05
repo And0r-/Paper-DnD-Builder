@@ -81,6 +81,7 @@ export function Segmented<V extends string | number>({
   onChange,
   name,
   help,
+  grid,
 }: {
   legend: ReactNode;
   legendHidden?: boolean;
@@ -89,11 +90,13 @@ export function Segmented<V extends string | number>({
   onChange: (v: V) => void;
   name?: string;
   help?: ReactNode;
+  /** Many short options (levels 1 to 20): rows of equal buttons instead of one squeezed row. */
+  grid?: boolean;
 }) {
   const auto = useId();
   const group = name ?? auto;
   return (
-    <fieldset className="segmented">
+    <fieldset className={grid ? "segmented segmented--grid" : "segmented"}>
       <legend className={legendHidden ? "visually-hidden" : "segmented__legend"}>{legend}</legend>
       <div className="segmented__track">
         {options.map((o) => {

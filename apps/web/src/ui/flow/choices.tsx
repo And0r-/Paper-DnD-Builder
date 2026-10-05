@@ -659,7 +659,6 @@ function RaisePoints({
                 </span>
                 <span className="pointbuy__explain">
                   {t("dist.raiseValue", {
-                    name,
                     before: String(before),
                     added: String(added),
                     value: String(before + added),

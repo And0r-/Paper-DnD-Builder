@@ -363,6 +363,11 @@ textarea.field__input {
   min-width: 0;
 }
 
+.segmented--grid .segmented__track {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(3.5rem, 1fr));
+}
+
 .segmented__input {
   position: absolute;
   opacity: 0;
