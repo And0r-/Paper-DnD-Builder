@@ -157,6 +157,7 @@ describe("raising a finished character", () => {
       "boon-12",
       "boon-16",
       "boon-19",
+      "lantern-mastery",
     ]);
     const { view } = await answerOpen(to20.json);
     const done = await client.call("POST", `/api/drafts/${l1.draft.id}/finish`, {

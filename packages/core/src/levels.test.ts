@@ -476,8 +476,21 @@ describe("raising a finished character", () => {
       "boon-12",
       "boon-16",
       "boon-19",
+      "lantern-mastery",
     ]);
-    expect(to20.state.openSteps).toEqual([...to20.state.newSteps, "talents", "knacks"]);
+    // Open steps come in flow order: the mastery step (level 18) sits after the knacks.
+    expect(to20.state.openSteps).toEqual([
+      "path",
+      "lantern-vow",
+      "boon-4",
+      "boon-8",
+      "boon-12",
+      "boon-16",
+      "boon-19",
+      "talents",
+      "knacks",
+      "lantern-mastery",
+    ]);
     expect(to20.ev.complete).toBe(true);
     // The level-20 lantern bearer worked out by hand above.
     expect(to20.ev.values).toEqual(evaluateDraft(pkg, chooseForMe(20, "calling.lantern-bearer")).values);
