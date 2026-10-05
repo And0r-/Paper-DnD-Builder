@@ -128,9 +128,9 @@ test("a newcomer builds a level-3 character from login to finished", async ({ pa
 
   // Scores: spread points with − and +, then let the recommendation finish it.
   await question(page, "Worin ist dein Charakter stark?");
-  await expect(page.getByText("Noch 14 Punkte übrig")).toBeVisible();
+  await expect(page.getByText("14 Punkte übrig", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Herz erhöhen" }).click();
-  await expect(page.getByText("Noch 13 Punkte übrig")).toBeVisible();
+  await expect(page.getByText("13 Punkte übrig", { exact: true })).toBeVisible();
   await shot(page, "11-grundwerte");
   await axe(page);
   await next(page);
