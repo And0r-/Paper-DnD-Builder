@@ -7,6 +7,7 @@
  */
 import { RuleError } from "@builder/core";
 import type { App } from "../app.ts";
+import { accessKeyHash, readBearerKey } from "../auth/access-keys.ts";
 import {
   SESSION_MS,
   SESSION_REFRESH_MS,
@@ -23,7 +24,10 @@ import { printRoutes } from "./routes/print.ts";
 import { assertSameOrigin, errorResponse, HttpError, json } from "./http.ts";
 
 export interface Session {
+  /** The session id (cookie) or the access key id (key). */
   id: string;
+  /** How the request logged in: the browser's session cookie or an access key. */
+  via: "cookie" | "key";
   account: AccountRow;
 }
 
@@ -96,8 +100,10 @@ export function createApiHandler(app: App, routes: Route[] = ROUTES): (req: Requ
       session: () => (cached ??= loadSession(app, req, responseHeaders)),
       requireSession: async () => {
         const s = await ctx.session();
-        if (!s) throw new HttpError(401, "notLoggedIn");
-        return s;
+        if (s) return s;
+        // A key that is wrong or withdrawn says so: a tool should not ask for a login.
+        if (req.headers.has("authorization")) throw new HttpError(401, "keyNotValid");
+        throw new HttpError(401, "notLoggedIn");
       },
     };
 
@@ -122,7 +128,17 @@ export function createApiHandler(app: App, routes: Route[] = ROUTES): (req: Requ
   };
 }
 
+/**
+ * Who is asking. A request with an `Authorization` header is judged by its
+ * access key alone, never by a cookie it may also carry: a tool gets exactly
+ * the account its key belongs to.
+ */
 async function loadSession(app: App, req: Request, out: Headers): Promise<Session | undefined> {
+  const key = readBearerKey(req.headers.get("authorization"));
+  if (key !== undefined) {
+    const found = key === null ? undefined : await app.store.findAccountByKey(accessKeyHash(key));
+    return found && { id: found.key_id, via: "key", account: found.account };
+  }
   const secure = app.config.secureCookies;
   const token = readSessionToken(req.headers.get("cookie"), secure);
   if (!token) return undefined;
@@ -135,5 +151,5 @@ async function loadSession(app: App, req: Request, out: Headers): Promise<Sessio
     await app.store.refreshSession(id, new Date(now.getTime() + SESSION_MS), now);
     out.append("Set-Cookie", sessionCookie(token, secure));
   }
-  return { id, account: found.account };
+  return { id, via: "cookie", account: found.account };
 }
