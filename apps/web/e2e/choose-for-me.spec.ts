@@ -35,7 +35,7 @@ async function checkScores(page: Page, name: string) {
   await expect(button).toBeInViewport({ ratio: 1 });
   await expect(page.getByText(m["flow.chooseForMeHint"])).toBeVisible();
   await expect(page.locator(".step-footer__reason")).toHaveCount(0);
-  await expect(page.getByText("Noch 14 Punkte übrig")).toBeVisible();
+  await expect(page.getByText("14 Punkte übrig", { exact: true })).toBeVisible();
 
   // Someone tried the other way first; the suggestion still sets its own.
   await page.getByText(m["dist.array"], { exact: true }).click();
@@ -50,14 +50,14 @@ async function checkScores(page: Page, name: string) {
   await expect(page.locator(".shortcuts__done")).toContainText(m["flow.choseForMe"]);
   await expect(page.getByRole("radio", { name: m["dist.pointBuy"] })).toBeChecked();
   await expect(page.locator(".stepper__value")).toHaveText(["8", "7", "9", "11"]);
-  await expect(page.getByText("Noch 2 Punkte übrig")).toBeVisible();
+  await expect(page.getByText("2 Punkte übrig", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: m["flow.chooseForMe"] })).toHaveCount(0);
   await shot(page, `${name}-nachher`);
 
   // Still yours to change.
   await page.getByRole("button", { name: "Kraft erhöhen" }).click();
   await expect(page.locator(".stepper__value").first()).toHaveText("9");
-  await expect(page.getByText("Noch 1 Punkt übrig")).toBeVisible();
+  await expect(page.getByText("1 Punkt übrig", { exact: true })).toBeVisible();
 
   // And it is saved: a fresh visit shows the same numbers.
   await page.reload();

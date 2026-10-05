@@ -34,6 +34,10 @@
       "choices": ["scores"]
     },
     {
+      "id": "gifts",
+      "gather": "gifts"
+    },
+    {
       "id": "boons",
       "gather": "boons"
     },
@@ -314,7 +318,29 @@
       "id": "scores",
       "kind": "distribute",
       "source": "mistland",
-      "targets": ["might", "grace", "wit", "heart"],
+      "targets": ["mightBase", "graceBase", "witBase", "heartBase"],
+      "textVariants": [
+        {
+          "id": "lantern-bearer",
+          "when": "has('calling.lantern-bearer')"
+        },
+        {
+          "id": "river-runner",
+          "when": "has('calling.river-runner')"
+        }
+      ],
+      "badges": [
+        {
+          "when": "has('calling.lantern-bearer')",
+          "targets": ["heartBase", "witBase"],
+          "text": "choice.scores.badge.lantern-bearer"
+        },
+        {
+          "when": "has('calling.river-runner')",
+          "targets": ["graceBase", "mightBase"],
+          "text": "choice.scores.badge.river-runner"
+        }
+      ],
       "methods": [
         {
           "method": "pointBuy",
@@ -338,30 +364,72 @@
         {
           "when": "has('calling.lantern-bearer')",
           "assign": {
-            "might": 8,
-            "grace": 7,
-            "wit": 9,
-            "heart": 11
+            "mightBase": 8,
+            "graceBase": 7,
+            "witBase": 9,
+            "heartBase": 11
           }
         },
         {
           "when": "has('calling.river-runner')",
           "assign": {
-            "might": 9,
-            "grace": 11,
-            "wit": 8,
-            "heart": 7
+            "mightBase": 9,
+            "graceBase": 11,
+            "witBase": 8,
+            "heartBase": 7
           }
         },
         {
           "assign": {
-            "might": 7,
-            "grace": 8,
-            "wit": 11,
-            "heart": 9
+            "mightBase": 7,
+            "graceBase": 8,
+            "witBase": 11,
+            "heartBase": 9
           }
         }
       ]
+    },
+    {
+      "id": "bell-tower-gifts",
+      "kind": "distribute",
+      "source": "mistland",
+      "targets": ["mightGift", "witGift", "heartGift"],
+      "methods": [
+        {
+          "method": "array",
+          "values": [2, 1, 0]
+        },
+        {
+          "method": "array",
+          "values": [1, 1, 1]
+        }
+      ],
+      "recommend": [
+        {
+          "when": "has('calling.lantern-bearer')",
+          "assign": {
+            "heartGift": 2,
+            "witGift": 1,
+            "mightGift": 0
+          }
+        },
+        {
+          "when": "has('calling.river-runner')",
+          "assign": {
+            "mightGift": 2,
+            "witGift": 1,
+            "heartGift": 0
+          }
+        },
+        {
+          "assign": {
+            "witGift": 2,
+            "heartGift": 1,
+            "mightGift": 0
+          }
+        }
+      ],
+      "gather": "gifts"
     },
     {
       "id": "extra-talent",

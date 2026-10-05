@@ -44,7 +44,7 @@ const LANTERN_BEARER_L3: [string, unknown][] = [
   ["gear", { pick: "item.reed-shield" }],
   ["knacks-lantern", { picks: ["knack.warm-glow", "knack.glow-thread", "knack.quiet-word"] }],
   ["path", { pick: "path.lightwarden" }],
-  ["scores", { method: 0, assign: { might: 8, grace: 7, wit: 9, heart: 11 } }],
+  ["scores", { method: 0, assign: { mightBase: 8, graceBase: 7, witBase: 9, heartBase: 11 } }],
   ["extra-talent", { pick: "talent.listening" }],
   ["name", { text: "Mira Fennwick" }],
   ["age", { value: 24 }],
@@ -150,7 +150,7 @@ describe("options", () => {
     expect(l1.choices["knacks-lantern"]!.recommended).toEqual(["knack.warm-glow", "knack.glow-thread"]);
     expect(l3.choices["scores"]!.recommended).toEqual({
       method: 0,
-      assign: { might: 8, grace: 7, wit: 9, heart: 11 },
+      assign: { mightBase: 8, graceBase: 7, witBase: 9, heartBase: 11 },
     });
   });
 
@@ -171,6 +171,16 @@ describe("options", () => {
       "calling.lantern-bearer": "choice.calling.badge.gentle",
     });
     expect(ev.choices["folk"]!.badges).toBeUndefined();
+  });
+
+  it("resolves row badges of a distribute choice by target, while their condition holds", () => {
+    const lantern = evaluateDraft(pkg, draft(1, { calling: { pick: "calling.lantern-bearer" } }));
+    expect(lantern.choices["scores"]!.badges).toEqual({
+      heartBase: "choice.scores.badge.lantern-bearer",
+      witBase: "choice.scores.badge.lantern-bearer",
+    });
+    const herbalist = evaluateDraft(pkg, draft(1, { calling: { pick: "calling.herbalist" } }));
+    expect(herbalist.choices["scores"]!.badges).toBeUndefined();
   });
 
   describe("held", () => {
@@ -436,26 +446,28 @@ describe("applyChange", () => {
     expect(problem("name", { text: "x".repeat(41) })).toBe("tooLong");
     expect(problem("name", { text: "Two\nlines" })).toBe("badCharacters");
     expect(problem("looks", { text: "Tall.\nGreen coat." })).toBe("ok");
-    expect(problem("scores", { method: 0, assign: { might: 12, grace: 12, wit: 6, heart: 6 } })).toBe(
-      "overBudget",
-    );
-    expect(problem("scores", { method: 0, assign: { might: 13, grace: 6, wit: 6, heart: 6 } })).toBe(
-      "outOfRange",
-    );
-    expect(problem("scores", { method: 1, assign: { might: 11, grace: 11, wit: 9, heart: 7 } })).toBe(
+    expect(
+      problem("scores", { method: 0, assign: { mightBase: 12, graceBase: 12, witBase: 6, heartBase: 6 } }),
+    ).toBe("overBudget");
+    expect(
+      problem("scores", { method: 0, assign: { mightBase: 13, graceBase: 6, witBase: 6, heartBase: 6 } }),
+    ).toBe("outOfRange");
+    expect(
+      problem("scores", { method: 1, assign: { mightBase: 11, graceBase: 11, witBase: 9, heartBase: 7 } }),
+    ).toBe("badAssignment");
+    expect(problem("scores", { method: 1, assign: { mightBase: 11, graceBase: 10, witBase: 9 } })).toBe(
       "badAssignment",
     );
-    expect(problem("scores", { method: 1, assign: { might: 11, grace: 10, wit: 9 } })).toBe("badAssignment");
-    expect(problem("scores", { method: 5, assign: { might: 11, grace: 10, wit: 9, heart: 7 } })).toBe(
-      "badMethod",
-    );
+    expect(
+      problem("scores", { method: 5, assign: { mightBase: 11, graceBase: 10, witBase: 9, heartBase: 7 } }),
+    ).toBe("badMethod");
   });
 
   it("accepts partial picks, but the choice stays open; leftover points are only reported", () => {
     let doc = base();
     for (const [choice, answer] of [
       ["knacks-current", { picks: ["knack.fog-hop"] }],
-      ["scores", { method: 0, assign: { might: 8, grace: 8, wit: 8, heart: 8 } }],
+      ["scores", { method: 0, assign: { mightBase: 8, graceBase: 8, witBase: 8, heartBase: 8 } }],
     ] as const) {
       const r = applyChange(pkg, doc, { type: "answer", choice, answer });
       if (!r.ok) throw new Error(choice);
@@ -473,7 +485,7 @@ describe("applyChange", () => {
     const r = applyChange(pkg, base(), {
       type: "answer",
       choice: "scores",
-      answer: { method: 1, assign: { might: 7, grace: 11, wit: 10, heart: 9 } },
+      answer: { method: 1, assign: { mightBase: 7, graceBase: 11, witBase: 10, heartBase: 9 } },
     });
     if (!r.ok) throw new Error("rejected");
     const ev = evaluateDraft(pkg, r.doc);

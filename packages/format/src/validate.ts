@@ -551,6 +551,13 @@ export function validatePackageFiles(files: PackageFiles): ValidationResult {
               err(F, `${p}.recommend[${j}].assign`, `gives more than the ${raise.points} points there are`);
           }
         });
+        c.badges?.forEach((b, j) => {
+          if (b.when !== undefined) checkExpr(F, `${p}.badges[${j}].when`, b.when);
+          b.targets.forEach((v, k) => {
+            if (!c.targets.includes(v))
+              err(F, `${p}.badges[${j}].targets[${k}]`, `${lit(v)} is not a target of this choice`);
+          });
+        });
         break;
       }
       case "number": {
@@ -814,13 +821,20 @@ export function validatePackageFiles(files: PackageFiles): ValidationResult {
       for (const b of c.badges ?? []) need(b.text, `badge of choice ${lit(c.id)}`);
       if (c.held) need(c.held.text, `line naming what the character has, in choice ${lit(c.id)}`);
     }
+    if (c.kind === "distribute") {
+      for (const b of c.badges ?? []) need(b.text, `badge of choice ${lit(c.id)}`);
+      for (const v of c.targets) optional.add(`choice.${c.id}.target.${v}`);
+    }
   }
-  // A variant replaces any of the four texts; which ones it replaces is up to the package.
+  // A variant replaces any of the four texts (and the row texts of a distribute choice); which ones is up to the package.
   const variantTexts = flow.choices.flatMap((c) =>
     (c.textVariants ?? []).map((v) => ({
       choice: c.id,
       variant: v.id,
-      keys: ["title", "question", "intro", "missing"].map((f) => `choice.${c.id}.variant.${v.id}.${f}`),
+      keys: [
+        ...["title", "question", "intro", "missing"],
+        ...(c.kind === "distribute" ? c.targets.map((t) => `target.${t}`) : []),
+      ].map((f) => `choice.${c.id}.variant.${v.id}.${f}`),
     })),
   );
   for (const v of variantTexts) for (const k of v.keys) optional.add(k);

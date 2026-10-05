@@ -41,6 +41,11 @@
     "id": "upbringing.bell-tower",
     "kind": "upbringing",
     "source": "mistland",
-    "grants": [{ "thing": "talent.legends" }, { "thing": "talent.listening" }, { "thing": "item.small-bell" }]
+    "grants": [
+      { "thing": "talent.legends" },
+      { "thing": "talent.listening" },
+      { "thing": "item.small-bell" },
+      { "choice": "bell-tower-gifts" }
+    ]
   }
 ]

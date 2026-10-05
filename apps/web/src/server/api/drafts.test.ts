@@ -183,7 +183,9 @@ describe("building a character over the API", () => {
       ["gear", { pick: "item.fishing-net" }],
       ["handling-river-runner", { picks: ["handling.boat-hook", "handling.small-bell"] }],
       ["knacks-current", { picks: ["knack.fog-hop", "knack.eddy"] }],
-      ["scores", { method: 1, assign: { might: 9, grace: 11, wit: 10, heart: 7 } }],
+      ["scores", { method: 1, assign: { mightBase: 9, graceBase: 11, witBase: 10, heartBase: 7 } }],
+      // The bell tower adds +2 and +1 on top of the scores.
+      ["bell-tower-gifts", { method: 0, assign: { mightGift: 2, witGift: 1, heartGift: 0 } }],
       ["name", { text: "Tobin" }],
       ["age", { value: 30 }],
     ] as const) {

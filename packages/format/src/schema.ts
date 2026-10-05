@@ -263,6 +263,13 @@ const pickRecommendation = z.strictObject({ when: expr.optional(), pick: z.array
 /** A short label (text key) shown on the listed options, e.g. how hard they are to play. */
 const badge = z.strictObject({ things: z.array(id).min(1), text: textKey });
 
+/** A short label (text key) on rows of a distribute choice. */
+const targetBadge = z.strictObject({
+  when: expr.optional(),
+  targets: z.array(valueId).min(1),
+  text: textKey,
+});
+
 /**
  * Prefer options whose `about` thing the character already has: they are
  * recommended first, and `text` (with {{var:things}}) names those things above the list.
@@ -329,6 +336,14 @@ export const choiceSchema = z.discriminatedUnion("kind", [
     recommend: z
       .array(z.strictObject({ when: expr.optional(), assign: z.record(valueId, z.number().int()) }))
       .optional(),
+    /**
+     * A short label on the rows of the listed targets while `when` holds, e.g.
+     * which values matter most for the character. The first badge that holds wins.
+     * Each row may also say in a sentence what its value does: the text
+     * `choice.<choice>.target.<target>` (or the active text variant's
+     * `choice.<choice>.variant.<id>.target.<target>`).
+     */
+    badges: z.array(targetBadge).optional(),
   }),
   z.strictObject({
     ...choiceBase,

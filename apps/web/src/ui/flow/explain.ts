@@ -99,10 +99,119 @@ export function valueOrigin(
   return sumText(lp, ctx, ev, valueId, exp.parts, w);
 }
 
+export interface RowValues {
+  /** The value the target adds up to (a base and a bonus make the score), or the target itself. */
+  total: string;
+  /** The number the sheet prints next to that score (a `scoreColumn` entry's `derived`), if any. */
+  derived?: string;
+}
+
+/**
+ * What a row of a distribute choice changes: the score it is part of, and
+ * the number that score gives at the table. Follows plain sums from the
+ * target to a score the sheet prints with a derived number.
+ */
+export function rowValues(lp: LoadedPackage, target: string): RowValues {
+  const total = totalOf(lp.pkg, target) ?? target;
+  const seen = new Set<string>();
+  for (let at: string | undefined = total; at !== undefined && !seen.has(at); at = totalOf(lp.pkg, at)) {
+    seen.add(at);
+    for (const s of lp.pkg.sheet.sections) {
+      if (s.kind !== "scoreColumn") continue;
+      const entry = s.scores.find((e) => e.value === at);
+      if (entry?.derived !== undefined) return { total, derived: entry.derived };
+    }
+  }
+  return { total };
+}
+
+/** Name of the value a row of a distribute choice stands for: "Strength", not "Strength: base". */
+export function rowName(lp: LoadedPackage, target: string): string {
+  const { total } = rowValues(lp, target);
+  return ptext(lp, `value.${total}.name`) ?? valueName(lp, target);
+}
+
+/**
+ * A row's number with what else adds to its score, named, while the player
+ * moves it, in the order of the score's formula: a base reads "8 + 1 from
+ * Ferry Child (Upbringing) = 9", a bonus "15 from Scores + 2 = 17".
+ * Undefined if nothing else adds to it.
+ */
+export function rowSum(
+  lp: LoadedPackage,
+  ctx: MeasureContext,
+  ev: Evaluation,
+  choiceId: string,
+  target: string,
+  amount: number,
+  w: Words,
+): string | undefined {
+  const { total } = rowValues(lp, target);
+  if (total === target) return undefined;
+  const exp = explainValue(lp.pkg, ev, total);
+  if (!exp) return undefined;
+  const mine = (s: PartSource) => s.kind === "choice" && s.choice === choiceId;
+  const others = exp.parts.filter((p) => !mine(p.source)).map((p) => ({ ...p }));
+  // A target not answered yet is still at its start number: that part is the row's own.
+  if (ev.inputs[target]?.choice !== choiceId) {
+    const start = others.find((p) => p.source.kind === "start");
+    if (start) start.amount -= lp.pkg.values.find((v) => v.id === target)?.default ?? 0;
+  }
+  const rest = others.filter((p) => p.amount !== 0);
+  if (rest.length === 0) return undefined;
+  const own: ValuePart = { amount, source: { kind: "choice", choice: choiceId } };
+  const parts = rowIsBase(lp, target) ? [own, ...rest] : [...rest, own];
+  const sum = parts.reduce((n, p) => n + p.amount, 0);
+  return `${sumText(lp, ctx, ev, total, parts, w, mine)} = ${formatValue(lp, ctx, total, sum)}`;
+}
+
+/**
+ * Whether a row's target comes first in the sum it is part of (a base, not
+ * a bonus on top): its sum then starts with the row's own number.
+ */
+export function rowIsBase(lp: LoadedPackage, target: string): boolean {
+  const { total } = rowValues(lp, target);
+  if (total === target) return true;
+  const formula = lp.pkg.values.find((v) => v.id === total)?.formula;
+  return formula !== undefined && [...collectRefs(parseExpr(formula)).values][0] === target;
+}
+
+/**
+ * What a row's number gives at the table, "Might bonus +1": the derived
+ * number of its score. Only while the row shows what is worked out (a row
+ * of numbers still being handed out is not saved yet): no number rather
+ * than a wrong one.
+ */
+export function rowEffect(
+  lp: LoadedPackage,
+  ctx: MeasureContext,
+  ev: Evaluation,
+  choiceId: string,
+  target: string,
+  amount: number | undefined,
+  w: Words,
+): string | undefined {
+  const { derived } = rowValues(lp, target);
+  if (derived === undefined || amount === undefined) return undefined;
+  const input = ev.inputs[target];
+  const counted = input && input.choice === choiceId ? input.amount : undefined;
+  if (
+    counted !== amount &&
+    !(counted === undefined && amount === (lp.pkg.values.find((v) => v.id === target)?.default ?? 0))
+  )
+    return undefined;
+  return w.t("dist.effect", {
+    name: valueName(lp, derived),
+    value: formatValue(lp, ctx, derived, ev.values[derived] ?? 0, true),
+  });
+}
+
 /**
  * One line per target of a distribute answer. A target that is added to
- * something else on the sheet (a base and a bonus) shows the whole sum:
- * "Grace: 7 + 1 from Ferry Child (Upbringing) = 8".
+ * something else on the sheet (a base and a bonus) shows the whole sum,
+ * every part named: "Grace: 7 from Scores + 1 from Ferry Child (Upbringing) = 8".
+ * A score already summed up in an earlier step (`summed`, filled as the
+ * lines are made) gets only this step's part: "Grace + 1".
  */
 export function distributeLines(
   lp: LoadedPackage,
@@ -112,17 +221,28 @@ export function distributeLines(
   targets: readonly string[],
   assign: Readonly<Record<string, number>>,
   w: Words,
+  summed: Set<string> = new Set(),
 ): string[] {
-  return targets.map((target) => {
-    const shown = totalOf(lp.pkg, target) ?? target;
+  const raise = state.raise !== undefined;
+  // A bonus of 0 adds nothing worth a line.
+  const shownTargets = targets.filter((v) => raise || rowIsBase(lp, v) || (assign[v] ?? 0) !== 0);
+  return shownTargets.map((target) => {
+    const shown = raise ? target : (totalOf(lp.pkg, target) ?? target);
+    const n = assign[target];
+    if (summed.has(shown) && n !== undefined) {
+      // A choice a thing brought along names the thing; the step's own title would say nothing new.
+      const from = partLabel(lp, ev, { kind: "choice", choice: state.id }, w);
+      const own = choiceTexts(lp, state.id).title || stepTitle(lp, ev, state.id);
+      const label = from && from !== own ? ` ${w.t("explain.from", { source: from })}` : "";
+      return `${valueName(lp, shown)} + ${formatValue(lp, ctx, shown, n)}${label}`;
+    }
     const exp = explainValue(lp.pkg, ev, shown);
     if (exp && exp.parts.length > 1) {
-      const own = (s: PartSource) => s.kind === "choice" && s.choice === state.id;
-      const sum = sumText(lp, ctx, ev, shown, exp.parts, w, own);
+      summed.add(shown);
+      const sum = sumText(lp, ctx, ev, shown, exp.parts, w);
       return `${valueName(lp, shown)}: ${sum} = ${formatValue(lp, ctx, shown, exp.total)}`;
     }
-    const n = assign[target];
-    return `${valueName(lp, target)} ${n === undefined ? "–" : formatValue(lp, ctx, target, n)}`;
+    return `${raise ? valueName(lp, target) : rowName(lp, target)} ${n === undefined ? "–" : formatValue(lp, ctx, target, n)}`;
   });
 }
 

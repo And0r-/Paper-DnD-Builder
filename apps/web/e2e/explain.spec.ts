@@ -66,14 +66,14 @@ async function expectNothingSpills(page: Page, lang: Lang) {
 
 const WORDS = {
   de: {
-    score: /Geschick: 7 \+ 1 aus Kindheit Fährkind = 8/,
+    score: /Geschick: 7 aus Grundwerte \+ 1 aus Kindheit Fährkind = 8/,
     origin: "Aus Herkunft Moorvolk",
     onSheet: /^Auf deinem Bogen: 21 = 3 aus .+ \+ 18 aus Beruf Laternenträgerin$/,
     later: "Diese Zahl ändert sich noch. Sie hängt auch von deiner Wahl im Schritt Grundwerte ab.",
     progress: /^Schritt \d+ von \d+ · Ausrüstung$/,
   },
   en: {
-    score: /Grace: 7 \+ 1 from Ferry Child \(Upbringing\) = 8/,
+    score: /Grace: 7 from Scores \+ 1 from Ferry Child \(Upbringing\) = 8/,
     origin: "From Moorfolk (Folk)",
     onSheet: /^On your sheet: 21 = 3 from .+ \+ 18 from Lantern Bearer \(Calling\)$/,
     later: "This number still changes. It also depends on what you choose in the step Scores.",
@@ -131,7 +131,7 @@ test("numbers and things say where they come from, in both languages", async ({ 
   const r = await page.request.put(`/api/drafts/${id}/answers/scores`, {
     data: {
       version: view.draft.version,
-      answer: { method: 0, assign: { might: 11, grace: 7, wit: 9, heart: 8 } },
+      answer: { method: 0, assign: { mightBase: 11, graceBase: 7, witBase: 9, heartBase: 8 } },
     },
   });
   expect(r.status()).toBe(200);

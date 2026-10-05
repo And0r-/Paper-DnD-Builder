@@ -27,13 +27,13 @@ const LANTERN_BEARER: [string, unknown][] = [
   ["upbringing", { pick: "upbringing.ferry-child" }],
   ["calling", { pick: "calling.lantern-bearer" }],
   ["gear", { pick: "item.reed-shield" }],
-  ["scores", { method: 0, assign: { might: 8, grace: 7, wit: 9, heart: 11 } }],
+  ["scores", { method: 0, assign: { mightBase: 8, graceBase: 7, witBase: 9, heartBase: 11 } }],
 ];
 
 describe("explainValue", () => {
   it("shows the answer and a thing's gift that add up to a score", () => {
     const ev = evaluateDraft(pkg, build(pkg, 1, LANTERN_BEARER));
-    expect(ev.inputs["grace"]).toEqual({ amount: 7, choice: "scores" });
+    expect(ev.inputs["graceBase"]).toEqual({ amount: 7, choice: "scores" });
     expect(explainValue(pkg, ev, "grace")).toEqual({
       total: 8,
       parts: [
@@ -71,7 +71,7 @@ describe("explainValue", () => {
       capped,
       build(capped, 1, [
         ...LANTERN_BEARER.slice(0, 4),
-        ["scores", { method: 0, assign: { might: 6, grace: 12, wit: 7, heart: 8 } }],
+        ["scores", { method: 0, assign: { mightBase: 6, graceBase: 12, witBase: 7, heartBase: 8 } }],
       ]),
     );
     expect(ev.values["grace"]).toBe(12);
@@ -147,7 +147,7 @@ describe("explainValue", () => {
     const lanternBearer = (gear: string, grace: number): [string, unknown][] => [
       ...LANTERN_BEARER.slice(0, 3),
       ["gear", { pick: gear }],
-      ["scores", { method: 0, assign: { might: 6, grace, wit: 7, heart: 8 } }],
+      ["scores", { method: 0, assign: { mightBase: 6, graceBase: grace, witBase: 7, heartBase: 8 } }],
     ];
 
     it("names the gear whose branch won, not the values the other branches use", () => {

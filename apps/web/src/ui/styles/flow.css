@@ -678,11 +678,34 @@
   gap: var(--space-3);
 }
 
-.pointbuy__row {
+/* Points left in large numbers; the rule in one sentence below. */
+.pointbuy__left:not(.pointbuy__left--done) {
   display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+}
+
+.pointbuy__count {
+  font-size: var(--text-2xl);
+  line-height: var(--text-2xl-lh);
+  font-weight: var(--weight-bold);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-primary);
+}
+
+.pointbuy__rule {
+  font-size: var(--text-sm);
+  line-height: var(--text-sm-lh);
+  color: var(--color-ink-muted);
+}
+
+/* Name, number and what it gives on the first line; the sentence below spans the row. */
+.pointbuy__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  justify-content: space-between;
-  gap: var(--space-4);
+  column-gap: var(--space-4);
+  row-gap: var(--space-2);
   padding: var(--space-3) var(--space-4);
   border: 1px solid var(--color-line);
   border-radius: var(--radius-md);
@@ -698,6 +721,46 @@
 .pointbuy__name,
 .array-assign__name {
   font-weight: var(--weight-semibold);
+}
+
+.pointbuy__name {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* A long badge wraps inside the row instead of running under the stepper. */
+.pointbuy__name .badge,
+.array-assign__label .badge {
+  max-width: 100%;
+  white-space: normal;
+}
+
+/* The sum and what the score gives, one line each. */
+.pointbuy__gives,
+.array-assign__gives {
+  overflow-wrap: anywhere;
+  display: flex;
+  flex-direction: column;
+  font-size: var(--text-sm);
+  line-height: var(--text-sm-lh);
+  font-variant-numeric: tabular-nums;
+}
+
+.pointbuy__effect,
+.array-assign__effect {
+  font-weight: var(--weight-semibold);
+}
+
+.pointbuy__row > .pointbuy__gives,
+.pointbuy__row > .pointbuy__explain {
+  grid-column: 1 / -1;
+}
+
+/* A row that matters most for the character stands out a little. */
+.pointbuy__row--key {
+  border-color: var(--color-primary);
 }
 
 .pointbuy__explain {
@@ -862,6 +925,12 @@
   font-size: var(--text-sm);
   line-height: var(--text-sm-lh);
   color: var(--color-ink-muted);
+}
+
+.array-assign__gives {
+  flex-basis: 100%;
+  font-weight: var(--weight-regular);
+  text-align: left;
 }
 
 .array-assign__tip {

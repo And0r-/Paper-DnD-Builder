@@ -80,7 +80,7 @@ export type ChoiceTexts = StepTexts & {
   missing: string | undefined;
 };
 
-type TextField = "title" | "question" | "intro" | "missing";
+type TextField = "title" | "question" | "intro" | "missing" | `target.${string}`;
 
 /** A choice text: the active variant's if the package has it, else the base text (SPEC 9.3). */
 function choiceText(
@@ -94,6 +94,24 @@ function choiceText(
   return (
     (variant !== undefined ? ptext(lp, `choice.${id}.variant.${variant}.${field}`) : undefined) ??
     ptext(lp, `choice.${id}.${field}`)
+  );
+}
+
+/**
+ * What a row of a distribute choice means for this character: the row's own
+ * text (in the active text variant, if it has one), else the value's explanation.
+ */
+export function choiceTargetText(
+  lp: LoadedPackage,
+  choiceId: string,
+  target: string,
+  shown: string,
+  state: ChoiceState | undefined,
+): string | undefined {
+  return (
+    choiceText(lp, choiceId, `target.${target}`, state) ??
+    ptext(lp, `value.${shown}.explain`) ??
+    ptext(lp, `value.${target}.explain`)
   );
 }
 
