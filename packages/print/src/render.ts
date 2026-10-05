@@ -511,9 +511,7 @@ function drawSection(pen: Pen, s: SheetSection, x: number, top: number, w: numbe
 /**
  * A row per thing: its name, then one column per stat. Each column is as
  * wide as its label and longest entry need, so a number or a dice roll is
- * never broken; what is left goes to the names. Where a number comes from
- * is a small line under its row, after the column label ("Hit: …"), as
- * wide as the stat columns together.
+ * never broken; what is left goes to the names.
  */
 function drawStatTable(
   pen: Pen,
@@ -524,7 +522,7 @@ function drawStatTable(
 ): number {
   const gap = 2.5;
   const natural = s.columns.map((label, i) =>
-    Math.max(pen.width(label, S.cardLabel), ...s.rows.map((r) => pen.width(r.cells[i]!.text, S.fieldName))),
+    Math.max(pen.width(label, S.cardLabel), ...s.rows.map((r) => pen.width(r.cells[i]!, S.fieldName))),
   );
   const minName = Math.min(28, w * 0.3);
   const room = w - minName - s.columns.length * gap;
@@ -537,17 +535,15 @@ function drawStatTable(
   labels.forEach((l, i) => l.lines.forEach((t, j) => pen.text(t, left[i]!, y + 2.5 + j * labelLh, l.style)));
   y += 1 + Math.max(1, ...labels.map((l) => l.lines.length)) * labelLh;
   pen.line(x, y, x + w, y, 0.5, "#777");
-  const partsX = left[0]!;
   for (const row of s.rows) {
     const top = y + 0.8;
     let bottom = pen.lines(pen.wrap(row.name, S.fieldName, nameW - 1), x, top, S.fieldName, 1.2);
     row.cells.forEach((cell, i) => {
-      const lines = pen.wrap(cell.text, S.fieldName, widths[i]!);
-      bottom = Math.max(bottom, pen.lines(lines, left[i]!, top, S.fieldName, 1.2));
+      bottom = Math.max(
+        bottom,
+        pen.lines(pen.wrap(cell, S.fieldName, widths[i]!), left[i]!, top, S.fieldName, 1.2),
+      );
     });
-    const origins = row.cells.flatMap((c, i) => (c.parts === "" ? [] : [`${s.columns[i]}: ${c.parts}`]));
-    for (const origin of origins)
-      bottom = pen.lines(pen.wrap(origin, S.hint, x + w - partsX), partsX, bottom, S.hint, 1.15);
     y = bottom + 1.4;
     pen.line(x, y, x + w, y, 0.3, "#BBB");
     y += 0.6;

@@ -221,15 +221,23 @@ describe("printed character (demo package)", () => {
     // Level 1: the level-3 "path" section is left out (`when`), so notes end up alone
     // on a sheet without the sections for higher levels.
     const level1 = demoCharacter(pkg, 1);
-    // A few more blank gear lines fill the first page, so only the notes move on.
-    const lower = new Set(["rolls", "lantern-slots", "lantern-slots-high", "attacks"]);
+    // Without the half-width boxes after the gear, and a few more blank gear lines to fill
+    // the first page, only the notes move on.
+    const lower = new Set([
+      "rolls",
+      "lantern-slots",
+      "lantern-slots-high",
+      "attacks",
+      "how-to-play",
+      "about",
+    ]);
     const early = {
       ...pkg,
       sheet: {
         ...pkg.sheet,
         sections: pkg.sheet.sections
           .filter((s) => !lower.has(s.id))
-          .map((s) => (s.id === "gear" && s.kind === "list" ? { ...s, blankLines: s.blankLines + 3 } : s)),
+          .map((s) => (s.id === "gear" && s.kind === "list" ? { ...s, blankLines: s.blankLines + 4 } : s)),
       },
     };
     const { pdf } = await print("de", {}, early, level1);
@@ -296,25 +304,11 @@ describe("printed character (demo package)", () => {
     expect(de.s.hint).toBe("Zum Treffen: 2W6 + diese Zahl. Schaden: diese Würfel.");
     expect(de.s.columns).toEqual(["Treffer", "Schaden", "Reichweite"]);
     expect(de.s.rows).toEqual([
-      {
-        name: "Bootshaken",
-        cells: [
-          { text: "+4", parts: "Geschick-Bonus +2 · Übung +2" },
-          { text: "1W4 +2, spitz", parts: "" },
-          { text: "—", parts: "" },
-        ],
-      },
-      {
-        name: "Schleuder",
-        cells: [
-          { text: "+4", parts: "Geschick-Bonus +2 · Übung +2" },
-          { text: "1W4 +2, stumpf", parts: "" },
-          { text: "9 m / 36 m", parts: "" },
-        ],
-      },
+      { name: "Bootshaken", cells: ["+4", "1W4 +2, spitz", "—"] },
+      { name: "Schleuder", cells: ["+4", "1W4 +2, stumpf", "9 m / 36 m"] },
     ]);
     const en = attacks("en", { length: "ft" });
-    expect(en.s.rows.map((row) => row.cells.map((c) => c.text))).toEqual([
+    expect(en.s.rows.map((row) => row.cells)).toEqual([
       ["+4", "1d4 +2, pointed", "—"],
       ["+4", "1d4 +2, blunt", "30 ft / 120 ft"],
     ]);
@@ -551,10 +545,7 @@ describe("printed character (demo package)", () => {
         columns: ["Zahl", "Text"],
         rows: names("Reihe").map((name) => ({
           name,
-          cells: [
-            { text: "+3", parts: "Anmut +1 · Übung +2" },
-            { text: "ein Text", parts: "" },
-          ],
+          cells: ["+3", "ein Text"],
         })),
       },
       {

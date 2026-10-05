@@ -65,7 +65,7 @@ export type SheetSection = { id: string; span: number; title: string; hint: stri
       /** `total`: the number in the box; empty text for a box to fill in by hand. */
       items: { name: string; marked: boolean; note: string; total: Figure }[];
     }
-  | { kind: "statTable"; columns: string[]; rows: { name: string; cells: Figure[] }[] }
+  | { kind: "statTable"; columns: string[]; rows: { name: string; cells: string[] }[] }
   | { kind: "featureTable"; rows: { name: string; text: string; uses: Uses }[] }
   | { kind: "list"; items: string[]; blankLines: number }
   | { kind: "answers"; rows: { label: string; text: string }[] }
@@ -240,12 +240,16 @@ export function buildPrintModel(
         return "";
     }
   };
-  /** The character's value as a figure: signed if asked, with its parts as in the builder's explanations. */
+  /**
+   * The character's value as a figure: signed if asked, with its parts as in
+   * the builder's explanations. A number of one part has nothing to take
+   * apart ("Wit bonus +1" under a +1): paper is short, so it stays alone.
+   */
   const figure = (id: string, sign: boolean): Figure => {
     const shown = sign ? signed.format(valueOf(id)) : valueText(id);
     const exp = explainValue(pkg, ev, id);
     const parts = (exp?.parts ?? []).map((p) => ({ label: partLabel(p.source), amount: p.amount }));
-    if (parts.every((p) => p.label === "")) return { text: shown, parts: "" };
+    if (parts.length < 2 || parts.every((p) => p.label === "")) return { text: shown, parts: "" };
     return {
       text: shown,
       parts: parts
@@ -343,11 +347,11 @@ export function buildPrintModel(
           columns: s.columns.map((c) => text(`stat.${c.stat}.name`)),
           rows: heldOf(s.things).map((t) => ({
             name: thingName(t.id),
-            cells: s.columns.map((c): Figure => {
+            // Numbers only: a table row is one line, so a few weapons still fit beside other boxes.
+            cells: s.columns.map((c) => {
               const v = t.stats?.[c.stat];
-              if (typeof v === "object" && "value" in v) return figure(v.value, c.signed === true);
-              if (typeof v === "number" && c.signed) return { text: signed.format(v), parts: "" };
-              return { text: statText(v), parts: "" };
+              const n = typeof v === "object" && "value" in v ? valueOf(v.value) : v;
+              return c.signed && typeof n === "number" ? signed.format(n) : statText(v);
             }),
           })),
         };

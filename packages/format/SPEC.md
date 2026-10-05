@@ -1030,9 +1030,10 @@ without it show no note.
 
 **Total** (`total`, on `checkList` sections). Names a stat key; each
 selected thing's stat must be `{ "value": "<value>" }`. The character's
-value is printed in the thing's box, always with its sign ("+5"), and
-where it comes from small under the name ("Grace bonus +2 · Practice
-+2"), taken apart from the value's formula as on screen. Things without
+value is printed in the thing's box, always with its sign ("+5"), and,
+if it is made of two parts or more, where it comes from small under the
+name ("Grace bonus +2 · Practice +2"), taken apart from the value's
+formula as on screen. Things without
 the stat get an empty box. Typical use: the number a skill adds to a
 roll, so a player at the table reads it instead of adding it up. The
 formula decides what counts, for example
@@ -1043,8 +1044,8 @@ its name, then one column per entry of `columns` (1 to 4), headed by
 `stat.<stat>.name`. A cell shows the thing's stat as a card field does
 (quantities converted, `{text}` with its `vars` filled in, `{value}` as
 the character's value); `signed: true` writes numbers with their sign.
-Where a `{value}` cell comes from is printed small under its row. A thing
-without the stat shows "—". Each column must be a stat that at least one
+A row is kept to one line (no origins under the numbers), so a handful of
+rows fits next to other sections. A thing without the stat shows "—". Each column must be a stat that at least one
 selected thing has and that is not true/false. Typical use: what a
 character attacks with, how well it hits and how much harm it does.
 
