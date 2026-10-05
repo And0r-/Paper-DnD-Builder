@@ -33,13 +33,14 @@ export default function StepPage() {
   const { stepId } = useParams<{ stepId: string }>();
   const key = decodeURIComponent(stepId);
   const { t, list } = useApp();
-  const { lp, ev, entries, change } = useDraft();
+  const { lp, ev, entries, allEntries, change } = useDraft();
   const ctx = useMeasure(lp);
   const headingId = useId();
   // The way of sharing out each distribute choice shows right now; the
   // package's "missing" sentence speaks of points and fits only that way.
   const [ways, setWays] = useState<Record<string, number>>({});
-  const entry = entries.find((e) => e.kind === "step" && e.key === key);
+  // During a level up an earlier step is not in the flow, but the overview leads to it.
+  const entry = [...entries, ...allEntries].find((e) => e.kind === "step" && e.key === key);
   usePageTitle(entry ? [] : [t("flow.stepNotFound")]);
 
   if (!entry) {

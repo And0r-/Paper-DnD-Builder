@@ -26,7 +26,7 @@ import { choiceOf, choiceTexts, formatValue, ptext } from "../../../../src/ui/pa
 
 export default function OverviewPage() {
   const { t, tc, list } = useApp();
-  const { lp, ev, entries, draft, finish } = useDraft();
+  const { lp, ev, entries, allEntries, draft, raise, finish } = useDraft();
   const ctx = useMeasure(lp);
   const router = useRouter();
   const headingId = useId();
@@ -41,7 +41,8 @@ export default function OverviewPage() {
   const growth = levelGrowth(lp, ev);
   const grown = new Set([...growth.own, ...growth.byThing.flatMap((g) => g.values)]);
   const openSteps = entries.filter((e) => e.kind === "step" && e.status !== "done");
-  const steps = entries.filter((e) => e.kind !== "overview");
+  // During a level up the earlier steps stay here, to look at and to change.
+  const steps = allEntries.filter((e) => e.kind !== "overview");
 
   const onFinish = async () => {
     if (!ev.complete) {
@@ -50,9 +51,11 @@ export default function OverviewPage() {
     }
     setBusy(true);
     setProblem(undefined);
+    // Finishing ends a level up: the end screen then says what it brought.
+    const from = raise?.from;
     const r = await finish();
     setBusy(false);
-    if (r === "ok") router.push(`/c/${draft.id}/done`);
+    if (r === "ok") router.push(`/c/${draft.id}/done${from !== undefined ? `?from=${from}` : ""}`);
     else if (r === "incomplete") setProblem(t("overview.finishBlocked"));
     else setProblem(t("save.error"));
   };

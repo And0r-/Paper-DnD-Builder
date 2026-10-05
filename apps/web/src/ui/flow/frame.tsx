@@ -248,6 +248,14 @@ export function FlowLayout({ current, children }: { current: string | undefined;
 export function ProgressHeader({ entry }: { entry: FlowEntry }) {
   const { t } = useApp();
   const { lp, entries } = useDraft();
+  // An earlier step opened from the overview during a level up: no count, it is not one of the new questions.
+  if (!entries.some((e) => e.key === entry.key)) {
+    return (
+      <div className="progress">
+        <p className="progress__text">{t("raise.earlier")}</p>
+      </div>
+    );
+  }
   const pos = positionOf(entries, entry);
   const text = t("flow.progress", pos);
   const part = pos.parts > 1 ? t("flow.part", pos) : undefined;
@@ -382,7 +390,8 @@ export function StepFrame({
   const { lp, entries, rejected } = useDraft();
   const autoId = useId();
   const headingId = givenHeadingId ?? autoId;
-  usePageTitle([question, t("flow.progress", positionOf(entries, entry))]);
+  const inFlow = entries.some((e) => e.key === entry.key);
+  usePageTitle(inFlow ? [question, t("flow.progress", positionOf(entries, entry))] : [question]);
   return (
     <div className="step" aria-labelledby={headingId}>
       <ProgressHeader entry={entry} />
@@ -463,14 +472,15 @@ export function StepFooter({
   focusTarget?: () => HTMLElement | null;
 }) {
   const { t } = useApp();
-  const { entries, draft } = useDraft();
+  const { entries, draft, raise } = useDraft();
   const router = useRouter();
   const params = useSearchParams();
-  const toOverview = params.get("from") === "overview";
-  const [shown, setShown] = useState<string | undefined>(undefined);
   const index = entries.findIndex((e) => e.key === entry.key);
-  const prev = entries[index - 1];
-  const next = entries[index + 1];
+  // An earlier step during a level up is reached from the overview only, and leads back there.
+  const toOverview = params.get("from") === "overview" || index < 0;
+  const [shown, setShown] = useState<string | undefined>(undefined);
+  const prev = index < 0 ? entries.at(-1) : entries[index - 1];
+  const next = index < 0 ? undefined : entries[index + 1];
   const reasonId = useId();
   const dock = useFooterDock();
 
@@ -519,7 +529,12 @@ export function StepFooter({
               {t("common.back")}
             </ButtonLink>
           ) : (
-            <ButtonLink href="/characters" variant="secondary" icon="arrowLeft">
+            // The first new question of a level up goes back to the choice of level.
+            <ButtonLink
+              href={raise ? `/c/${draft.id}/raise` : "/characters"}
+              variant="secondary"
+              icon="arrowLeft"
+            >
               {t("common.back")}
             </ButtonLink>
           )}
