@@ -6,13 +6,14 @@
  * - `{{length:30|short}}`  same, with the short unit form ("m", "ft")
  * - `{{var:name}}`         a value supplied by the screen that shows the
  *                          text (documented per text key in SPEC.md)
+ * - `{{var:name|signed}}`  same, a number always with its sign ("+3", "-1")
  * - `[[glossary:id|text]]` `text` is shown, marked as a glossary term
  */
 
 export type TemplatePart =
   | { type: "text"; text: string }
   | { type: "quantity"; dimension: string; amount: number; form: "long" | "short" }
-  | { type: "var"; name: string }
+  | { type: "var"; name: string; signed?: true }
   | { type: "glossary"; id: string; text: string };
 
 export class TemplateSyntaxError extends Error {
@@ -24,7 +25,7 @@ export class TemplateSyntaxError extends Error {
 
 const TOKEN = /\{\{([^{}]*)\}\}|\[\[([^[\]]*)\]\]/g;
 const QUANTITY = /^([a-z][a-z0-9-]*):(-?[0-9]+(?:\.[0-9]+)?)(?:\|(short|long))?$/;
-const VAR = /^var:([a-zA-Z][a-zA-Z0-9]*)$/;
+const VAR = /^var:([a-zA-Z][a-zA-Z0-9]*)(\|signed)?$/;
 const GLOSSARY = /^glossary:([a-z0-9]+(?:[.-][a-z0-9]+)*)\|([^|]+)$/;
 
 export function parseTemplate(src: string): TemplatePart[] {
@@ -37,7 +38,7 @@ export function parseTemplate(src: string): TemplatePart[] {
       const inner = m[1].trim();
       const v = VAR.exec(inner);
       if (v) {
-        parts.push({ type: "var", name: v[1]! });
+        parts.push(v[2] ? { type: "var", name: v[1]!, signed: true } : { type: "var", name: v[1]! });
         continue;
       }
       const q = QUANTITY.exec(inner);
@@ -51,7 +52,7 @@ export function parseTemplate(src: string): TemplatePart[] {
         continue;
       }
       throw new TemplateSyntaxError(
-        `bad placeholder "{{${m[1]}}}": use {{dimension:amount}}, {{dimension:amount|short}} or {{var:name}}`,
+        `bad placeholder "{{${m[1]}}}": use {{dimension:amount}}, {{dimension:amount|short}}, {{var:name}} or {{var:name|signed}}`,
       );
     }
     const g = GLOSSARY.exec(m[2]!.trim());

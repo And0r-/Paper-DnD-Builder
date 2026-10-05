@@ -82,7 +82,8 @@ export type TextPart = { type: "text"; text: string } | { type: "glossary"; id: 
 
 /**
  * Fills the placeholders of a package text (SPEC 10.4): quantities are
- * converted and formatted, `{{var:x}}` takes `vars.x`. Glossary links stay
+ * converted and formatted, `{{var:x}}` takes `vars.x` (`{{var:x|signed}}`
+ * writes a number with its sign: "+3", "-1"). Glossary links stay
  * separate parts so the screen can make them clickable.
  */
 export function renderText(
@@ -103,9 +104,8 @@ export function renderText(
         break;
       case "var": {
         const v = vars[part.name];
-        push(
-          v === undefined ? "" : typeof v === "number" ? new Intl.NumberFormat(ctx.language).format(v) : v,
-        );
+        const format = new Intl.NumberFormat(ctx.language, part.signed ? { signDisplay: "always" } : {});
+        push(v === undefined ? "" : typeof v === "number" ? format.format(v) : v);
         break;
       }
       case "quantity": {

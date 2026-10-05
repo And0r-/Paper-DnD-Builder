@@ -20,6 +20,13 @@ describe("parseTemplate", () => {
     ]);
   });
 
+  it("reads a signed variable", () => {
+    expect(parseTemplate("1 {{var:bonus|signed}}")).toEqual([
+      { type: "text", text: "1 " },
+      { type: "var", name: "bonus", signed: true },
+    ]);
+  });
+
   it("accepts plain text", () => {
     expect(parseTemplate("Nothing special.")).toEqual([{ type: "text", text: "Nothing special." }]);
   });
@@ -27,6 +34,7 @@ describe("parseTemplate", () => {
   it.each([
     ["{{30 feet}}", "bad placeholder"],
     ["{{length:thirty}}", "bad placeholder"],
+    ["{{var:bonus|loud}}", "bad placeholder"],
     ["[[stamina]]", "bad glossary link"],
     ["a {{ b", "unbalanced"],
   ])("rejects %j", (src, message) => {

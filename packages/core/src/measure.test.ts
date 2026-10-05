@@ -74,6 +74,14 @@ describe("renderText", () => {
     ]);
   });
 
+  it("writes a signed variable with its sign, zero included", () => {
+    const roll = (bonus: number) =>
+      renderText(ctx("de"), "1W6 {{var:bonus|signed}}", { bonus })
+        .map((p) => p.text)
+        .join("");
+    expect([roll(3), roll(0), roll(-1)]).toEqual(["1W6 +3", "1W6 +0", "1W6 -1"]);
+  });
+
   it("renders the demo package's own texts", () => {
     const parts = renderText(ctx("en"), pkg.texts["en"]!["trait.quick-feet.explain.table"] as string);
     expect(parts.map((p) => p.text).join("")).toContain("5 feet");

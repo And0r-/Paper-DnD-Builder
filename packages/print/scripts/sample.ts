@@ -52,6 +52,7 @@ const overLong: PrintModel = {
         name: `Erfundenes Talent ${i + 1}`,
         marked: i % 3 === 0,
         note: "",
+        total: { text: "", parts: "" },
       }));
       return { ...s, items: [...s.items, ...more] };
     }

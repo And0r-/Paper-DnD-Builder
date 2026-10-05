@@ -52,7 +52,13 @@ function Stats({ lp, thing }: { lp: LoadedPackage; thing: Thing }) {
         // A stat that names a value shows the character's value (uses that grow with the level).
         else if ("value" in v)
           shown = formatValue(lp, ctx, v.value, v.value === "level" ? ev.level : (ev.values[v.value] ?? 0));
-        else shown = plain(ctx, ptext(lp, v.text));
+        // `vars` fill the text with the character's values ("1d8 +3").
+        else
+          shown = plain(
+            ctx,
+            ptext(lp, v.text),
+            Object.fromEntries(Object.entries(v.vars ?? {}).map(([n, id]) => [n, ev.values[id] ?? 0])),
+          );
         return (
           <div className="stats__row" key={key}>
             <dt>{ptext(lp, `stat.${key}.name`)}</dt>
