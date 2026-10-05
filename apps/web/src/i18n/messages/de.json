@@ -98,6 +98,7 @@
   "flow.status.needsAttention": "muss neu gewählt werden",
   "flow.overview": "Überblick",
   "flow.later": "Später entscheiden",
+  "flow.going": "Lädt …",
   "flow.chooseForMe": "Für mich wählen",
   "flow.chooseForMeHint": "Nimmt einen guten Vorschlag. Du kannst ihn danach ändern.",
   "flow.choseForMe": "Erledigt. Du siehst die Wahl unten und kannst sie ändern.",

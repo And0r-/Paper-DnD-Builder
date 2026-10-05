@@ -13,6 +13,7 @@ import {
   useMemo,
   useRef,
   useState,
+  useTransition,
   type ReactNode,
 } from "react";
 import { useApp } from "../app-state.tsx";
@@ -455,6 +456,20 @@ export function useFooterDock() {
   return dock;
 }
 
+/** True once `on` has stayed true for `ms`; false again as soon as it is false. */
+function useLate(on: boolean, ms: number): boolean {
+  const [late, setLate] = useState(false);
+  useEffect(() => {
+    if (!on) {
+      setLate(false);
+      return;
+    }
+    const timer = setTimeout(() => setLate(true), ms);
+    return () => clearTimeout(timer);
+  }, [on, ms]);
+  return on && late;
+}
+
 /**
  * Where Next leads from a step. In the flow: the step after it. A step that
  * was still open when the player came to it from elsewhere (from the
@@ -480,6 +495,12 @@ function useNextStep(entry: FlowEntry): { index: number; next: FlowEntry | undef
  * missing right above itself and moves focus to the first open place. The
  * dock stays on screen on every size, so the reason and "Choose for me" are
  * in view wherever that place is.
+ *
+ * Pressed while the last answer is still on its way, Next waits for it and
+ * then goes on by itself: one tap is enough on a slow connection. Until the
+ * next step is on screen the button says so and further taps do nothing.
+ * If saving fails, it goes on anyway; the top bar says the answer is not
+ * saved yet, and saving keeps trying.
  */
 export function StepFooter({
   entry,
@@ -496,9 +517,39 @@ export function StepFooter({
   focusTarget?: () => HTMLElement | null;
 }) {
   const { t } = useApp();
-  const { entries, draft, raise } = useDraft();
+  const { entries, draft, raise, saveState, flush } = useDraft();
   const router = useRouter();
   const { index, next, toOverview } = useNextStep(entry);
+  const [waiting, setWaiting] = useState(false);
+  const [moving, startMoving] = useTransition();
+  const busy = waiting || moving;
+  // A quick save or step change shows no flicker; a slow one says what is going on.
+  const late = useLate(busy, 300);
+  // The tap on Next that waits for saving. Any other way out (a link, the
+  // browser's Back, leaving the step) cancels it: the player's newer tap wins.
+  const pending = useRef<symbol | null>(null);
+  useEffect(() => {
+    if (!waiting) return;
+    const cancel = () => {
+      pending.current = null;
+      setWaiting(false);
+    };
+    const onClick = (e: MouseEvent) => {
+      if (e.target instanceof Element && e.target.closest("a[href]")) cancel();
+    };
+    document.addEventListener("click", onClick, true);
+    window.addEventListener("popstate", cancel);
+    return () => {
+      document.removeEventListener("click", onClick, true);
+      window.removeEventListener("popstate", cancel);
+    };
+  }, [waiting]);
+  useEffect(
+    () => () => {
+      pending.current = null;
+    },
+    [],
+  );
   const [shown, setShown] = useState<string | undefined>(undefined);
   const prev = index < 0 ? entries.at(-1) : entries[index - 1];
   const reasonId = useId();
@@ -516,8 +567,21 @@ export function StepFooter({
       requestAnimationFrame(() => focusTarget?.()?.focus());
       return;
     }
-    if (next) router.push(next.href);
+    if (!next) return;
+    const href = next.href;
+    const tap = Symbol();
+    pending.current = tap;
+    setWaiting(true);
+    void flush().then(() => {
+      if (pending.current !== tap) return;
+      pending.current = null;
+      setWaiting(false);
+      startMoving(() => router.push(href));
+    });
   };
+  // Saving shown in the top bar already: the button says the same at once.
+  const busyLabel =
+    waiting && (late || saveState !== "saved") ? t("save.saving") : late ? t("flow.going") : undefined;
 
   return (
     <div className="step-footer">
@@ -564,7 +628,13 @@ export function StepFooter({
             </ButtonLink>
           ) : (
             next && (
-              <Button iconAfter="arrowRight" onClick={goNext} aria-describedby={shown ? reasonId : undefined}>
+              <Button
+                iconAfter="arrowRight"
+                onClick={goNext}
+                busy={busy}
+                {...(busyLabel !== undefined ? { busyLabel } : {})}
+                aria-describedby={shown ? reasonId : undefined}
+              >
                 {nextLabel ?? t("common.next")}
               </Button>
             )
