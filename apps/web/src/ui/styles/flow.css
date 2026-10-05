@@ -1204,3 +1204,42 @@
   flex-direction: column;
   gap: var(--space-3);
 }
+
+/* -------------------------------------------------------------- level up */
+
+/* Phones: the main button on top, both full width; larger screens: Back left, go on right. */
+.raise__actions {
+  display: flex;
+  flex-direction: column-reverse;
+  gap: var(--space-3);
+}
+
+@media (min-width: 600px) {
+  .raise__actions {
+    flex-direction: row;
+    justify-content: space-between;
+  }
+}
+
+.raise__stop {
+  text-align: center;
+}
+
+.done__news {
+  width: 100%;
+  max-width: 32rem;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  text-align: left;
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-md);
+}
+
+.done__level {
+  font-size: var(--text-lg);
+  line-height: var(--text-lg-lh);
+  color: var(--color-ink-muted);
+}
