@@ -33,6 +33,7 @@ export {
   type Evaluation,
   type HeldThing,
   type InfoContent,
+  type PoolState,
   type StepState,
 } from "./evaluate.ts";
 export { explainValue, totalOf, type PartSource, type ValueExplanation, type ValuePart } from "./explain.ts";

@@ -19,6 +19,7 @@ import {
   TextChoice,
 } from "../../../../../src/ui/flow/choices.tsx";
 import { useDraft } from "../../../../../src/ui/flow/draft-state.tsx";
+import { PoolList, poolMissingText } from "../../../../../src/ui/flow/pool.tsx";
 import { StepFooter, StepFrame, StepShortcuts, usePageTitle } from "../../../../../src/ui/flow/frame.tsx";
 import { firstOpen, missingText } from "../../../../../src/ui/flow/model.ts";
 import { choiceTexts, plist, stepTexts } from "../../../../../src/ui/package-text.ts";
@@ -31,7 +32,7 @@ function settled(c: ChoiceState): boolean {
 export default function StepPage() {
   const { stepId } = useParams<{ stepId: string }>();
   const key = decodeURIComponent(stepId);
-  const { t } = useApp();
+  const { t, list } = useApp();
   const { lp, ev, entries, change } = useDraft();
   const ctx = useMeasure(lp);
   const headingId = useId();
@@ -51,19 +52,24 @@ export default function StepPage() {
     );
   }
 
-  const texts = stepTexts(lp, { id: entry.key, choices: entry.choices }, ev, ctx);
+  const step = ev.steps.find((s) => s.id === entry.key);
+  const texts = stepTexts(lp, step ?? { id: entry.key, choices: entry.choices }, ev, ctx);
+  const pool = step?.pool;
   const choices = entry.choices
     .map((id) => ({ def: lp.pkg.flow.choices.find((c) => c.id === id), state: ev.choices[id] }))
     .filter((x): x is { def: Choice; state: ChoiceState } => x.def !== undefined && x.state !== undefined);
-  const single = choices.length === 1;
+  // A gather step always shows its choices as sections under its own question.
+  const single = choices.length === 1 && step?.gather === undefined;
   const open = choices.filter((c) => !settled(c.state));
   const head = open[0];
   const way = head?.def.kind === "distribute" ? head.def.methods[ways[head.def.id] ?? 0] : undefined;
   const problem = !head
     ? undefined
-    : way?.method === "array" && head.state.status !== "invalid"
-      ? t("dist.arrayMissing")
-      : missingText(lp, ctx, head.state, t);
+    : pool && head.state.status !== "invalid"
+      ? poolMissingText(lp, ctx, ev, pool, t, list)
+      : way?.method === "array" && head.state.status !== "invalid"
+        ? t("dist.arrayMissing")
+        : missingText(lp, ctx, head.state, t);
   const isInfo = choices.length > 0 && choices.every((c) => c.def.kind === "info");
 
   // "Choose for me": the package's recommendation (or a good default) for every open choice.
@@ -90,11 +96,26 @@ export default function StepPage() {
   };
   const recs = open.map((c) => recommendation(c.def, c.state));
   const chooseForMe =
-    open.length > 0 && recs.every(Boolean) ? () => recs.forEach((r) => r && change(r)) : undefined;
+    open.length === 0
+      ? undefined
+      : pool
+        ? // One list: the core's full suggestion, spread over all sources in one change.
+          pool.recommended.length > 0
+          ? () => change({ type: "pool", step: entry.key, picks: pool.recommended })
+          : undefined
+        : recs.every(Boolean)
+          ? () => recs.forEach((r) => r && change(r))
+          : undefined;
 
   // The first answer of the open choice, not the search box above the list:
   // an empty search field says nothing about what is missing.
   const focusTarget = () => {
+    if (pool) {
+      // The first option that can still be picked.
+      return document.querySelector<HTMLElement>(
+        "#block-pool .option:not(.option--checked):not(.option--blocked) input",
+      );
+    }
     const block = open[0] && document.getElementById(`block-${open[0].def.id}`);
     return (
       block?.querySelector<HTMLElement>("[data-open-target]") ??
@@ -146,37 +167,43 @@ export default function StepPage() {
         />
       }
     >
-      {choices.map(({ def, state }) => {
-        const ct = choiceTexts(lp, def.id, state, ctx);
-        if (single) {
+      {pool && step ? (
+        <div id="block-pool">
+          <PoolList step={{ ...step, pool }} labelledBy={headingId} />
+        </div>
+      ) : (
+        choices.map(({ def, state }) => {
+          const ct = choiceTexts(lp, def.id, state, ctx);
+          if (single) {
+            return (
+              <div id={`block-${def.id}`} key={def.id}>
+                {render(def, state, headingId, texts.question)}
+              </div>
+            );
+          }
+          const subId = `q-${def.id}`;
           return (
-            <div id={`block-${def.id}`} key={def.id}>
-              {render(def, state, headingId, texts.question)}
-            </div>
+            <section
+              className="subquestion"
+              id={`block-${def.id}`}
+              key={def.id}
+              {...(def.kind !== "text" ? { "aria-labelledby": subId } : {})}
+            >
+              {def.kind !== "text" && (
+                <h2 className="subquestion__title" id={subId}>
+                  {ct.question}
+                </h2>
+              )}
+              {ct.intro && (
+                <p className="subquestion__intro">
+                  <RichText lp={lp} text={ct.intro} vars={ct.vars} />
+                </p>
+              )}
+              {render(def, state, subId, ct.question)}
+            </section>
           );
-        }
-        const subId = `q-${def.id}`;
-        return (
-          <section
-            className="subquestion"
-            id={`block-${def.id}`}
-            key={def.id}
-            {...(def.kind !== "text" ? { "aria-labelledby": subId } : {})}
-          >
-            {def.kind !== "text" && (
-              <h2 className="subquestion__title" id={subId}>
-                {ct.question}
-              </h2>
-            )}
-            {ct.intro && (
-              <p className="subquestion__intro">
-                <RichText lp={lp} text={ct.intro} vars={ct.vars} />
-              </p>
-            )}
-            {render(def, state, subId, ct.question)}
-          </section>
-        );
-      })}
+        })
+      )}
     </StepFrame>
   );
 }

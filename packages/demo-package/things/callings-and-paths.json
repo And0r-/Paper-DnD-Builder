@@ -9,9 +9,11 @@
       { "value": "stamina", "add": 5, "atLevel": 3 },
       { "thing": "item.lantern-staff" },
       { "thing": "item.provisions" },
+      { "choice": "talents-lantern-bearer" },
       { "choice": "gear" },
       { "choice": "knacks-lantern" },
       { "thing": "trait.steady-flame", "atLevel": 2 },
+      { "choice": "extra-talent", "atLevel": 2 },
       { "choice": "path", "atLevel": 3 }
     ]
   },
@@ -25,10 +27,11 @@
       { "value": "stamina", "add": 6, "atLevel": 3 },
       { "thing": "item.boat-hook" },
       { "thing": "item.provisions" },
+      { "choice": "talents-river-runner" },
       { "choice": "gear" },
-      { "choice": "handling-river-runner" },
       { "choice": "knacks-current" },
       { "thing": "trait.quick-feet", "atLevel": 2 },
+      { "choice": "extra-talent", "atLevel": 2 },
       { "choice": "path", "atLevel": 3 }
     ]
   },
@@ -42,10 +45,12 @@
       { "value": "stamina", "add": 4, "atLevel": 3 },
       { "thing": "item.herb-satchel" },
       { "thing": "item.provisions" },
+      { "choice": "talents-herbalist" },
       { "choice": "gear" },
       { "choice": "knacks-root" },
       { "thing": "trait.green-thumb", "atLevel": 2 },
       { "choice": "borrowed-knack", "atLevel": 2 },
+      { "choice": "extra-talent", "atLevel": 2 },
       { "choice": "path", "atLevel": 3 }
     ]
   },

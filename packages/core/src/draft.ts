@@ -60,4 +60,9 @@ export interface DraftDocument {
 export type DraftChange =
   | { type: "setLevel"; level: number }
   /** `answer: null` removes the answer. */
-  | { type: "answer"; choice: string; answer: unknown };
+  | { type: "answer"; choice: string; answer: unknown }
+  /**
+   * All picks of a list step (`together: "list"`). The core assigns each pick
+   * to one of the step's choices and stores one answer per choice.
+   */
+  | { type: "pool"; step: string; picks: string[] };

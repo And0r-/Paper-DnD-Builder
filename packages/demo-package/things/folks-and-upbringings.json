@@ -20,7 +20,11 @@
     "id": "folk.coastfolk",
     "kind": "folk",
     "source": "mistland",
-    "grants": [{ "value": "pace", "add": 30 }, { "thing": "trait.salt-blood" }]
+    "grants": [
+      { "value": "pace", "add": 30 },
+      { "thing": "trait.salt-blood" },
+      { "choice": "coastfolk-talent" }
+    ]
   },
   {
     "id": "upbringing.ferry-child",

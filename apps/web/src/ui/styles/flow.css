@@ -363,6 +363,39 @@
   background: var(--color-primary-soft);
 }
 
+/* An option no free source offers: still readable (ink-muted on sunk is
+   above 4.5:1), the reason in words, never only the colour. */
+.option--blocked {
+  border-style: dashed;
+  border-color: var(--color-line);
+  background: var(--color-surface-sunk);
+  box-shadow: none;
+  color: var(--color-ink-muted);
+  cursor: not-allowed;
+}
+
+.option--blocked:hover {
+  border-color: var(--color-border);
+}
+
+.option--blocked .option__name {
+  cursor: not-allowed;
+}
+
+.option__blocked {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  line-height: var(--text-sm-lh);
+  font-weight: var(--weight-semibold);
+}
+
+.option__blocked svg {
+  flex: none;
+  margin-top: 0.1875rem;
+}
+
 .option:has(.option__input:focus-visible) {
   outline: var(--focus-ring);
   outline-offset: 2px;
@@ -455,6 +488,24 @@
 
 .pick-counter__count {
   font-weight: var(--weight-semibold);
+}
+
+.pool__total {
+  font-size: var(--text-md);
+  line-height: var(--text-md-lh);
+  font-weight: var(--weight-semibold);
+}
+
+.pool__held {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.pool__origin,
+.gifts__where {
+  color: var(--color-ink-muted);
 }
 
 .pick-counter__hint {

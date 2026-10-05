@@ -210,6 +210,11 @@ const choiceBase = {
     .array(z.strictObject({ id, when: expr }))
     .min(1)
     .optional(),
+  /**
+   * Group this choice is gathered in when a thing grants it: it is asked at
+   * the flow step with the same `gather` instead of right after the granting step.
+   */
+  gather: id.optional(),
 };
 
 const pickRecommendation = z.strictObject({ when: expr.optional(), pick: z.array(id).min(1) });
@@ -292,21 +297,31 @@ export const choiceSchema = z.discriminatedUnion("kind", [
   }),
 ]);
 
+export const fixedStepSchema = z.strictObject({
+  id,
+  /** Choices shown on this step. More than one only for small related questions. */
+  choices: z.array(id).min(1),
+  /** Step is shown only while this expression is true. */
+  when: expr.optional(),
+});
+
+/** A place in the flow where granted choices with the same `gather` group are asked. */
+export const gatherStepSchema = z.strictObject({
+  id,
+  gather: id,
+  /**
+   * Missing: each gathered choice is its own step here. `sections`: one step
+   * with all of them. `list`: one step with one shared list of options.
+   */
+  together: z.enum(["sections", "list"]).optional(),
+  when: expr.optional(),
+});
+
 export const flowSchema = z.strictObject({
   level: z
     .strictObject({ min: level, max: level, default: level })
     .refine((l) => l.min <= l.default && l.default <= l.max, { message: "need min <= default <= max" }),
-  steps: z
-    .array(
-      z.strictObject({
-        id,
-        /** Choices shown on this step. More than one only for small related questions. */
-        choices: z.array(id).min(1),
-        /** Step is shown only while this expression is true. */
-        when: expr.optional(),
-      }),
-    )
-    .min(1),
+  steps: z.array(z.union([fixedStepSchema, gatherStepSchema])).min(1),
   choices: z.array(choiceSchema).min(1),
   /** The text choice whose answer is the character's name. */
   characterName: id,
@@ -425,6 +440,8 @@ export type OptionSource = z.infer<typeof optionSourceSchema>;
 export type Choice = z.infer<typeof choiceSchema>;
 export type Flow = z.infer<typeof flowSchema>;
 export type Step = Flow["steps"][number];
+export type FixedStep = z.infer<typeof fixedStepSchema>;
+export type GatherStep = z.infer<typeof gatherStepSchema>;
 export type Section = z.infer<typeof sectionSchema>;
 export type Sheet = z.infer<typeof sheetSchema>;
 export type GlossaryEntry = z.infer<typeof glossarySchema>[number];

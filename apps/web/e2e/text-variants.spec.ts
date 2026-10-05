@@ -1,7 +1,9 @@
 /**
- * A choice's intro for this character (format 0.6): the number of talents
- * comes from the rule core, and only hillfolk read why they get one more.
- * One language on screen, in German and in English.
+ * The number of talents comes from the rule core (format 0.6 count by
+ * expression): hillfolk get one more. Since format 0.8 the talents of all
+ * sources share one step with its own texts, so the step shows the count
+ * on its counter; the choice's hillfolk text variant is checked in the unit
+ * tests (package-text.test.ts). One language on screen, in German and English.
  */
 import type { Page } from "@playwright/test";
 import en from "../src/i18n/messages/en.json" with { type: "json" };
@@ -26,50 +28,27 @@ async function riverRunner(page: Page, folk: string): Promise<string> {
   return view.draft.id;
 }
 
-async function intro(page: Page, id: string, lang: "de" | "en", text: string, name: string) {
-  await page.goto(`/c/${id}/step/talents-river-runner`);
-  await expect(page.locator(".question__intro")).toHaveText(text);
+async function intro(page: Page, id: string, lang: "de" | "en", text: RegExp, name: string) {
+  await page.goto(`/c/${id}/step/talents`);
+  // The shared list words the count; the step's own texts stand above it.
+  await expect(page.locator("[data-pool-total]")).toHaveText(text);
   await expectOneLanguage(page, lang);
   await shot(page, name);
 }
 
-test("the talent intro names the count and, for hillfolk only, the reason", async ({ page, foreign }) => {
+test("the talents step counts one more talent for hillfolk", async ({ page, foreign }) => {
   void foreign;
   await login(page, uniqueEmail("variants"));
   const hill = await riverRunner(page, "folk.hillfolk");
   const moor = await riverRunner(page, "folk.moorfolk");
 
-  await intro(
-    page,
-    hill,
-    "de",
-    "Als Flussläufer lernst du 3 Talente, eins mehr als die anderen: Das Bergvolk lernt viel von seinen Alten. Wähle die, die zu deinem Charakter passen.",
-    "31-talente-bergvolk",
-  );
-  await intro(
-    page,
-    moor,
-    "de",
-    "Als Flussläufer lernst du 2 Talente. Wähle die, die zu deinem Charakter passen.",
-    "32-talente-moorvolk",
-  );
+  await intro(page, hill, "de", /^Du wählst 3: /, "31-talente-bergvolk");
+  await intro(page, moor, "de", /^Du wählst 2: /, "32-talente-moorvolk");
 
   await page.goto("/settings");
   await page.getByText("English", { exact: true }).click();
   await expect(page.getByRole("heading", { level: 1, name: en["settings.title"] })).toBeVisible();
 
-  await intro(
-    page,
-    hill,
-    "en",
-    "As a River Runner, you learn 3 talents, one more than others: the hillfolk learn a lot from their elders. Pick the ones that fit your character.",
-    "33-talents-hillfolk-en",
-  );
-  await intro(
-    page,
-    moor,
-    "en",
-    "As a River Runner, you learn 2 talents. Pick the ones that fit your character.",
-    "34-talents-moorfolk-en",
-  );
+  await intro(page, hill, "en", /^You choose 3: /, "33-talents-hillfolk-en");
+  await intro(page, moor, "en", /^You choose 2: /, "34-talents-moorfolk-en");
 });

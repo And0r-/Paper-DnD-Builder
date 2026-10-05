@@ -57,41 +57,50 @@ describe("steps", () => {
       "character",
       "calling",
       "calling-gifts",
-      "upbringing",
       "folk",
+      "upbringing",
       "scores",
       "looks",
     ]);
     expect(ev.complete).toBe(false);
-    expect(ev.open).toEqual(["name", "calling", "upbringing", "folk", "scores", "age"]);
+    expect(ev.open).toEqual(["name", "calling", "folk", "upbringing", "scores", "age"]);
   });
 
   it("shows level-dependent steps from their level on", () => {
-    expect(evaluateDraft(pkg, draft(2)).steps.map((s) => s.id)).toContain("extra-talent");
+    const calling = { calling: { pick: "calling.lantern-bearer" } };
+    expect(evaluateDraft(pkg, draft(1, calling)).choices["extra-talent"]).toBeUndefined();
+    expect(evaluateDraft(pkg, draft(2, calling)).choices["extra-talent"]!.step).toBe("talents");
+    // A fixed step with a condition: only river runners handle their things.
+    const runner = { calling: { pick: "calling.river-runner" } };
+    expect(evaluateDraft(pkg, draft(1, runner)).steps.map((s) => s.id)).toContain("handling-river-runner");
+    expect(evaluateDraft(pkg, draft(1, calling)).steps.map((s) => s.id)).not.toContain(
+      "handling-river-runner",
+    );
   });
 
-  it("inserts granted choices right after the step that granted them, in grant order", () => {
+  it("asks granted choices at their gather step, in grant order", () => {
     const ev = evaluateDraft(pkg, draft(3, { calling: { pick: "calling.lantern-bearer" } }));
     expect(ev.steps.map((s) => s.id)).toEqual([
       "character",
       "calling",
-      "gear",
-      "knacks-lantern",
-      "path",
       "calling-gifts",
-      "upbringing",
       "folk",
-      "talents-lantern-bearer",
+      "upbringing",
+      "path",
       "scores",
-      "extra-talent",
+      "talents",
+      "knacks",
+      "gear",
       "looks",
     ]);
     const gear = ev.steps.find((s) => s.id === "gear")!;
     expect(gear.origin).toBe("granted");
     expect(gear.grantedBy).toEqual(["calling.lantern-bearer"]);
     expect(gear.dependsOn).toEqual(["calling"]);
-    // The talents are a flow step after the folk, so the folk can add one.
-    expect(ev.steps.find((s) => s.id === "talents-lantern-bearer")!.origin).toBe("flow");
+    // The talents of the calling and of level 2 share one list after the scores.
+    const talents = ev.steps.find((s) => s.id === "talents")!;
+    expect(talents).toMatchObject({ origin: "flow", gather: { group: "talents", together: "list" } });
+    expect(talents.choices).toEqual(["talents-lantern-bearer", "extra-talent"]);
   });
 
   it("asks a choice granted at a higher level only from that level on", () => {
@@ -106,16 +115,16 @@ describe("options", () => {
       pkg,
       draft(2, {
         calling: { pick: "calling.lantern-bearer" },
-        "talents-lantern-bearer": { picks: ["talent.climbing", "talent.mending"] },
         upbringing: { pick: "upbringing.ferry-child" },
       }),
     );
-    // Climbing and mending come with the calling, weather sense and haggling
-    // with the upbringing, so the extra talent does not offer them again.
+    // Weather sense and haggling come with the upbringing, an earlier step,
+    // so the talents step does not offer them again.
     const options = ev.choices["extra-talent"]!.options;
     expect(options).toContain("talent.legends");
-    for (const had of ["talent.climbing", "talent.mending", "talent.weather-sense", "talent.haggling"]) {
+    for (const had of ["talent.weather-sense", "talent.haggling"]) {
       expect(options).not.toContain(had);
+      expect(ev.steps.find((s) => s.id === "talents")!.pool!.options).not.toContain(had);
     }
   });
 
@@ -225,13 +234,25 @@ describe("options", () => {
     });
 
     it("counts only what earlier steps brought", () => {
-      // The upbringing's bell comes in a later step than the calling's choices.
-      const ev = riverRunner({ upbringing: { pick: "upbringing.bell-tower" } });
-      expect(ev.choices["handling-river-runner"]!.held).toEqual(["item.boat-hook"]);
-      const ids = ev.steps.map((s) => s.id);
-      expect(ids.indexOf("handling-river-runner")).toBe(ids.indexOf("gear") + 1);
+      const bell = { upbringing: { pick: "upbringing.bell-tower" } };
+      // The handling step comes after the upbringing, so its bell counts.
+      const ev = riverRunner(bell);
+      expect(ev.choices["handling-river-runner"]!.held).toEqual(["item.boat-hook", "item.small-bell"]);
       const step = ev.steps.find((s) => s.id === "handling-river-runner")!;
-      expect(step.dependsOn).toEqual(["calling"]);
+      expect(step.dependsOn).toEqual(["calling", "upbringing"]);
+      // Asked before the upbringing, the bell is not there yet.
+      const early: ContentPackage = structuredClone(pkg);
+      const steps = early.flow.steps;
+      const handling = steps.splice(
+        steps.findIndex((s) => s.id === "handling-river-runner"),
+        1,
+      )[0]!;
+      steps.splice(
+        steps.findIndex((s) => s.id === "folk"),
+        0,
+        handling,
+      );
+      expect(riverRunner(bell, early).choices["handling-river-runner"]!.held).toEqual(["item.boat-hook"]);
     });
 
     it("is left out on choices without it", () => {
@@ -288,17 +309,19 @@ describe("a complete level 3 character", () => {
       thing: "calling.lantern-bearer",
       things: ["item.lantern-staff", "item.provisions", "trait.steady-flame"],
       values: [{ value: "stamina", add: 18 }],
-      choices: ["gear", "knacks-lantern", "path"],
+      choices: ["talents-lantern-bearer", "gear", "knacks-lantern", "extra-talent", "path"],
     });
   });
 
-  it("asks the choices an info step lists before the info step itself", () => {
-    // The flow words them as already chosen, never as coming next.
+  it("asks an info step's choices before it, unless a gather group moves them later", () => {
+    // The flow words them as already chosen, or as chosen later at their step; never as coming next.
     const ev = evaluateDraft(pkg, build(3, LANTERN_BEARER_L3));
     const order = ev.steps.map((s) => s.id);
     const infoAt = order.indexOf(ev.choices["calling-gifts"]!.step);
+    const gathered = (c: string) => pkg.flow.choices.find((x) => x.id === c)?.gather !== undefined;
     for (const c of ev.choices["calling-gifts"]!.info!.choices) {
-      expect(order.indexOf(ev.choices[c]!.step)).toBeLessThan(infoAt);
+      const at = order.indexOf(ev.choices[c]!.step);
+      expect(at < infoAt || gathered(c)).toBe(true);
       expect(ev.choices[c]!.status).toBe("answered");
     }
   });

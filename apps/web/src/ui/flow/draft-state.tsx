@@ -31,16 +31,42 @@ import {
 import { useApp } from "../app-state.tsx";
 import { api, ApiError, type DraftInfo, type DraftView } from "../api.ts";
 import { usePackage, type LoadedPackage } from "../packages.ts";
-import { buildFlow, stepDiff, stepTitle, type FlowEntry } from "./model.ts";
+import { buildFlow, isPart, stepDiff, stepTitle, type FlowEntry } from "./model.ts";
 
 export type SaveState = "saved" | "saving" | "error" | "offline";
 
-type Pending = { type: "answer"; choice: string; answer: unknown } | { type: "setLevel"; level: number };
+type Pending = DraftChange;
+
+/** Two queued changes of the same thing: only the newer one needs to be sent. */
+function sameTarget(a: Pending, b: Pending): boolean {
+  if (a.type === "setLevel") return b.type === "setLevel";
+  if (a.type === "answer") return b.type === "answer" && a.choice === b.choice;
+  return b.type === "pool" && a.step === b.step;
+}
+
+function send(id: string, version: number, next: Pending): Promise<DraftView> {
+  switch (next.type) {
+    case "setLevel":
+      return api<DraftView>("PATCH", `/api/drafts/${id}`, { version, level: next.level });
+    case "answer":
+      return api<DraftView>("PUT", `/api/drafts/${id}/answers/${encodeURIComponent(next.choice)}`, {
+        version,
+        answer: next.answer,
+      });
+    case "pool":
+      return api<DraftView>("PUT", `/api/drafts/${id}/pools/${encodeURIComponent(next.step)}`, {
+        version,
+        picks: next.picks,
+      });
+  }
+}
 
 /** Titles of steps a change added or removed: counted steps, and parts of a step. */
 export interface StepNotice {
   added: string[];
   removed: string[];
+  /** Steps that were there before and now ask more (a gather step got a new choice). */
+  grown: string[];
   addedParts: string[];
   removedParts: string[];
 }
@@ -197,13 +223,7 @@ function ReadyDraft({
         const id = serverRef.current.draft.id;
         const version = serverRef.current.draft.version;
         try {
-          const res =
-            next.type === "setLevel"
-              ? await api<DraftView>("PATCH", `/api/drafts/${id}`, { version, level: next.level })
-              : await api<DraftView>("PUT", `/api/drafts/${id}/answers/${encodeURIComponent(next.choice)}`, {
-                  version,
-                  answer: next.answer,
-                });
+          const res = await send(id, version, next);
           serverRef.current = res;
           setServer(res);
           queue.current.shift();
@@ -282,30 +302,22 @@ function ReadyDraft({
       const before = evaluateDraft(pkg, docRef.current);
       const after = evaluateDraft(pkg, r.doc);
       const diff = stepDiff(before, after);
-      if (diff.added.length > 0 || diff.removed.length > 0) {
-        const isPart = (e: Evaluation, id: string) => e.steps.find((s) => s.id === id)?.origin === "granted";
+      if (diff.added.length > 0 || diff.removed.length > 0 || diff.grown.length > 0) {
         const titles = (e: Evaluation, ids: string[], parts: boolean) =>
-          ids.filter((id) => isPart(e, id) === parts).map((id) => stepTitle(lp, e, id));
+          ids.filter((id) => isPart(lp, e, id) === parts).map((id) => stepTitle(lp, e, id));
         setNotice({
           added: titles(after, diff.added, false),
           removed: titles(before, diff.removed, false),
           addedParts: titles(after, diff.added, true),
           removedParts: titles(before, diff.removed, true),
+          grown: diff.grown.map((s) => stepTitle(lp, after, s)),
         });
       }
       setDoc(r.doc);
-      const item: Pending =
-        c.type === "setLevel"
-          ? { type: "setLevel", level: c.level }
-          : { type: "answer", choice: c.choice, answer: c.answer };
+      const item: Pending = c;
       // Typing sends many changes to one choice: keep only the newest one that is not on its way yet.
       const from = running.current ? 1 : 0;
-      const same = queue.current.findIndex(
-        (p, i) =>
-          i >= from &&
-          p.type === item.type &&
-          (p.type === "setLevel" || (item.type === "answer" && p.choice === item.choice)),
-      );
+      const same = queue.current.findIndex((p, i) => i >= from && sameTarget(p, item));
       if (same >= 0) queue.current[same] = item;
       else queue.current.push(item);
       void pump();

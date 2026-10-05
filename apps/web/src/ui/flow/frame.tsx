@@ -209,7 +209,7 @@ export function ProgressHeader({ entry }: { entry: FlowEntry }) {
  * swaps parts only says what the new choice brings.
  */
 export function StepNotice() {
-  const { tc } = useApp();
+  const { tc, list } = useApp();
   const { notice } = useDraft();
   const lines: string[] = [];
   if (notice?.addedParts.length) lines.push(tc("flow.partsAdded", notice.addedParts.length));
@@ -218,6 +218,8 @@ export function StepNotice() {
   const too = lines.length > 0 ? "Too" : "";
   if (notice?.added.length) lines.push(tc(`flow.stepAdded${too}`, notice.added.length));
   if (notice?.removed.length) lines.push(tc(`flow.stepRemoved${too}`, notice.removed.length));
+  if (notice?.grown.length)
+    lines.push(tc("flow.stepGrown", notice.grown.length, { steps: list(notice.grown) }));
   return <div aria-live="polite">{lines.length > 0 && <Callout tone="info">{lines.join(" ")}</Callout>}</div>;
 }
 
