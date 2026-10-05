@@ -1,8 +1,9 @@
 import type { DraftDocument } from "@builder/core";
 import { evaluateDraft } from "@builder/core";
 import type { ContentPackage, TextValue } from "@builder/format";
+import PDFDocument from "pdfkit";
 import { getDocument } from "pdfjs-dist/legacy/build/pdf.mjs";
-import { beforeAll, describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 import { cardCount } from "./cards.ts";
 import { MESSAGES } from "./messages.ts";
 import { buildPrintModel, firstSentence, PrintError, type PrintModel, type SheetSection } from "./model.ts";
@@ -396,6 +397,27 @@ describe("printed character (demo package)", () => {
     expect(h.model.cards.length).toBe(10);
     expect(h.pdf.cardPages).toBe(2);
     expect(h.pdf.pages).toBe(h.pdf.sheetPages + 2);
+  });
+
+  it("reads each font file once per PDF, however often the text switches fonts", async () => {
+    // Every font pdfkit opens gets a new number; re-reading a font file on
+    // each switch made a level-20 PDF take half a minute.
+    const opened: number[] = [];
+    const original = PDFDocument.prototype.end;
+    const end = vi.spyOn(PDFDocument.prototype, "end").mockImplementation(function (
+      this: PDFKit.PDFDocument,
+    ) {
+      opened.push((this as unknown as { _fontCount: number })._fontCount);
+      return original.call(this);
+    });
+    try {
+      await renderPdf(buildPrintModel(pkg, demoCharacter(pkg, 20), { language: "de", createdAt }));
+    } finally {
+      end.mockRestore();
+    }
+    // At most once for each of the three font files.
+    expect(opened).toHaveLength(1);
+    expect(opened[0]).toBeLessThanOrEqual(3);
   });
 
   it("prints a raised character at its new level: 1 → 2 → 3 → 5, and 1 → 20 in one go", async () => {

@@ -98,15 +98,29 @@ class Pen {
   /** The builder's page words in the document's language. */
   readonly messages: Messages;
   dry = false;
+  /**
+   * Font files by name. pdfkit caches a font under the source it was opened
+   * with; a name given to registerFont() for the file that is also the
+   * document's default font is never cached and makes pdfkit read and parse
+   * the whole file again on every switch (most of the time a big PDF took).
+   * Fonts are therefore always selected by their path.
+   */
+  private readonly fonts: Readonly<Record<FontName, string>>;
 
-  constructor(doc: PDFKit.PDFDocument, language: string, messages: Messages) {
+  constructor(
+    doc: PDFKit.PDFDocument,
+    language: string,
+    messages: Messages,
+    fonts: Record<FontName, string>,
+  ) {
     this.doc = doc;
     this.language = language;
     this.messages = messages;
+    this.fonts = fonts;
   }
 
   private prepare(s: TextStyle): string {
-    this.doc.font(s.font ?? "regular").fontSize(s.size);
+    this.doc.font(this.fonts[s.font ?? "regular"]).fontSize(s.size);
     return s.color ?? "#000";
   }
 
@@ -913,6 +927,11 @@ export interface RenderedPdf {
 
 /** The character sheet followed by the cards, as one A4 PDF. */
 export async function renderPdf(model: PrintModel): Promise<RenderedPdf> {
+  const fonts: Record<FontName, string> = {
+    regular: fileURLToPath(FONTS.regular),
+    semibold: fileURLToPath(FONTS.semibold),
+    bold: fileURLToPath(FONTS.bold),
+  };
   const doc = new PDFDocument({
     size: "A4",
     margin: 0,
@@ -922,7 +941,7 @@ export async function renderPdf(model: PrintModel): Promise<RenderedPdf> {
     subset: "PDF/A-2b",
     lang: model.language,
     displayTitle: true,
-    font: fileURLToPath(FONTS.regular),
+    font: fonts.regular,
     info: {
       Title: model.name,
       Creator: "Character Builder",
@@ -931,7 +950,6 @@ export async function renderPdf(model: PrintModel): Promise<RenderedPdf> {
       ModDate: model.createdAt,
     },
   });
-  for (const [name, url] of Object.entries(FONTS)) doc.registerFont(name, fileURLToPath(url));
   const chunks: Buffer[] = [];
   doc.on("data", (c: Buffer) => chunks.push(c));
   const done = new Promise<void>((resolve, reject) => {
@@ -939,7 +957,7 @@ export async function renderPdf(model: PrintModel): Promise<RenderedPdf> {
     doc.on("error", reject);
   });
 
-  const pen = new Pen(doc, model.language, model.messages);
+  const pen = new Pen(doc, model.language, model.messages, fonts);
   const m = model.messages;
 
   // The source and license line is wrapped, never cut; on the sheet it needs
