@@ -193,6 +193,18 @@ export function firstOpen(entries: FlowEntry[]): FlowEntry {
   return entries.find((e) => e.kind === "step" && e.status !== "done") ?? entries.at(-1)!;
 }
 
+/**
+ * The step after `key` in the order of every step (`all`) that is still to
+ * answer and one of the steps to go through (`entries`), else the overview.
+ * During a level up an earlier step that had to be answered again leads on
+ * to the new ones this way, though it is not one of them.
+ */
+export function nextOpen(all: FlowEntry[], entries: FlowEntry[], key: string): FlowEntry {
+  const asked = new Set(entries.map((e) => e.key));
+  const after = all.slice(all.findIndex((e) => e.key === key) + 1);
+  return after.find((e) => e.kind === "step" && e.status !== "done" && asked.has(e.key)) ?? entries.at(-1)!;
+}
+
 /** Position for "Step 3 of 7": the first open step. */
 export function progressOf(entries: FlowEntry[]): Position {
   return positionOf(entries, firstOpen(entries));
