@@ -8,6 +8,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useApp } from "../app-state.tsx";
+import { Explained } from "./Explained.tsx";
 import { Icon } from "./Icon.tsx";
 
 export function SkipLink() {
@@ -58,7 +59,13 @@ export function AppShell({
           <Icon name="menu" />
           <span>{t("menu.open")}</span>
         </button>
-        <div className="topbar__title">{title ?? <Link href="/characters">{t("app.name")}</Link>}</div>
+        <div className="topbar__title">
+          {title ?? (
+            <Explained hint={t("app.about")}>
+              <Link href="/characters">{t("app.name")}</Link>
+            </Explained>
+          )}
+        </div>
         <div className="topbar__status">{status}</div>
       </header>
       <MenuDrawer open={menuOpen} onClose={() => setMenuOpen(false)}>

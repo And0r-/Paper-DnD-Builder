@@ -12,6 +12,7 @@ import {
   measureContext,
   plain,
   stepTexts,
+  thingHint,
 } from "./package-text.ts";
 import type { LoadedPackage } from "./packages.ts";
 
@@ -66,6 +67,27 @@ describe("what you get", () => {
     expect(isYesNoValue(lp, "stamina")).toBe(false);
     expect(isYesNoValue(lp, "capped")).toBe(false);
     expect(grantedValue(lp, ctx, "stamina", 15)).toBe("Ausdauer +15");
+  });
+});
+
+describe("one sentence about a thing (AND-87)", () => {
+  const lp = {
+    lang: "de",
+    texts: {
+      "a.short": "Kurz gesagt.",
+      "a.explain.what": "Lang. Und länger.",
+      "b.explain.what": "Erster Satz. Zweiter Satz.",
+      "c.explain.what": "Ohne Punkt",
+    },
+    pkg: { units: [] },
+  } as unknown as LoadedPackage;
+  const ctx = measureContext(lp, undefined);
+
+  it("takes the short text first, else the first sentence of what it is", () => {
+    expect(thingHint(lp, ctx, "a")).toBe("Kurz gesagt.");
+    expect(thingHint(lp, ctx, "b")).toBe("Erster Satz.");
+    expect(thingHint(lp, ctx, "c")).toBe("Ohne Punkt");
+    expect(thingHint(lp, ctx, "d")).toBeUndefined();
   });
 });
 

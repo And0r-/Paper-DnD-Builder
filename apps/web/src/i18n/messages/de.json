@@ -1,5 +1,6 @@
 {
   "app.name": "Charakterbuilder",
+  "app.about": "Ein Werkzeug, mit dem du Schritt für Schritt eine Spielfigur für ein Rollenspiel baust und als Bogen ausdruckst.",
   "common.skipToContent": "Zum Inhalt springen",
   "common.back": "Zurück",
   "common.next": "Weiter",
@@ -13,6 +14,7 @@
   "common.moreInfo": "Mehr erfahren",
   "common.lessInfo": "Weniger anzeigen",
   "common.unnamed": "Ohne Namen",
+  "common.whatIsThis": "Was heisst das?",
   "common.yes": "ja",
   "common.no": "nein",
   "common.toStart": "Zur Startseite",
@@ -238,6 +240,7 @@
   "done.text": "Druck dir den Bogen und die Karten aus. Nimm sie zum Spielabend mit.",
   "done.textSheetOnly": "Druck dir den Bogen aus. Nimm ihn zum Spielabend mit.",
   "done.download": "PDF herunterladen",
+  "done.pdfHint": "Ein PDF ist eine Datei, die auf jedem Gerät gleich aussieht und sich drucken lässt.",
   "done.preparing": "PDF wird erstellt …",
   "done.pdfError": "Das PDF konnte nicht erstellt werden.",
   "done.pdfNotYet": "Das Drucken kommt mit der nächsten Version. Dein Charakter ist gespeichert und bleibt es.",

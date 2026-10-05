@@ -8,12 +8,13 @@
 import { useId } from "react";
 import { useApp } from "../app-state.tsx";
 import { RichText, useMeasure } from "../components/RichText.tsx";
+import { fillNodes, ThingLabel } from "../components/ThingName.tsx";
 import { formatValue, levelWord, ptext } from "../package-text.ts";
 import { useDraft } from "./draft-state.tsx";
-import { levelGrowth, thingLabel } from "./explain.ts";
+import { levelGrowth } from "./explain.ts";
 
 export function LevelGrowth() {
-  const { t, list } = useApp();
+  const { t } = useApp();
   const { lp, ev } = useDraft();
   const ctx = useMeasure(lp);
   const id = useId();
@@ -45,7 +46,9 @@ export function LevelGrowth() {
           {growth.byThing.map((g) => (
             <li className="origins__group" key={g.thing}>
               <p className="origins__from">
-                {t("growth.fromThing", { source: thingLabel(lp, g.thing, { t, list }), because })}
+                {fillNodes((m) => t("growth.fromThing", { ...m, because }), {
+                  source: <ThingLabel lp={lp} id={g.thing} t={t} />,
+                })}
               </p>
               <ul className="gift__numbers">
                 {g.values.map((v) => (

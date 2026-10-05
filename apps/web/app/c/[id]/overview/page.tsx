@@ -6,11 +6,12 @@
  */
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useId, useState } from "react";
+import { useId, useState, type ReactNode } from "react";
 import { useApp } from "../../../../src/ui/app-state.tsx";
 import { Button, ButtonLink } from "../../../../src/ui/components/Button.tsx";
 import { Callout } from "../../../../src/ui/components/Feedback.tsx";
 import { RichText, useMeasure } from "../../../../src/ui/components/RichText.tsx";
+import { listNodes, ThingName } from "../../../../src/ui/components/ThingName.tsx";
 import { useDraft } from "../../../../src/ui/flow/draft-state.tsx";
 import {
   ProgressHeader,
@@ -19,7 +20,7 @@ import {
   usePageTitle,
 } from "../../../../src/ui/flow/frame.tsx";
 import { distributeLines, levelGrowth, valueOrigin } from "../../../../src/ui/flow/explain.ts";
-import { describeAnswer, OVERVIEW_KEY, positionOf } from "../../../../src/ui/flow/model.ts";
+import { answerThings, describeAnswer, OVERVIEW_KEY, positionOf } from "../../../../src/ui/flow/model.ts";
 import { LevelGrowth } from "../../../../src/ui/flow/growth.tsx";
 import { Origins } from "../../../../src/ui/flow/origins.tsx";
 import { choiceOf, choiceTexts, formatValue, ptext } from "../../../../src/ui/package-text.ts";
@@ -104,10 +105,10 @@ export default function OverviewPage() {
 
       <ul className="summary">
         {steps.map((s) => {
-          const lines =
+          const lines: ReactNode[] =
             s.kind === "level"
               ? [String(ev.level)]
-              : s.choices.flatMap((c) => {
+              : s.choices.flatMap((c): ReactNode[] => {
                   const state = ev.choices[c]!;
                   const choice = choiceOf(lp, c);
                   const assign = (state.answer as { assign?: Record<string, number> } | undefined)?.assign;
@@ -120,14 +121,24 @@ export default function OverviewPage() {
                       : choice.targets;
                     return distributeLines(lp, ctx, ev, state, targets, assign, { t, list });
                   }
-                  const text = describeAnswer(lp, ctx, state, list, grown);
+                  // Names of things explain themselves on hover and tap: their text is not on this screen.
+                  const named = answerThings(lp, ctx, state, grown);
+                  const text =
+                    named && named.things.length + named.values.length > 0
+                      ? listNodes(t, [
+                          ...named.things.map((id) => <ThingName key={id} lp={lp} id={id} />),
+                          ...named.values,
+                        ])
+                      : describeAnswer(lp, ctx, state, list, grown);
                   const prefix = s.choices.length > 1 ? `${choiceTexts(lp, c, state, ctx).title}: ` : "";
                   return [
-                    prefix +
-                      (text ??
+                    <>
+                      {prefix}
+                      {text ??
                         (state.optional && state.status === "missing"
                           ? t("overview.leftEmpty")
-                          : t("overview.nothingChosen"))),
+                          : t("overview.nothingChosen"))}
+                    </>,
                   ];
                 });
           return (

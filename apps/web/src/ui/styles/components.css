@@ -619,6 +619,99 @@ textarea.field__input {
   color: var(--color-primary);
 }
 
+/* ------------------------------------------- name with an explanation */
+
+.term {
+  display: inline;
+}
+
+.explained {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+}
+
+.explained > :first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.explained--block {
+  display: flex;
+  gap: var(--space-2);
+  width: 100%;
+}
+
+.explained--block > :first-child {
+  flex: 1;
+}
+
+.term__word {
+  display: inline;
+  padding: var(--space-1) 0;
+  margin: calc(-1 * var(--space-1)) 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: inherit;
+  text-decoration: underline dotted;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 0.25em;
+  cursor: help;
+}
+
+.term__word:hover,
+.term__word[aria-expanded="true"] {
+  color: var(--color-primary);
+}
+
+.explained__info {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--target-min);
+  height: var(--target-min);
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-ink-muted);
+  cursor: help;
+}
+
+.explained__info:hover,
+.explained__info[aria-expanded="true"] {
+  background: var(--color-surface-sunk);
+  color: var(--color-primary);
+}
+
+.hint {
+  position: fixed;
+  z-index: 30;
+  top: 0;
+  left: 0;
+  width: min(320px, calc(100vw - 16px));
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--color-ink);
+  color: var(--color-surface);
+  box-shadow: var(--shadow-2);
+  font-size: var(--text-sm);
+  line-height: var(--text-sm-lh);
+  font-weight: var(--weight-regular);
+  text-align: left;
+  white-space: normal;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.hint--shown {
+  visibility: visible;
+}
+
 .glossary {
   display: flex;
   flex-direction: column;

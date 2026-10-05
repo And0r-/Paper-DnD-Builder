@@ -162,6 +162,7 @@ export interface OriginGroup {
   /** The thing the player picked that brought the others. */
   from: string;
   label: string;
+  /** Ids of the things it brought, in order; each has a name. */
   things: string[];
 }
 
@@ -189,8 +190,7 @@ export function originGroups(lp: LoadedPackage, ev: Evaluation, w: Words): Origi
       g = { from, label: thingLabel(lp, from, w), things: [] };
       groups.set(from, g);
     }
-    const name = thingName(lp, h.id);
-    if (name) g.things.push(name);
+    if (thingName(lp, h.id)) g.things.push(h.id);
   }
   return [...groups.values()].filter((g) => g.things.length > 0);
 }
