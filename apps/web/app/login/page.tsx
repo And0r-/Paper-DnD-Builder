@@ -11,6 +11,7 @@ import { useApp } from "../../src/ui/app-state.tsx";
 import { api, ApiError, type Account } from "../../src/ui/api.ts";
 import { Button } from "../../src/ui/components/Button.tsx";
 import { Callout } from "../../src/ui/components/Feedback.tsx";
+import { Explained } from "../../src/ui/components/Explained.tsx";
 import { TextField } from "../../src/ui/components/Fields.tsx";
 import { LanguageSelect } from "../../src/ui/components/LanguageSelect.tsx";
 import { GuestShell } from "../../src/ui/components/Shell.tsx";
@@ -162,7 +163,12 @@ export default function LoginPage() {
   return (
     <GuestShell corner={<LanguageSelect compact />}>
       <div className="auth">
-        <p className="auth__brand">{t("app.name")}</p>
+        {/* The name explains itself where it is seen first, as in the top bar after login (AND-90). */}
+        <p className="auth__brand">
+          <Explained hint={t("app.about")}>
+            <span>{t("app.name")}</span>
+          </Explained>
+        </p>
         {mode === "email" && (
           <form className="auth__card" onSubmit={onSend} noValidate>
             <h1 className="auth__title" tabIndex={-1} ref={headingRef}>

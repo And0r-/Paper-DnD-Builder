@@ -667,6 +667,22 @@ textarea.field__input {
   color: var(--color-primary);
 }
 
+/* A tapped word's sentence, in the text under it: the lines below move down, none is hidden. */
+.term__inline {
+  display: block;
+  margin: var(--space-1) 0 var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-left: 3px solid var(--color-primary);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-sunk);
+  color: var(--color-ink);
+  font-size: var(--text-sm);
+  line-height: var(--text-sm-lh);
+  font-weight: var(--weight-regular);
+  text-align: left;
+  white-space: normal;
+}
+
 .explained__info {
   flex: none;
   display: inline-flex;

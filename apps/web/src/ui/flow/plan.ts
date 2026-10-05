@@ -52,6 +52,11 @@ export function plannedDraft(lp: LoadedPackage, doc: DraftDocument): DraftDocume
     const taken = new Set<string>();
     const pools: DraftChange[] = [];
     let changed = false;
+    // The rule core's suggestion for a choice leaves out what is already picked
+    // and names the next ones instead. A choice whose suggestion holds a thing
+    // picked earlier in this round is answered from a fresh evaluation, as
+    // "choose for me" does one screen after the other (AND-90).
+    let now = ev;
     for (const step of ev.steps) {
       if (step.status === "done") continue;
       if (step.pool) {
@@ -61,7 +66,10 @@ export function plannedDraft(lp: LoadedPackage, doc: DraftDocument): DraftDocume
         continue;
       }
       for (const id of step.choices) {
-        const c = suggestion(lp, ev, id, taken);
+        const rec = now.choices[id]?.recommended;
+        if (Array.isArray(rec) && rec.some((p) => taken.has(p)))
+          now = evaluateDraft(lp.pkg, { ...d, answers });
+        const c = suggestion(lp, now, id, taken);
         if (c?.type !== "answer") continue;
         if (JSON.stringify(answers[id]) !== JSON.stringify(c.answer)) changed = true;
         answers[id] = c.answer;
