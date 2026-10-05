@@ -100,25 +100,26 @@ test.describe("phone", () => {
       await expectInsideAndFree(page, pdfHint);
       await shot(page, `87-pdf-handy-${lang}`);
 
-      // A name from the package on the overview: its first sentence.
+      // A name from the package on the overview: a tap puts its first sentence
+      // under it, in the text; no bubble covers the lines below (AND-90).
       await page.goto(`/c/${id}/overview`);
-      const name = page.locator(".summary").locator(".term__word").last();
-      await expect(name).toBeVisible();
-      const nameHint = await hintOf(page, name);
-      await name.tap();
-      await expect(nameHint).toBeVisible();
+      const name = page.locator(".summary .term").last();
+      const word = name.locator(".term__word");
+      await expect(word).toBeVisible();
+      const nameHint = await hintOf(page, word);
+      await word.tap();
+      await expect(name.locator(".term__inline")).toBeVisible();
+      await expect(name.locator(".term__inline")).toHaveText((await nameHint.textContent()) ?? "");
+      await expect(nameHint).toBeHidden();
       if (lang === "de") {
-        const calling = page.locator(".summary .term__word", { hasText: CALLING.de.name });
-        await calling.tap();
-        await expect(await hintOf(page, calling)).toHaveText(CALLING.de.short);
-        await expect(nameHint).toBeHidden();
-        // On a full list something lies under it; a tap on that still works and closes it.
-        await expectInsideAndFree(page, await hintOf(page, calling), false);
+        const calling = page.locator(".summary .term", { hasText: CALLING.de.name });
+        await calling.locator(".term__word").tap();
+        await expect(calling.locator(".term__inline")).toHaveText(CALLING.de.short);
+        await expect(name.locator(".term__inline")).toBeHidden();
       }
       await expectOneLanguage(page, lang);
-      const open = page.locator(".hint--shown");
-      await expect(open).toHaveCount(1);
-      await expect(open).toBeVisible();
+      await expect(page.locator(".hint--shown")).toHaveCount(0);
+      await expect(page.locator(".term__inline")).toHaveCount(1);
       await shot(page, `87-ueberblick-handy-${lang}`);
     });
   }

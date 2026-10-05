@@ -271,6 +271,16 @@
   color: var(--color-ink-muted);
 }
 
+/* Where a choice comes from (AND-90): a quiet line above the answers, next to the question it belongs to. */
+.choice-source {
+  margin: 0 0 var(--space-4);
+  padding-left: var(--space-3);
+  border-left: 3px solid var(--color-border);
+  color: var(--color-ink-muted);
+  font-size: var(--text-sm);
+  line-height: var(--text-sm-lh);
+}
+
 /* -------------------------------------------------------------- footer */
 
 .step-footer {

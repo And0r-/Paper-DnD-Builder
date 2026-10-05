@@ -21,6 +21,7 @@ import {
 import { chooseForMe as chooseForMeChanges, suggestedAnswer } from "../../../../../src/ui/flow/choose.ts";
 import { useDraft } from "../../../../../src/ui/flow/draft-state.tsx";
 import { PoolList, poolMissingText } from "../../../../../src/ui/flow/pool.tsx";
+import { ChoiceSource } from "../../../../../src/ui/flow/source.tsx";
 import { StepFooter, StepFrame, StepShortcuts, usePageTitle } from "../../../../../src/ui/flow/frame.tsx";
 import { firstOpen, missingText } from "../../../../../src/ui/flow/model.ts";
 import { choiceOf, choiceTexts, stepTexts } from "../../../../../src/ui/package-text.ts";
@@ -156,6 +157,7 @@ export default function StepPage() {
           if (single) {
             return (
               <div id={`block-${def.id}`} key={def.id}>
+                <ChoiceSource def={def} state={state} />
                 {render(def, state, headingId, texts.question)}
               </div>
             );
@@ -178,6 +180,7 @@ export default function StepPage() {
                   <RichText lp={lp} text={ct.intro} vars={ct.vars} />
                 </p>
               )}
+              <ChoiceSource def={def} state={state} />
               {render(def, state, subId, ct.question)}
             </section>
           );

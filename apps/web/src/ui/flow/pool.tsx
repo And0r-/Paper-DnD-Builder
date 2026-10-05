@@ -13,6 +13,7 @@ import type { Translator } from "../../i18n/index.ts";
 import { useApp } from "../app-state.tsx";
 import { Callout } from "../components/Feedback.tsx";
 import { TextField } from "../components/Fields.tsx";
+import { fillNodes, listNodes, ThingName } from "../components/ThingName.tsx";
 import { useMeasure } from "../components/RichText.tsx";
 import { plain, ptext, thingName } from "../package-text.ts";
 import type { LoadedPackage } from "../packages.ts";
@@ -96,27 +97,25 @@ export function poolMissingText(
       });
 }
 
-/** Things the character already has, grouped by where they came from. */
+/** Things the character already has, grouped by where they came from (thing ids, for names that explain themselves). */
 function heldGroups(
   lp: LoadedPackage,
   ev: Evaluation,
   held: HeldThing[],
-  t: Translator["t"],
-): { key: string; things: string[]; origin: string }[] {
-  const groups = new Map<string, { key: string; things: string[]; origin: string }>();
+): { key: string; things: string[]; by?: string; step?: string }[] {
+  const groups = new Map<string, { key: string; things: string[]; by?: string; step?: string }>();
   for (const h of held) {
     const key = h.grantedBy ? `g:${h.grantedBy}` : h.pickedIn ? `p:${h.pickedIn}` : `s:${h.step}`;
     let g = groups.get(key);
     if (!g) {
-      const origin = h.grantedBy
-        ? t("pool.heldBy", { name: thingName(lp, h.grantedBy) })
-        : t("pool.heldPicked", { step: stepTitle(lp, ev, h.step) });
-      g = { key, things: [], origin };
+      g = h.grantedBy
+        ? { key, things: [], by: h.grantedBy }
+        : { key, things: [], step: stepTitle(lp, ev, h.step) };
       groups.set(key, g);
     }
-    g.things.push(thingName(lp, h.id));
+    if (thingName(lp, h.id)) g.things.push(h.id);
   }
-  return [...groups.values()];
+  return [...groups.values()].filter((g) => g.things.length > 0);
 }
 
 export function PoolList({
@@ -174,7 +173,7 @@ export function PoolList({
         thingName(lp, th.id).toLocaleLowerCase(lp.lang).includes(query.trim().toLocaleLowerCase(lp.lang)),
       )
     : options;
-  const held = heldGroups(lp, ev, pool.held, t);
+  const held = heldGroups(lp, ev, pool.held);
   const open = rows.filter((r) => r.remaining > 0);
   const invalid = states.some((s) => s.status === "invalid");
 
@@ -189,9 +188,20 @@ export function PoolList({
       {held.length > 0 && (
         <Callout tone="info" title={t("pool.held")}>
           <ul className="pool__held" data-pool-held>
+            {/* Each name explains itself on tap, as the options below do with their short text (AND-90). */}
             {held.map((g) => (
               <li key={g.key}>
-                {list(g.things)} <span className="pool__origin">({g.origin})</span>
+                {listNodes(
+                  t,
+                  g.things.map((id) => <ThingName key={id} lp={lp} id={id} />),
+                )}{" "}
+                <span className="pool__origin">
+                  (
+                  {g.by
+                    ? fillNodes((m) => t("pool.heldBy", m), { name: <ThingName lp={lp} id={g.by} /> })
+                    : t("pool.heldPicked", { step: g.step ?? "" })}
+                  )
+                </span>
               </li>
             ))}
           </ul>

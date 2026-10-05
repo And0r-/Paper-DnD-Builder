@@ -1,6 +1,6 @@
 /**
  * The step count on every screen of a whole build (AND-77): "Step x of y"
- * and "Part x of y" never grow without a note, and the bar moves on every
+ * and "Part x of y" never change without a note (not up, not down), and the bar moves on every
  * screen. The walk goes through the screens as a player does: the step,
  * "choose for me" (or a given pick), Next.
  *
@@ -47,8 +47,8 @@ interface Screen {
   part: number;
   parts: number;
   percent: number;
-  /** Total or parts went up on the way to this screen, and whether a note said so. */
-  grew: boolean;
+  /** Total or parts changed on the way to this screen (up or down). */
+  changed: boolean;
 }
 
 /** Every screen from the first step to the overview, answering each step on the way. */
@@ -71,9 +71,9 @@ function walk(lp: LoadedPackage, start: DraftDocument, picks: Record<string, str
       part: p.part,
       parts: p.parts,
       percent: Math.round(progressFraction(entries, entry) * 100),
-      grew:
+      changed:
         before !== undefined &&
-        (p.total > before.total || (p.current === before.current && p.parts > before.parts)),
+        (p.total !== before.total || (p.current === before.current && p.parts !== before.parts)),
     };
     screens.push(screen);
     before = screen;
@@ -107,7 +107,7 @@ function walk(lp: LoadedPackage, start: DraftDocument, picks: Record<string, str
 
 function line(s: Screen): string {
   const part = s.parts > 1 ? ` · Teil ${s.part} von ${s.parts}` : "";
-  return `Schritt ${s.current} von ${s.total}${part} · ${s.percent}% · ${s.key}${s.grew ? "  ← GREW" : ""}`;
+  return `Schritt ${s.current} von ${s.total}${part} · ${s.percent}% · ${s.key}${s.changed ? "  ← CHANGED" : ""}`;
 }
 
 const external = process.env["WALK_PACKAGE_DIR"];
@@ -115,14 +115,48 @@ const external = process.env["WALK_PACKAGE_DIR"];
 describe.skipIf(external !== undefined)("step count on the demo package", async () => {
   const lp = await load(DEMO_PACKAGE_DIR);
   for (const level of [1, 5, 20]) {
-    it(`never grows on the recommended way, level ${level}`, () => {
+    it(`never changes on the recommended way, level ${level}`, () => {
       const screens = walk(lp, start(lp, level));
-      expect(screens.filter((s) => s.grew).map(line)).toEqual([]);
+      expect(screens.filter((s) => s.changed).map(line)).toEqual([]);
       // The bar moves on every screen.
       for (const [i, s] of screens.entries())
         if (i > 0) expect(s.percent).toBeGreaterThan(screens[i - 1]!.percent);
     });
   }
+
+  // Several choices share one long recommendation (like a list of tricks at
+  // levels 16 and 19). Once level 16 takes the first, the rule core suggests
+  // the next one for level 19, a boon without a raise. The plan must see the
+  // same, or "Part x of 10" drops to "of 9" halfway through (AND-90).
+  it("holds when a later choice's suggestion moves on to the next recommended thing", () => {
+    const calm = {
+      id: "boon.still-water",
+      kind: "boon",
+      source: "mistland",
+    } as (typeof lp.pkg.things)[number];
+    const recommend = [{ pick: ["boon.sure-step", "boon.still-water"] }];
+    const shared: LoadedPackage = {
+      ...lp,
+      pkg: {
+        ...lp.pkg,
+        things: [...lp.pkg.things, calm],
+        flow: {
+          ...lp.pkg.flow,
+          choices: lp.pkg.flow.choices.map((c) =>
+            c.id === "boon-16" || c.id === "boon-19"
+              ? ({ ...c, kind: "pickMany", count: 1, recommend } as typeof c)
+              : c,
+          ),
+        },
+      },
+    };
+    const screens = walk(shared, start(shared, 20));
+    expect(screens.filter((s) => s.changed).map(line)).toEqual([]);
+    // Boons 4, 8 and 12 with their raises, then sure step and still water.
+    expect(screens.filter((s) => s.key.startsWith("boon-")).map((s) => s.parts)).toEqual([
+      8, 8, 8, 8, 8, 8, 8, 8,
+    ]);
+  });
 });
 
 describe.skipIf(external === undefined)("step count on another package", () => {

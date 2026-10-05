@@ -91,7 +91,7 @@ async function walk(
   return out;
 }
 
-/** The total never rises without a note on the same screen; the bar never goes back. */
+/** The total and the parts never change without a note on the same screen (up or down, AND-90); the bar never goes back. */
 function expectHonest(screens: { before: Screen; after: Screen }[]) {
   let last: Screen | undefined;
   for (const { before, after } of screens) {
@@ -101,7 +101,7 @@ function expectHonest(screens: { before: Screen; after: Screen }[]) {
       expect(before.bar, `${last.text} → ${before.text}`).toBeGreaterThan(last.bar);
       if (before.current === last.current) expect(before.parts).toBe(last.parts);
     }
-    if (after.total > before.total || after.parts > before.parts)
+    if (after.total !== before.total || after.parts !== before.parts)
       expect(after.note, `${before.text} → ${after.text} without a note`).not.toBe("");
     last = after;
   }
@@ -162,4 +162,33 @@ test("in English: the same count and the same note", async ({ page, foreign }) =
   const grew = screens.find((s) => s.after.total > s.before.total)!;
   expect(grew.after.note).toContain("Your choice adds a step.");
   await expectOneLanguage(page, "en");
+});
+
+test("a pick that takes a part away says so, and the parts hold from then on (AND-90)", async ({
+  page,
+  foreign,
+}) => {
+  void foreign;
+  await login(page, uniqueEmail("count-fewer-parts"));
+  const id = await newDraft(page, 20);
+  await page.goto(`/c/${id}/step/character`);
+  // A boon without a raise of its own: the boons lose one part.
+  const screens = await walk(
+    page,
+    de,
+    { "Welche Gabe bekommst du auf Stufe 16?": "Sicherer Schritt" },
+    async (s) => {
+      if (s.note !== "" && s.parts === 9) await shot(page, "count-90-ein-teil-weniger");
+    },
+  );
+  expectHonest(screens);
+  const fell = screens.find((s) => s.after.parts < s.before.parts)!;
+  expect(fell.before.text).toContain("Teil 7 von 10");
+  expect(fell.after.text).toContain("Teil 7 von 9");
+  expect(fell.after.note).toContain(de["flow.partsRemoved.one"]);
+  // From there on every part of the boons counts to 9.
+  const later = screens
+    .slice(screens.indexOf(fell) + 1)
+    .filter((s) => s.before.current === fell.after.current);
+  expect(later.map((s) => `${s.before.part}/${s.before.parts}`)).toEqual(["8/9", "9/9"]);
 });

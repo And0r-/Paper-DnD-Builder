@@ -7,6 +7,10 @@
  * `Term` makes the word itself the trigger. `Explained` wraps a link or a
  * button that already does something (follow, download): hover and focus on
  * it show the sentence, and a small info button next to it shows it on tap.
+ *
+ * A tapped `Term` shows its sentence in the text, under the word, and moves
+ * the lines below down: a bubble on top would hide them on a phone (AND-90).
+ * Hover and keyboard focus keep the bubble; it goes when the pointer does.
  */
 import {
   cloneElement,
@@ -34,7 +38,7 @@ interface Place {
   width: number;
 }
 
-function useHint() {
+function useHint(inline = false) {
   const id = useId();
   const box = useRef<HTMLSpanElement>(null);
   const bubble = useRef<HTMLSpanElement>(null);
@@ -43,6 +47,8 @@ function useHint() {
   const [pinned, setPinned] = useState(false);
   const [place, setPlace] = useState<Place>();
   const shown = hover || focus || pinned;
+  // The bubble; a pinned inline explanation stands in the text instead.
+  const floating = inline ? (hover || focus) && !pinned : shown;
 
   // Fixed position next to the word, kept inside the screen: escapes the
   // clipping of the top bar and never pushes the page sideways.
@@ -62,7 +68,7 @@ function useHint() {
   }, []);
 
   useLayoutEffect(() => {
-    if (!shown) return;
+    if (!floating) return;
     measure();
     window.addEventListener("scroll", measure, true);
     window.addEventListener("resize", measure);
@@ -70,7 +76,7 @@ function useHint() {
       window.removeEventListener("scroll", measure, true);
       window.removeEventListener("resize", measure);
     };
-  }, [shown, measure]);
+  }, [floating, measure]);
 
   useEffect(() => {
     if (!shown) return;
@@ -80,15 +86,18 @@ function useHint() {
       setHover(false);
       setFocus(false);
     };
-    // A tap anywhere else closes a pinned explanation.
-    const onDown = (e: globalThis.PointerEvent) => {
+    // A tap anywhere else closes a pinned explanation. On the click, not when
+    // the finger lands: a sentence in the text that closes earlier moves the
+    // words below it, and the tap would miss the one it was meant for.
+    // Capture, so a word that keeps its click to itself still closes this one.
+    const onClick = (e: MouseEvent) => {
       if (!box.current?.contains(e.target as Node)) setPinned(false);
     };
     document.addEventListener("keydown", onKey);
-    document.addEventListener("pointerdown", onDown);
+    document.addEventListener("click", onClick, true);
     return () => {
       document.removeEventListener("keydown", onKey);
-      document.removeEventListener("pointerdown", onDown);
+      document.removeEventListener("click", onClick, true);
     };
   }, [shown]);
 
@@ -115,7 +124,7 @@ function useHint() {
         ref={bubble}
         id={id}
         role="tooltip"
-        className={`hint${shown ? " hint--shown" : ""}`}
+        className={`hint${floating ? " hint--shown" : ""}`}
         style={place ? { top: place.top, left: place.left, width: place.width } : undefined}
       >
         {text}
@@ -128,7 +137,7 @@ function useHint() {
 
 /** A word that explains itself on hover, focus and tap. */
 export function Term({ hint, children }: { hint: string | undefined; children: ReactNode }) {
-  const h = useHint();
+  const h = useHint(true);
   if (!hint) return <>{children}</>;
   return (
     <span className="term" ref={h.box} {...h.triggers}>
@@ -146,6 +155,11 @@ export function Term({ hint, children }: { hint: string | undefined; children: R
       >
         {children}
       </button>
+      {h.pinned && (
+        <span className="term__inline" aria-hidden="true">
+          {hint}
+        </span>
+      )}
       {h.node(hint)}
     </span>
   );
