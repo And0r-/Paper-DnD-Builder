@@ -269,6 +269,16 @@
       },
       "recommend": [
         {
+          "when": "level >= 10",
+          "pick": [
+            "knack.heartwood",
+            "knack.bramble-wall",
+            "knack.forest-wake",
+            "knack.herb-scent",
+            "knack.root-grip"
+          ]
+        },
+        {
           "when": "level >= 2",
           "pick": ["knack.herb-scent", "knack.root-grip", "knack.moss-bed"]
         },
@@ -417,7 +427,7 @@
           "knack.wave-push",
           "knack.dew-breath",
           "knack.rapid-rush",
-          "knack.river-voice",
+          "knack.quiet-word",
           "knack.spore-veil"
         ]
       },

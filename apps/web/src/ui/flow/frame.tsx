@@ -23,7 +23,7 @@ import { RichText } from "../components/RichText.tsx";
 import { AppShell } from "../components/Shell.tsx";
 import { levelWord, ptext } from "../package-text.ts";
 import { useDraft } from "./draft-state.tsx";
-import { OVERVIEW_KEY, positionOf, progressFraction, type FlowEntry } from "./model.ts";
+import { nextOpen, OVERVIEW_KEY, positionOf, progressFraction, type FlowEntry } from "./model.ts";
 
 // ------------------------------------------------------------ explanation
 
@@ -456,6 +456,26 @@ export function useFooterDock() {
 }
 
 /**
+ * Where Next leads from a step. In the flow: the step after it. A step that
+ * was still open when the player came to it from elsewhere (from the
+ * overview, or an earlier step that a level up asked again and that is not
+ * one of the new ones) goes on to the next open step, so the open steps run
+ * one after the other to the overview. Only "Change" on a finished step
+ * leads back to the overview.
+ */
+function useNextStep(entry: FlowEntry): { index: number; next: FlowEntry | undefined; toOverview: boolean } {
+  const { entries, allEntries } = useDraft();
+  const params = useSearchParams();
+  // As it was when the player came here; answering the step does not change where it leads.
+  const cameDone = useRef(entry.status === "done").current;
+  const index = entries.findIndex((e) => e.key === entry.key);
+  const aside = params.get("from") === "overview" || index < 0;
+  if (!aside) return { index, next: entries[index + 1], toOverview: false };
+  if (cameDone) return { index, next: undefined, toOverview: true };
+  return { index, next: nextOpen(allEntries, entries, entry.key), toOverview: false };
+}
+
+/**
  * Back and Next. Next is never disabled: pressed too early, it says what is
  * missing right above itself and moves focus to the first open place. The
  * dock stays on screen on every size, so the reason and "Choose for me" are
@@ -478,13 +498,9 @@ export function StepFooter({
   const { t } = useApp();
   const { entries, draft, raise } = useDraft();
   const router = useRouter();
-  const params = useSearchParams();
-  const index = entries.findIndex((e) => e.key === entry.key);
-  // An earlier step during a level up is reached from the overview only, and leads back there.
-  const toOverview = params.get("from") === "overview" || index < 0;
+  const { index, next, toOverview } = useNextStep(entry);
   const [shown, setShown] = useState<string | undefined>(undefined);
   const prev = index < 0 ? entries.at(-1) : entries[index - 1];
-  const next = index < 0 ? undefined : entries[index + 1];
   const reasonId = useId();
   const dock = useFooterDock();
 
@@ -562,8 +578,7 @@ export function StepFooter({
 /** "Decide later": leave the step open and go on. */
 export function LaterLink({ entry }: { entry: FlowEntry }) {
   const { t } = useApp();
-  const { entries } = useDraft();
-  const next = entries[entries.findIndex((e) => e.key === entry.key) + 1];
+  const { next } = useNextStep(entry);
   if (!next || entry.status === "done") return null;
   return (
     <p className="later">

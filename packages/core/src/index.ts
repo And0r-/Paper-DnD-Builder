@@ -39,6 +39,7 @@ export {
   type RaiseState,
   type StepState,
 } from "./evaluate.ts";
+export { fillPicks, type PoolSlot } from "./pool.ts";
 export { explainValue, totalOf, type PartSource, type ValueExplanation, type ValuePart } from "./explain.ts";
 export {
   applyChange,
