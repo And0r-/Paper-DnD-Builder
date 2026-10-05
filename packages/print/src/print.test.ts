@@ -322,6 +322,48 @@ describe("printed character (demo package)", () => {
     expect(none.sections.map((s) => s.id)).not.toContain("primary");
   });
 
+  it("prints a level-20 character: every slot rank above 0, cards over several pages", async () => {
+    // Lantern bearer: slots of ranks 1 to 9, in a row of 5 and a row of 4.
+    const lantern = demoCharacter(pkg, 20);
+    const { model, pdf, extracted } = await print("de", {}, pkg, lantern);
+    const boxes = (id: string) => {
+      const s = model.sections.find((x) => x.id === id);
+      if (s?.kind !== "statBoxes") throw new Error(`no box row ${id}`);
+      return s.boxes.map((b) => [b.label, b.circles]);
+    };
+    expect(boxes("lantern-slots")).toEqual([
+      ["Rang 1", 3],
+      ["Rang 2", 2],
+      ["Rang 3", 2],
+      ["Rang 4", 2],
+      ["Rang 5", 2],
+    ]);
+    expect(boxes("lantern-slots-high")).toEqual([
+      ["Rang 6", 2],
+      ["Rang 7", 1],
+      ["Rang 8", 1],
+      ["Rang 9", 2],
+    ]);
+    const sheet = extracted.pageTexts.slice(0, pdf.sheetPages).join("\n");
+    expect(sheet).toContain("LATERNEN-PLÄTZE, HOHE RÄNGE");
+
+    // At level 5 only ranks 1 to 3 have slots; the high row is not printed at all.
+    const low = buildPrintModel(pkg, demoCharacter(pkg, 5), { language: "de", createdAt });
+    const row = low.sections.find((x) => x.id === "lantern-slots");
+    expect(row?.kind === "statBoxes" && row.boxes.map((b) => b.label)).toEqual([
+      "Rang 1",
+      "Rang 2",
+      "Rang 3",
+    ]);
+    expect(low.sections.map((x) => x.id)).not.toContain("lantern-slots-high");
+
+    // Herbalist: 8 root knacks, a borrowed one and the path's: 10 cards, two card pages.
+    const h = await print("de", {}, pkg, demoCharacter(pkg, 20, "Mira Fennwick", "calling.herbalist"));
+    expect(h.model.cards.length).toBe(10);
+    expect(h.pdf.cardPages).toBe(2);
+    expect(h.pdf.pages).toBe(h.pdf.sheetPages + 2);
+  });
+
   it("goes on on the next page with a section longer than a page, for every kind of rows", async () => {
     const model = buildPrintModel(pkg, doc, { language: "de", createdAt });
     const n = 45;
