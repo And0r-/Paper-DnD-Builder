@@ -616,12 +616,6 @@ function PointBuy({
                   <span id={`pb-${v}`}>{name}</span>
                   {badge && <span className="badge">{ptext(lp, badge)}</span>}
                 </span>
-                {(sum || effect) && (
-                  <span className="pointbuy__gives" id={`pb-${v}-effect`}>
-                    {sum && <span className="pointbuy__sum">{sum}</span>}
-                    {effect && <span className="pointbuy__effect">{effect}</span>}
-                  </span>
-                )}
               </div>
               <div className="stepper">
                 <button
@@ -651,6 +645,12 @@ function PointBuy({
                   <Icon name="plus" />
                 </button>
               </div>
+              {(sum || effect) && (
+                <span className="pointbuy__gives" id={`pb-${v}-effect`}>
+                  {sum && <span className="pointbuy__sum">{sum}</span>}
+                  {effect && <span className="pointbuy__effect">{effect}</span>}
+                </span>
+              )}
               {explain && (
                 <span className="pointbuy__explain">
                   <RichText lp={lp} text={explain} />

@@ -740,6 +740,7 @@
 /* The sum and what the score gives, one line each. */
 .pointbuy__gives,
 .array-assign__gives {
+  overflow-wrap: anywhere;
   display: flex;
   flex-direction: column;
   font-size: var(--text-sm);
@@ -752,6 +753,7 @@
   font-weight: var(--weight-semibold);
 }
 
+.pointbuy__row > .pointbuy__gives,
 .pointbuy__row > .pointbuy__explain {
   grid-column: 1 / -1;
 }
