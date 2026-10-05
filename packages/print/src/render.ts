@@ -346,19 +346,26 @@ function hint(pen: Pen, text: string, x: number, y: number, w: number): number {
 
 const USE_BOX = 3;
 const USE_BOX_GAP = 1.2;
+/** Width of the field next to a use count, wide enough to write a two-digit number. */
+const USE_FIELD = 8;
 
 /** Width of a thing's use boxes (or its word, like "always"), in mm. */
 function usesWidth(pen: Pen, uses: Uses, s: TextStyle): number {
   if (uses === null) return 0;
   if ("text" in uses) return pen.width(uses.text, s);
+  if ("count" in uses) return pen.width(String(uses.count), s) + USE_BOX_GAP + USE_FIELD;
   return uses.boxes * USE_BOX + (uses.boxes - 1) * USE_BOX_GAP;
 }
 
-/** Use boxes to tick, or the word, right-aligned at `right`; `y` is the text baseline. */
+/** Use boxes to tick (or the count and a field), or the word, right-aligned at `right`; `y` is the text baseline. */
 function drawUses(pen: Pen, uses: Uses, right: number, y: number, s: TextStyle): void {
   if (uses === null) return;
   if ("text" in uses) return pen.text(uses.text, right, y, s, "right");
   const top = y - USE_BOX + 0.4;
+  if ("count" in uses) {
+    pen.rect(right - USE_FIELD, top, USE_FIELD, USE_BOX, { width: 0.5 });
+    return pen.text(String(uses.count), right - USE_FIELD - USE_BOX_GAP, y, s, "right");
+  }
   for (let i = 0; i < uses.boxes; i++)
     pen.rect(right - USE_BOX - i * (USE_BOX + USE_BOX_GAP), top, USE_BOX, USE_BOX, { width: 0.5 });
 }

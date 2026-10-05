@@ -289,6 +289,20 @@ describe("printed character (demo package)", () => {
     const runnerModel = buildPrintModel(pkg, runner, { language: "de", createdAt });
     expect(traitRow(runnerModel, "trait.river-heart").uses).toEqual({ boxes: 6 });
 
+    // More uses than fit a row as boxes: the number is printed, not cut to twelve boxes.
+    const many: ContentPackage = {
+      ...pkg,
+      things: pkg.things.map((t) =>
+        t.id === "trait.river-heart" ? { ...t, stats: { ...t.stats, uses: 20 } } : t,
+      ),
+    };
+    const manyRun = await print("de", {}, many, runner);
+    expect(traitRow(manyRun.model, "trait.river-heart").uses).toEqual({ count: 20 });
+    // The PDF has one more "20" than the same character with six uses (its level is 20 too).
+    const twenties = (t: string) => t.match(/\b20\b/g)?.length ?? 0;
+    const runnerRun = await print("de", {}, pkg, runner);
+    expect(twenties(manyRun.extracted.text)).toBe(twenties(runnerRun.extracted.text) + 1);
+
     // Favourite knacks (level 18, options.owned): printed by name in their answers section.
     const bearer = demoCharacter(pkg, 18);
     const ev = evaluateDraft(pkg, bearer);

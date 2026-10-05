@@ -42,8 +42,13 @@ export interface StatBox {
   hint: string;
 }
 
-/** Use boxes (SPEC 13 `uses`): n boxes to tick, a word like "always", or nothing. */
-export type Uses = { boxes: number } | { text: string } | null;
+/**
+ * Use boxes (SPEC 13 `uses`): n boxes to tick, a word like "always", or nothing.
+ * More than MAX_USE_BOXES do not fit a row: then the number is printed with a field to write what is left.
+ */
+export type Uses = { boxes: number } | { count: number } | { text: string } | null;
+
+export const MAX_USE_BOXES = 12;
 
 export type SheetSection = { id: string; span: number; title: string; hint: string } & (
   | { kind: "header"; name: string; summary: string; packageName: string }
@@ -204,7 +209,11 @@ export function buildPrintModel(
     const stat = key === undefined ? undefined : t.stats?.[key];
     // A stat that names a value has as many boxes as the character's value (uses by level).
     const v = typeof stat === "object" && "value" in stat ? valueOf(stat.value) : stat;
-    if (typeof v === "number") return v > 0 ? { boxes: Math.min(12, Math.round(v)) } : null;
+    if (typeof v === "number") {
+      const n = Math.round(v);
+      if (n <= 0) return null;
+      return n <= MAX_USE_BOXES ? { boxes: n } : { count: n };
+    }
     if (typeof v === "object" && "text" in v) return { text: text(v.text) };
     return null;
   };
