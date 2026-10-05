@@ -42,6 +42,10 @@
       "name": "Print"
     },
     {
+      "name": "Campaigns",
+      "description": "Whoever makes a campaign leads it (game master) and adds players by mail address. The game master reaches every character of the players; a player sees only their own characters and the campaigns they are in. Anyone else gets 404."
+    },
+    {
       "name": "Server"
     }
   ],
@@ -379,7 +383,7 @@
         "operationId": "deleteAccount",
         "summary": "Delete the account",
         "tags": ["Account"],
-        "description": "Deletes the account with its sessions, access keys and every character. Cannot be undone.",
+        "description": "Deletes the account with its sessions, access keys, every character, the campaigns it leads (the players keep their characters) and its places in other campaigns. Cannot be undone.",
         "requestBody": {
           "required": true,
           "content": {
@@ -1005,7 +1009,7 @@
         "operationId": "listDrafts",
         "summary": "The account's characters",
         "tags": ["Characters"],
-        "description": "Newest change first.",
+        "description": "Newest change first. Your own characters only; a game master finds the players' characters in `GET /api/campaigns/{id}`.",
         "responses": {
           "200": {
             "description": "The characters.",
@@ -1165,7 +1169,7 @@
             "$ref": "#/components/responses/Unauthorized"
           },
           "404": {
-            "description": "`draftNotFound`",
+            "description": "`draftNotFound` (also someone else's character: it looks exactly like a missing one)",
             "content": {
               "application/json": {
                 "schema": {
@@ -1186,7 +1190,8 @@
           "default": {
             "$ref": "#/components/responses/ServerError"
           }
-        }
+        },
+        "description": "Your own character, or a player's in a campaign you lead (`draft.access`). Every draft route below works on both."
       },
       "patch": {
         "operationId": "setLevel",
@@ -1247,7 +1252,7 @@
             "$ref": "#/components/responses/CrossSite"
           },
           "404": {
-            "description": "`draftNotFound`",
+            "description": "`draftNotFound` (also someone else's character: it looks exactly like a missing one)",
             "content": {
               "application/json": {
                 "schema": {
@@ -1346,10 +1351,26 @@
             "$ref": "#/components/responses/Unauthorized"
           },
           "403": {
-            "$ref": "#/components/responses/CrossSite"
+            "description": "`ownerOnly`, `crossSite`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "enum": ["ownerOnly", "crossSite"]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
           },
           "404": {
-            "description": "`draftNotFound`",
+            "description": "`draftNotFound` (also someone else's character: it looks exactly like a missing one)",
             "content": {
               "application/json": {
                 "schema": {
@@ -1370,7 +1391,8 @@
           "default": {
             "$ref": "#/components/responses/ServerError"
           }
-        }
+        },
+        "description": "Only the owner deletes; a game master gets `403 ownerOnly`."
       }
     },
     "/api/drafts/{id}/answers/{choice}": {
@@ -1449,7 +1471,7 @@
             "$ref": "#/components/responses/CrossSite"
           },
           "404": {
-            "description": "`draftNotFound`",
+            "description": "`draftNotFound` (also someone else's character: it looks exactly like a missing one)",
             "content": {
               "application/json": {
                 "schema": {
@@ -1601,7 +1623,7 @@
             "$ref": "#/components/responses/CrossSite"
           },
           "404": {
-            "description": "`draftNotFound`",
+            "description": "`draftNotFound` (also someone else's character: it looks exactly like a missing one)",
             "content": {
               "application/json": {
                 "schema": {
@@ -1738,7 +1760,7 @@
             "$ref": "#/components/responses/CrossSite"
           },
           "404": {
-            "description": "`draftNotFound`",
+            "description": "`draftNotFound` (also someone else's character: it looks exactly like a missing one)",
             "content": {
               "application/json": {
                 "schema": {
@@ -1878,7 +1900,7 @@
             "$ref": "#/components/responses/CrossSite"
           },
           "404": {
-            "description": "`draftNotFound`",
+            "description": "`draftNotFound` (also someone else's character: it looks exactly like a missing one)",
             "content": {
               "application/json": {
                 "schema": {
@@ -1963,7 +1985,7 @@
         "operationId": "pdf",
         "summary": "The printed character",
         "tags": ["Print"],
-        "description": "A4 PDF: sheet, then cards; language and units from the account settings. Made on every request, never stored.",
+        "description": "A4 PDF: sheet, then cards; language and units from the account settings. Made on every request, never stored. A game master prints a player's character in the game master's language and units.",
         "parameters": [
           {
             "name": "id",
@@ -1999,7 +2021,7 @@
             "$ref": "#/components/responses/Unauthorized"
           },
           "404": {
-            "description": "`draftNotFound`",
+            "description": "`draftNotFound` (also someone else's character: it looks exactly like a missing one)",
             "content": {
               "application/json": {
                 "schema": {
@@ -2104,6 +2126,785 @@
             "$ref": "#/components/responses/ServerError"
           }
         }
+      }
+    },
+    "/api/campaigns": {
+      "get": {
+        "operationId": "listCampaigns",
+        "summary": "Campaigns you lead or play in",
+        "tags": ["Campaigns"],
+        "responses": {
+          "200": {
+            "description": "Oldest first.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "campaigns": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Campaign"
+                      }
+                    }
+                  },
+                  "required": ["campaigns"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "default": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      },
+      "post": {
+        "operationId": "createCampaign",
+        "summary": "Make a campaign",
+        "tags": ["Campaigns"],
+        "description": "You lead it. At most 50 per account.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 80,
+                    "description": "One line; trimmed; no control characters."
+                  }
+                },
+                "required": ["name"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The new campaign, without players.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CampaignView"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadBody"
+          },
+          "413": {
+            "$ref": "#/components/responses/BodyTooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/JsonRequired"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/CrossSite"
+          },
+          "422": {
+            "description": "`tooManyCampaigns`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "enum": ["tooManyCampaigns"]
+                        },
+                        "max": {
+                          "type": "integer"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/api/campaigns/{id}": {
+      "get": {
+        "operationId": "getCampaign",
+        "summary": "A campaign",
+        "tags": ["Campaigns"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Campaign id (a UUID).",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "The game master gets the players and all their characters; a player gets the campaign only.",
+        "responses": {
+          "200": {
+            "description": "The campaign.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CampaignView"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "description": "`campaignNotFound`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "enum": ["campaignNotFound"]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      },
+      "patch": {
+        "operationId": "renameCampaign",
+        "summary": "Rename a campaign",
+        "tags": ["Campaigns"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Campaign id (a UUID).",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Game master only.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 80,
+                    "description": "One line; trimmed; no control characters."
+                  }
+                },
+                "required": ["name"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The campaign.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "campaign": {
+                      "$ref": "#/components/schemas/Campaign"
+                    }
+                  },
+                  "required": ["campaign"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadBody"
+          },
+          "413": {
+            "$ref": "#/components/responses/BodyTooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/JsonRequired"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "description": "`gameMasterOnly`, `crossSite`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "enum": ["gameMasterOnly", "crossSite"]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`campaignNotFound`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "enum": ["campaignNotFound"]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteCampaign",
+        "summary": "Delete a campaign",
+        "tags": ["Campaigns"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Campaign id (a UUID).",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Game master only. The campaign and its player list go; every character stays with its player.",
+        "responses": {
+          "204": {
+            "description": "Done. No body."
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "description": "`gameMasterOnly`, `crossSite`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "enum": ["gameMasterOnly", "crossSite"]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`campaignNotFound`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "enum": ["campaignNotFound"]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/api/campaigns/{id}/players": {
+      "post": {
+        "operationId": "addPlayer",
+        "summary": "Add a player by mail address",
+        "tags": ["Campaigns"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Campaign id (a UUID).",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Game master only. An address without an account gets one and the password mail; an existing account keeps its password and gets a short mail. Both mails name the game master. The answer is the same either way. The mail goes out before anything is stored. At most 50 players per campaign; at most 30 additions per hour per game master, 5 mails per hour per address.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "maxLength": 254
+                  },
+                  "language": {
+                    "enum": ["de", "en"],
+                    "description": "Language of a new account and its mail; default: yours. An existing account keeps its own."
+                  }
+                },
+                "required": ["email"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The player.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "player": {
+                      "$ref": "#/components/schemas/Player"
+                    }
+                  },
+                  "required": ["player"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadBody"
+          },
+          "413": {
+            "$ref": "#/components/responses/BodyTooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/JsonRequired"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "description": "`gameMasterOnly`, `crossSite`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "enum": ["gameMasterOnly", "crossSite"]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`campaignNotFound`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "enum": ["campaignNotFound"]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`alreadyPlayer`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "enum": ["alreadyPlayer"]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "`cannotAddYourself`, `tooManyPlayers`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "enum": ["cannotAddYourself", "tooManyPlayers"]
+                        },
+                        "max": {
+                          "type": "integer"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "`tooManyAttempts`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "enum": ["tooManyAttempts"]
+                        },
+                        "retryAfter": {
+                          "type": "integer"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds to wait.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "`mailFailed`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "enum": ["mailFailed"]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "`mailNotConfigured`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "enum": ["mailNotConfigured"]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/api/campaigns/{id}/players/{playerId}": {
+      "delete": {
+        "operationId": "removePlayer",
+        "summary": "Remove a player, or leave",
+        "tags": ["Campaigns"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Campaign id (a UUID).",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "playerId",
+            "in": "path",
+            "required": true,
+            "description": "The player's id, or `me` to leave the campaign yourself.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "The game master removes any player; a player removes only themselves (`me`). The characters stay with the player; the game master no longer reaches them.",
+        "responses": {
+          "204": {
+            "description": "Done. No body."
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "description": "`gameMasterOnly`, `crossSite`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "enum": ["gameMasterOnly", "crossSite"]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`campaignNotFound`, `playerNotFound`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "enum": ["campaignNotFound", "playerNotFound"]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/api/campaigns/{id}/players/{playerId}/drafts": {
+      "post": {
+        "operationId": "createDraftForPlayer",
+        "summary": "Start a character for a player",
+        "tags": ["Campaigns"],
+        "description": "Game master only. Like `POST /api/drafts`, but the character is the player's (`owner`); you build it with the draft routes.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "packageId": {
+                    "type": "string",
+                    "maxLength": 100
+                  },
+                  "level": {
+                    "type": "integer"
+                  }
+                },
+                "required": ["packageId"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The new draft.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DraftView"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadBody"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "description": "`gameMasterOnly`, `crossSite`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "enum": ["gameMasterOnly", "crossSite"]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`campaignNotFound`, `playerNotFound`, `packageNotFound`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "enum": ["campaignNotFound", "playerNotFound", "packageNotFound"]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "$ref": "#/components/responses/BodyTooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/JsonRequired"
+          },
+          "422": {
+            "description": "`changeRejected`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "enum": ["changeRejected"]
+                        },
+                        "reason": {
+                          "$ref": "#/components/schemas/ChangeError"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Campaign id (a UUID).",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "playerId",
+            "in": "path",
+            "required": true,
+            "description": "The player's id from the campaign (a UUID).",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
       }
     }
   },
@@ -2260,35 +3061,43 @@
       "ErrorCode": {
         "description": "Every error code the API answers with. Stable and English; screens word them in the player's language.\n\n- `badJson`: 400. The body is not JSON.\n- `badRequest`: 400. The body has the wrong shape; `issues` lists `{ path, message }`.\n- `notLoggedIn`: 401. No session cookie and no `Authorization` header.\n- `keyNotValid`: 401. The `Authorization` header holds no valid access key (unknown, withdrawn, or not `Bearer <key>`).\n- `wrongMailOrPassword`: 401. Login failed.\n- `crossSite`: 403. A change sent from another site (`Origin` or `Sec-Fetch-Site`).\n- `keyCannotMakeKeys`: 403. Access keys are made on the settings screen only, never with a key.\n- `notFound`: 404. No such API path.\n- `draftNotFound`: 404. No draft with this id in this account.\n- `keyNotFound`: 404. No access key with this id in this account.\n- `packageNotFound`: 404. No loaded package with this id.\n- `languageNotFound`: 404. The package has no texts in this language.\n- `methodNotAllowed`: 405. The path exists, the method does not.\n- `versionConflict`: 409. The draft moved on; `current` holds its state now.\n- `notFinished`: 409. The character is not finished (PDF) or not finished and not in a raise (level-up); `open` lists the open choices.\n- `packageUnavailable`: 409. The draft's package is not loaded right now; `packageId` names it.\n- `bodyTooLarge`: 413. The body is larger than 64 KiB.\n- `jsonRequired`: 415. The body is not `application/json`.\n- `changeRejected`: 422. The rule core refused the change; `reason` says why (see `ChangeError`).\n- `incomplete`: 422. Finishing with open choices; `open` lists them.\n- `languageNotSupported`: 422. The account's language cannot be printed with this package; `languages` lists those that can.\n- `tooManyKeys`: 422. The account has the most access keys allowed (`max`).\n- `unknownUnit`: 422. No loaded package offers this unit for this dimension.\n- `tooManyAttempts`: 429. Too many logins or password mails; `retryAfter` seconds, also in `Retry-After`.\n- `tooManyRequests`: 429. Too many PDFs; see `Retry-After`.\n- `internal`: 500. A bug in the builder.\n- `packageRuleError`: 500. The package's rules could not be worked out (a bug in the package); `message` says where.\n- `mailFailed`: 502. The mail server refused the password mail; nothing was changed.\n- `mailNotConfigured`: 503. The server has no mail set up; nobody can get a password.",
         "enum": [
+          "alreadyPlayer",
           "badJson",
           "badRequest",
-          "notLoggedIn",
-          "keyNotValid",
-          "wrongMailOrPassword",
-          "crossSite",
-          "keyCannotMakeKeys",
-          "notFound",
-          "draftNotFound",
-          "keyNotFound",
-          "packageNotFound",
-          "languageNotFound",
-          "methodNotAllowed",
-          "versionConflict",
-          "notFinished",
-          "packageUnavailable",
           "bodyTooLarge",
-          "jsonRequired",
+          "campaignNotFound",
+          "cannotAddYourself",
           "changeRejected",
+          "crossSite",
+          "draftNotFound",
+          "gameMasterOnly",
           "incomplete",
-          "languageNotSupported",
-          "tooManyKeys",
-          "unknownUnit",
-          "tooManyAttempts",
-          "tooManyRequests",
           "internal",
-          "packageRuleError",
+          "jsonRequired",
+          "keyCannotMakeKeys",
+          "keyNotFound",
+          "keyNotValid",
+          "languageNotFound",
+          "languageNotSupported",
           "mailFailed",
-          "mailNotConfigured"
+          "mailNotConfigured",
+          "methodNotAllowed",
+          "notFinished",
+          "notFound",
+          "notLoggedIn",
+          "ownerOnly",
+          "packageNotFound",
+          "packageRuleError",
+          "packageUnavailable",
+          "playerNotFound",
+          "tooManyAttempts",
+          "tooManyCampaigns",
+          "tooManyKeys",
+          "tooManyPlayers",
+          "tooManyRequests",
+          "unknownUnit",
+          "versionConflict",
+          "wrongMailOrPassword"
         ]
       },
       "Error": {
@@ -2524,6 +3333,21 @@
                 "type": "null"
               }
             ]
+          },
+          "owner": {
+            "type": "object",
+            "properties": {
+              "email": {
+                "type": "string"
+              }
+            },
+            "required": ["email"],
+            "additionalProperties": false,
+            "description": "Whose character it is. It stays theirs, whoever changes it."
+          },
+          "access": {
+            "enum": ["owner", "gameMaster"],
+            "description": "`owner`: your own. `gameMaster`: a player's, in a campaign you lead; you may open, change, raise and print it, not delete it."
           }
         },
         "required": [
@@ -2537,7 +3361,9 @@
           "answers",
           "createdAt",
           "updatedAt",
-          "finishedAt"
+          "finishedAt",
+          "owner",
+          "access"
         ],
         "additionalProperties": false
       },
@@ -2610,6 +3436,21 @@
                 "type": "null"
               }
             ]
+          },
+          "owner": {
+            "type": "object",
+            "properties": {
+              "email": {
+                "type": "string"
+              }
+            },
+            "required": ["email"],
+            "additionalProperties": false,
+            "description": "Whose character it is. It stays theirs, whoever changes it."
+          },
+          "access": {
+            "enum": ["owner", "gameMaster"],
+            "description": "`owner`: your own. `gameMaster`: a player's, in a campaign you lead; you may open, change, raise and print it, not delete it."
           }
         },
         "required": [
@@ -2624,6 +3465,8 @@
           "createdAt",
           "updatedAt",
           "finishedAt",
+          "owner",
+          "access",
           "packageAvailable",
           "summary"
         ],
@@ -3383,6 +4226,107 @@
           }
         ],
         "description": "An answer; its shape follows the choice's `kind`."
+      },
+      "Campaign": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "role": {
+            "enum": ["gameMaster", "player"],
+            "description": "Yours in this campaign: you lead it, or you play in it."
+          },
+          "gameMaster": {
+            "type": "object",
+            "properties": {
+              "email": {
+                "type": "string"
+              }
+            },
+            "required": ["email"],
+            "additionalProperties": false,
+            "description": "Who leads it."
+          },
+          "playerCount": {
+            "type": "integer"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": ["id", "name", "role", "gameMaster", "playerCount", "createdAt"],
+        "additionalProperties": false
+      },
+      "Player": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The player's id; used in the player routes."
+          },
+          "email": {
+            "type": "string"
+          },
+          "addedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": ["id", "email", "addedAt"],
+        "additionalProperties": false,
+        "description": "A player as the game master sees them."
+      },
+      "CampaignView": {
+        "type": "object",
+        "properties": {
+          "campaign": {
+            "$ref": "#/components/schemas/Campaign"
+          },
+          "players": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "description": "The player's id; used in the player routes."
+                    },
+                    "email": {
+                      "type": "string"
+                    },
+                    "addedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "characters": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/DraftListEntry"
+                      },
+                      "description": "Every character of the player, newest first."
+                    }
+                  },
+                  "required": ["id", "email", "addedAt", "characters"],
+                  "additionalProperties": false
+                }
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "For the game master: the players with their characters. For a player: null (players do not see each other)."
+          }
+        },
+        "required": ["campaign", "players"],
+        "additionalProperties": false,
+        "description": "A campaign; what it shows depends on your role in it."
       }
     }
   }
