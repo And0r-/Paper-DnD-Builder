@@ -47,11 +47,18 @@ export function answerSchemaFor(kind: Choice["kind"]): z.ZodType<Answer> | undef
 
 export const draftDocumentSchema = z.strictObject({
   level: z.number().int().min(1),
+  levelBefore: z.number().int().min(1).optional(),
   answers: z.record(z.string(), z.unknown()),
 });
 
 export interface DraftDocument {
   level: number;
+  /**
+   * Set while a finished character is being raised: the level it was
+   * finished at. Steps with `atLevel` above it are the ones the raise added.
+   * Cleared when the character is finished again.
+   */
+  levelBefore?: number;
   /** Raw answers by choice key. Shapes are checked against the package on use. */
   answers: Record<string, unknown>;
 }

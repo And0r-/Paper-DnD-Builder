@@ -4,7 +4,7 @@
  * word them in the player's language.
  */
 import type { ContentPackage, TextValue } from "@builder/format/pure";
-import type { DraftSummary, Evaluation } from "@builder/core";
+import type { DraftSummary, Evaluation, LevelUpState } from "@builder/core";
 
 export class ApiError extends Error {
   readonly status: number;
@@ -91,6 +91,8 @@ export interface DraftInfo {
   version: number;
   status: "draft" | "finished";
   level: number;
+  /** The level a raise started from, until the character is finished again. */
+  levelBefore: number | null;
   answers: Record<string, unknown>;
   createdAt: string;
   updatedAt: string;
@@ -102,6 +104,7 @@ export interface DraftView {
   packageAvailable: boolean;
   evaluation: Evaluation | null;
   summary: DraftSummary | null;
+  levelUp: LevelUpState | null;
 }
 
 export type DraftListEntry = DraftInfo & { packageAvailable: boolean; summary: DraftSummary | null };

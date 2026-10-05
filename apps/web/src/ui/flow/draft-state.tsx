@@ -115,7 +115,8 @@ function apply(pkg: LoadedPackage["pkg"], doc: DraftDocument, queue: readonly Pe
 }
 
 function docOf(view: DraftView): DraftDocument {
-  return { level: view.draft.level, answers: view.draft.answers };
+  const { level, levelBefore, answers } = view.draft;
+  return levelBefore === null ? { level, answers } : { level, levelBefore, answers };
 }
 
 export type DraftLoad =

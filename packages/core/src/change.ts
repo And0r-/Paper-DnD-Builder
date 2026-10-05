@@ -11,6 +11,8 @@ import { assignPicks } from "./pool.ts";
 
 export type ChangeError =
   | { code: "levelOutOfRange"; min: number; max: number }
+  /** `levelUp`: the new level is not above the current one. */
+  | { code: "levelNotHigher"; level: number }
   | { code: "unknownChoice" }
   | { code: "notAsked" }
   /** `pool`: the step is not asked now or has no shared list. */
@@ -41,7 +43,10 @@ export function applyChange(pkg: ContentPackage, doc: DraftDocument, change: Dra
   if (change.type === "setLevel") {
     const range = levelRange(pkg, change.level);
     if (range) return { ok: false, error: range };
-    return { ok: true, doc: { ...doc, level: change.level } };
+    const next: DraftDocument = { ...doc, level: change.level };
+    // Going back to the level a raise started from (or below) ends the raise.
+    if (next.levelBefore !== undefined && change.level <= next.levelBefore) delete next.levelBefore;
+    return { ok: true, doc: next };
   }
 
   if (change.type === "pool") return applyPool(pkg, doc, change.step, change.picks);
@@ -74,6 +79,50 @@ export function applyChange(pkg: ContentPackage, doc: DraftDocument, change: Dra
     return { ok: false, error: { code: "answerDoesNotFit", problem: j.problem ?? "badShape" } };
   }
   return { ok: true, doc: { ...doc, answers: { ...doc.answers, [change.choice]: change.answer } } };
+}
+
+/**
+ * Raises a character to a higher level. Every answer stays; the steps the
+ * new levels add (`atLevel` above the old level) are asked on top. The old
+ * level is kept as `levelBefore` until the character is finished again; a
+ * second raise before that keeps the first one's starting level, so the
+ * new steps of both raises stay recognisable.
+ */
+export function levelUp(pkg: ContentPackage, doc: DraftDocument, level: number): ChangeResult {
+  const range = levelRange(pkg, level);
+  if (range) return { ok: false, error: range };
+  if (level <= doc.level) return { ok: false, error: { code: "levelNotHigher", level: doc.level } };
+  return { ok: true, doc: { ...doc, level, levelBefore: doc.levelBefore ?? doc.level } };
+}
+
+/** What a raise from level `from` brought, read from the evaluation at the new level. */
+export interface LevelUpState {
+  from: number;
+  to: number;
+  /** Steps the raise added (`atLevel > from`), in step order. */
+  newSteps: string[];
+  /**
+   * Choices the raise added (`atLevel > from`), in step order. A step that
+   * was there before can get a new choice (a gather step), so this can name
+   * choices of a step not in `newSteps`.
+   */
+  newChoices: string[];
+  /**
+   * Every step not done, in step order: the steps with a new choice, and an
+   * older step that asks for more at the new level (a pick count from a
+   * table by level, for example). The character is complete when it is empty.
+   */
+  openSteps: string[];
+}
+
+export function levelUpState(ev: Evaluation, from: number): LevelUpState {
+  return {
+    from,
+    to: ev.level,
+    newSteps: ev.steps.filter((s) => s.atLevel > from).map((s) => s.id),
+    newChoices: ev.steps.flatMap((s) => s.choices).filter((c) => (ev.choices[c]?.atLevel ?? 0) > from),
+    openSteps: ev.steps.filter((s) => s.status !== "done").map((s) => s.id),
+  };
 }
 
 function applyPool(pkg: ContentPackage, doc: DraftDocument, stepId: string, picks: string[]): ChangeResult {

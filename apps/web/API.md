@@ -42,10 +42,11 @@ else is derived by the rule core and returned with every response:
 
 ```json
 {
-  "draft": { "id", "packageId", "version", "status": "draft|finished", "level", "answers", ... },
+  "draft": { "id", "packageId", "version", "status": "draft|finished", "level", "levelBefore", "answers", ... },
   "packageAvailable": true,
   "evaluation": { "level", "steps", "choices", "things", "values", "inputs", "raises", "open", "complete", "inactiveAnswers" },
-  "summary": { "name", "level", "complete", "line" }
+  "summary": { "name", "level", "complete", "line" },
+  "levelUp": null
 }
 ```
 
@@ -60,6 +61,7 @@ the answer is `409 versionConflict` with the current state in
 | 🔒 `GET /api/drafts/:id`                 | —                       | The draft.                                                                                                  |
 | 🔒 `PATCH /api/drafts/:id`               | `{ version, level }`    | Changes the level.                                                                                          |
 | 🔒 `PUT /api/drafts/:id/answers/:choice` | `{ version, answer }`   | Answers one choice; `answer: null` removes it. `422 changeRejected` with the reason if it does not fit now. |
+| 🔒 `POST /api/drafts/:id/level-up`       | `{ version, level }`    | Raises a finished character; see [Raising a character](#raising-a-character).                               |
 | 🔒 `POST /api/drafts/:id/finish`         | `{ version }`           | Marks the character finished; `422 incomplete` with the open choices.                                       |
 | 🔒 `DELETE /api/drafts/:id`              | —                       | `204`.                                                                                                      |
 
@@ -98,6 +100,61 @@ those of the declared choice (`copyOf` in the evaluation).
 
 A finished character stays finished while it is complete; a change that
 leaves something open makes it a draft again.
+
+### Raising a character
+
+`POST /api/drafts/:id/level-up` with `{ "version": 7, "level": 5 }` raises a
+finished character one or more levels. Every answer stays and is not asked
+again; what the new levels add is asked on top. Every number that depends
+on the level (tables by level, formulas with `level`, grants with
+`atLevel`, text variants with `when`) is worked out again at the new level,
+on the screen and in the PDF.
+
+- **Something to answer:** the character is a draft again
+  (`status: "draft"`, `finishedAt: null`), `draft.levelBefore` is the level
+  it was finished at. `POST /finish` works once the open choices are
+  answered and then clears `levelBefore`. The PDF is refused
+  (`409 notFinished`) until then, as for any draft.
+- **Nothing to answer:** the character is finished again at once, with a new
+  `finishedAt`; `levelBefore` is `null`.
+- **Raising again before finishing** is allowed and keeps the first
+  `levelBefore`. Setting the level (`PATCH`) back to `levelBefore` or below
+  ends the raise (`levelBefore: null`); the character stays a draft until
+  it is finished.
+
+The answer is the usual draft view. While a raise lasts (and in the answer
+of the raise itself, also when it finished at once), `levelUp` says what it
+brought; otherwise it is `null`:
+
+```json
+"levelUp": {
+  "from": 1,
+  "to": 2,
+  "newSteps": [],
+  "newChoices": ["extra-talent"],
+  "openSteps": ["talents", "knacks"]
+}
+```
+
+| Field        | Meaning                                                                                                                                                                                              |
+| ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `newSteps`   | Steps with `atLevel > from`, in step order.                                                                                                                                                          |
+| `newChoices` | Choices with `atLevel > from`, in step order. A step that was there before can get a new choice (a gather step), so this can name a choice whose step is not in `newSteps`.                          |
+| `openSteps`  | Every step not `done`, in step order: the steps with new choices, and older steps that ask for more at the new level (a pick count from a table by level keeps the old picks and asks for the rest). |
+
+The open choices themselves are `evaluation.open`, as always. A copy of a
+choice (`<choice>@<step>`) that a new pick brings appears once that pick is
+answered.
+
+Errors:
+
+| Status | Code                                                              | When                                                                                                 |
+| ------ | ----------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `409`  | `notFinished` (with `open`)                                       | The character is a draft and not in a raise. Build it first, or change its level with `PATCH`.       |
+| `422`  | `changeRejected`, `reason: { code: "levelNotHigher", level }`     | The level is not above the current one (`level` is the current one). A raise never lowers the level. |
+| `422`  | `changeRejected`, `reason: { code: "levelOutOfRange", min, max }` | Above the package's `flow.level.max` (or not a level at all).                                        |
+| `409`  | `versionConflict`                                                 | The draft moved on (see above).                                                                      |
+| `400`  | `badRequest`                                                      | `level` is not a whole number.                                                                       |
 
 ## Print
 
