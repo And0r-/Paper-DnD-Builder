@@ -194,3 +194,40 @@ export function originGroups(lp: LoadedPackage, ev: Evaluation, w: Words): Origi
   }
   return [...groups.values()].filter((g) => g.things.length > 0);
 }
+
+export interface LevelGrowth {
+  /** Values that follow the level alone (a formula of the level, a table by level). */
+  own: string[];
+  /** Values a held thing raises by a table by level, by that thing. */
+  byThing: { thing: string; values: string[] }[];
+}
+
+/**
+ * Numbers that grow with the level and nothing else, for "what grows with
+ * your level": "Practice 6, because level 20". Values that also depend on
+ * choices (stamina from a score) are explained with their own sums instead.
+ */
+export function levelGrowth(lp: LoadedPackage, ev: Evaluation): LevelGrowth {
+  const named = (id: string) => ptext(lp, `value.${id}.name`) !== undefined && (ev.values[id] ?? 0) !== 0;
+  const own = lp.pkg.values
+    .filter((v) => {
+      if (v.byLevel !== undefined) return true;
+      if (v.formula === undefined) return false;
+      const refs = collectRefs(parseExpr(v.formula));
+      return refs.values.size === 1 && refs.values.has("level");
+    })
+    .map((v) => v.id)
+    .filter(named);
+  const things = new Map(lp.pkg.things.map((x) => [x.id, x]));
+  const byThing: LevelGrowth["byThing"] = [];
+  const taken = new Set(own);
+  for (const h of ev.things) {
+    const values = (things.get(h.id)?.grants ?? [])
+      .filter((g) => g.value !== undefined && typeof g.add === "object" && (g.atLevel ?? 1) <= ev.level)
+      .map((g) => g.value!)
+      .filter((id) => named(id) && !taken.has(id));
+    for (const id of values) taken.add(id);
+    if (values.length > 0) byThing.push({ thing: h.id, values });
+  }
+  return { own, byThing };
+}

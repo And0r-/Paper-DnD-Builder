@@ -116,6 +116,25 @@
   border-left: 2px solid var(--color-border);
 }
 
+/* The level a run of parts comes at ("From level 8"): a quiet heading, not a link. */
+.steplist__level {
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  color: var(--color-ink-muted);
+  padding: var(--space-2) var(--space-2) 0;
+}
+
+.steplist__name {
+  display: flex;
+  flex-direction: column;
+}
+
+.steplist__note {
+  font-size: var(--text-xs);
+  font-weight: var(--weight-regular);
+  color: var(--color-ink-muted);
+}
+
 /* --------------------------------------------------------------- frame */
 
 .step {
@@ -670,6 +689,29 @@
   color: var(--color-ink-muted);
 }
 
+/* Raising values: the sum reads large enough to follow; a full row is quiet. */
+.raise .pointbuy__name {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.raise__sum {
+  font-size: var(--text-md);
+  font-variant-numeric: tabular-nums;
+}
+
+.raise__why {
+  font-size: var(--text-sm);
+  line-height: var(--text-sm-lh);
+  color: var(--color-ink-muted);
+}
+
+.pointbuy__row--full {
+  background: var(--color-surface-sunk);
+}
+
 .array-assign {
   display: flex;
   flex-direction: column;
@@ -1122,5 +1164,43 @@
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
+  gap: var(--space-3);
+}
+
+/* Numbers a gift raises, without explanations of their own: one card, one line each. */
+.gift__numbers {
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
+  gap: var(--space-1) var(--space-4);
+  font-weight: var(--weight-semibold);
+}
+
+.gifts__later .disclosure__panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding-top: var(--space-3);
+}
+
+.gifts__level {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+/* The level a step comes at, next to its title in the overview. */
+.summary__level {
+  margin-left: var(--space-2);
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-sunk);
+  font-weight: var(--weight-regular);
+  white-space: nowrap;
+}
+
+.growth {
+  display: flex;
+  flex-direction: column;
   gap: var(--space-3);
 }

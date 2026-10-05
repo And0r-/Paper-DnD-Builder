@@ -18,8 +18,9 @@ import {
   useFooterDock,
   usePageTitle,
 } from "../../../../src/ui/flow/frame.tsx";
-import { distributeLines, valueOrigin } from "../../../../src/ui/flow/explain.ts";
+import { distributeLines, levelGrowth, valueOrigin } from "../../../../src/ui/flow/explain.ts";
 import { describeAnswer, OVERVIEW_KEY, positionOf } from "../../../../src/ui/flow/model.ts";
+import { LevelGrowth } from "../../../../src/ui/flow/growth.tsx";
 import { Origins } from "../../../../src/ui/flow/origins.tsx";
 import { choiceOf, choiceTexts, formatValue, ptext } from "../../../../src/ui/package-text.ts";
 
@@ -36,6 +37,9 @@ export default function OverviewPage() {
   const index = entries.indexOf(entry);
   usePageTitle([t("overview.question"), t("flow.progress", positionOf(entries, entry))]);
 
+  // Numbers of the section "what grows with your level" are not repeated in the lines below.
+  const growth = levelGrowth(lp, ev);
+  const grown = new Set([...growth.own, ...growth.byThing.flatMap((g) => g.values)]);
   const openSteps = entries.filter((e) => e.kind === "step" && e.status !== "done");
   const steps = entries.filter((e) => e.kind !== "overview");
 
@@ -91,6 +95,8 @@ export default function OverviewPage() {
         </ul>
       </section>
 
+      <LevelGrowth />
+
       <Origins />
 
       <ul className="summary">
@@ -111,7 +117,7 @@ export default function OverviewPage() {
                       : choice.targets;
                     return distributeLines(lp, ctx, ev, state, targets, assign, { t, list });
                   }
-                  const text = describeAnswer(lp, ctx, state, list);
+                  const text = describeAnswer(lp, ctx, state, list, grown);
                   const prefix = s.choices.length > 1 ? `${choiceTexts(lp, c, state, ctx).title}: ` : "";
                   return [
                     prefix +
@@ -127,6 +133,11 @@ export default function OverviewPage() {
                 <h2 className="summary__title">
                   {s.status !== "done" && <span className="summary__flag">! </span>}
                   {s.title}
+                  {s.atLevel > lp.pkg.flow.level.min && (
+                    <span className="summary__level">
+                      {t("flow.atLevel", { levelName: ptext(lp, "level.name") ?? "", level: s.atLevel })}
+                    </span>
+                  )}
                 </h2>
                 {lines.map((l, i) => (
                   <p key={i} className="summary__line">

@@ -19,6 +19,7 @@ import {
   formatValue,
   grantedValue,
   isYesNoValue,
+  levelWord,
   plain,
   plist,
   ptext,
@@ -30,6 +31,7 @@ import { laterSteps, sumText } from "./explain.ts";
 import { fillArray, forcedArray, freeMarks } from "./array-fill.ts";
 import { useExplain } from "./frame.tsx";
 import { useGuardedChange } from "./guard.tsx";
+import { longListGroups, SEARCH_FROM } from "./long-list.ts";
 import { stepHref, stepTitle } from "./model.ts";
 
 // ------------------------------------------------------------ explanation
@@ -239,22 +241,6 @@ export function OptionCard({
   );
 }
 
-export function groupOptions(things: Thing[]): { group: string | undefined; things: Thing[] }[] {
-  if (!things.some((th) => th.group)) return [{ group: undefined, things }];
-  const groups: { group: string | undefined; things: Thing[] }[] = [];
-  for (const th of things) {
-    let g = groups.find((x) => x.group === th.group);
-    if (!g) {
-      g = { group: th.group, things: [] };
-      groups.push(g);
-    }
-    g.things.push(th);
-  }
-  return groups;
-}
-
-export const SEARCH_FROM = 12;
-
 export function PickChoice({
   choice,
   state,
@@ -365,9 +351,15 @@ export function PickChoice({
         />
       )}
       {shown.length === 0 && <p className="options__none">{t("pick.noResults")}</p>}
-      {groupOptions(shown).map((g) => (
+      {longListGroups(
+        lp,
+        shown,
+        options.length >= SEARCH_FROM,
+        query.trim() ? [] : recommended,
+        t("pick.recommendedGroup"),
+      ).map((g) => (
         <div className="options__group" key={g.group ?? "-"}>
-          {g.group && <h2 className="options__group-title">{ptext(lp, `group.${g.group}.name`)}</h2>}
+          {g.title && <h2 className="options__group-title">{g.title}</h2>}
           <div className="options__list">
             {g.things.map((th) => (
               <OptionCard
@@ -473,6 +465,7 @@ export function DistributeChoice({
           targets={choice.targets}
           raise={state.raise ?? { points: m.points, before: {}, most: {} }}
           initial={stored?.method === method ? stored.assign : undefined}
+          tip={rec?.method === method ? rec.assign : undefined}
           onSave={save}
           tc={tc}
         />
@@ -608,14 +601,16 @@ function PointBuy({
 
 /**
  * Points added on top of the values the character already has (a boon on a
- * higher level). Each row shows the value before and after; a row stops
- * where the choice's cap or its most per value is reached.
+ * higher level). Each row reads as a sum: the value now, the points added
+ * (between − and +) and the value after. A row that cannot take more says
+ * why ("already 15"), so a grey + never stands without a reason.
  */
 function RaisePoints({
   lp,
   targets,
   raise,
   initial,
+  tip,
   onSave,
   tc,
 }: {
@@ -623,6 +618,8 @@ function RaisePoints({
   targets: string[];
   raise: NonNullable<ChoiceState["raise"]>;
   initial: Record<string, number> | undefined;
+  /** The package's recommendation, shown as a tip per row. */
+  tip: Record<string, number> | undefined;
   onSave: (assign: Record<string, number>) => void;
   tc: ReturnType<typeof useApp>["tc"];
 }) {
@@ -641,7 +638,7 @@ function RaisePoints({
   };
 
   return (
-    <div className="pointbuy">
+    <div className="pointbuy raise">
       <p className={left === 0 ? "pointbuy__left pointbuy__left--done" : "pointbuy__left"} aria-live="polite">
         {left === 0 && <Icon name="check" size={20} />}
         {left === 0 ? t("dist.allSpent") : stuck ? t("dist.noRoom") : tc("dist.left", left)}
@@ -650,20 +647,37 @@ function RaisePoints({
         {targets.map((v) => {
           const added = assign[v] ?? 0;
           const before = raise.before[v] ?? 0;
+          const most = raise.most[v] ?? 0;
           const name = ptext(lp, `value.${v}.name`) ?? v;
+          // Why + is grey: the value is at its limit already, or this row took all it may.
+          const why =
+            most <= 0
+              ? t("dist.raiseFull", { value: String(before) })
+              : room(v) <= 0 && left > 0
+                ? t("dist.raiseMost", { value: String(before + most) })
+                : undefined;
+          const tipped = tip?.[v];
           return (
-            <li className="pointbuy__row" key={v}>
+            <li className={`pointbuy__row${most <= 0 ? " pointbuy__row--full" : ""}`} key={v}>
               <div className="pointbuy__label">
                 <span className="pointbuy__name" id={`ra-${v}`}>
                   {name}
+                  {tipped !== undefined && tipped > 0 && (
+                    <span className="badge">{t("dist.tip", { value: `+${tipped}` })}</span>
+                  )}
                 </span>
-                <span className="pointbuy__explain">
+                <span className="raise__sum" id={`ra-${v}-sum`}>
                   {t("dist.raiseValue", {
                     before: String(before),
                     added: String(added),
                     value: String(before + added),
                   })}
                 </span>
+                {why && (
+                  <span className="raise__why" id={`ra-${v}-why`}>
+                    {why}
+                  </span>
+                )}
               </div>
               <div className="stepper">
                 <button
@@ -675,13 +689,14 @@ function RaisePoints({
                 >
                   <Icon name="minus" />
                 </button>
-                <output className="stepper__value" aria-labelledby={`ra-${v}`} aria-live="polite">
-                  {before + added}
+                <output className="stepper__value" aria-labelledby={`ra-${v} ra-${v}-sum`} aria-live="polite">
+                  +{added}
                 </output>
                 <button
                   type="button"
                   className="stepper__btn"
                   aria-label={t("dist.increase", { name })}
+                  aria-describedby={why ? `ra-${v}-why` : undefined}
                   aria-disabled={left <= 0 || room(v) <= 0 || undefined}
                   onClick={() => left > 0 && room(v) > 0 && set(v, added + 1)}
                 >
@@ -1029,7 +1044,7 @@ function GiftOnSheet({ valueId, add }: { valueId: string; add: number }) {
 }
 
 export function InfoChoice({ state }: { state: ChoiceState }) {
-  const { t } = useApp();
+  const { t, tc } = useApp();
   const { lp, ev, draft } = useDraft();
   const ctx = useMeasure(lp);
   const info = state.info;
@@ -1059,32 +1074,66 @@ export function InfoChoice({ state }: { state: ChoiceState }) {
   if (things.length === 0 && info.values.length === 0 && info.choices.length === 0) {
     return <p>{t("info.nothing")}</p>;
   }
+  // Numbers without an explanation of their own (a table by level, such as
+  // places per rank) share one card: nine cards of "+2" would bury the rest.
+  const explained = info.values.filter((v) => ptext(lp, `value.${v.value}.explain`));
+  const plainValues = info.values.filter((v) => !ptext(lp, `value.${v.value}.explain`));
+  // Things a higher level brings fold away under the level they come at, so
+  // a level-20 character sees first what everyone starts with.
+  const min = lp.pkg.flow.level.min;
+  const from = new Map(ev.things.map((h) => [h.id, h.atLevel]));
+  const atStart = things.filter((th) => (from.get(th.id) ?? min) <= min);
+  const higher = things.filter((th) => (from.get(th.id) ?? min) > min);
+  const laterLevels = [...new Set(higher.map((th) => from.get(th.id)!))].sort((a, b) => a - b);
+  const word = levelWord(lp);
+  const thingCard = (th: Thing) => (
+    <li className="gift" key={th.id}>
+      <p className="gift__name">{thingName(lp, th.id)}</p>
+      <p className="gift__text">
+        <RichText lp={lp} text={ptext(lp, `${th.id}.short`)} />
+      </p>
+      <Disclosure more={t("common.moreInfo")} less={t("common.lessInfo")}>
+        <OptionDetails lp={lp} thing={th} level={ev.level} />
+      </Disclosure>
+    </li>
+  );
   return (
     <div className="gifts">
       <ul className="gifts__list">
-        {info.values.map((v) => (
+        {explained.map((v) => (
           <li className="gift" key={`v-${v.value}`}>
             <p className="gift__name">{grantedValue(lp, ctx, v.value, v.add)}</p>
-            {ptext(lp, `value.${v.value}.explain`) && (
-              <p className="gift__text">
-                <RichText lp={lp} text={ptext(lp, `value.${v.value}.explain`)} />
-              </p>
-            )}
+            <p className="gift__text">
+              <RichText lp={lp} text={ptext(lp, `value.${v.value}.explain`)} />
+            </p>
             <GiftOnSheet valueId={v.value} add={v.add} />
           </li>
         ))}
-        {things.map((th) => (
-          <li className="gift" key={th.id}>
-            <p className="gift__name">{thingName(lp, th.id)}</p>
-            <p className="gift__text">
-              <RichText lp={lp} text={ptext(lp, `${th.id}.short`)} />
-            </p>
-            <Disclosure more={t("common.moreInfo")} less={t("common.lessInfo")}>
-              <OptionDetails lp={lp} thing={th} level={ev.level} />
-            </Disclosure>
+        {plainValues.length > 0 && (
+          <li className="gift">
+            <ul className="gift__numbers">
+              {plainValues.map((v) => (
+                <li key={v.value}>{grantedValue(lp, ctx, v.value, v.add)}</li>
+              ))}
+            </ul>
           </li>
-        ))}
+        )}
+        {atStart.map(thingCard)}
       </ul>
+      {higher.length > 0 && (
+        <Disclosure
+          className="gifts__later"
+          more={tc("info.higherMore", higher.length, { levelName: word, level: ev.level })}
+          less={t("common.lessInfo")}
+        >
+          {laterLevels.map((lv) => (
+            <div className="gifts__level" key={lv}>
+              <p className="gifts__choices-title">{t("flow.fromLevel", { levelName: word, level: lv })}</p>
+              <ul className="gifts__list">{higher.filter((th) => from.get(th.id) === lv).map(thingCard)}</ul>
+            </div>
+          ))}
+        </Disclosure>
+      )}
       {/* Granted choices usually sit right after the step that grants them,
           so by the info step they are answered: say so, never "next". A
           choice gathered at a later step (SPEC 9.4) is named with that step. */}
@@ -1104,12 +1153,14 @@ export function InfoChoice({ state }: { state: ChoiceState }) {
                 {group.ids.map((c) => (
                   <li key={c}>
                     {choiceTexts(lp, c, ev.choices[c], ctx).title}
-                    {later.includes(c) && (
-                      <span className="gifts__where">
-                        {" "}
-                        ({t("info.laterAt", { step: stepTitle(lp, ev, ev.choices[c]!.step) })})
-                      </span>
-                    )}
+                    {later.includes(c) &&
+                      stepTitle(lp, ev, ev.choices[c]!.step) !==
+                        choiceTexts(lp, c, ev.choices[c], ctx).title && (
+                        <span className="gifts__where">
+                          {" "}
+                          ({t("info.laterAt", { step: stepTitle(lp, ev, ev.choices[c]!.step) })})
+                        </span>
+                      )}
                   </li>
                 ))}
               </ul>

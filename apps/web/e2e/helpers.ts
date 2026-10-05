@@ -7,7 +7,7 @@
  *   folder,
  * - the one-language check: no text of the other language on screen.
  */
-import { expect, test as base, type Page } from "@playwright/test";
+import { expect, test as base, type APIResponse, type Page } from "@playwright/test";
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -201,6 +201,78 @@ export async function makeCharacter(page: Page, finish = true): Promise<string> 
   if (finish) {
     const r = await req.post(`/api/drafts/${id}/finish`, { data: { version: view.draft.version } });
     expect(r.status()).toBe(200);
+  }
+  return id;
+}
+
+interface DraftView {
+  draft: { id: string; version: number };
+  evaluation: {
+    complete: boolean;
+    steps: { id: string; choices: string[]; pool?: { recommended: string[] } }[];
+    choices: Record<string, { id: string; kind: string; status: string; recommended?: unknown }>;
+  };
+}
+
+/**
+ * A character of any level made through the API with nothing but the
+ * package's recommendations, as "choose for me" would answer; `stopAt`
+ * leaves that step and all after it open.
+ */
+export async function makeLeveled(
+  page: Page,
+  level: number,
+  calling = "calling.lantern-bearer",
+  stopAt?: string,
+): Promise<string> {
+  const req = page.request;
+  const created = await req.post("/api/drafts", { data: { packageId: "demo" } });
+  let view = (await created.json()) as DraftView;
+  const id = view.draft.id;
+  const send = async (r: Promise<APIResponse>, what: string) => {
+    const res = await r;
+    expect(res.status(), what).toBe(200);
+    view = (await res.json()) as DraftView;
+  };
+  await send(req.patch(`/api/drafts/${id}`, { data: { version: view.draft.version, level } }), "level");
+  await send(
+    req.put(`/api/drafts/${id}/answers/calling`, {
+      data: { version: view.draft.version, answer: { pick: calling } },
+    }),
+    "calling",
+  );
+  for (let guard = 0; guard < 200 && !view.evaluation.complete; guard++) {
+    const ev = view.evaluation;
+    const waits = (c: string) => ev.choices[c]!.kind !== "info" && ev.choices[c]!.status !== "answered";
+    const step = ev.steps.find((s) => s.choices.some(waits))!;
+    if (step.id === stopAt) break;
+    if (step.pool) {
+      await send(
+        req.put(`/api/drafts/${id}/pools/${encodeURIComponent(step.id)}`, {
+          data: { version: view.draft.version, picks: step.pool.recommended },
+        }),
+        step.id,
+      );
+      continue;
+    }
+    const open = ev.choices[step.choices.find(waits)!]!;
+    const rec = open.recommended;
+    const answer =
+      open.kind === "pickOne"
+        ? { pick: (rec as string[])[0] }
+        : open.kind === "pickMany"
+          ? { picks: rec }
+          : open.kind === "distribute"
+            ? rec
+            : open.kind === "number"
+              ? { value: 20 }
+              : { text: "Mira" };
+    await send(
+      req.put(`/api/drafts/${id}/answers/${encodeURIComponent(open.id)}`, {
+        data: { version: view.draft.version, answer },
+      }),
+      open.id,
+    );
   }
   return id;
 }
