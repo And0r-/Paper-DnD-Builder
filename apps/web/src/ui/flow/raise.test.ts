@@ -14,6 +14,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { translator } from "../../i18n/index.ts";
 import type { LoadedPackage } from "../packages.ts";
+import { levelGrowth } from "./explain.ts";
 import { evaluateBefore, flowOf, raiseNews } from "./raise.ts";
 
 const pkg = (await validatePackageDir(DEMO_PACKAGE_DIR)).package!;
@@ -63,13 +64,13 @@ function answerFlow(doc: DraftDocument): { doc: DraftDocument; visited: string[]
   throw new Error("did not complete");
 }
 
-function built(level: number): DraftDocument {
+function built(level: number, calling = "calling.lantern-bearer"): DraftDocument {
   const created = newDraft(pkg, level);
   if (!created.ok) throw new Error("newDraft");
   const doc = apply(created.doc, {
     type: "answer",
     choice: "calling",
-    answer: { pick: "calling.lantern-bearer" },
+    answer: { pick: calling },
   });
   return answerFlow(doc).doc;
 }
@@ -139,5 +140,17 @@ describe("the flow of a level up", () => {
       { id: "stamina", before: 13, after: 18 },
       { id: "guard", before: 8, after: 9 },
     ]);
+  });
+
+  it("grows only the uses of abilities the character has", () => {
+    // Ward uses are a table by level that only the herbalist's ward names.
+    const lantern = levelGrowth(lp, evaluateDraft(pkg, built(11)));
+    expect(lantern.own).toContain("practice");
+    expect(lantern.own).not.toContain("bloomWardUses");
+    const herbalist = evaluateDraft(pkg, built(11, "calling.herbalist"));
+    expect(herbalist.things.map((h) => h.id)).toContain("trait.bloom-ward");
+    const growth = levelGrowth(lp, herbalist);
+    expect(growth.own.filter((v) => v === "bloomWardUses")).toEqual(["bloomWardUses"]);
+    expect(new Set(growth.own).size).toBe(growth.own.length);
   });
 });
