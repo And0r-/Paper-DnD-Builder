@@ -745,7 +745,7 @@ export function validatePackageFiles(files: PackageFiles): ValidationResult {
       need(`step.${s.id}.title`, `title of step ${lit(s.id)}`);
       need(`step.${s.id}.question`, `question of step ${lit(s.id)}`);
       need(`step.${s.id}.intro`, `introduction of step ${lit(s.id)}`);
-    }
+    } else if ("gather" in s) optional.add(`step.${s.id}.title`);
   }
   for (const g of groups) need(`group.${g}.name`, `heading of option group ${lit(g)}`);
   for (const v of values) {

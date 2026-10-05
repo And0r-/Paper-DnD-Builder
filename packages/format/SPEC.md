@@ -365,7 +365,9 @@ of one gather group are asked (see `gather` in [9.3](#93-choices) and
 - `when` (optional): as on other steps. A hidden gather step still asks
   its gathered choices, each as its own step at its place.
 - With `together`, the step needs its own texts `step.<id>.title`,
-  `.question`, `.intro`.
+  `.question`, `.intro`. Without `together`, `step.<id>.title` is
+  optional: the progress line names the gathered choices by it ("Spells,
+  part 2 of 4") instead of by the first choice's title.
 
 **One shared list** (`"together": "list"`). The player sees one list and
 picks from it; each pick counts for exactly one of the gathered choices.
@@ -617,6 +619,7 @@ Text keys follow from the keys of the things they belong to.
 | `choice.<id>.missing`                                                    | no                                                                  | what is still missing                                   |
 | `choice.<id>.variant.<variant>.title`, `.question`, `.intro`, `.missing` | no; once in one language, in all                                    | a text variant (9.3)                                    |
 | `step.<id>.title`, `.question`, `.intro`                                 | if the step has several choices or is a gather step with `together` | a combined step                                         |
+| `step.<id>.title` of a gather step without `together`                    | no; once in one language, in all                                    | the name of its gathered choices in the progress line   |
 | `choice.<id>.from`                                                       | no                                                                  | where a gathered choice's places come from (9.2)        |
 | `group.<group>.name`                                                     | yes, per group used                                                 | heading in option lists                                 |
 | `value.<id>.name`                                                        | yes                                                                 | name of a value                                         |

@@ -429,6 +429,16 @@ describe("gather", () => {
     expect(messages(r)).toEqual([]);
   });
 
+  it("uses a title of a step whose gathered choices stand one by one, and nothing more", () => {
+    const r = mutate((f) => {
+      gatherKnacks(f);
+      for (const lang of ["de", "en"])
+        for (const field of ["question", "intro"]) delete texts(f, lang)[`step.knacks.${field}`];
+    });
+    expect(messages(r)).toEqual([]);
+    expect(messages(r, "warnings")).toEqual([]);
+  });
+
   it.each<[string, (f: RawFiles) => void, string]>([
     [
       "the same group gathered twice",

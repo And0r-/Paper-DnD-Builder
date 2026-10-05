@@ -37,6 +37,11 @@ export interface FlowEntry {
   parts: number;
   /** Key of the section's first entry. */
   sectionKey: string;
+  /**
+   * Name of the whole section when it differs from the first entry's title:
+   * the package's title for a gather step whose choices stand one by one.
+   */
+  sectionTitle?: string;
 }
 
 export const LEVEL_KEY = "level";
@@ -73,11 +78,13 @@ export function buildFlow(
   let group: string | undefined;
   for (const s of ev.steps) {
     const gathered = gatherGroupOf(lp, s);
-    if (s.origin === "flow" || (gathered !== undefined && gathered !== group)) {
+    const opens = s.origin === "flow" || (gathered !== undefined && gathered !== group);
+    if (opens) {
       section++;
       sectionKey = s.id;
     }
     group = gathered;
+    const sectionTitle = opens && gathered !== undefined ? gatherTitle(lp, gathered) : undefined;
     entries.push({
       key: s.id,
       kind: "step",
@@ -89,6 +96,7 @@ export function buildFlow(
       part: 1,
       parts: 1,
       sectionKey,
+      ...(sectionTitle !== undefined && { sectionTitle }),
     });
   }
   entries.push({
@@ -124,6 +132,12 @@ export function gatherGroupOf(lp: LoadedPackage, step: Evaluation["steps"][numbe
   return lp.pkg.flow.steps.some((f) => "gather" in f && f.gather === group) ? group : undefined;
 }
 
+/** The package's title for the flow step that gathers `group`, if it has one. */
+function gatherTitle(lp: LoadedPackage, group: string): string | undefined {
+  const step = lp.pkg.flow.steps.find((f) => "gather" in f && f.gather === group);
+  return step && ptext(lp, `step.${step.id}.title`);
+}
+
 /** A step a choice brought along right behind it: a part of that step, not a step of its own. */
 export function isPart(lp: LoadedPackage, ev: Evaluation, id: string): boolean {
   const step = ev.steps.find((s) => s.id === id);
@@ -151,7 +165,7 @@ export function positionOf(entries: FlowEntry[], entry: FlowEntry): Position {
     total: last.section + 1,
     part: entry.part,
     parts: entry.parts,
-    sectionTitle: head.title,
+    sectionTitle: head.sectionTitle ?? head.title,
   };
 }
 
