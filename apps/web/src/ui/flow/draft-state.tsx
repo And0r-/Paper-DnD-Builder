@@ -31,7 +31,8 @@ import {
 import { useApp } from "../app-state.tsx";
 import { api, ApiError, type DraftInfo, type DraftView } from "../api.ts";
 import { usePackage, type LoadedPackage } from "../packages.ts";
-import { buildFlow, isPart, stepDiff, stepTitle, type FlowEntry } from "./model.ts";
+import { isPart, stepDiff, stepTitle, type FlowEntry } from "./model.ts";
+import { flowOf, type Raise } from "./raise.ts";
 
 export type SaveState = "saved" | "saving" | "error" | "offline";
 
@@ -76,7 +77,12 @@ export interface DraftApi {
   draft: DraftInfo;
   doc: DraftDocument;
   ev: Evaluation;
+  /** The steps to go through; during a raise only those the new levels bring. */
   entries: FlowEntry[];
+  /** Every step, for the overview: during a raise the earlier ones stay reachable there. */
+  allEntries: FlowEntry[];
+  /** Set while a finished character is being raised and not finished again. */
+  raise: Raise | null;
   saveState: SaveState;
   /**
    * Set when a change was refused (by the server, or here because the
@@ -91,6 +97,11 @@ export interface DraftApi {
   /** Resolves when everything is saved (true) or saving failed for now (false). */
   flush(): Promise<boolean>;
   finish(): Promise<"ok" | "incomplete" | "failed">;
+  /**
+   * Raises the character to a higher level on the server. "finished" when
+   * the new level asks nothing, so the character is done again at once.
+   */
+  levelUp(level: number): Promise<"open" | "finished" | "failed">;
 }
 
 const Ctx = createContext<DraftApi | null>(null);
@@ -211,7 +222,7 @@ function ReadyDraft({
   const pkg = lp.pkg;
 
   const ev = useMemo(() => evaluateDraft(pkg, doc), [pkg, doc]);
-  const entries = useMemo(() => buildFlow(server.draft.id, lp, ev, t), [server.draft.id, lp, ev, t]);
+  const flow = useMemo(() => flowOf(server.draft.id, lp, doc, ev, t), [server.draft.id, lp, doc, ev, t]);
 
   const settle = useCallback((ok: boolean) => {
     const w = waiters.current;
@@ -355,12 +366,33 @@ function ReadyDraft({
       });
       serverRef.current = res;
       setServer(res);
+      // Finishing ends a raise.
+      setDoc(docOf(res));
       return "ok";
     } catch (error) {
       if (error instanceof ApiError && error.code === "incomplete") return "incomplete";
       return "failed";
     }
-  }, [flush, setServer]);
+  }, [flush, setServer, setDoc]);
+
+  const levelUp = useCallback(
+    async (level: number): Promise<"open" | "finished" | "failed"> => {
+      if (!(await flush())) return "failed";
+      try {
+        const res = await api<DraftView>("POST", `/api/drafts/${serverRef.current.draft.id}/level-up`, {
+          version: serverRef.current.draft.version,
+          level,
+        });
+        serverRef.current = res;
+        setServer(res);
+        setDoc(docOf(res));
+        return res.draft.status === "finished" ? "finished" : "open";
+      } catch {
+        return "failed";
+      }
+    },
+    [flush, setServer, setDoc],
+  );
 
   const value = useMemo<DraftApi>(
     () => ({
@@ -368,7 +400,9 @@ function ReadyDraft({
       draft: server.draft,
       doc,
       ev,
-      entries,
+      entries: flow.entries,
+      allEntries: flow.all,
+      raise: flow.raise,
       saveState,
       rejected,
       clearRejected: () => setRejected(null),
@@ -376,8 +410,9 @@ function ReadyDraft({
       change,
       flush,
       finish,
+      levelUp,
     }),
-    [lp, server.draft, doc, ev, entries, saveState, rejected, notice, change, flush, finish],
+    [lp, server.draft, doc, ev, flow, saveState, rejected, notice, change, flush, finish, levelUp],
   );
   return <Ctx.Provider value={value}>{render({ state: "ready", api: value })}</Ctx.Provider>;
 }

@@ -5,7 +5,8 @@
  * the levels the package names as common (`level.pick.<n>`) stand as big
  * cards, any other level is one card with a number to step or type.
  */
-import { useId, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useId, useState } from "react";
 import { useApp } from "../../../../src/ui/app-state.tsx";
 import { RichText } from "../../../../src/ui/components/RichText.tsx";
 import { Callout } from "../../../../src/ui/components/Feedback.tsx";
@@ -18,11 +19,12 @@ import { levelWord, ptext } from "../../../../src/ui/package-text.ts";
 
 export default function LevelPage() {
   const { t } = useApp();
-  const { lp, ev, entries } = useDraft();
+  const { lp, ev, entries, raise, draft } = useDraft();
+  const router = useRouter();
   const guard = useGuardedChange();
   const legendId = useId();
   const otherId = useId();
-  const entry = entries.find((e) => e.key === LEVEL_KEY)!;
+  const entry = entries.find((e) => e.key === LEVEL_KEY);
   const { min, max } = lp.pkg.flow.level;
   const recommended = lp.pkg.flow.level.default ?? min;
   const levelName = ptext(lp, "level.name") ?? "";
@@ -36,6 +38,11 @@ export default function LevelPage() {
   const [other, setOther] = useState(!quick.includes(ev.level));
   const [text, setText] = useState(String(ev.level));
   const otherChosen = other || !quick.includes(ev.level);
+  // During a level up the level is chosen on the level-up screen, only above the old one.
+  useEffect(() => {
+    if (raise) router.replace(`/c/${draft.id}/raise`);
+  }, [raise, draft.id, router]);
+  if (!entry) return null;
 
   const setLevel = (level: number) => {
     const clamped = Math.min(max, Math.max(min, Math.round(level)));
