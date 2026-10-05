@@ -73,11 +73,16 @@ no answer. A partial `pickMany` answer is allowed; the choice stays open.
 `raise`): the same shape, `{ "method": 0, "assign": { "heart": 2 } }` or
 `{ "method": 0, "assign": { "wit": 1, "heart": 1 } }`. `assign` names only
 the values that get points; the points are added on top of the value as it
-is before this choice (they do not set its base). Refused with
+is before this choice, at the choice's level (they do not set its base; from
+format 0.10, bonuses of higher levels do not count against the cap). Refused with
 `answerDoesNotFit` and `badAssignment` (not a target, or below 0),
 `outOfRange` (more than the value may take here) or `overBudget` (more
 points than there are). Fewer points than `points` leave the choice open
 (`incomplete`, `remaining`), unless no value can take another one.
+
+**Picks among what the character has** (format 0.10, `options.owned`):
+answered like any pick choice; `options` lists only things the character
+already has. The pick is listed in `marks` and gives nothing.
 
 **Copies of a choice** (format 0.9, things with `repeatable`): a choice
 granted by a repeatable thing is asked once per pick of that thing, under
@@ -94,7 +99,8 @@ those of the declared choice (`copyOf` in the evaluation).
 | `choices.*` (raise)                | `raise`       | `{ points, before: { value: n }, most: { value: n } }`: points to give, each value before this choice, most points each value can take here (cap and the value's `max` included).                  |
 | `choices.*` (raise)                | `recommended` | `{ method, assign }`, always a full answer: the package's assignment as far as it fits, the rest in order.                                                                                         |
 | `choices.*` (copy)                 | `copyOf`      | The declared choice a copy uses for rules and texts.                                                                                                                                               |
-| `raises`                           | —             | Per value, the points added by raise answers in step order: `{ "heart": [{ "amount": 2, "choice": "boon-raise@boon-4" }] }`.                                                                       |
+| `raises`                           | —             | Per value, the points added by raise answers in step order: `{ "heart": [{ "amount": 2, "choice": "boon-raise@boon-4", "atLevel": 4 }] }`.                                                         |
+| `marks`                            | —             | Format 0.10: things picked in choices with `options.owned` (they mark what the character has, they give nothing): `{ "knack.warm-glow": ["lantern-mastery"] }`.                                    |
 
 A finished character stays finished while it is complete; a change that
 leaves something open makes it a draft again.

@@ -122,7 +122,7 @@ people who distribute packages.
 
 ```json
 {
-  "formatVersion": "0.9",
+  "formatVersion": "0.10",
   "id": "demo",
   "version": "0.1.0",
   "languages": ["de", "en"],
@@ -197,20 +197,34 @@ Each `things/*.json` file is an array of things:
 }
 ```
 
-| Field        | Required | Meaning                                                                                                                                                                    |
-| ------------ | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `id`         | yes      | Thing key.                                                                                                                                                                 |
-| `kind`       | yes      | One of `manifest.kinds`.                                                                                                                                                   |
-| `source`     | yes      | Source key. `license` optional.                                                                                                                                            |
-| `rank`       | no       | The thing's own tier (for example a spell level). Shown on cards. Not the character level.                                                                                 |
-| `group`      | no       | Heading under which the thing appears in long option lists. Text: `group.<group>.name`.                                                                                    |
-| `tags`       | no       | Free labels for selecting things (`options`, `count()`).                                                                                                                   |
-| `requires`   | no       | [Expression](#8-expressions). The thing is offered as an option only while it is true.                                                                                     |
-| `stats`      | no       | Fixed facts shown on cards and in details: number, `true`/`false`, quantity `{amount, unit}` or `{text}` (a text key, for words like "instant"). Label: `stat.<key>.name`. |
-| `grants`     | no       | What having this thing gives, see below.                                                                                                                                   |
-| `about`      | no       | Another thing this one is about, for example skill with one tool → that tool. Used by choices with `held` ([9.3](#93-choices)).                                            |
-| `card`       | no       | Print a card for this thing. Needs a card layout for its kind in `sheet.json`.                                                                                             |
-| `repeatable` | no       | May be picked again in a later choice although the character has it; each pick asks the choices it grants anew (see below).                                                |
+| Field        | Required | Meaning                                                                                                                                                                                     |
+| ------------ | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`         | yes      | Thing key.                                                                                                                                                                                  |
+| `kind`       | yes      | One of `manifest.kinds`.                                                                                                                                                                    |
+| `source`     | yes      | Source key. `license` optional.                                                                                                                                                             |
+| `rank`       | no       | The thing's own tier (for example a spell level). Shown on cards. Not the character level.                                                                                                  |
+| `group`      | no       | Heading under which the thing appears in long option lists. Text: `group.<group>.name`.                                                                                                     |
+| `tags`       | no       | Free labels for selecting things (`options`, `count()`).                                                                                                                                    |
+| `requires`   | no       | [Expression](#8-expressions). The thing is offered as an option only while it is true.                                                                                                      |
+| `stats`      | no       | Facts shown on cards and in details: number, `true`/`false`, quantity `{amount, unit}`, `{text}` (a text key, for words like "instant") or `{value}` (see below). Label: `stat.<key>.name`. |
+| `grants`     | no       | What having this thing gives, see below.                                                                                                                                                    |
+| `about`      | no       | Another thing this one is about, for example skill with one tool → that tool. Used by choices with `held` ([9.3](#93-choices)).                                                             |
+| `card`       | no       | Print a card for this thing. Needs a card layout for its kind in `sheet.json`.                                                                                                              |
+| `repeatable` | no       | May be picked again in a later choice although the character has it; each pick asks the choices it grants anew (see below).                                                                 |
+
+**Stats that grow.** A stat is fixed per thing, except `{ "value": "<value>" }`:
+it shows the character's value with that key (with its unit, if it has
+one). Use it for a number that changes with the level or with other
+things, for example how often a feature may be used:
+
+```json
+{ "id": "trait.bloom-ward", "kind": "trait", "stats": { "uses": { "value": "bloomWardUses" } } }
+```
+
+with a value `{ "id": "bloomWardUses", "byLevel": [0, 0, ..., 2, 2, 3, 3] }`
+(or a formula, or `practice` itself for "as often as your practice").
+The use boxes on the sheet and the cards follow that value
+([13](#13-print-sheet-and-cards)).
 
 ### Grants
 
@@ -522,6 +536,32 @@ listed in `ids` (if given) and carry every tag in `tags` (if given). From
 these, the builder offers those whose `requires` is true and that the
 character does not already have from somewhere else.
 
+**Picking among what the character has** (`"owned": true` in `options`).
+Some choices pick from what the character already has, for example "two
+of your knacks become your favourites". With `owned`, the builder offers
+only the selected things the character has by the time the choice is
+asked (in step order; put the choice behind the steps that give those
+things, for example with a gather step). A pick does not give the thing a
+second time and gives nothing it grants; it only **marks** it: the
+evaluation lists the marked things with their choices, and an `answers`
+section on the sheet prints the picks ([13](#13-print-sheet-and-cards)).
+If the character no longer has a picked thing (an earlier answer
+changed), the pick no longer fits and the step needs a new answer.
+Everything else (`count`, `recommend`, `badges`, `requires`) works as for
+other pick choices. An `owned` choice cannot be gathered in a `list`
+gather step: that list leaves out what the character has.
+
+```json
+{
+  "id": "lantern-mastery",
+  "kind": "pickMany",
+  "source": "mistland",
+  "options": { "kind": "knack", "owned": true },
+  "count": 2,
+  "gather": "mastery"
+}
+```
+
 `recommend` is a list; the first entry whose `when` is true (or that has
 no `when`) is the recommendation. It drives the "recommended" badge and
 the "choose for me" button. A `pickOne` recommends exactly one thing. For a
@@ -590,7 +630,11 @@ and things like `{ "id": "handling.rope", "kind": "handling", "about": "item.rop
   `budget`. Scores must be consecutive and costs may not fall.
 - `array`: each number is assigned to exactly one target.
 - `raise`: adds points **on top of** the targets as they are before this
-  choice, instead of setting their base. `points` in all, at most
+  choice, instead of setting their base. "Before this choice" means at the
+  choice's level: grants, raises and things from a higher level do not
+  count yet, tables by level and `level` give the entry of the choice's
+  level. So a bonus at level 20 does not use up the cap of a raise at
+  level 4. The same holds for `cap` and the `when` of `recommend`. `points` in all, at most
   `maxPerTarget` on one target (default: `points`), and no target above
   `cap` (a number or an expression; the value's own `max` applies too).
   The answer names only the targets that get points:
@@ -900,7 +944,7 @@ kinds:
 | `checkList`    | all things selected; marked if the character has them; `note` stat small next to the name                                                 | `things` (like `options`), `note?`         |
 | `featureTable` | the selected things the character has: name, `short`, use boxes from the `uses` stat                                                      | `things`, `uses?`                          |
 | `list`         | the selected things the character has, plus blank lines                                                                                   | `things`, `blankLines`                     |
-| `answers`      | answers to text and number choices                                                                                                        | `choices[]`                                |
+| `answers`      | answers to text and number choices, and the picks of choices with `owned` options                                                         | `choices[]`                                |
 | `helpBox`      | the text `sheet.<id>.text`                                                                                                                | —                                          |
 | `notes`        | blank lines                                                                                                                               | `lines`                                    |
 
@@ -933,16 +977,18 @@ fit even then; keep labels to one word of about 15 letters.
 Names a stat key. The builder knows no stat names, so this field is the
 only way it learns which stat counts the uses. Per thing:
 
-| The thing's stat                  | Printed                        |
-| --------------------------------- | ------------------------------ |
-| whole number n > 0                | n empty boxes to tick (□ □)    |
-| `{ "text": "stat-value.always" }` | the text, for example "always" |
-| 0, or the thing has no such stat  | nothing                        |
+| The thing's stat                  | Printed                                    |
+| --------------------------------- | ------------------------------------------ |
+| whole number n > 0                | n empty boxes to tick (□ □)                |
+| `{ "value": "bloomWardUses" }`    | as many boxes as the character's value has |
+| `{ "text": "stat-value.always" }` | the text, for example "always"             |
+| 0, or the thing has no such stat  | nothing                                    |
 
 Every value of that stat on the selected things must be a whole number
-≥ 0 or a `{text}`; quantities and true/false are errors. At least one
-selected thing must have the stat. The count is fixed per thing for now;
-a count that depends on the level would later become an expression.
+≥ 0, a `{value}` or a `{text}`; quantities and true/false are errors. At
+least one selected thing must have the stat. A count that changes with
+the level is a `{value}` stat ([6](#6-things)); the builder rounds the
+value and prints at most 12 boxes.
 Explain the boxes in the section hint (`sheet.<id>.hint`, for example
 "□ = used once: tick it. Erase after a rest.").
 
@@ -988,6 +1034,7 @@ well-formed does the second stage check the rules between files:
   values, tags, glossary entries, units;
 - every expression parses and refers to existing values and things;
   formulas are not circular;
+- `{value}` stats name existing values;
 - option sources select at least one thing; recommendations are among the
   options; badges name options, at most one per thing, and their texts
   exist in every language; `about` names another existing thing; `held`
@@ -998,7 +1045,9 @@ well-formed does the second stage check the rules between files:
   a `count` table asks for no more than there are options;
 - each choice is asked exactly one way; `characterName` is a text choice;
   each gather group has at most one gather step; a `list` gather step
-  gathers only `pickOne` and `pickMany` choices;
+  gathers only `pickOne` and `pickMany` choices, and none with `owned`
+  options; `answers` sections show text and number choices and choices
+  with `owned` options;
 - sheet sections and card fields refer to existing values, choices and
   stats; section and box conditions (`when`) parse and refer to existing
   values and things; box labels (`label`) exist in every language; things with `card: true` have a layout; `uses` stats are whole
@@ -1042,17 +1091,18 @@ are removed (saved characters may lose picks). Keys are never renamed.
 
 ### Changelog
 
-| Version | Date       | Change                                                                                                                                                                                                                                                                                                                                                                | Migration                                                                                                                                                                                          |
-| ------- | ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 0.1     | 2026-10-04 | First version.                                                                                                                                                                                                                                                                                                                                                        | —                                                                                                                                                                                                  |
-| 0.2     | 2026-10-04 | Optional `uses` on `featureTable` sections and card layouts (use boxes), optional `note` on `checkList` sections.                                                                                                                                                                                                                                                     | Set `formatVersion` to `"0.2"`. Nothing else changes: both fields are optional, so every valid 0.1 package is a valid 0.2 package.                                                                 |
-| 0.3     | 2026-10-04 | Optional `when` (condition) on every sheet section and on each box of a `statBoxes` section: false means not printed.                                                                                                                                                                                                                                                 | Set `formatVersion` to `"0.3"`. Nothing else changes: the field is optional, so every valid 0.2 package is a valid 0.3 package.                                                                    |
-| 0.4     | 2026-10-04 | Optional `label` (text key) on each box of a `statBoxes` section, printed instead of the value name.                                                                                                                                                                                                                                                                  | Set `formatVersion` to `"0.4"`. Nothing else changes: the field is optional, so every valid 0.3 package is a valid 0.4 package.                                                                    |
-| 0.5     | 2026-10-04 | Optional `badges` on `pickOne` and `pickMany` choices: a package text shown on options instead of "recommended".                                                                                                                                                                                                                                                      | Set `formatVersion` to `"0.5"`. Nothing else changes: the field is optional, so every valid 0.4 package is a valid 0.5 package.                                                                    |
-| 0.6     | 2026-10-04 | Optional `textVariants` on every choice (other texts while a condition holds); `{{var:count}}` in the title, question and intro of a `pickMany` choice.                                                                                                                                                                                                               | Set `formatVersion` to `"0.6"`. Nothing else changes: the field is optional and the variable is new, so every valid 0.5 package is a valid 0.6 package.                                            |
-| 0.7     | 2026-10-04 | Optional `about` on things and `held` on `pickOne` and `pickMany` choices: recommend and name what the character has.                                                                                                                                                                                                                                                 | Set `formatVersion` to `"0.7"`. Nothing else changes: both fields are optional, so every valid 0.6 package is a valid 0.7 package.                                                                 |
-| 0.9     | 2026-10-05 | Levels up to 20: `distribute` method `raise` (points on top of values, `maxPerTarget`, `cap`); tables by level (`byLevel` on values, `{ "byLevel": [...] }` for a grant's `add` and a `pickMany` `count`); `repeatable` on things (choices asked again per pick as `<choice>@<where>`). A `pickMany` recommendation is cut to `count` and filled up from the options. | Set `formatVersion` to `"0.9"`. Nothing else changes: every field is optional, and a recommendation that already had `count` picks is the same, so every valid 0.8 package is a valid 0.9 package. |
-| 0.8     | 2026-10-04 | Gather steps (`gather`, optional `together`: `sections` or one shared `list`) in `flow.steps`, optional `gather` on choices, optional text `choice.<id>.from`.                                                                                                                                                                                                        | Set `formatVersion` to `"0.8"`. Nothing else changes: a package without gather steps builds the same steps as before, so every valid 0.7 package is a valid 0.8 package.                           |
+| Version | Date       | Change                                                                                                                                                                                                                                                                                                                                                                                      | Migration                                                                                                                                                                                                                                                                                                                                                                         |
+| ------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0.1     | 2026-10-04 | First version.                                                                                                                                                                                                                                                                                                                                                                              | —                                                                                                                                                                                                                                                                                                                                                                                 |
+| 0.2     | 2026-10-04 | Optional `uses` on `featureTable` sections and card layouts (use boxes), optional `note` on `checkList` sections.                                                                                                                                                                                                                                                                           | Set `formatVersion` to `"0.2"`. Nothing else changes: both fields are optional, so every valid 0.1 package is a valid 0.2 package.                                                                                                                                                                                                                                                |
+| 0.3     | 2026-10-04 | Optional `when` (condition) on every sheet section and on each box of a `statBoxes` section: false means not printed.                                                                                                                                                                                                                                                                       | Set `formatVersion` to `"0.3"`. Nothing else changes: the field is optional, so every valid 0.2 package is a valid 0.3 package.                                                                                                                                                                                                                                                   |
+| 0.4     | 2026-10-04 | Optional `label` (text key) on each box of a `statBoxes` section, printed instead of the value name.                                                                                                                                                                                                                                                                                        | Set `formatVersion` to `"0.4"`. Nothing else changes: the field is optional, so every valid 0.3 package is a valid 0.4 package.                                                                                                                                                                                                                                                   |
+| 0.5     | 2026-10-04 | Optional `badges` on `pickOne` and `pickMany` choices: a package text shown on options instead of "recommended".                                                                                                                                                                                                                                                                            | Set `formatVersion` to `"0.5"`. Nothing else changes: the field is optional, so every valid 0.4 package is a valid 0.5 package.                                                                                                                                                                                                                                                   |
+| 0.6     | 2026-10-04 | Optional `textVariants` on every choice (other texts while a condition holds); `{{var:count}}` in the title, question and intro of a `pickMany` choice.                                                                                                                                                                                                                                     | Set `formatVersion` to `"0.6"`. Nothing else changes: the field is optional and the variable is new, so every valid 0.5 package is a valid 0.6 package.                                                                                                                                                                                                                           |
+| 0.7     | 2026-10-04 | Optional `about` on things and `held` on `pickOne` and `pickMany` choices: recommend and name what the character has.                                                                                                                                                                                                                                                                       | Set `formatVersion` to `"0.7"`. Nothing else changes: both fields are optional, so every valid 0.6 package is a valid 0.7 package.                                                                                                                                                                                                                                                |
+| 0.9     | 2026-10-05 | Levels up to 20: `distribute` method `raise` (points on top of values, `maxPerTarget`, `cap`); tables by level (`byLevel` on values, `{ "byLevel": [...] }` for a grant's `add` and a `pickMany` `count`); `repeatable` on things (choices asked again per pick as `<choice>@<where>`). A `pickMany` recommendation is cut to `count` and filled up from the options.                       | Set `formatVersion` to `"0.9"`. Nothing else changes: every field is optional, and a recommendation that already had `count` picks is the same, so every valid 0.8 package is a valid 0.9 package.                                                                                                                                                                                |
+| 0.10    | 2026-10-05 | Stats `{ "value": "<value>" }`: show the character's value, and give use boxes that grow with the level. `"owned": true` in a pick choice's `options`: pick among what the character has; a pick marks the thing instead of giving it, `answers` sections print the picks. A `raise` sees the values, `cap` and `recommend` conditions at the choice's level, not at the character's level. | Set `formatVersion` to `"0.10"`. The new fields are optional. A `raise` on a level below the character's no longer counts what later levels give: a package that worked around this (for example a second value for the printed score) can drop the workaround. Saved raises stay valid; a raise that left points over because a later bonus filled the cap may now ask for them. |
+| 0.8     | 2026-10-04 | Gather steps (`gather`, optional `together`: `sections` or one shared `list`) in `flow.steps`, optional `gather` on choices, optional text `choice.<id>.from`.                                                                                                                                                                                                                              | Set `formatVersion` to `"0.8"`. Nothing else changes: a package without gather steps builds the same steps as before, so every valid 0.7 package is a valid 0.8 package.                                                                                                                                                                                                          |
 
 ## 16. A minimal package
 
@@ -1063,7 +1113,7 @@ language. The validator accepts it as is.
 
 ```json
 {
-  "formatVersion": "0.9",
+  "formatVersion": "0.10",
   "id": "tiny",
   "version": "1.0.0",
   "languages": ["en"],
@@ -1160,7 +1210,7 @@ language. The validator accepts it as is.
 
 ## 17. Reserved for later versions
 
-Not part of 0.9; listed so nobody builds on a different idea:
+Not part of 0.10; listed so nobody builds on a different idea:
 
 - **Packages that extend other packages** (an expansion adding things to a
   base package). Planned: `manifest.dependsOn` and keys of the form

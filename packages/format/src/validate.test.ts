@@ -95,7 +95,7 @@ describe("structure errors", () => {
       /flow\.json choices\[0\]\.kind: Invalid discriminator value\. Expected 'pickOne' \| 'pickMany'/,
     );
     expect(messages(r)).toContain(
-      'things/knacks.json [8].stats.reach: must be a number, true/false, {"amount": n, "unit": "u"} or {"text": "text.key"}',
+      'things/knacks.json [8].stats.reach: must be a number, true/false, {"amount": n, "unit": "u"}, {"text": "text.key"} or {"value": "valueKey"}',
     );
     expect(messages(r)).toContain('manifest.json : Unrecognized key: "extra"');
   });
@@ -127,7 +127,7 @@ describe("cross-file rules", () => {
     [
       "format version",
       (f) => (f.get("manifest.json").formatVersion = "0.3"),
-      "manifest.json formatVersion: package is written for format 0.3, this builder understands 0.9",
+      "manifest.json formatVersion: package is written for format 0.3, this builder understands 0.10",
     ],
     [
       "duplicate thing",
@@ -228,7 +228,7 @@ describe("cross-file rules", () => {
     [
       "choice both fixed and granted",
       (f) => f.get("flow.json").steps.push({ id: "gear", choices: ["gear"] }),
-      'flow.json steps[13].choices[0]: choice "gear" is granted by "calling.herbalist" and cannot also be a fixed step',
+      'flow.json steps[14].choices[0]: choice "gear" is granted by "calling.herbalist" and cannot also be a fixed step',
     ],
     [
       "card without layout",
@@ -253,12 +253,12 @@ describe("cross-file rules", () => {
     [
       "use boxes from a quantity",
       (f) => (thing(f, "talents-and-traits", "trait.stone-steady").stats.uses = { amount: 5, unit: "ft" }),
-      'things/talents-and-traits.json [9].stats.uses: sections[5].uses draws use boxes from this stat; it must be a whole number ≥ 0 or {"text": …}',
+      'things/talents-and-traits.json [9].stats.uses: sections[5].uses draws use boxes from this stat; it must be a whole number ≥ 0, {"text": …} or {"value": …}',
     ],
     [
       "use boxes from a fraction",
       (f) => (thing(f, "knacks", "knack.spark-shower").stats.uses = 1.5),
-      'things/knacks.json [0].stats.uses: sections[6].uses draws use boxes from this stat; it must be a whole number ≥ 0 or {"text": …}',
+      'things/knacks.json [0].stats.uses: sections[6].uses draws use boxes from this stat; it must be a whole number ≥ 0, {"text": …} or {"value": …}',
     ],
     [
       "check list note from true/false",
@@ -447,7 +447,7 @@ describe("gather", () => {
         gatherKnacks(f);
         f.get("flow.json").steps.push({ id: "knacks-again", gather: "knacks" });
       },
-      'flow.json steps[13].gather: group "knacks" is already gathered in step "knacks"',
+      'flow.json steps[14].gather: group "knacks" is already gathered in step "knacks"',
     ],
     [
       "a list step with a choice that is not picked from a list",
@@ -480,7 +480,7 @@ describe("gather", () => {
     [
       "a gather step without choices",
       (f) => f.get("flow.json").steps.push({ id: "spare", gather: "spare" }),
-      'flow.json steps[13].gather: no choice is gathered in group "spare"; the step is never shown',
+      'flow.json steps[14].gather: no choice is gathered in group "spare"; the step is never shown',
     ],
   ])("warns about %s", (_name, change, expected) => {
     expect(messages(mutate(change), "warnings")).toContain(expected);
@@ -624,5 +624,55 @@ describe("levels 1 to 20 (format 0.9)", () => {
     const r = mutate(change);
     expect(messages(r)).toEqual([]);
     expect(messages(r, "warnings")).toContain(expected());
+  });
+});
+
+describe("uses by value and picks among what the character has (format 0.10)", () => {
+  /* eslint-disable @typescript-eslint/no-explicit-any -- tests poke into raw JSON */
+  const choiceIndex = (id: string) =>
+    (demo as RawFiles).get("flow.json").choices.findIndex((c: any) => c.id === id);
+  const choice = (f: RawFiles, id: string) => f.get("flow.json").choices[choiceIndex(id)];
+  const thingIndex = (file: string, id: string) =>
+    (demo as RawFiles).get(`things/${file}.json`).findIndex((t: any) => t.id === id);
+  const sectionIndex = (id: string) =>
+    (demo as RawFiles).get("sheet.json").sections.findIndex((s: any) => s.id === id);
+  /* eslint-enable @typescript-eslint/no-explicit-any */
+
+  it("accepts a stat that names a value, as use boxes and on a card", () => {
+    const r = mutate((f) => (thing(f, "knacks", "knack.spark-shower").stats.uses = { value: "practice" }));
+    expect(messages(r)).toEqual([]);
+  });
+
+  it("lets an answers section print the picks of an owned choice", () => {
+    expect(messages(mutate(() => {}))).toEqual([]);
+    const r = mutate((f) => delete choice(f, "lantern-mastery").options.owned);
+    expect(messages(r)).toContain(
+      `sheet.json sections[${sectionIndex("mastery")}].choices[0]: choice "lantern-mastery" is pickMany; answers shows text and number choices and picks with options.owned`,
+    );
+  });
+
+  it.each<[string, (f: RawFiles) => void, () => string]>([
+    [
+      "a stat that names an unknown value",
+      (f) => (thing(f, "boons-and-high-levels", "trait.bloom-ward").stats.uses = { value: "bloomUses" }),
+      () =>
+        `things/boons-and-high-levels.json [${thingIndex("boons-and-high-levels", "trait.bloom-ward")}].stats.uses.value: unknown value "bloomUses"`,
+    ],
+    [
+      "an owned choice in a shared list",
+      (f) => (choice(f, "lantern-mastery").gather = "talents"),
+      () =>
+        `flow.json choices[${choiceIndex("lantern-mastery")}].gather: step "talents" shows one list without what the character has; choice "lantern-mastery" offers only that (options.owned)`,
+    ],
+    [
+      "owned that is not true/false",
+      (f) => (choice(f, "lantern-mastery").options.owned = "yes"),
+      () =>
+        `flow.json choices[${choiceIndex("lantern-mastery")}].options.owned: Invalid input: expected boolean, received string`,
+    ],
+  ])("rejects %s", (_name, change, expected) => {
+    const r = mutate(change);
+    expect(r.ok).toBe(false);
+    expect(messages(r)).toContain(expected());
   });
 });

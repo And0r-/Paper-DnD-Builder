@@ -399,6 +399,8 @@ export function validatePackageFiles(files: PackageFiles): ValidationResult {
       statKeys.add(k);
       if (typeof s === "object" && "amount" in s) checkAmount(file, `${p}.stats.${k}`, s.amount, s.unit);
       if (typeof s === "object" && "text" in s) statTextKeys.add(s.text);
+      if (typeof s === "object" && "value" in s && !isValueRef(s.value))
+        err(file, `${p}.stats.${k}.value`, `unknown value ${lit(s.value)}`);
     }
     t.grants?.forEach((g, j) => {
       const gp = `${p}.grants[${j}]`;
@@ -619,6 +621,12 @@ export function validatePackageFiles(files: PackageFiles): ValidationResult {
         `choices[${i}].gather`,
         `step ${lit(at.id)} shows one list of options; choice ${lit(c.id)} is ${c.kind}`,
       );
+    } else if (at.together === "list" && "options" in c && c.options.owned) {
+      err(
+        F,
+        `choices[${i}].gather`,
+        `step ${lit(at.id)} shows one list without what the character has; choice ${lit(c.id)} offers only that (options.owned)`,
+      );
     }
   });
   flow.steps.forEach((s, i) => {
@@ -668,7 +676,8 @@ export function validatePackageFiles(files: PackageFiles): ValidationResult {
       const v = t.stats![key]!;
       const ok =
         role === "uses"
-          ? (typeof v === "number" && Number.isInteger(v) && v >= 0) || (typeof v === "object" && "text" in v)
+          ? (typeof v === "number" && Number.isInteger(v) && v >= 0) ||
+            (typeof v === "object" && ("text" in v || "value" in v))
           : typeof v !== "boolean";
       if (ok) continue;
       const at = thingPlace.get(t.id)!;
@@ -676,7 +685,7 @@ export function validatePackageFiles(files: PackageFiles): ValidationResult {
         at.file,
         `[${at.index}].stats.${key}`,
         role === "uses"
-          ? `${path} draws use boxes from this stat; it must be a whole number ≥ 0 or {"text": …}`
+          ? `${path} draws use boxes from this stat; it must be a whole number ≥ 0, {"text": …} or {"value": …}`
           : `${path} prints this stat next to the name; it cannot be true/false`,
       );
     }
@@ -716,11 +725,12 @@ export function validatePackageFiles(files: PackageFiles): ValidationResult {
         s.choices.forEach((cid, j) => {
           const c = choiceById.get(cid);
           if (!c) err(S, `${p}.choices[${j}]`, `unknown choice ${lit(cid)}`);
-          else if (c.kind !== "text" && c.kind !== "number") {
+          // Picks among what the character has (options.owned) are printed nowhere else.
+          else if (c.kind !== "text" && c.kind !== "number" && !("options" in c && c.options.owned)) {
             err(
               S,
               `${p}.choices[${j}]`,
-              `choice ${lit(cid)} is ${c.kind}; answers shows text and number choices`,
+              `choice ${lit(cid)} is ${c.kind}; answers shows text and number choices and picks with options.owned`,
             );
           }
         });

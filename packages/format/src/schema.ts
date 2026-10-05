@@ -167,8 +167,18 @@ export const grantSchema = z
   });
 
 export const statValueSchema = z.union(
-  [z.number(), z.boolean(), quantitySchema, z.strictObject({ text: textKey })],
-  { error: 'must be a number, true/false, {"amount": n, "unit": "u"} or {"text": "text.key"}' },
+  [
+    z.number(),
+    z.boolean(),
+    quantitySchema,
+    z.strictObject({ text: textKey }),
+    /** The character's value with this key, e.g. uses that grow with the level. */
+    z.strictObject({ value: z.string().min(1) }),
+  ],
+  {
+    error:
+      'must be a number, true/false, {"amount": n, "unit": "u"}, {"text": "text.key"} or {"value": "valueKey"}',
+  },
 );
 
 export const thingSchema = z.strictObject({
@@ -201,16 +211,27 @@ export const thingsFileSchema = z.array(thingSchema);
 
 // ---------------------------------------------------------------------- flow
 
-export const optionSourceSchema = z
-  .strictObject({
-    kind: id.optional(),
-    /** Every listed tag must be present on the thing. */
-    tags: z.array(id).optional(),
-    ids: z.array(id).optional(),
-  })
-  .refine((o) => o.kind !== undefined || o.ids !== undefined || o.tags !== undefined, {
-    message: 'select options with "kind", "tags" or "ids"',
-  });
+const optionSourceShape = {
+  kind: id.optional(),
+  /** Every listed tag must be present on the thing. */
+  tags: z.array(id).optional(),
+  ids: z.array(id).optional(),
+};
+const selectsSomething = [
+  (o: { kind?: string | undefined; tags?: string[] | undefined; ids?: string[] | undefined }) =>
+    o.kind !== undefined || o.ids !== undefined || o.tags !== undefined,
+  { message: 'select options with "kind", "tags" or "ids"' },
+] as const;
+
+export const optionSourceSchema = z.strictObject(optionSourceShape).refine(...selectsSomething);
+
+/**
+ * Options of a pick choice. With `owned`, only things the character already
+ * has are offered, and a pick marks the thing instead of giving it again.
+ */
+export const choiceOptionsSchema = z
+  .strictObject({ ...optionSourceShape, owned: z.boolean().optional() })
+  .refine(...selectsSomething);
 
 const choiceBase = {
   id,
@@ -274,7 +295,7 @@ export const choiceSchema = z.discriminatedUnion("kind", [
   z.strictObject({
     ...choiceBase,
     kind: z.literal("pickOne"),
-    options: optionSourceSchema,
+    options: choiceOptionsSchema,
     recommend: z.array(pickRecommendation).optional(),
     /** Shown on an option instead of the "recommended" badge. At most one per thing. */
     badges: z.array(badge).optional(),
@@ -283,7 +304,7 @@ export const choiceSchema = z.discriminatedUnion("kind", [
   z.strictObject({
     ...choiceBase,
     kind: z.literal("pickMany"),
-    options: optionSourceSchema,
+    options: choiceOptionsSchema,
     /** How many to pick: a number, an expression or a table by level. */
     count: z.union([
       z.number().int().positive(),
@@ -485,6 +506,7 @@ export type Amount = z.infer<typeof amountSchema>;
 export type StatValue = z.infer<typeof statValueSchema>;
 export type Thing = z.infer<typeof thingSchema>;
 export type OptionSource = z.infer<typeof optionSourceSchema>;
+export type ChoiceOptions = z.infer<typeof choiceOptionsSchema>;
 export type Choice = z.infer<typeof choiceSchema>;
 export type Flow = z.infer<typeof flowSchema>;
 export type Step = Flow["steps"][number];

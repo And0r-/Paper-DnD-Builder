@@ -1,19 +1,90 @@
 [
-  { "id": "might", "source": "mistland", "default": 6, "min": 6, "max": 15 },
-  { "id": "grace", "source": "mistland", "default": 6, "min": 6, "max": 15 },
-  { "id": "wit", "source": "mistland", "default": 6, "min": 6, "max": 15 },
-  { "id": "heart", "source": "mistland", "default": 6, "min": 6, "max": 15 },
-  { "id": "mightBonus", "source": "mistland", "formula": "floor(might / 3) - 2" },
-  { "id": "graceBonus", "source": "mistland", "formula": "floor(grace / 3) - 2" },
-  { "id": "witBonus", "source": "mistland", "formula": "floor(wit / 3) - 2" },
-  { "id": "heartBonus", "source": "mistland", "formula": "floor(heart / 3) - 2" },
-  { "id": "stamina", "source": "mistland", "formula": "mightBonus * level", "min": 1 },
-  { "id": "guard", "source": "mistland", "formula": "6 + graceBonus" },
-  { "id": "pace", "source": "mistland", "unit": "ft", "default": 0 },
-  { "id": "luck", "source": "mistland", "formula": "min(3, 1 + max(0, heartBonus))" },
-  { "id": "nerve", "source": "mistland", "formula": "1 + floor(level / 2) + max(witBonus, heartBonus)" },
-  { "id": "carry", "source": "mistland", "unit": "lb", "formula": "might * 5" },
-  { "id": "practice", "source": "mistland", "formula": "floor((level - 1) / 4) + 2" },
+  {
+    "id": "might",
+    "source": "mistland",
+    "default": 6,
+    "min": 6,
+    "max": 15
+  },
+  {
+    "id": "grace",
+    "source": "mistland",
+    "default": 6,
+    "min": 6,
+    "max": 17
+  },
+  {
+    "id": "wit",
+    "source": "mistland",
+    "default": 6,
+    "min": 6,
+    "max": 15
+  },
+  {
+    "id": "heart",
+    "source": "mistland",
+    "default": 6,
+    "min": 6,
+    "max": 15
+  },
+  {
+    "id": "mightBonus",
+    "source": "mistland",
+    "formula": "floor(might / 3) - 2"
+  },
+  {
+    "id": "graceBonus",
+    "source": "mistland",
+    "formula": "floor(grace / 3) - 2"
+  },
+  {
+    "id": "witBonus",
+    "source": "mistland",
+    "formula": "floor(wit / 3) - 2"
+  },
+  {
+    "id": "heartBonus",
+    "source": "mistland",
+    "formula": "floor(heart / 3) - 2"
+  },
+  {
+    "id": "stamina",
+    "source": "mistland",
+    "formula": "mightBonus * level",
+    "min": 1
+  },
+  {
+    "id": "guard",
+    "source": "mistland",
+    "formula": "6 + graceBonus"
+  },
+  {
+    "id": "pace",
+    "source": "mistland",
+    "unit": "ft",
+    "default": 0
+  },
+  {
+    "id": "luck",
+    "source": "mistland",
+    "formula": "min(3, 1 + max(0, heartBonus))"
+  },
+  {
+    "id": "nerve",
+    "source": "mistland",
+    "formula": "1 + floor(level / 2) + max(witBonus, heartBonus)"
+  },
+  {
+    "id": "carry",
+    "source": "mistland",
+    "unit": "lb",
+    "formula": "might * 5"
+  },
+  {
+    "id": "practice",
+    "source": "mistland",
+    "formula": "floor((level - 1) / 4) + 2"
+  },
   {
     "id": "sneakRoll",
     "source": "mistland",
@@ -24,14 +95,59 @@
     "source": "mistland",
     "byLevel": [1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 5, 5, 5, 5]
   },
-  { "id": "lanternSlots1", "source": "mistland", "default": 0 },
-  { "id": "lanternSlots2", "source": "mistland", "default": 0 },
-  { "id": "lanternSlots3", "source": "mistland", "default": 0 },
-  { "id": "lanternSlots4", "source": "mistland", "default": 0 },
-  { "id": "lanternSlots5", "source": "mistland", "default": 0 },
-  { "id": "lanternSlots6", "source": "mistland", "default": 0 },
-  { "id": "lanternSlots7", "source": "mistland", "default": 0 },
-  { "id": "lanternSlots8", "source": "mistland", "default": 0 },
-  { "id": "lanternSlots9", "source": "mistland", "default": 0 },
-  { "id": "age", "source": "mistland", "default": 20 }
+  {
+    "id": "bloomWardUses",
+    "source": "mistland",
+    "byLevel": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3]
+  },
+  {
+    "id": "lanternSlots1",
+    "source": "mistland",
+    "default": 0
+  },
+  {
+    "id": "lanternSlots2",
+    "source": "mistland",
+    "default": 0
+  },
+  {
+    "id": "lanternSlots3",
+    "source": "mistland",
+    "default": 0
+  },
+  {
+    "id": "lanternSlots4",
+    "source": "mistland",
+    "default": 0
+  },
+  {
+    "id": "lanternSlots5",
+    "source": "mistland",
+    "default": 0
+  },
+  {
+    "id": "lanternSlots6",
+    "source": "mistland",
+    "default": 0
+  },
+  {
+    "id": "lanternSlots7",
+    "source": "mistland",
+    "default": 0
+  },
+  {
+    "id": "lanternSlots8",
+    "source": "mistland",
+    "default": 0
+  },
+  {
+    "id": "lanternSlots9",
+    "source": "mistland",
+    "default": 0
+  },
+  {
+    "id": "age",
+    "source": "mistland",
+    "default": 20
+  }
 ]

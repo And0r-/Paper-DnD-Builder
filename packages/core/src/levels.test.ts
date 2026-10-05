@@ -125,6 +125,7 @@ describe("a level-20 lantern bearer, worked out by hand", () => {
       practice: 6, // floor(19 / 4) + 2
       sneakRoll: 0, // grace bonus 0, sneaking not trained
       knackRank: 5,
+      bloomWardUses: 3, // a herbalist's table; the value is there for everyone
       lanternSlots1: 3,
       lanternSlots2: 2,
       lanternSlots3: 2,
@@ -180,6 +181,7 @@ describe("a level-20 lantern bearer, worked out by hand", () => {
       "boon-raise@boon-16",
       "boon-19",
       "boon-raise@boon-19",
+      "lantern-mastery",
     ]);
     expect(ev.choices["boon-raise@boon-12"]!.atLevel).toBe(12);
     expect(ev.things.find((t) => t.id === "trait.undying-flame")?.atLevel).toBe(17);
@@ -192,8 +194,8 @@ describe("a level-20 lantern bearer, worked out by hand", () => {
     expect(ev.choices["boon-raise@boon-8"]).toMatchObject({ copyOf: "boon-raise", kind: "distribute" });
     expect(ev.choices["boon-raise"]).toBeUndefined();
     expect(ev.raises["heart"]).toEqual([
-      { amount: 2, choice: "boon-raise@boon-4" },
-      { amount: 2, choice: "boon-raise@boon-8" },
+      { amount: 2, choice: "boon-raise@boon-4", atLevel: 4 },
+      { amount: 2, choice: "boon-raise@boon-8", atLevel: 8 },
     ]);
   });
 
@@ -349,5 +351,101 @@ describe("tables by level", () => {
       amount: 6,
       source: { kind: "values", values: ["practice"] },
     });
+  });
+});
+
+describe("a raise sees the character at its own level", () => {
+  // The river runner gets grace +2 from the tide crown at level 20 only.
+  let doc: DraftDocument;
+  let ev: Evaluation;
+  beforeAll(() => {
+    doc = chooseForMe(20, "calling.river-runner");
+    ev = evaluateDraft(pkg, doc);
+  });
+
+  it("does not count a bonus of a higher level against the cap of an earlier raise", () => {
+    expect(ev.things.find((t) => t.id === "trait.tide-crown")?.atLevel).toBe(20);
+    const at19 = evaluateDraft(pkg, apply(doc, { type: "setLevel", level: 19 }));
+    // Every raise looks the same at level 19 and 20: the crown is not there yet when they are made.
+    for (const id of ["boon-raise@boon-4", "boon-raise@boon-8", "boon-raise@boon-19"]) {
+      expect(ev.choices[id]!.raise).toEqual(at19.choices[id]!.raise);
+      expect(ev.choices[id]!.recommended).toEqual(at19.choices[id]!.recommended);
+    }
+    expect(ev.values["grace"]).toBe(at19.values["grace"]! + 2);
+  });
+
+  it("takes grace up to the cap before the crown, and the crown goes above it", () => {
+    // Grace 13 before boon 4 would leave room for 2 at cap 15. With the crown
+    // counted at level 4 (grace 15) there would be no room at all.
+    const raised = apply(doc, {
+      type: "answer",
+      choice: "boon-raise@boon-4",
+      answer: { method: 0, assign: { grace: 2 } },
+    });
+    const ev2 = evaluateDraft(pkg, raised);
+    const before = ev2.choices["boon-raise@boon-4"]!.raise!.before["grace"]!;
+    expect(ev2.choices["boon-raise@boon-4"]!.raise!.most["grace"]).toBe(Math.min(2, 15 - before));
+    expect(ev2.raises["grace"]?.[0]).toMatchObject({ choice: "boon-raise@boon-4", atLevel: 4 });
+    // Value max 17: the crown's 2 come on top of whatever the boons gave.
+    const fromBoons = (ev2.raises["grace"] ?? []).reduce((n, r) => n + r.amount, 0);
+    expect(ev2.values["grace"]).toBe(Math.min(17, before + fromBoons + 2));
+  });
+});
+
+describe("picking among what the character has", () => {
+  let doc: DraftDocument;
+  let ev: Evaluation;
+  beforeAll(() => {
+    doc = chooseForMe(18, "calling.lantern-bearer");
+    ev = evaluateDraft(pkg, doc);
+  });
+  const knacksHeld = () => ev.things.filter((h) => h.kind === "knack").map((h) => h.id);
+
+  it("offers exactly the knacks the character has, from level 18 on", () => {
+    const state = ev.choices["lantern-mastery"]!;
+    expect(state.atLevel).toBe(18);
+    expect([...state.options!].sort()).toEqual(knacksHeld().sort());
+    expect(state.options).toContain("knack.lantern-call"); // from the path, not picked
+    // It depends on the step that gave the knacks.
+    expect(ev.steps.find((s) => s.id === "lantern-mastery")!.dependsOn).toContain("knacks");
+    expect(evaluateDraft(pkg, apply(doc, { type: "setLevel", level: 17 })).choices["lantern-mastery"]).toBe(
+      undefined,
+    );
+  });
+
+  it("marks the picks without giving anything a second time", () => {
+    const picks = ev.choices["lantern-mastery"]!.answer as { picks: string[] };
+    expect(ev.choices["lantern-mastery"]!.status).toBe("answered");
+    expect(Object.keys(ev.marks).sort()).toEqual([...picks.picks].sort());
+    for (const p of picks.picks) {
+      expect(ev.marks[p]).toEqual(["lantern-mastery"]);
+      const held = ev.things.filter((h) => h.id === p);
+      expect(held).toHaveLength(1);
+      expect(held[0]!.pickedIn).not.toBe("lantern-mastery");
+    }
+  });
+
+  it("refuses a thing the character does not have, and asks again when a picked one is gone", () => {
+    const notHeld = pkg.things.find((t) => t.kind === "knack" && !ev.things.some((h) => h.id === t.id))!.id;
+    const r = applyChange(pkg, doc, {
+      type: "answer",
+      choice: "lantern-mastery",
+      answer: { picks: [notHeld, ev.choices["lantern-mastery"]!.options![0]!] },
+    });
+    expect(r.ok ? "ok" : r.error).toEqual({ code: "answerDoesNotFit", problem: "notOffered" });
+
+    // Swap a picked knack for one the character did not have: the mark no longer fits.
+    const picked = (ev.choices["lantern-mastery"]!.answer as { picks: string[] }).picks[0]!;
+    const knacks = (ev.choices["knacks-lantern"]!.answer as { picks: string[] }).picks;
+    const other = ev.choices["knacks-lantern"]!.options!.find((o) => !knacks.includes(o))!;
+    expect(knacks).toContain(picked);
+    const swapped = {
+      ...doc,
+      answers: { ...doc.answers, "knacks-lantern": { picks: knacks.map((k) => (k === picked ? other : k)) } },
+    };
+    const ev2 = evaluateDraft(pkg, swapped);
+    expect(ev2.choices["lantern-mastery"]).toMatchObject({ status: "invalid", problem: "notOffered" });
+    expect(ev2.marks[picked]).toBeUndefined();
+    expect(ev2.open).toContain("lantern-mastery");
   });
 });

@@ -4,61 +4,141 @@
     "kind": "calling",
     "source": "mistland",
     "grants": [
-      { "value": "stamina", "add": 8 },
-      { "value": "stamina", "add": 5, "atLevel": 2 },
-      { "value": "stamina", "add": 5, "atLevel": 3 },
-      { "thing": "item.lantern-staff" },
-      { "thing": "item.provisions" },
-      { "choice": "talents-lantern-bearer" },
-      { "choice": "gear" },
-      { "choice": "knacks-lantern" },
-      { "thing": "trait.steady-flame", "atLevel": 2 },
-      { "choice": "extra-talent", "atLevel": 2 },
-      { "choice": "path", "atLevel": 3 },
-      { "value": "stamina", "add": "5 * (level - 3)", "atLevel": 4 },
-      { "thing": "trait.bright-beacon", "atLevel": 5 },
-      { "choice": "lantern-vow", "atLevel": 11 },
-      { "thing": "trait.undying-flame", "atLevel": 17 },
-      { "choice": "boon-4", "atLevel": 4 },
-      { "choice": "boon-8", "atLevel": 8 },
-      { "choice": "boon-12", "atLevel": 12 },
-      { "choice": "boon-16", "atLevel": 16 },
-      { "choice": "boon-19", "atLevel": 19 },
+      {
+        "value": "stamina",
+        "add": 8
+      },
+      {
+        "value": "stamina",
+        "add": 5,
+        "atLevel": 2
+      },
+      {
+        "value": "stamina",
+        "add": 5,
+        "atLevel": 3
+      },
+      {
+        "thing": "item.lantern-staff"
+      },
+      {
+        "thing": "item.provisions"
+      },
+      {
+        "choice": "talents-lantern-bearer"
+      },
+      {
+        "choice": "gear"
+      },
+      {
+        "choice": "knacks-lantern"
+      },
+      {
+        "thing": "trait.steady-flame",
+        "atLevel": 2
+      },
+      {
+        "choice": "extra-talent",
+        "atLevel": 2
+      },
+      {
+        "choice": "path",
+        "atLevel": 3
+      },
+      {
+        "value": "stamina",
+        "add": "5 * (level - 3)",
+        "atLevel": 4
+      },
+      {
+        "thing": "trait.bright-beacon",
+        "atLevel": 5
+      },
+      {
+        "choice": "lantern-vow",
+        "atLevel": 11
+      },
+      {
+        "thing": "trait.undying-flame",
+        "atLevel": 17
+      },
+      {
+        "choice": "boon-4",
+        "atLevel": 4
+      },
+      {
+        "choice": "boon-8",
+        "atLevel": 8
+      },
+      {
+        "choice": "boon-12",
+        "atLevel": 12
+      },
+      {
+        "choice": "boon-16",
+        "atLevel": 16
+      },
+      {
+        "choice": "boon-19",
+        "atLevel": 19
+      },
+      {
+        "choice": "lantern-mastery",
+        "atLevel": 18
+      },
       {
         "value": "lanternSlots1",
-        "add": { "byLevel": [1, 2, 2, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3] }
+        "add": {
+          "byLevel": [1, 2, 2, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3]
+        }
       },
       {
         "value": "lanternSlots2",
-        "add": { "byLevel": [0, 0, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2] }
+        "add": {
+          "byLevel": [0, 0, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2]
+        }
       },
       {
         "value": "lanternSlots3",
-        "add": { "byLevel": [0, 0, 0, 0, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2] }
+        "add": {
+          "byLevel": [0, 0, 0, 0, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2]
+        }
       },
       {
         "value": "lanternSlots4",
-        "add": { "byLevel": [0, 0, 0, 0, 0, 0, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2] }
+        "add": {
+          "byLevel": [0, 0, 0, 0, 0, 0, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2]
+        }
       },
       {
         "value": "lanternSlots5",
-        "add": { "byLevel": [0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2] }
+        "add": {
+          "byLevel": [0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2]
+        }
       },
       {
         "value": "lanternSlots6",
-        "add": { "byLevel": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2] }
+        "add": {
+          "byLevel": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2]
+        }
       },
       {
         "value": "lanternSlots7",
-        "add": { "byLevel": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1] }
+        "add": {
+          "byLevel": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1]
+        }
       },
       {
         "value": "lanternSlots8",
-        "add": { "byLevel": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1] }
+        "add": {
+          "byLevel": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1]
+        }
       },
       {
         "value": "lanternSlots9",
-        "add": { "byLevel": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 2] }
+        "add": {
+          "byLevel": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 2]
+        }
       }
     ]
   },
@@ -67,26 +147,88 @@
     "kind": "calling",
     "source": "mistland",
     "grants": [
-      { "value": "stamina", "add": 10 },
-      { "value": "stamina", "add": 6, "atLevel": 2 },
-      { "value": "stamina", "add": 6, "atLevel": 3 },
-      { "thing": "item.boat-hook" },
-      { "thing": "item.provisions" },
-      { "choice": "talents-river-runner" },
-      { "choice": "gear" },
-      { "choice": "knacks-current" },
-      { "thing": "trait.quick-feet", "atLevel": 2 },
-      { "choice": "extra-talent", "atLevel": 2 },
-      { "choice": "path", "atLevel": 3 },
-      { "value": "stamina", "add": "6 * (level - 3)", "atLevel": 4 },
-      { "thing": "trait.current-sense", "atLevel": 5 },
-      { "thing": "trait.flood-stride", "atLevel": 11 },
-      { "thing": "trait.river-heart", "atLevel": 17 },
-      { "choice": "boon-4", "atLevel": 4 },
-      { "choice": "boon-8", "atLevel": 8 },
-      { "choice": "boon-12", "atLevel": 12 },
-      { "choice": "boon-16", "atLevel": 16 },
-      { "choice": "boon-19", "atLevel": 19 }
+      {
+        "value": "stamina",
+        "add": 10
+      },
+      {
+        "value": "stamina",
+        "add": 6,
+        "atLevel": 2
+      },
+      {
+        "value": "stamina",
+        "add": 6,
+        "atLevel": 3
+      },
+      {
+        "thing": "item.boat-hook"
+      },
+      {
+        "thing": "item.provisions"
+      },
+      {
+        "choice": "talents-river-runner"
+      },
+      {
+        "choice": "gear"
+      },
+      {
+        "choice": "knacks-current"
+      },
+      {
+        "thing": "trait.quick-feet",
+        "atLevel": 2
+      },
+      {
+        "choice": "extra-talent",
+        "atLevel": 2
+      },
+      {
+        "choice": "path",
+        "atLevel": 3
+      },
+      {
+        "value": "stamina",
+        "add": "6 * (level - 3)",
+        "atLevel": 4
+      },
+      {
+        "thing": "trait.current-sense",
+        "atLevel": 5
+      },
+      {
+        "thing": "trait.flood-stride",
+        "atLevel": 11
+      },
+      {
+        "thing": "trait.river-heart",
+        "atLevel": 17
+      },
+      {
+        "thing": "trait.tide-crown",
+        "atLevel": 20
+      },
+      {
+        "choice": "boon-4",
+        "atLevel": 4
+      },
+      {
+        "choice": "boon-8",
+        "atLevel": 8
+      },
+      {
+        "choice": "boon-12",
+        "atLevel": 12
+      },
+      {
+        "choice": "boon-16",
+        "atLevel": 16
+      },
+      {
+        "choice": "boon-19",
+        "atLevel": 19
+      }
     ]
   },
   {
@@ -94,27 +236,88 @@
     "kind": "calling",
     "source": "mistland",
     "grants": [
-      { "value": "stamina", "add": 7 },
-      { "value": "stamina", "add": 4, "atLevel": 2 },
-      { "value": "stamina", "add": 4, "atLevel": 3 },
-      { "thing": "item.herb-satchel" },
-      { "thing": "item.provisions" },
-      { "choice": "talents-herbalist" },
-      { "choice": "gear" },
-      { "choice": "knacks-root" },
-      { "thing": "trait.green-thumb", "atLevel": 2 },
-      { "choice": "borrowed-knack", "atLevel": 2 },
-      { "choice": "extra-talent", "atLevel": 2 },
-      { "choice": "path", "atLevel": 3 },
-      { "value": "stamina", "add": "4 * (level - 3)", "atLevel": 4 },
-      { "thing": "trait.deep-roots", "atLevel": 5 },
-      { "thing": "trait.bloom-ward", "atLevel": 11 },
-      { "thing": "trait.old-growth", "atLevel": 17 },
-      { "choice": "boon-4", "atLevel": 4 },
-      { "choice": "boon-8", "atLevel": 8 },
-      { "choice": "boon-12", "atLevel": 12 },
-      { "choice": "boon-16", "atLevel": 16 },
-      { "choice": "boon-19", "atLevel": 19 }
+      {
+        "value": "stamina",
+        "add": 7
+      },
+      {
+        "value": "stamina",
+        "add": 4,
+        "atLevel": 2
+      },
+      {
+        "value": "stamina",
+        "add": 4,
+        "atLevel": 3
+      },
+      {
+        "thing": "item.herb-satchel"
+      },
+      {
+        "thing": "item.provisions"
+      },
+      {
+        "choice": "talents-herbalist"
+      },
+      {
+        "choice": "gear"
+      },
+      {
+        "choice": "knacks-root"
+      },
+      {
+        "thing": "trait.green-thumb",
+        "atLevel": 2
+      },
+      {
+        "choice": "borrowed-knack",
+        "atLevel": 2
+      },
+      {
+        "choice": "extra-talent",
+        "atLevel": 2
+      },
+      {
+        "choice": "path",
+        "atLevel": 3
+      },
+      {
+        "value": "stamina",
+        "add": "4 * (level - 3)",
+        "atLevel": 4
+      },
+      {
+        "thing": "trait.deep-roots",
+        "atLevel": 5
+      },
+      {
+        "thing": "trait.bloom-ward",
+        "atLevel": 11
+      },
+      {
+        "thing": "trait.old-growth",
+        "atLevel": 17
+      },
+      {
+        "choice": "boon-4",
+        "atLevel": 4
+      },
+      {
+        "choice": "boon-8",
+        "atLevel": 8
+      },
+      {
+        "choice": "boon-12",
+        "atLevel": 12
+      },
+      {
+        "choice": "boon-16",
+        "atLevel": 16
+      },
+      {
+        "choice": "boon-19",
+        "atLevel": 19
+      }
     ]
   },
   {
@@ -122,20 +325,41 @@
     "kind": "path",
     "source": "mistland",
     "requires": "has('calling.lantern-bearer')",
-    "grants": [{ "thing": "trait.warding-glow" }, { "thing": "knack.lantern-call" }]
+    "grants": [
+      {
+        "thing": "trait.warding-glow"
+      },
+      {
+        "thing": "knack.lantern-call"
+      }
+    ]
   },
   {
     "id": "path.ferrymaster",
     "kind": "path",
     "source": "mistland",
     "requires": "has('calling.river-runner')",
-    "grants": [{ "thing": "trait.ferry-sense" }, { "thing": "knack.river-voice" }]
+    "grants": [
+      {
+        "thing": "trait.ferry-sense"
+      },
+      {
+        "thing": "knack.river-voice"
+      }
+    ]
   },
   {
     "id": "path.mushroom-whisperer",
     "kind": "path",
     "source": "mistland",
     "requires": "has('calling.herbalist')",
-    "grants": [{ "thing": "trait.spore-friend" }, { "thing": "knack.spore-veil" }]
+    "grants": [
+      {
+        "thing": "trait.spore-friend"
+      },
+      {
+        "thing": "knack.spore-veil"
+      }
+    ]
   }
 ]
