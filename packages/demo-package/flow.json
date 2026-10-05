@@ -143,6 +143,11 @@
       "kind": "pickOne",
       "source": "mistland",
       "options": { "kind": "path" },
+      "recommend": [
+        { "when": "has('calling.lantern-bearer')", "pick": ["path.lightwarden"] },
+        { "when": "has('calling.river-runner')", "pick": ["path.ferrymaster"] },
+        { "pick": ["path.mushroom-whisperer"] }
+      ],
       "gather": "path"
     },
     {

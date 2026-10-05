@@ -512,3 +512,116 @@ describe("formatVersionMismatch", () => {
     expect(formatVersionMismatch("2.0", "1.2")).toMatch(/major versions differ/);
   });
 });
+
+describe("levels 1 to 20 (format 0.9)", () => {
+  /* eslint-disable @typescript-eslint/no-explicit-any -- tests poke into raw JSON */
+  const choiceIndex = (id: string) => demo.get("flow.json").choices.findIndex((c: any) => c.id === id);
+  const choice = (f: RawFiles, id: string) => f.get("flow.json").choices[choiceIndex(id)];
+  const valueIndex = (id: string) => demo.get("values.json").findIndex((v: any) => v.id === id);
+  const thingIndex = (file: string, id: string) =>
+    demo.get(`things/${file}.json`).findIndex((t: any) => t.id === id);
+  /* eslint-enable @typescript-eslint/no-explicit-any */
+
+  it("checks the shape of the new fields", () => {
+    const r = mutate((f) => {
+      f.get("values.json")[valueIndex("knackRank")].formula = "level";
+      choice(f, "boon-raise").methods[0].points = 0;
+      choice(f, "knacks-root").count = { byLevel: [2, 0] };
+      thing(f, "boons-and-high-levels", "boon.raise").repeatable = "yes";
+    });
+    const p = (id: string) => `flow.json choices[${choiceIndex(id)}]`;
+    expect(messages(r)).toEqual(
+      expect.arrayContaining([
+        `values.json [${valueIndex("knackRank")}]: use only one of formula, default and byLevel`,
+        `${p("boon-raise")}.methods[0].points: Too small: expected number to be >0`,
+        `${p("knacks-root")}.count.byLevel[1]: Too small: expected number to be >0`,
+        "things/boons-and-high-levels.json [0].repeatable: Invalid input: expected boolean, received string",
+      ]),
+    );
+  });
+
+  it.each<[string, (f: RawFiles) => void, () => string]>([
+    [
+      "a value's table of the wrong length",
+      (f) => (f.get("values.json")[valueIndex("knackRank")].byLevel = [1, 2, 3]),
+      () => `values.json [${valueIndex("knackRank")}].byLevel: has 3 numbers, but levels 1 to 20 need 20`,
+    ],
+    [
+      "a grant's table of the wrong length",
+      (f) => (thing(f, "callings-and-paths", "calling.lantern-bearer").grants.at(-1).add = { byLevel: [1] }),
+      () => {
+        const grants = demo.get("things/callings-and-paths.json")[0].grants.length;
+        return `things/callings-and-paths.json [0].grants[${grants - 1}].add.byLevel: has 1 numbers, but levels 1 to 20 need 20`;
+      },
+    ],
+    [
+      "a count table of the wrong length",
+      (f) => (choice(f, "knacks-root").count = { byLevel: [2, 3] }),
+      () =>
+        `flow.json choices[${choiceIndex("knacks-root")}].count.byLevel: has 2 numbers, but levels 1 to 20 need 20`,
+    ],
+    [
+      "a count table asking for more than there are options",
+      (f) => (choice(f, "knacks-root").count = { byLevel: Array.from({ length: 20 }, () => 12) }),
+      () => `flow.json choices[${choiceIndex("knacks-root")}].count: asks for 12 but only 9 options exist`,
+    ],
+    [
+      "raising next to another method",
+      (f) => choice(f, "boon-raise").methods.push({ method: "array", values: [1, 1, 1, 1] }),
+      () =>
+        `flow.json choices[${choiceIndex("boon-raise")}].methods: "raise" adds to values and cannot be offered next to other methods`,
+    ],
+    [
+      "a cap on an unknown value",
+      (f) => (choice(f, "keen-senses-raise").methods[0].cap = "10 + practise"),
+      () =>
+        `flow.json choices[${choiceIndex("keen-senses-raise")}].methods[0].cap: expression "10 + practise" uses unknown value "practise"`,
+    ],
+    [
+      "a raise recommendation with more points than there are",
+      (f) => (choice(f, "boon-raise").recommend[0].assign = { heart: 2, wit: 1 }),
+      () =>
+        `flow.json choices[${choiceIndex("boon-raise")}].recommend[0].assign: gives more than the 2 points there are`,
+    ],
+    [
+      "a raise recommendation over the most per target",
+      (f) => (choice(f, "boon-raise").methods[0].maxPerTarget = 1),
+      () =>
+        `flow.json choices[${choiceIndex("boon-raise")}].recommend[0].assign: gives a target less than 0 or more than 1 points`,
+    ],
+    [
+      "a table where a value takes input",
+      (f) => (choice(f, "scores").targets[0] = "knackRank"),
+      () =>
+        `flow.json choices[${choiceIndex("scores")}].targets[0]: value "knackRank" has a formula and cannot take input`,
+    ],
+  ])("rejects %s", (_name, change, expected) => {
+    const r = mutate(change);
+    expect(r.ok).toBe(false);
+    expect(messages(r)).toContain(expected());
+  });
+
+  it("lets a raise add to any value, also one with a formula", () => {
+    const r = mutate((f) => choice(f, "keen-senses-raise").targets.push("nerve"));
+    expect(messages(r)).toEqual([]);
+  });
+
+  it.each<[string, (f: RawFiles) => void, () => string]>([
+    [
+      "a repeatable thing that asks nothing",
+      (f) => (thing(f, "boons-and-high-levels", "boon.sure-step").repeatable = true),
+      () =>
+        `things/boons-and-high-levels.json [${thingIndex("boons-and-high-levels", "boon.sure-step")}].repeatable: the thing grants no choice; picking it again changes nothing (a thing counts once)`,
+    ],
+    [
+      "more per target than there are points",
+      (f) => (choice(f, "boon-raise").methods[0].maxPerTarget = 3),
+      () =>
+        `flow.json choices[${choiceIndex("boon-raise")}].methods[0].maxPerTarget: is more than the 2 points there are`,
+    ],
+  ])("warns about %s", (_name, change, expected) => {
+    const r = mutate(change);
+    expect(messages(r)).toEqual([]);
+    expect(messages(r, "warnings")).toContain(expected());
+  });
+});
