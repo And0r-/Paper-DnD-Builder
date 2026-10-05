@@ -3,7 +3,14 @@
  * takes every recommendation would build it. Only imported by tests and
  * the sample script.
  */
-import { applyChange, evaluateDraft, newDraft, type ChoiceState, type DraftDocument } from "@builder/core";
+import {
+  applyChange,
+  evaluateDraft,
+  levelUp,
+  newDraft,
+  type ChoiceState,
+  type DraftDocument,
+} from "@builder/core";
 import type { ContentPackage } from "@builder/format";
 import { validatePackageDir } from "@builder/format";
 import { DEMO_PACKAGE_DIR } from "@builder/demo-package";
@@ -51,6 +58,26 @@ export function demoCharacter(
     if (!r.ok) throw new Error(JSON.stringify(r.error));
     doc = r.doc;
   }
+  return answerOpen(pkg, doc, name);
+}
+
+/**
+ * `doc` raised to `level` the way the API does it: every answer kept, only
+ * what is open answered, then finished (which ends the raise).
+ */
+export function raisedCharacter(
+  pkg: ContentPackage,
+  doc: DraftDocument,
+  level: number,
+  name = "Mira Fennwick",
+): DraftDocument {
+  const r = levelUp(pkg, doc, level);
+  if (!r.ok) throw new Error(JSON.stringify(r.error));
+  const { levelBefore: _, ...finished } = answerOpen(pkg, r.doc, name);
+  return finished;
+}
+
+function answerOpen(pkg: ContentPackage, doc: DraftDocument, name: string): DraftDocument {
   for (let guard = 0; guard < 100; guard++) {
     const ev = evaluateDraft(pkg, doc);
     if (ev.complete) return doc;

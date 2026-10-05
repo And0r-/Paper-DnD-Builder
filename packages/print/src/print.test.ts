@@ -7,7 +7,7 @@ import { cardCount } from "./cards.ts";
 import { MESSAGES } from "./messages.ts";
 import { buildPrintModel, firstSentence, PrintError, type PrintModel, type SheetSection } from "./model.ts";
 import { renderPdf, type RenderedPdf } from "./render.ts";
-import { demoCharacter, loadDemoPackage } from "./testing.ts";
+import { demoCharacter, loadDemoPackage, raisedCharacter } from "./testing.ts";
 
 let pkg: ContentPackage;
 let doc: DraftDocument;
@@ -362,6 +362,51 @@ describe("printed character (demo package)", () => {
     expect(h.model.cards.length).toBe(10);
     expect(h.pdf.cardPages).toBe(2);
     expect(h.pdf.pages).toBe(h.pdf.sheetPages + 2);
+  });
+
+  it("prints a raised character at its new level: 1 → 2 → 3 → 5, and 1 → 20 in one go", async () => {
+    const l1 = demoCharacter(pkg, 1);
+    const l2 = raisedCharacter(pkg, l1, 2);
+    const l3 = raisedCharacter(pkg, l2, 3);
+    const l5 = raisedCharacter(pkg, l3, 5);
+    const l20 = raisedCharacter(pkg, l1, 20);
+    const boxes = (model: PrintModel, id: string) => {
+      const s = model.sections.find((x) => x.id === id);
+      if (s?.kind !== "statBoxes") return [];
+      return s.boxes.map((b) => (b.style === "circles" ? b.circles : b.text));
+    };
+    // Primary row: stamina, guard, pace, luck, nerve, practice; worked out by hand:
+    // stamina 8 + 5 (level 2) + 5 (level 3) + 5 per level from 4; guard 6 + shield 2 + the path's glow 1;
+    // luck min(3, 1 + heart bonus); nerve 1 + floor(level / 2) + heart bonus; practice by table.
+    // Heart 11 (bonus 1), 13 from boon 4 on (bonus 2), 15 from boon 8 on (bonus 3).
+    // Cards: the knacks of the level's table (3, 3, 4, 8) and, from level 3, the path's own knack.
+    const expected = [
+      { doc: l2, level: 2, primary: ["13", "8", "7,5 m", 2, "3", "2"], slots: [2], cards: 3 },
+      { doc: l3, level: 3, primary: ["18", "9", "7,5 m", 2, "3", "2"], slots: [2, 1], cards: 4 },
+      { doc: l5, level: 5, primary: ["28", "9", "7,5 m", 3, "5", "3"], slots: [3, 2, 1], cards: 5 },
+      { doc: l20, level: 20, primary: ["103", "9", "7,5 m", 3, "14", "6"], slots: [3, 2, 2, 2, 2], cards: 9 },
+    ];
+    for (const e of expected) {
+      const { model, pdf, extracted } = await print("de", {}, pkg, e.doc);
+      expect(model.levelLabel, `level ${e.level}`).toBe(`Stufe ${e.level}`);
+      expect(extracted.text).toContain(`Laternenträgerin · Stufe ${e.level}`);
+      expect(boxes(model, "primary"), `level ${e.level}`).toEqual(e.primary);
+      expect(boxes(model, "lantern-slots"), `level ${e.level}`).toEqual(e.slots);
+      expect(model.cards.length, `level ${e.level}`).toBe(cardCount(pkg, evaluateDraft(pkg, e.doc)));
+      expect(model.cards.length, `level ${e.level}`).toBe(e.cards);
+      expect(extracted.pages).toBe(pdf.sheetPages + pdf.cardPages);
+    }
+    // The cards of level 1 are still there after every raise.
+    const first = buildPrintModel(pkg, l1, { language: "de", createdAt }).cards.map((c) => c.name);
+    for (const e of expected) {
+      const names = buildPrintModel(pkg, e.doc, { language: "de", createdAt }).cards.map((c) => c.name);
+      expect(names).toEqual(expect.arrayContaining(first));
+    }
+    // The same character raised in one go or built at 20 prints the same numbers.
+    const built = buildPrintModel(pkg, demoCharacter(pkg, 20), { language: "de", createdAt });
+    const raised = buildPrintModel(pkg, l20, { language: "de", createdAt });
+    expect(boxes(raised, "primary")).toEqual(boxes(built, "primary"));
+    expect(boxes(raised, "lantern-slots-high")).toEqual(boxes(built, "lantern-slots-high"));
   });
 
   it("goes on on the next page with a section longer than a page, for every kind of rows", async () => {

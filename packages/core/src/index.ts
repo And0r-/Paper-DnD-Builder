@@ -42,11 +42,14 @@ export {
 export { explainValue, totalOf, type PartSource, type ValueExplanation, type ValuePart } from "./explain.ts";
 export {
   applyChange,
+  levelUp,
+  levelUpState,
   newDraft,
   summarize,
   type ChangeError,
   type ChangeResult,
   type DraftSummary,
+  type LevelUpState,
 } from "./change.ts";
 export {
   convertMeasure,

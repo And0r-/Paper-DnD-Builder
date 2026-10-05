@@ -11,6 +11,8 @@ import {
   evaluateDraft,
   explainValue,
   judgeAnswer,
+  levelUp,
+  levelUpState,
   newDraft,
   type ChoiceState,
   type DraftChange,
@@ -50,21 +52,27 @@ function recommendation(s: ChoiceState): unknown {
 function chooseForMe(level: number, calling: string): DraftDocument {
   const created = newDraft(pkg, level);
   if (!created.ok) throw new Error(JSON.stringify(created.error));
-  let doc = apply(created.doc, { type: "answer", choice: "calling", answer: { pick: calling } });
+  return answerOpen(apply(created.doc, { type: "answer", choice: "calling", answer: { pick: calling } }));
+}
+
+/** Answers every open step with "choose for me", in step order, until the character is complete. */
+function answerOpen(doc: DraftDocument, answered: string[] = []): DraftDocument {
   for (let guard = 0; guard < 200; guard++) {
     const ev = evaluateDraft(pkg, doc);
     if (ev.complete) return doc;
     const step = ev.steps.find((s) => s.status !== "done")!;
     if (step.pool) {
+      answered.push(...step.pool.choices.filter((c) => c.remaining > 0).map((c) => c.choice));
       doc = apply(doc, { type: "pool", step: step.id, picks: step.pool.recommended });
       continue;
     }
     const open = step.choices.map((c) => ev.choices[c]!).find((c) => c.status !== "answered")!;
     const answer = recommendation(open);
-    if (answer === undefined) throw new Error(`no recommendation for ${open.id} at level ${level}`);
+    if (answer === undefined) throw new Error(`no recommendation for ${open.id} at level ${doc.level}`);
+    answered.push(open.id);
     doc = apply(doc, { type: "answer", choice: open.id, answer });
   }
-  throw new Error(`level ${level} ${calling} did not complete`);
+  throw new Error(`level ${doc.level} did not complete`);
 }
 
 const CALLINGS = ["calling.lantern-bearer", "calling.river-runner", "calling.herbalist"];
@@ -349,5 +357,170 @@ describe("tables by level", () => {
       amount: 6,
       source: { kind: "values", values: ["practice"] },
     });
+  });
+});
+
+describe("raising a finished character", () => {
+  /**
+   * Raises `doc` to `level` and checks that nothing chosen is lost: every
+   * answer stays, every choice answered before is still answered, or asks
+   * for more picks on top of the ones it keeps.
+   */
+  function raise(doc: DraftDocument, level: number) {
+    const before = evaluateDraft(pkg, doc);
+    const r = levelUp(pkg, doc, level);
+    if (!r.ok) throw new Error(JSON.stringify(r.error));
+    expect(r.doc).toEqual({ level, levelBefore: doc.level, answers: doc.answers });
+    const ev = evaluateDraft(pkg, r.doc);
+    const grown: string[] = [];
+    for (const [id, was] of Object.entries(before.choices)) {
+      if (was.status !== "answered") continue;
+      const now = ev.choices[id]!;
+      if (now.status === "answered") continue;
+      expect(now, id).toMatchObject({ status: "incomplete", answer: was.answer });
+      expect(now.count!, id).toBeGreaterThan(was.count!);
+      grown.push(id);
+    }
+    const state = levelUpState(ev, doc.level);
+    const answered: string[] = [];
+    // Finishing (the API's part) ends the raise.
+    const { levelBefore: _, ...after } = answerOpen(r.doc, answered);
+    const done = evaluateDraft(pkg, after);
+    // Only what the raise added or grew is asked; a copy of a choice comes with the pick that brings it.
+    const added = levelUpState(done, doc.level).newChoices;
+    for (const id of answered) expect([...added, ...grown], id).toContain(id);
+    for (const id of state.newChoices.filter((c) => ev.choices[c]!.status !== "answered")) {
+      expect(answered).toContain(id);
+    }
+    return { state, grown, answered, doc: after, ev: done };
+  }
+
+  it("raises a level-1 character to 2, 3 and 5, asking only what the new levels add", () => {
+    const l1 = chooseForMe(1, "calling.lantern-bearer");
+
+    // 1 → 2: no new step, but the talent group gets a level-2 choice and the
+    // knack count grows from 2 to 3 (table by level). Both steps were there before.
+    const to2 = raise(l1, 2);
+    expect(to2.state).toEqual({
+      from: 1,
+      to: 2,
+      newSteps: [],
+      newChoices: ["extra-talent"],
+      openSteps: ["talents", "knacks"],
+    });
+    expect(to2.grown).toEqual(["knacks-lantern"]);
+    expect(to2.answered).toEqual(["extra-talent", "knacks-lantern"]);
+    expect(to2.ev.complete).toBe(true);
+    expect(to2.ev.values).toMatchObject({
+      stamina: 13, // 0 * 2 + 8 + 5
+      practice: 2,
+      nerve: 3, // 1 + floor(2 / 2) + heart bonus 1
+      knackRank: 1,
+      lanternSlots1: 2,
+      lanternSlots2: 0,
+      guard: 8, // 6 + 0 + reed shield 2
+    });
+
+    // 2 → 3: the path is the only new step; nothing older grows.
+    const to3 = raise(to2.doc, 3);
+    expect(to3.state).toMatchObject({ from: 2, to: 3, newSteps: ["path"], openSteps: ["path"] });
+    expect(to3.grown).toEqual([]);
+    expect(to3.answered).toEqual(["path"]);
+    expect(to3.ev.values).toMatchObject({
+      stamina: 18, // 8 + 5 + 5
+      practice: 2,
+      nerve: 3,
+      lanternSlots1: 2,
+      lanternSlots2: 1,
+      guard: 9, // the path's warding glow: 1 more
+    });
+
+    // 3 → 5: boon 4 (and the raise it brings), and two more knacks of rank 2 at most.
+    const to5 = raise(to3.doc, 5);
+    expect(to5.state).toMatchObject({
+      from: 3,
+      to: 5,
+      newSteps: ["boon-4"],
+      openSteps: ["boon-4", "knacks"],
+    });
+    expect(to5.grown).toEqual(["knacks-lantern"]);
+    expect(to5.answered).toEqual(["boon-4", "boon-raise@boon-4", "knacks-lantern"]);
+    expect(to5.ev.values).toMatchObject({
+      heart: 13, // 11 + 2 from boon 4
+      heartBonus: 2, // floor(13 / 3) - 2
+      stamina: 28, // 8 + 5 + 5 + 5 * (5 - 3)
+      practice: 3,
+      nerve: 5, // 1 + floor(5 / 2) + 2
+      luck: 3, // min(3, 1 + 2)
+      knackRank: 2,
+      lanternSlots1: 3,
+      lanternSlots2: 2,
+      lanternSlots3: 1,
+    });
+    // Every answer of levels 1 and 3 is still there, unchanged unless it grew.
+    for (const [id, a] of Object.entries(to3.doc.answers)) {
+      if (id !== "knacks-lantern") expect(to5.doc.answers[id], id).toEqual(a);
+    }
+  });
+
+  it("raises a level-1 character to 20 in one go: the same character as one built at 20", () => {
+    const l1 = chooseForMe(1, "calling.lantern-bearer");
+    const to20 = raise(l1, 20);
+    expect(to20.state.newSteps).toEqual([
+      "path",
+      "lantern-vow",
+      "boon-4",
+      "boon-8",
+      "boon-12",
+      "boon-16",
+      "boon-19",
+    ]);
+    expect(to20.state.openSteps).toEqual([...to20.state.newSteps, "talents", "knacks"]);
+    expect(to20.ev.complete).toBe(true);
+    // The level-20 lantern bearer worked out by hand above.
+    expect(to20.ev.values).toEqual(evaluateDraft(pkg, chooseForMe(20, "calling.lantern-bearer")).values);
+    expect(to20.ev.values).toMatchObject({
+      stamina: 103,
+      practice: 6,
+      nerve: 14,
+      wit: 15,
+      heart: 15,
+      knackRank: 5,
+    });
+    expect(to20.ev.choices["lantern-vow"]!.textVariant).toBe("late");
+  });
+
+  it("switches a text variant by level on a raise, without asking the choice again", () => {
+    const l11 = raise(chooseForMe(1, "calling.lantern-bearer"), 11);
+    expect(l11.answered).toContain("lantern-vow");
+    expect(l11.ev.choices["lantern-vow"]!.textVariant).toBeUndefined();
+    const l17 = raise(l11.doc, 17);
+    expect(l17.answered).not.toContain("lantern-vow");
+    expect(l17.ev.choices["lantern-vow"]).toMatchObject({ status: "answered", textVariant: "late" });
+  });
+
+  it("finishes at once when the new level asks nothing", () => {
+    // 4 → 5 brings no step and no larger count for a lantern bearer.
+    const l4 = chooseForMe(4, "calling.lantern-bearer");
+    const r = levelUp(pkg, l4, 5);
+    if (!r.ok) throw new Error(JSON.stringify(r.error));
+    const ev = evaluateDraft(pkg, r.doc);
+    expect(ev.complete).toBe(true);
+    expect(levelUpState(ev, 4)).toEqual({ from: 4, to: 5, newSteps: [], newChoices: [], openSteps: [] });
+    expect(ev.values["practice"]).toBe(3);
+  });
+
+  it("refuses a level that is not higher or above the package's highest, and keeps the first start level", () => {
+    const l3 = chooseForMe(3, "calling.lantern-bearer");
+    expect(levelUp(pkg, l3, 3)).toEqual({ ok: false, error: { code: "levelNotHigher", level: 3 } });
+    expect(levelUp(pkg, l3, 2)).toEqual({ ok: false, error: { code: "levelNotHigher", level: 3 } });
+    expect(levelUp(pkg, l3, 21)).toEqual({ ok: false, error: { code: "levelOutOfRange", min: 1, max: 20 } });
+    const to5 = levelUp(pkg, l3, 5);
+    if (!to5.ok) throw new Error();
+    const to8 = levelUp(pkg, to5.doc, 8);
+    expect(to8.ok && to8.doc).toMatchObject({ level: 8, levelBefore: 3 });
+    // Setting the level back to the start ends the raise.
+    expect(apply(to5.doc, { type: "setLevel", level: 3 })).toEqual({ level: 3, answers: l3.answers });
+    expect(apply(to5.doc, { type: "setLevel", level: 4 })).toMatchObject({ level: 4, levelBefore: 3 });
   });
 });
