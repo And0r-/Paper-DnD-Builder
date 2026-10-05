@@ -135,6 +135,7 @@ describe("options", () => {
       "item.travel-cloak",
       "item.reed-shield",
       "item.trail-boots",
+      "item.sling",
     ]);
     expect(ev.choices["knacks-lantern"]!.options).toContain("knack.light-bridge");
     const l1 = evaluateDraft(pkg, draft(1, { calling: { pick: "calling.lantern-bearer" } }));

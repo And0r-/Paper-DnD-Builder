@@ -196,7 +196,7 @@
     "sheet.scores.title": "Scores",
     "sheet.scores.hint": "Add the number in the circle to matching rolls.",
     "sheet.talents.title": "Talents",
-    "sheet.talents.hint": "● = trained: add 2 to your roll.",
+    "sheet.talents.hint": "● = trained. Add the number in the box to your roll.",
     "sheet.traits.title": "Abilities",
     "sheet.traits.hint": "□ = used once: tick it. Erase after a rest.",
     "sheet.knacks.title": "Knacks",
@@ -562,6 +562,22 @@
     "handling.trail-boots.name": "Trail Boots",
     "handling.trail-boots.short": "In your trail boots, you don't slip.",
     "handling.trail-boots.explain.what": "You know every step on wet stone and moss.",
-    "handling.trail-boots.explain.table": "On slippery ground, you don't fall."
+    "handling.trail-boots.explain.table": "On slippery ground, you don't fall.",
+
+    "stat.roll.name": "Roll",
+    "stat.hit.name": "Hit",
+    "stat.harm.name": "Harm",
+    "stat.range.name": "Range",
+    "sheet.attacks.title": "Attacks",
+    "sheet.attacks.hint": "To hit: 2d6 + this number. Harm: these dice.",
+    "stat-value.item.lantern-staff.harm": "1d6 {{var:bonus|signed}}, blunt",
+    "stat-value.item.boat-hook.harm": "1d4 {{var:bonus|signed}}, pointed",
+    "stat-value.item.sling.harm": "1d4 {{var:bonus|signed}}, blunt",
+    "stat-value.item.sling.range": "{{length:30|short}} / {{length:120|short}}",
+    "item.sling.name": "Sling",
+    "item.sling.short": "A leather strap for throwing stones.",
+    "item.sling.goodIf": "Good if you would rather hit from afar.",
+    "item.sling.explain.what": "A leather strap and a pouch of round river pebbles.",
+    "item.sling.explain.table": "You hit things that are far away."
   }
 }

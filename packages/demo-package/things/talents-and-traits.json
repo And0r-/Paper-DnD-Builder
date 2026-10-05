@@ -7,6 +7,9 @@
     "stats": {
       "score": {
         "text": "value.might.name"
+      },
+      "roll": {
+        "value": "climbingRoll"
       }
     }
   },
@@ -18,6 +21,9 @@
     "stats": {
       "score": {
         "text": "value.heart.name"
+      },
+      "roll": {
+        "value": "hagglingRoll"
       }
     }
   },
@@ -29,6 +35,9 @@
     "stats": {
       "score": {
         "text": "value.wit.name"
+      },
+      "roll": {
+        "value": "trackingRoll"
       }
     }
   },
@@ -40,6 +49,9 @@
     "stats": {
       "score": {
         "text": "value.heart.name"
+      },
+      "roll": {
+        "value": "mendingRoll"
       }
     }
   },
@@ -51,6 +63,9 @@
     "stats": {
       "score": {
         "text": "value.wit.name"
+      },
+      "roll": {
+        "value": "listeningRoll"
       }
     }
   },
@@ -62,6 +77,9 @@
     "stats": {
       "score": {
         "text": "value.wit.name"
+      },
+      "roll": {
+        "value": "legendsRoll"
       }
     }
   },
@@ -73,6 +91,9 @@
     "stats": {
       "score": {
         "text": "value.grace.name"
+      },
+      "roll": {
+        "value": "sneakRoll"
       }
     }
   },
@@ -84,10 +105,12 @@
     "stats": {
       "score": {
         "text": "value.wit.name"
+      },
+      "roll": {
+        "value": "weatherSenseRoll"
       }
     }
   },
-
   {
     "id": "trait.mist-sight",
     "kind": "trait",

@@ -156,6 +156,20 @@
     "choice.lantern-mastery.question": "Which two knacks do you know best?",
     "choice.lantern-mastery.intro": "At level 18 two of your knacks become second nature. Pick two of the knacks you already know.",
     "choice.lantern-mastery.missing": "Pick {{var:remaining}} more.",
-    "sheet.mastery.title": "Favourite knacks"
+    "sheet.mastery.title": "Favourite knacks",
+
+    "value.climbingRoll.name": "Climbing",
+    "value.hagglingRoll.name": "Haggling",
+    "value.trackingRoll.name": "Tracking",
+    "value.mendingRoll.name": "Mending",
+    "value.listeningRoll.name": "Listening",
+    "value.legendsRoll.name": "Legends",
+    "value.weatherSenseRoll.name": "Weather Sense",
+    "value.lanternStaffHit.name": "Hit with the lantern staff",
+    "value.lanternStaffHarm.name": "Harm with the lantern staff",
+    "value.boatHookHit.name": "Hit with the boat hook",
+    "value.boatHookHarm.name": "Harm with the boat hook",
+    "value.slingHit.name": "Hit with the sling",
+    "value.slingHarm.name": "Harm with the sling"
   }
 }

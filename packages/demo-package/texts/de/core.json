@@ -192,7 +192,7 @@
     "sheet.scores.title": "Grundwerte",
     "sheet.scores.hint": "Die Zahl im Kreis zählst du zu passenden Würfen dazu.",
     "sheet.talents.title": "Talente",
-    "sheet.talents.hint": "● = geübt: Zähl 2 zu deinem Wurf dazu.",
+    "sheet.talents.hint": "● = geübt. Die Zahl im Kästchen zählst du zu deinem Wurf dazu.",
     "sheet.traits.title": "Fähigkeiten",
     "sheet.traits.hint": "□ = einmal benutzt: ankreuzen. Nach einer Rast wegradieren.",
     "sheet.knacks.title": "Kniffe",
@@ -558,6 +558,22 @@
     "handling.trail-boots.name": "Wanderstiefel",
     "handling.trail-boots.short": "In deinen Wanderstiefeln rutschst du nicht aus.",
     "handling.trail-boots.explain.what": "Du kennst jeden Tritt auf nassem Stein und Moos.",
-    "handling.trail-boots.explain.table": "Auf glattem Boden fällst du nicht hin."
+    "handling.trail-boots.explain.table": "Auf glattem Boden fällst du nicht hin.",
+
+    "stat.roll.name": "Wurf",
+    "stat.hit.name": "Treffer",
+    "stat.harm.name": "Schaden",
+    "stat.range.name": "Reichweite",
+    "sheet.attacks.title": "Angriffe",
+    "sheet.attacks.hint": "Zum Treffen: 2W6 + diese Zahl. Schaden: diese Würfel.",
+    "stat-value.item.lantern-staff.harm": "1W6 {{var:bonus|signed}}, stumpf",
+    "stat-value.item.boat-hook.harm": "1W4 {{var:bonus|signed}}, spitz",
+    "stat-value.item.sling.harm": "1W4 {{var:bonus|signed}}, stumpf",
+    "stat-value.item.sling.range": "{{length:30|short}} / {{length:120|short}}",
+    "item.sling.name": "Schleuder",
+    "item.sling.short": "Ein Lederband, mit dem du Steine wirfst.",
+    "item.sling.goodIf": "Gut, wenn du lieber aus der Ferne triffst.",
+    "item.sling.explain.what": "Ein Riemen aus Leder und ein Beutel mit runden Flusskieseln.",
+    "item.sling.explain.table": "Du triffst Dinge, die weit weg sind."
   }
 }

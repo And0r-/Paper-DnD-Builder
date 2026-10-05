@@ -156,6 +156,20 @@
     "choice.lantern-mastery.question": "Welche zwei Kniffe kannst du am besten?",
     "choice.lantern-mastery.intro": "Auf Stufe 18 gehen dir zwei deiner Kniffe in Fleisch und Blut über. Wähle zwei Kniffe, die du schon kannst.",
     "choice.lantern-mastery.missing": "Wähle noch {{var:remaining}}.",
-    "sheet.mastery.title": "Lieblingskniffe"
+    "sheet.mastery.title": "Lieblingskniffe",
+
+    "value.climbingRoll.name": "Klettern",
+    "value.hagglingRoll.name": "Feilschen",
+    "value.trackingRoll.name": "Spurenlesen",
+    "value.mendingRoll.name": "Flicken",
+    "value.listeningRoll.name": "Lauschen",
+    "value.legendsRoll.name": "Sagenkunde",
+    "value.weatherSenseRoll.name": "Wettergespür",
+    "value.lanternStaffHit.name": "Treffer mit dem Laternenstab",
+    "value.lanternStaffHarm.name": "Schaden mit dem Laternenstab",
+    "value.boatHookHit.name": "Treffer mit dem Bootshaken",
+    "value.boatHookHarm.name": "Schaden mit dem Bootshaken",
+    "value.slingHit.name": "Treffer mit der Schleuder",
+    "value.slingHarm.name": "Schaden mit der Schleuder"
   }
 }

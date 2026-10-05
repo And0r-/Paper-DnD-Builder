@@ -91,6 +91,71 @@
     "formula": "graceBonus + if(has('talent.sneaking'), practice, 0)"
   },
   {
+    "id": "climbingRoll",
+    "source": "mistland",
+    "formula": "mightBonus + if(has('talent.climbing'), practice, 0)"
+  },
+  {
+    "id": "hagglingRoll",
+    "source": "mistland",
+    "formula": "heartBonus + if(has('talent.haggling'), practice, 0)"
+  },
+  {
+    "id": "trackingRoll",
+    "source": "mistland",
+    "formula": "witBonus + if(has('talent.tracking'), practice, 0)"
+  },
+  {
+    "id": "mendingRoll",
+    "source": "mistland",
+    "formula": "heartBonus + if(has('talent.mending'), practice, 0)"
+  },
+  {
+    "id": "listeningRoll",
+    "source": "mistland",
+    "formula": "witBonus + if(has('talent.listening'), practice, 0)"
+  },
+  {
+    "id": "legendsRoll",
+    "source": "mistland",
+    "formula": "witBonus + if(has('talent.legends'), practice, 0)"
+  },
+  {
+    "id": "weatherSenseRoll",
+    "source": "mistland",
+    "formula": "witBonus + if(has('talent.weather-sense'), practice, 0)"
+  },
+  {
+    "id": "lanternStaffHit",
+    "source": "mistland",
+    "formula": "mightBonus + if(has('calling.lantern-bearer'), practice, 0)"
+  },
+  {
+    "id": "lanternStaffHarm",
+    "source": "mistland",
+    "formula": "mightBonus"
+  },
+  {
+    "id": "boatHookHit",
+    "source": "mistland",
+    "formula": "max(mightBonus, graceBonus) + if(has('calling.river-runner'), practice, 0)"
+  },
+  {
+    "id": "boatHookHarm",
+    "source": "mistland",
+    "formula": "max(mightBonus, graceBonus)"
+  },
+  {
+    "id": "slingHit",
+    "source": "mistland",
+    "formula": "graceBonus + practice"
+  },
+  {
+    "id": "slingHarm",
+    "source": "mistland",
+    "formula": "graceBonus"
+  },
+  {
     "id": "knackRank",
     "source": "mistland",
     "byLevel": [1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 5, 5, 5, 5]
