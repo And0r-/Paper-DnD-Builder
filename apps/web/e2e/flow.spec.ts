@@ -85,7 +85,8 @@ test("a newcomer builds a level-3 character from login to finished", async ({ pa
   await expect(page.getByRole("main").getByText(m["common.recommended"], { exact: true })).toHaveCount(0);
   // The calling's choices are asked later, each at its own step; the count never changes without a word.
   await pick(page, "Laternenträgerin");
-  await expect(page.getByText("Deine Wahl bringt 4 Schritte dazu.", { exact: true })).toBeVisible();
+  // The count already holds the steps the suggested calling brings: picking it adds none, so no note.
+  await expect(page.locator(".step-notice")).toBeEmpty();
   await expect(page.locator(".progress__text")).toHaveText(/^Schritt 3 von \d+ · Beruf$/);
   await shot(page, "05-beruf");
   await axe(page);

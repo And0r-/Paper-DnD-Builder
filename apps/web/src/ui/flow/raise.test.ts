@@ -127,7 +127,7 @@ describe("the flow of a level up", () => {
     const l3 = built(3);
     const flow = flowOf("x", lp, l3, evaluateDraft(pkg, l3), t);
     expect(flow.raise).toBeNull();
-    expect(flow.entries).toBe(flow.all);
+    expect(flow.entries.map((e) => e.key)).toEqual(flow.all.map((e) => e.key));
   });
 
   it("names what a level up brought: new things and changed numbers", () => {

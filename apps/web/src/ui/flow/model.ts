@@ -14,6 +14,7 @@ import type { ContentPackage } from "@builder/format/pure";
 import type { Translator } from "../../i18n/index.ts";
 import { choiceOf, choiceTexts, grantedValue, plain, ptext, stepTexts, thingName } from "../package-text.ts";
 import type { LoadedPackage } from "../packages.ts";
+import type { Count } from "./plan.ts";
 
 export type EntryStatus = "done" | "open" | "needsAttention";
 
@@ -44,6 +45,11 @@ export interface FlowEntry {
    * the package's title for a gather step whose choices stand one by one.
    */
   sectionTitle?: string;
+  /**
+   * The count shown for the entry, by the planned flow (plan.ts): the
+   * total stands from the start instead of growing with each answer.
+   */
+  count?: Count;
 }
 
 export const LEVEL_KEY = "level";
@@ -147,12 +153,6 @@ function gatherTitle(lp: LoadedPackage, group: string): string | undefined {
   return step && ptext(lp, `step.${step.id}.title`);
 }
 
-/** A step a choice brought along right behind it: a part of that step, not a step of its own. */
-export function isPart(lp: LoadedPackage, ev: Evaluation, id: string): boolean {
-  const step = ev.steps.find((s) => s.id === id);
-  return step?.origin === "granted" && gatherGroupOf(lp, step) === undefined;
-}
-
 // A type, not an interface: it fills message placeholders ({current}, {part}).
 export type Position = {
   /** Counted step, from 1, and how many there are. */
@@ -165,25 +165,31 @@ export type Position = {
   sectionTitle: string;
 };
 
-/** Where an entry is: "Step 3 of 9", and "part 2 of 4" inside a step that brought its own parts. */
+/**
+ * Where an entry is: "Step 3 of 9", and "part 2 of 4" inside a step that
+ * brought its own parts. Counted by the planned flow when the entry has its
+ * count, else by the entries as they are.
+ */
 export function positionOf(entries: FlowEntry[], entry: FlowEntry): Position {
   const last = entries.at(-1)!;
   const head = entries.find((e) => e.key === entry.sectionKey) ?? entry;
+  const count = entries.find((e) => e.key === entry.key)?.count;
   return {
-    current: entry.section + 1,
-    total: last.section + 1,
-    part: entry.part,
-    parts: entry.parts,
+    current: count?.current ?? entry.section + 1,
+    total: count?.total ?? last.section + 1,
+    part: count?.part ?? entry.part,
+    parts: count?.parts ?? entry.parts,
     sectionTitle: head.sectionTitle ?? head.title,
   };
 }
 
 /**
- * How far along, from 0 to 1, by position: each counted step weighs the
- * same, split among its parts. Moving on never makes the bar shorter, even
- * when a choice brings new parts.
+ * How far along, from 0 to 1: by screens of the planned flow, so every
+ * screen moves the bar the same bit, the parts of a long step too.
  */
 export function progressFraction(entries: FlowEntry[], entry: FlowEntry): number {
+  const count = entries.find((e) => e.key === entry.key)?.count;
+  if (count) return count.screen / count.screens;
   const p = positionOf(entries, entry);
   return (p.current - 1 + p.part / p.parts) / p.total;
 }

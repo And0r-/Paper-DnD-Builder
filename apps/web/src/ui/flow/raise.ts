@@ -9,6 +9,7 @@ import type { ContentPackage } from "@builder/format/pure";
 import type { Translator } from "../../i18n/index.ts";
 import type { LoadedPackage } from "../packages.ts";
 import { buildFlow, type FlowEntry } from "./model.ts";
+import { countByPlan, plannedDraft } from "./plan.ts";
 
 /** A raise under way: from the level the character was finished at, to the level now. */
 export interface Raise {
@@ -19,6 +20,7 @@ export interface Raise {
 /**
  * The flow of a draft: every step (`all`, for the overview), and the steps
  * to go through (`entries`), which during a raise are only the new ones.
+ * Each entry to go through carries its count by the planned flow (plan.ts).
  */
 export function flowOf(
   draftId: string,
@@ -28,10 +30,27 @@ export function flowOf(
   t: Translator["t"],
 ): { all: FlowEntry[]; entries: FlowEntry[]; raise: Raise | null } {
   const all = buildFlow(draftId, lp, ev, t);
+  const plan = plannedDraft(lp, doc);
+  const planEv = plan === doc ? ev : evaluateDraft(lp.pkg, plan);
+  const planAll = plan === doc ? all : buildFlow(draftId, lp, planEv, t);
   const from = doc.levelBefore;
-  if (from === undefined || from >= doc.level) return { all, entries: all, raise: null };
-  const ids = raiseStepIds(evaluateBefore(lp.pkg, doc, from), ev, from);
-  return { all, entries: raiseFlow(all, ids, from, doc.level), raise: { from, to: doc.level } };
+  if (from === undefined || from >= doc.level)
+    return { all, entries: counted(all, planAll), raise: null };
+  const before = evaluateBefore(lp.pkg, doc, from);
+  const ids = raiseStepIds(before, ev, from);
+  const entries = raiseFlow(all, ids, from, doc.level);
+  // The steps the plan's new levels ask, and every step asked now.
+  const planIds = new Set([...raiseStepIds(before, planEv, from), ...ids]);
+  const planned = raiseFlow(planAll, planIds, from, doc.level);
+  return { all, entries: counted(entries, planned), raise: { from, to: doc.level } };
+}
+
+function counted(entries: FlowEntry[], planned: FlowEntry[]): FlowEntry[] {
+  const counts = countByPlan(entries, planned);
+  return entries.map((e) => {
+    const count = counts.get(e.key);
+    return count ? { ...e, count } : e;
+  });
 }
 
 /** The character as it was before the raise: same answers, the old level. */
