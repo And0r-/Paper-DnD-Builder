@@ -26,7 +26,8 @@ export default function DraftLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const { t } = useApp();
   const current = currentKey(pathname);
-  const isEnd = pathname.endsWith("/done");
+  // The end and the level-up question stand on their own, without the step list.
+  const isEnd = pathname.endsWith("/done") || pathname.endsWith("/raise");
   return (
     <RequireAccount>
       {() => (

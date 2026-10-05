@@ -13,6 +13,7 @@ const PATHS = {
   chevronDown: "M6 9l6 6 6-6",
   chevronUp: "M6 15l6-6 6 6",
   arrowLeft: "M19 12H5M11 6l-6 6 6 6",
+  arrowUp: "M12 19V5M6 11l6-6 6 6",
   arrowRight: "M5 12h14M13 6l6 6-6 6",
   more: "M5 12h.01M12 12h.01M19 12h.01",
   dice: "M5 4h14a1 1 0 011 1v14a1 1 0 01-1 1H5a1 1 0 01-1-1V5a1 1 0 011-1zM8.5 8.5h.01M15.5 15.5h.01M12 12h.01",

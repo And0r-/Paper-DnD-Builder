@@ -14,9 +14,10 @@ import { Toast } from "../../src/ui/components/Fields.tsx";
 import { Icon } from "../../src/ui/components/Icon.tsx";
 import { AppShell } from "../../src/ui/components/Shell.tsx";
 import { usePageTitle } from "../../src/ui/flow/frame.tsx";
-import { buildFlow, firstOpen, progressOf } from "../../src/ui/flow/model.ts";
+import { firstOpen, progressOf } from "../../src/ui/flow/model.ts";
+import { flowOf } from "../../src/ui/flow/raise.ts";
 import { RequireAccount } from "../../src/ui/guards.tsx";
-import { plain, measureContext, thingName, ptext } from "../../src/ui/package-text.ts";
+import { levelWord, plain, measureContext, thingName, ptext } from "../../src/ui/package-text.ts";
 import { loadPackage, type LoadedPackage } from "../../src/ui/packages.ts";
 
 const UNDO_MS = 10_000;
@@ -133,8 +134,13 @@ function Characters() {
     const name = d.summary?.name || t("common.unnamed");
     if (!lp)
       return { id: d.id, name, line: "", finished: false, status: t("characters.packageMissing"), href: "" };
-    const ev = evaluateDraft(lp.pkg, { level: d.level, answers: d.answers });
-    const entries = buildFlow(d.id, lp, ev, t);
+    const doc = {
+      level: d.level,
+      answers: d.answers,
+      ...(d.levelBefore !== null && { levelBefore: d.levelBefore }),
+    };
+    const ev = evaluateDraft(lp.pkg, doc);
+    const { entries, raise } = flowOf(d.id, lp, doc, ev, t);
     const finished = d.status === "finished" && ev.complete;
     // The line only makes sense once everything it names is chosen.
     const vars: Record<string, string | number> = {};
@@ -150,9 +156,15 @@ function Characters() {
       name,
       line: whole ? plain(ctx, ptext(lp, "summary.line"), vars) : "",
       finished,
-      status: finished ? t("characters.finished") : t("characters.progress", p),
+      status: finished
+        ? t("characters.finished")
+        : raise
+          ? t("characters.raising", { ...p, levelName: levelWord(lp), level: raise.to })
+          : t("characters.progress", p),
       href: finished ? `/c/${d.id}/overview` : firstOpen(entries).href,
       doneHref: `/c/${d.id}/done`,
+      // A finished character below the highest level can go up.
+      raiseHref: finished && ev.level < lp.pkg.flow.level.max ? `/c/${d.id}/raise` : undefined,
     };
   }
 
@@ -204,6 +216,7 @@ function CharacterCard({
     status: string;
     href: string;
     doneHref?: string;
+    raiseHref?: string | undefined;
   };
   onDelete: () => void;
 }) {
@@ -228,6 +241,16 @@ function CharacterCard({
         {item.finished && item.doneHref && (
           <ButtonLink href={item.doneHref} variant="secondary" icon="printer">
             {t("characters.print")}
+          </ButtonLink>
+        )}
+        {item.raiseHref && (
+          <ButtonLink
+            href={item.raiseHref}
+            variant="secondary"
+            icon="arrowUp"
+            aria-label={t("raise.buttonLabel", { name: item.name })}
+          >
+            {t("raise.button")}
           </ButtonLink>
         )}
         <div className="character__more">
