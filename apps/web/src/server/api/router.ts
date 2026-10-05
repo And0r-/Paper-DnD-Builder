@@ -18,6 +18,7 @@ import {
 import type { AccountRow } from "../store.ts";
 import { accountRoutes } from "./routes/account.ts";
 import { authRoutes } from "./routes/auth.ts";
+import { campaignRoutes } from "./routes/campaigns.ts";
 import { draftRoutes } from "./routes/drafts.ts";
 import { packageRoutes } from "./routes/packages.ts";
 import { printRoutes } from "./routes/print.ts";
@@ -56,6 +57,7 @@ export const ROUTES: Route[] = [
   ...packageRoutes,
   ...draftRoutes,
   ...printRoutes,
+  ...campaignRoutes,
 ];
 
 function match(pattern: string, path: string): Record<string, string> | undefined {

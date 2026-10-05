@@ -75,4 +75,7 @@ export const LIMITS = {
   loginFailuresPerIp: { max: 30, windowMs: 15 * MINUTE },
   passwordMailsPerAccount: { max: 3, windowMs: 60 * MINUTE },
   passwordMailsPerIp: { max: 10, windowMs: 60 * MINUTE },
+  // A game master adds a group at a time; a loop cannot turn the builder into a mail cannon.
+  invitationsPerAccount: { max: 30, windowMs: 60 * MINUTE },
+  invitationMailsPerAddress: { max: 5, windowMs: 60 * MINUTE },
 } as const satisfies Record<string, Limit>;
