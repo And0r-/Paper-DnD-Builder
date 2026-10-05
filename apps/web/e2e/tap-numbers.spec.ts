@@ -47,7 +47,7 @@ test("fixed numbers: tap to give, tap to take back, no dropdowns", async ({ page
   await page.getByText(m["dist.array"], { exact: true }).click();
   await expect(page.locator("select")).toHaveCount(0);
   await expect(page.locator(".array-assign__tray")).toContainText("Zu vergeben:");
-  await expect(status(page)).toHaveText("Wohin kommt die 11? Tippe darauf.");
+  await expect(status(page)).toHaveText("Wohin kommt die 11? Tippe auf einen Wert unten.");
   await shot(page, "60-zahlen-antippen-start");
   await axe(page);
 
@@ -60,7 +60,7 @@ test("fixed numbers: tap to give, tap to take back, no dropdowns", async ({ page
   await row(page, "Klugheit").click();
   await expect(hit(page, "Klugheit")).toHaveAttribute("aria-pressed", "true");
   await expect(row(page, "Klugheit").locator(".array-assign__value")).toHaveText("11");
-  await expect(status(page)).toHaveText("Wohin kommt die 10? Tippe darauf.");
+  await expect(status(page)).toHaveText("Wohin kommt die 10? Tippe auf einen Wert unten.");
   await shot(page, "61-zahlen-antippen-eins");
 
   // Keyboard works the same way.
@@ -84,7 +84,7 @@ test("fixed numbers: tap to give, tap to take back, no dropdowns", async ({ page
   // A tap takes a number back; the step is open again and says so.
   await row(page, "Geschick").click();
   await expect(hit(page, "Geschick")).toHaveAttribute("aria-pressed", "false");
-  await expect(status(page)).toHaveText("Wohin kommt die 10? Tippe darauf.");
+  await expect(status(page)).toHaveText("Wohin kommt die 10? Tippe auf einen Wert unten.");
   await expect(page.locator(".shortcuts").getByRole("button", { name: m["flow.chooseForMe"] })).toBeVisible();
   await page.getByRole("button", { name: m["common.next"], exact: true }).click();
   await expect(page.locator(".step-footer__reason")).toBeVisible();
