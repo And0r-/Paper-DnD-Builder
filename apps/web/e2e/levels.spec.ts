@@ -4,6 +4,7 @@
  * plain words, and the step list of a long build grouped by level.
  */
 import AxeBuilder from "@axe-core/playwright";
+import type { Page } from "@playwright/test";
 import m from "../src/i18n/messages/de.json" with { type: "json" };
 import { expect, expectOneLanguage, login, makeLeveled, shot, test, uniqueEmail } from "./helpers.ts";
 
@@ -120,12 +121,25 @@ test("raising values: old value, points, new value, and why a row is full", asyn
   await shot(page, "75-werte-anheben-fehler");
 });
 
+/**
+ * Opens the menu on the phone. A level-20 step screen is drawn on the server
+ * first; a tap before the page is live is lost, so the tap is repeated until
+ * the button reports the menu as open.
+ */
+async function openMenu(page: Page) {
+  const button = page.getByRole("button", { name: m["menu.open"] });
+  await expect(async () => {
+    await button.click();
+    await expect(button).toHaveAttribute("aria-expanded", "true", { timeout: 1000 });
+  }).toPass();
+}
+
 test("a long build: the step list groups the steps a higher level brings", async ({ page, foreign }) => {
   void foreign;
   await login(page, uniqueEmail("steplist"));
   const id = await makeLeveled(page, 20, "calling.lantern-bearer", "boon-raise@boon-8");
   await page.goto(`/c/${id}/step/${encodeURIComponent("boon-raise@boon-8")}`);
-  await page.getByRole("button", { name: m["menu.open"] }).click();
+  await openMenu(page);
   const list = page.locator(".steplist").first();
   // The boons are one step of the count, with their levels inside.
   await expect(list.getByRole("link", { name: /^Gaben/ })).toContainText("Stufe 4 bis 19");
@@ -134,7 +148,7 @@ test("a long build: the step list groups the steps a higher level brings", async
   await shot(page, "76-schrittliste-stufen");
   // Elsewhere the group stays closed: one line, and the parts of other steps are not listed.
   await page.goto(`/c/${id}/step/folk`);
-  await page.getByRole("button", { name: m["menu.open"] }).click();
+  await openMenu(page);
   await expect(page.locator(".steplist").first().getByText("Ab Stufe 8", { exact: true })).toHaveCount(0);
   // Demo 0.10.0: the mastery step (level 18) makes it 15 steps.
   await expect(page.locator(".progress__text")).toContainText("von 15");
