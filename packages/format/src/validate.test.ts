@@ -127,7 +127,7 @@ describe("cross-file rules", () => {
     [
       "format version",
       (f) => (f.get("manifest.json").formatVersion = "0.3"),
-      "manifest.json formatVersion: package is written for format 0.3, this builder understands 0.10",
+      "manifest.json formatVersion: package is written for format 0.3, this builder understands 0.11",
     ],
     [
       "duplicate thing",
@@ -153,8 +153,8 @@ describe("cross-file rules", () => {
     ],
     [
       "unknown value in expression",
-      (f) => (f.get("values.json")[8].formula = "mightBonus * levle"),
-      'values.json [8].formula: expression "mightBonus * levle" uses unknown value "levle"',
+      (f) => (f.get("values.json")[16].formula = "mightBonus * levle"),
+      'values.json [16].formula: expression "mightBonus * levle" uses unknown value "levle"',
     ],
     [
       "has() of unknown thing",
@@ -164,7 +164,7 @@ describe("cross-file rules", () => {
     [
       "formula cycle across values",
       (f) => {
-        f.get("values.json")[4].formula = "floor(stamina / 3)";
+        f.get("values.json")[12].formula = "floor(stamina / 3)";
       },
       "values.json : formulas depend on each other in a circle: mightBonus → stamina → mightBonus",
     ],
@@ -228,7 +228,7 @@ describe("cross-file rules", () => {
     [
       "choice both fixed and granted",
       (f) => f.get("flow.json").steps.push({ id: "gear", choices: ["gear"] }),
-      'flow.json steps[14].choices[0]: choice "gear" is granted by "calling.herbalist" and cannot also be a fixed step',
+      'flow.json steps[15].choices[0]: choice "gear" is granted by "calling.herbalist" and cannot also be a fixed step',
     ],
     [
       "card without layout",
@@ -383,7 +383,7 @@ describe("warnings", () => {
     [
       "choice never asked",
       (f) => f.get("flow.json").steps.splice(0, 1),
-      'flow.json choices[14]: choice "name" is never asked: no step lists it and no thing grants it',
+      'flow.json choices[15]: choice "name" is never asked: no step lists it and no thing grants it',
     ],
     [
       "text variant without texts",
@@ -447,7 +447,7 @@ describe("gather", () => {
         gatherKnacks(f);
         f.get("flow.json").steps.push({ id: "knacks-again", gather: "knacks" });
       },
-      'flow.json steps[14].gather: group "knacks" is already gathered in step "knacks"',
+      'flow.json steps[15].gather: group "knacks" is already gathered in step "knacks"',
     ],
     [
       "a list step with a choice that is not picked from a list",
@@ -457,7 +457,7 @@ describe("gather", () => {
         choice(f, "looks").gather = "knacks";
         thing(f, "callings-and-paths", "calling.herbalist").grants.push({ choice: "looks" });
       },
-      'flow.json choices[17].gather: step "knacks" shows one list of options; choice "looks" is text',
+      'flow.json choices[18].gather: step "knacks" shows one list of options; choice "looks" is text',
     ],
   ])("rejects %s", (_name, change, expected) => {
     expect(messages(mutate(change))).toContain(expected);
@@ -480,7 +480,7 @@ describe("gather", () => {
     [
       "a gather step without choices",
       (f) => f.get("flow.json").steps.push({ id: "spare", gather: "spare" }),
-      'flow.json steps[14].gather: no choice is gathered in group "spare"; the step is never shown',
+      'flow.json steps[15].gather: no choice is gathered in group "spare"; the step is never shown',
     ],
   ])("warns about %s", (_name, change, expected) => {
     expect(messages(mutate(change), "warnings")).toContain(expected);

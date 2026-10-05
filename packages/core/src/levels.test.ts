@@ -116,6 +116,8 @@ describe("a level-20 lantern bearer, worked out by hand", () => {
     // Scores (recommendation): might 8, grace 7, wit 9, heart 11; the ferry child gives grace 1.
     // Boons 4 and 8 raise heart 11 → 13 → 15; then heart is above 13, so 12, 16 and 19 raise wit 9 → 15.
     expect(ev.values).toEqual({
+      ...{ mightBase: 8, graceBase: 7, witBase: 9, heartBase: 11 },
+      ...{ mightGift: 0, graceGift: 0, witGift: 0, heartGift: 0 },
       might: 8,
       grace: 8,
       wit: 15,
@@ -321,7 +323,7 @@ describe("raising values", () => {
     expect(ev.choices["boon-raise@boon-8"]!.recommended).toEqual({ method: 0, assign: { heart: 2 } });
     const high = {
       ...at15,
-      answers: { ...at15.answers, scores: { method: 0, assign: { might: 8, grace: 7, wit: 9, heart: 12 } } },
+      answers: { ...at15.answers, scores: { method: 0, assign: { mightBase: 8, graceBase: 7, witBase: 9, heartBase: 12 } } },
     };
     // Heart 12 + 2 = 14: still at most 13 is false, so the package says wit; heart could take only 1.
     const ev2 = evaluateDraft(pkg, high);

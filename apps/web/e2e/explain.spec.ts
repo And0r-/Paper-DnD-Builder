@@ -131,7 +131,7 @@ test("numbers and things say where they come from, in both languages", async ({ 
   const r = await page.request.put(`/api/drafts/${id}/answers/scores`, {
     data: {
       version: view.draft.version,
-      answer: { method: 0, assign: { might: 11, grace: 7, wit: 9, heart: 8 } },
+      answer: { method: 0, assign: { mightBase: 11, graceBase: 7, witBase: 9, heartBase: 8 } },
     },
   });
   expect(r.status()).toBe(200);

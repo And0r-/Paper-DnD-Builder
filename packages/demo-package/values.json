@@ -1,30 +1,82 @@
 [
   {
-    "id": "might",
+    "id": "mightBase",
     "source": "mistland",
     "default": 6,
     "min": 6,
     "max": 15
   },
   {
-    "id": "grace",
+    "id": "mightGift",
+    "source": "mistland",
+    "default": 0,
+    "min": 0,
+    "max": 2
+  },
+  {
+    "id": "might",
+    "source": "mistland",
+    "formula": "mightBase + mightGift",
+    "max": 15
+  },
+  {
+    "id": "graceBase",
     "source": "mistland",
     "default": 6,
     "min": 6,
     "max": 17
   },
   {
-    "id": "wit",
+    "id": "graceGift",
+    "source": "mistland",
+    "default": 0,
+    "min": 0,
+    "max": 2
+  },
+  {
+    "id": "grace",
+    "source": "mistland",
+    "formula": "graceBase + graceGift",
+    "max": 17
+  },
+  {
+    "id": "witBase",
     "source": "mistland",
     "default": 6,
     "min": 6,
     "max": 15
   },
   {
-    "id": "heart",
+    "id": "witGift",
+    "source": "mistland",
+    "default": 0,
+    "min": 0,
+    "max": 2
+  },
+  {
+    "id": "wit",
+    "source": "mistland",
+    "formula": "witBase + witGift",
+    "max": 15
+  },
+  {
+    "id": "heartBase",
     "source": "mistland",
     "default": 6,
     "min": 6,
+    "max": 15
+  },
+  {
+    "id": "heartGift",
+    "source": "mistland",
+    "default": 0,
+    "min": 0,
+    "max": 2
+  },
+  {
+    "id": "heart",
+    "source": "mistland",
+    "formula": "heartBase + heartGift",
     "max": 15
   },
   {

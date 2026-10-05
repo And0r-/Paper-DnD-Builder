@@ -193,7 +193,7 @@ export async function answerCharacter(page: Page, id: string, finish = true): Pr
     ["gear", { pick: "item.reed-shield" }],
     ["knacks-lantern", { picks: ["knack.warm-glow", "knack.glow-thread", "knack.quiet-word"] }],
     ["path", { pick: "path.lightwarden" }],
-    ["scores", { method: 0, assign: { might: 8, grace: 7, wit: 9, heart: 11 } }],
+    ["scores", { method: 0, assign: { mightBase: 8, graceBase: 7, witBase: 9, heartBase: 11 } }],
     ["extra-talent", { pick: "talent.listening" }],
     ["name", { text: "Mira" }],
     ["concept", { text: "Mira trägt das Licht durch jeden Sumpf." }],

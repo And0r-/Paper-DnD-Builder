@@ -55,7 +55,7 @@ export interface ChoiceState {
   max?: number;
   /** Recommended picks (pick choices) or assignment (distribute). */
   recommended?: string[] | { method: number; assign: Record<string, number> };
-  /** Badge text key by offered option (pick choices); shown instead of "recommended". */
+  /** Badge text key by offered option (pick choices; shown instead of "recommended") or by target (distribute). */
   badges?: Record<string, string>;
   /**
    * Choices with `held`: things the character already has that an offered
@@ -708,6 +708,11 @@ function prepareChoice(
       // A raise sees the values as they are at its own level (see Character.scopeAt).
       const at = raise ? character.scopeAt(atLevel) : scope;
       const rec = choice.recommend?.find((r) => r.when === undefined || evaluateCondition(r.when, at));
+      const badges: Record<string, string> = {};
+      for (const b of choice.badges ?? [])
+        if (b.when === undefined || evaluateCondition(b.when, at))
+          for (const t of b.targets) badges[t] ??= b.text;
+      if (Object.keys(badges).length > 0) state.badges = badges;
       if (raise) {
         const raiseState = raiseFor(pkg, choice.targets, raise, character, atLevel);
         state.raise = raiseState;
