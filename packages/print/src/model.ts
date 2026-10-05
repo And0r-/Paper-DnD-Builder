@@ -197,10 +197,13 @@ export function buildPrintModel(
     if (typeof v === "number") return numberFormat.format(v);
     if (typeof v === "boolean") return v ? messages.yes : messages.no;
     if ("text" in v) return text(v.text) || "—";
+    if ("value" in v) return valueText(v.value);
     return formatMeasure(measure, v, "short");
   };
   const uses = (t: Thing, key: string | undefined): Uses => {
-    const v = key === undefined ? undefined : t.stats?.[key];
+    const stat = key === undefined ? undefined : t.stats?.[key];
+    // A stat that names a value has as many boxes as the character's value (uses by level).
+    const v = typeof stat === "object" && "value" in stat ? valueOf(stat.value) : stat;
     if (typeof v === "number") return v > 0 ? { boxes: Math.min(12, Math.round(v)) } : null;
     if (typeof v === "object" && "text" in v) return { text: text(v.text) };
     return null;

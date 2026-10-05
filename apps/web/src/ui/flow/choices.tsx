@@ -38,6 +38,7 @@ import { stepHref, stepTitle } from "./model.ts";
 
 function Stats({ lp, thing }: { lp: LoadedPackage; thing: Thing }) {
   const { t } = useApp();
+  const { ev } = useDraft();
   const ctx = useMeasure(lp);
   const entries = Object.entries(thing.stats ?? {});
   if (entries.length === 0) return null;
@@ -48,6 +49,9 @@ function Stats({ lp, thing }: { lp: LoadedPackage; thing: Thing }) {
         if (typeof v === "number") shown = new Intl.NumberFormat(lp.lang).format(v);
         else if (typeof v === "boolean") shown = v ? t("common.yes") : t("common.no");
         else if ("amount" in v) shown = formatMeasure(ctx, v, "long");
+        // A stat that names a value shows the character's value (uses that grow with the level).
+        else if ("value" in v)
+          shown = formatValue(lp, ctx, v.value, v.value === "level" ? ev.level : (ev.values[v.value] ?? 0));
         else shown = plain(ctx, ptext(lp, v.text));
         return (
           <div className="stats__row" key={key}>

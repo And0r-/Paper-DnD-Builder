@@ -1,17 +1,40 @@
 {
   "sections": [
-    { "id": "header", "kind": "header", "span": 12 },
+    {
+      "id": "header",
+      "kind": "header",
+      "span": 12
+    },
     {
       "id": "primary",
       "kind": "statBoxes",
       "span": 12,
       "boxes": [
-        { "value": "stamina", "style": "pencil" },
-        { "value": "guard", "style": "number" },
-        { "value": "pace", "style": "number" },
-        { "value": "luck", "style": "circles" },
-        { "value": "nerve", "style": "number", "label": "sheet.primary.nerve" },
-        { "value": "practice", "style": "number" }
+        {
+          "value": "stamina",
+          "style": "pencil"
+        },
+        {
+          "value": "guard",
+          "style": "number"
+        },
+        {
+          "value": "pace",
+          "style": "number"
+        },
+        {
+          "value": "luck",
+          "style": "circles"
+        },
+        {
+          "value": "nerve",
+          "style": "number",
+          "label": "sheet.primary.nerve"
+        },
+        {
+          "value": "practice",
+          "style": "number"
+        }
       ]
     },
     {
@@ -19,21 +42,63 @@
       "kind": "scoreColumn",
       "span": 4,
       "scores": [
-        { "value": "might", "derived": "mightBonus" },
-        { "value": "grace", "derived": "graceBonus" },
-        { "value": "wit", "derived": "witBonus" },
-        { "value": "heart", "derived": "heartBonus" }
+        {
+          "value": "might",
+          "derived": "mightBonus"
+        },
+        {
+          "value": "grace",
+          "derived": "graceBonus"
+        },
+        {
+          "value": "wit",
+          "derived": "witBonus"
+        },
+        {
+          "value": "heart",
+          "derived": "heartBonus"
+        }
       ]
     },
-    { "id": "talents", "kind": "checkList", "span": 8, "things": { "kind": "talent" }, "note": "score" },
+    {
+      "id": "talents",
+      "kind": "checkList",
+      "span": 8,
+      "things": {
+        "kind": "talent"
+      },
+      "note": "score"
+    },
     {
       "id": "rolls",
       "kind": "statBoxes",
       "span": 4,
-      "boxes": [{ "value": "sneakRoll", "style": "number", "label": "sheet.rolls.sneak" }]
+      "boxes": [
+        {
+          "value": "sneakRoll",
+          "style": "number",
+          "label": "sheet.rolls.sneak"
+        }
+      ]
     },
-    { "id": "traits", "kind": "featureTable", "span": 8, "things": { "kind": "trait" }, "uses": "uses" },
-    { "id": "knacks", "kind": "featureTable", "span": 8, "things": { "kind": "knack" }, "uses": "uses" },
+    {
+      "id": "traits",
+      "kind": "featureTable",
+      "span": 8,
+      "things": {
+        "kind": "trait"
+      },
+      "uses": "uses"
+    },
+    {
+      "id": "knacks",
+      "kind": "featureTable",
+      "span": 8,
+      "things": {
+        "kind": "knack"
+      },
+      "uses": "uses"
+    },
     {
       "id": "lantern-slots",
       "kind": "statBoxes",
@@ -103,13 +168,53 @@
         }
       ]
     },
-    { "id": "path", "kind": "featureTable", "span": 4, "things": { "kind": "path" }, "when": "level >= 3" },
-    { "id": "gear", "kind": "list", "span": 6, "things": { "kind": "item" }, "blankLines": 4 },
-    { "id": "how-to-play", "kind": "helpBox", "span": 6 },
-    { "id": "about", "kind": "answers", "span": 6, "choices": ["concept", "age", "looks"] },
-    { "id": "notes", "kind": "notes", "span": 6, "lines": 6 }
+    {
+      "id": "path",
+      "kind": "featureTable",
+      "span": 4,
+      "things": {
+        "kind": "path"
+      },
+      "when": "level >= 3"
+    },
+    {
+      "id": "mastery",
+      "kind": "answers",
+      "span": 4,
+      "when": "has('calling.lantern-bearer') and level >= 18",
+      "choices": ["lantern-mastery"]
+    },
+    {
+      "id": "gear",
+      "kind": "list",
+      "span": 6,
+      "things": {
+        "kind": "item"
+      },
+      "blankLines": 4
+    },
+    {
+      "id": "how-to-play",
+      "kind": "helpBox",
+      "span": 6
+    },
+    {
+      "id": "about",
+      "kind": "answers",
+      "span": 6,
+      "choices": ["concept", "age", "looks"]
+    },
+    {
+      "id": "notes",
+      "kind": "notes",
+      "span": 6,
+      "lines": 6
+    }
   ],
   "cards": {
-    "knack": { "fields": ["reach", "duration", "uses", "focus"], "uses": "uses" }
+    "knack": {
+      "fields": ["reach", "duration", "uses", "focus"],
+      "uses": "uses"
+    }
   }
 }

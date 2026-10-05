@@ -269,6 +269,40 @@ describe("printed character (demo package)", () => {
     expect(plain.cards.every((c) => c.uses === null)).toBe(true);
   });
 
+  it("prints use boxes from a value that grows, and the picks among what the character has", async () => {
+    const traitRow = (model: ReturnType<typeof buildPrintModel>, thing: string) => {
+      const traits = model.sections.find((s) => s.id === "traits")!;
+      if (traits.kind !== "featureTable") throw new Error("demo sheet changed");
+      return traits.rows.find((r) => r.name === pkg.texts["de"]![`${thing}.name`])!;
+    };
+    // Bloom ward: 2 uses from level 11, 3 from level 17 (value bloomWardUses).
+    for (const [level, boxes] of [
+      [11, 2],
+      [17, 3],
+    ] as const) {
+      const herbalist = demoCharacter(pkg, level, "Mira Fennwick", "calling.herbalist");
+      const model = buildPrintModel(pkg, herbalist, { language: "de", createdAt });
+      expect(traitRow(model, "trait.bloom-ward").uses).toEqual({ boxes });
+    }
+    // River heart: as often as practice, 6 at level 20.
+    const runner = demoCharacter(pkg, 20, "Mira Fennwick", "calling.river-runner");
+    const runnerModel = buildPrintModel(pkg, runner, { language: "de", createdAt });
+    expect(traitRow(runnerModel, "trait.river-heart").uses).toEqual({ boxes: 6 });
+
+    // Favourite knacks (level 18, options.owned): printed by name in their answers section.
+    const bearer = demoCharacter(pkg, 18);
+    const ev = evaluateDraft(pkg, bearer);
+    const picks = (ev.choices["lantern-mastery"]!.answer as { picks: string[] }).picks;
+    const { model, extracted } = await print("de", {}, pkg, bearer);
+    const mastery = model.sections.find((s) => s.id === "mastery")!;
+    if (mastery.kind !== "answers") throw new Error("demo sheet changed");
+    const names = picks.map((p) => pkg.texts["de"]![`${p}.name`] as string);
+    expect(mastery.rows).toEqual([
+      { label: pkg.texts["de"]!["choice.lantern-mastery.title"], text: names.join(", ") },
+    ]);
+    for (const n of names) expect(extracted.text).toContain(n);
+  });
+
   it("leaves out sections and boxes whose `when` is false; the rest moves up", async () => {
     const title = pkg.texts["de"]!["sheet.path.title"] as string;
     const pathShort = pkg.texts["de"]!["path.lightwarden.short"] as string;
@@ -285,7 +319,7 @@ describe("printed character (demo package)", () => {
     const low = await print("de", {}, pkg, level2);
     const ids = pkg.sheet.sections
       .map((s) => s.id)
-      .filter((id) => id !== "path" && id !== "lantern-slots-high");
+      .filter((id) => id !== "path" && id !== "lantern-slots-high" && id !== "mastery");
     expect(low.model.sections.map((s) => s.id)).toEqual(ids);
     expect(low.pdf.sheetLayout.flat().map((p) => p.section.id)).toEqual(ids);
     expect(low.extracted.pageTexts.slice(0, low.pdf.sheetPages).join("\n")).not.toContain(title);

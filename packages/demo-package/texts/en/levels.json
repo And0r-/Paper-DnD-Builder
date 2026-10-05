@@ -42,7 +42,7 @@
     "trait.river-heart.name": "River Heart",
     "trait.river-heart.short": "You shake off what would stop you.",
     "trait.river-heart.explain.what": "Like a river around a stone, you go on.",
-    "trait.river-heart.explain.table": "Once per rest, you end one thing that holds you back, like a trap or a spell.",
+    "trait.river-heart.explain.table": "As often per rest as your practice, you end one thing that holds you back, like a trap or a spell.",
     "trait.deep-roots.name": "Deep Roots",
     "trait.deep-roots.short": "Plants tell you who passed by.",
     "trait.deep-roots.explain.what": "Grass and trees remember steps. You can ask them.",
@@ -50,7 +50,7 @@
     "trait.bloom-ward.name": "Bloom Ward",
     "trait.bloom-ward.short": "Flowers shield a friend.",
     "trait.bloom-ward.explain.what": "A cloud of petals wraps around someone you choose.",
-    "trait.bloom-ward.explain.table": "Your friend's guard goes up by 2 until their next turn. Twice per rest.",
+    "trait.bloom-ward.explain.table": "Your friend's guard goes up by 2 until their next turn. Twice per rest, from level 17 three times.",
     "trait.old-growth.name": "Old Growth",
     "trait.old-growth.short": "You become as tough as an old tree.",
     "trait.old-growth.explain.what": "Bark grows over your skin for a while.",
@@ -145,6 +145,17 @@
     "sheet.lantern-slots.rank6": "Rank 6",
     "sheet.lantern-slots.rank7": "Rank 7",
     "sheet.lantern-slots.rank8": "Rank 8",
-    "sheet.lantern-slots.rank9": "Rank 9"
+    "sheet.lantern-slots.rank9": "Rank 9",
+    "trait.tide-crown.name": "Tide Crown",
+    "trait.tide-crown.short": "The river carries you: grace +2, up to 17.",
+    "trait.tide-crown.explain.what": "At the height of your journey, you move like water.",
+    "trait.tide-crown.explain.table": "Your grace goes up by 2. It can now reach 17.",
+    "value.bloomWardUses.name": "Bloom Ward uses",
+    "value.bloomWardUses.explain": "How often per rest you can use Bloom Ward.",
+    "choice.lantern-mastery.title": "Favourite knacks",
+    "choice.lantern-mastery.question": "Which two knacks do you know best?",
+    "choice.lantern-mastery.intro": "At level 18 two of your knacks become second nature. Pick two of the knacks you already know.",
+    "choice.lantern-mastery.missing": "Pick {{var:remaining}} more.",
+    "sheet.mastery.title": "Favourite knacks"
   }
 }

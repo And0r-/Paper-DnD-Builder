@@ -42,7 +42,7 @@
     "trait.river-heart.name": "Flussherz",
     "trait.river-heart.short": "Du schüttelst ab, was dich aufhalten will.",
     "trait.river-heart.explain.what": "Wie ein Fluss um einen Stein gehst du weiter.",
-    "trait.river-heart.explain.table": "Einmal pro Rast beendest du etwas, das dich festhält, zum Beispiel eine Falle oder einen Zauber.",
+    "trait.river-heart.explain.table": "So oft pro Rast, wie deine Übung zeigt, beendest du etwas, das dich festhält, zum Beispiel eine Falle oder einen Zauber.",
     "trait.deep-roots.name": "Tiefe Wurzeln",
     "trait.deep-roots.short": "Pflanzen sagen dir, wer vorbeikam.",
     "trait.deep-roots.explain.what": "Gras und Bäume merken sich Schritte. Du kannst sie fragen.",
@@ -50,7 +50,7 @@
     "trait.bloom-ward.name": "Blütenschild",
     "trait.bloom-ward.short": "Blüten schützen eine Freundin oder einen Freund.",
     "trait.bloom-ward.explain.what": "Eine Wolke aus Blütenblättern hüllt jemanden ein, den du wählst.",
-    "trait.bloom-ward.explain.table": "Der Schutz dieser Person steigt um 2 bis zu ihrem nächsten Zug. Zweimal pro Rast.",
+    "trait.bloom-ward.explain.table": "Der Schutz dieser Person steigt um 2 bis zu ihrem nächsten Zug. Zweimal pro Rast, ab Stufe 17 dreimal.",
     "trait.old-growth.name": "Uralter Wald",
     "trait.old-growth.short": "Du wirst zäh wie ein alter Baum.",
     "trait.old-growth.explain.what": "Eine Weile wächst Rinde über deine Haut.",
@@ -145,6 +145,17 @@
     "sheet.lantern-slots.rank6": "Rang 6",
     "sheet.lantern-slots.rank7": "Rang 7",
     "sheet.lantern-slots.rank8": "Rang 8",
-    "sheet.lantern-slots.rank9": "Rang 9"
+    "sheet.lantern-slots.rank9": "Rang 9",
+    "trait.tide-crown.name": "Gezeitenkrone",
+    "trait.tide-crown.short": "Der Fluss trägt dich: Geschick +2, bis 17.",
+    "trait.tide-crown.explain.what": "Auf dem Höhepunkt deiner Reise bewegst du dich wie Wasser.",
+    "trait.tide-crown.explain.table": "Dein Geschick steigt um 2. Es kann jetzt bis 17 gehen.",
+    "value.bloomWardUses.name": "Blütenschild pro Rast",
+    "value.bloomWardUses.explain": "Wie oft du Blütenschild pro Rast nutzen kannst.",
+    "choice.lantern-mastery.title": "Lieblingskniffe",
+    "choice.lantern-mastery.question": "Welche zwei Kniffe kannst du am besten?",
+    "choice.lantern-mastery.intro": "Auf Stufe 18 gehen dir zwei deiner Kniffe in Fleisch und Blut über. Wähle zwei Kniffe, die du schon kannst.",
+    "choice.lantern-mastery.missing": "Wähle noch {{var:remaining}}.",
+    "sheet.mastery.title": "Lieblingskniffe"
   }
 }

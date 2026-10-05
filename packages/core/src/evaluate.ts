@@ -162,8 +162,13 @@ export interface Evaluation {
   values: Record<string, number>;
   /** Values set directly by an answer (distribute, number), with the choice that set them. */
   inputs: Record<string, { amount: number; choice: string }>;
-  /** Points added to values by `raise` answers, per value in step order, with the choice that gave them. */
-  raises: Record<string, { amount: number; choice: string }[]>;
+  /** Points added to values by `raise` answers, per value in step order, with the choice that gave them and its level. */
+  raises: Record<string, { amount: number; choice: string; atLevel: number }[]>;
+  /**
+   * Things the character has that were picked again in a choice with
+   * `options.owned` (for example "your favourite knack"), with those choices.
+   */
+  marks: Record<string, string[]>;
   /** Choices that still need an answer (missing, incomplete or invalid, not optional). */
   open: string[];
   complete: boolean;
@@ -199,8 +204,8 @@ class Character {
   readonly inputs = new Map<string, number>();
   /** The choice that set each input. */
   readonly inputChoices = new Map<string, string>();
-  /** Points added by raise answers, per value. */
-  readonly raises = new Map<string, { amount: number; choice: string }[]>();
+  /** Points added by raise answers, per value, with the level of the choice that gave them. */
+  readonly raises = new Map<string, { amount: number; choice: string; atLevel: number }[]>();
   private memo = new Map<string, number>();
   private computing = new Set<string>();
 
@@ -212,6 +217,7 @@ class Character {
     this.pkg = pkg;
     this.ix = ix;
     this.level = level;
+    this.scope = this.scopeAt(level);
   }
 
   /**
@@ -250,21 +256,30 @@ class Character {
     }
   }
 
-  addRaises(raises: Record<string, number>, choice: string): void {
+  /** Things picked in choices with `options.owned`, with those choices in step order. */
+  readonly marks = new Map<string, string[]>();
+
+  mark(id: string, choice: string): void {
+    const list = this.marks.get(id) ?? [];
+    list.push(choice);
+    this.marks.set(id, list);
+  }
+
+  addRaises(raises: Record<string, number>, choice: string, atLevel: number): void {
     for (const [k, amount] of Object.entries(raises)) {
       if (amount === 0) continue;
       const list = this.raises.get(k) ?? [];
-      list.push({ amount, choice });
+      list.push({ amount, choice, atLevel });
       this.raises.set(k, list);
     }
     this.memo.clear();
   }
 
-  /** A number, an expression or a table by level, worked out for this character. */
-  amount(src: Amount): number {
+  /** A number, an expression or a table by level, worked out for this character (at `at`, see {@link scopeAt}). */
+  amount(src: Amount, at = this.level): number {
     return typeof src === "object"
-      ? byLevel(this.pkg, src.byLevel, this.level)
-      : evaluateNumber(src, this.scope);
+      ? byLevel(this.pkg, src.byLevel, at)
+      : evaluateNumber(src, this.scopeAt(at));
   }
 
   setInputs(inputs: Record<string, number>, choice: string): void {
@@ -275,43 +290,60 @@ class Character {
     this.memo.clear();
   }
 
-  readonly scope: ExprScope = {
-    value: (name) => this.value(name),
-    has: (id) => this.held.has(id),
-    count: (tag) => {
-      let n = 0;
-      for (const h of this.held.values()) if (this.ix.things.get(h.id)?.tags?.includes(tag)) n++;
-      return n;
-    },
-  };
+  /** The character at its own level. */
+  readonly scope: ExprScope;
 
-  value(name: string): number {
-    if (name === "level") return this.level;
-    const cached = this.memo.get(name);
+  /**
+   * The character as it was at level `at`: only what it had from that level
+   * on, grants and raises up to it, tables and `level` at it. A raise looks
+   * at the values this way (SPEC 9.3): a bonus that only comes at a later
+   * level must not count against the cap of an earlier raise.
+   */
+  scopeAt(at: number): ExprScope {
+    const had = (h: HeldThing) => h.atLevel <= at;
+    return {
+      value: (name) => this.value(name, at),
+      has: (id) => {
+        const h = this.held.get(id);
+        return h !== undefined && had(h);
+      },
+      count: (tag) => {
+        let n = 0;
+        for (const h of this.held.values()) if (had(h) && this.ix.things.get(h.id)?.tags?.includes(tag)) n++;
+        return n;
+      },
+    };
+  }
+
+  value(name: string, at = this.level): number {
+    if (name === "level") return at;
+    const key = `${at}:${name}`;
+    const cached = this.memo.get(key);
     if (cached !== undefined) return cached;
     const def = this.ix.values.get(name);
     if (!def) throw new RuleError(`unknown value "${name}"`);
-    if (this.computing.has(name)) throw new RuleError(`value "${name}" depends on itself`);
-    this.computing.add(name);
+    if (this.computing.has(key)) throw new RuleError(`value "${name}" depends on itself`);
+    this.computing.add(key);
     try {
       let result =
         def.formula !== undefined
-          ? evaluateNumber(def.formula, this.scope)
+          ? evaluateNumber(def.formula, this.scopeAt(at))
           : def.byLevel !== undefined
-            ? byLevel(this.pkg, def.byLevel, this.level)
+            ? byLevel(this.pkg, def.byLevel, at)
             : (this.inputs.get(name) ?? def.default ?? 0);
       for (const h of this.held.values()) {
+        if (h.atLevel > at) continue;
         for (const g of this.ix.things.get(h.id)?.grants ?? []) {
-          if (g.value === name && (g.atLevel ?? 1) <= this.level) result += this.amount(g.add!);
+          if (g.value === name && (g.atLevel ?? 1) <= at) result += this.amount(g.add!, at);
         }
       }
-      for (const r of this.raises.get(name) ?? []) result += r.amount;
+      for (const r of this.raises.get(name) ?? []) if (r.atLevel <= at) result += r.amount;
       if (def.min !== undefined) result = Math.max(def.min, result);
       if (def.max !== undefined) result = Math.min(def.max, result);
-      this.memo.set(name, result);
+      this.memo.set(key, result);
       return result;
     } finally {
-      this.computing.delete(name);
+      this.computing.delete(key);
     }
   }
 
@@ -558,6 +590,7 @@ export function evaluateDraft(pkg: ContentPackage, doc: DraftDocument): Evaluati
       [...character.inputs].map(([k, amount]) => [k, { amount, choice: character.inputChoices.get(k)! }]),
     ),
     raises: Object.fromEntries(character.raises),
+    marks: Object.fromEntries(character.marks),
     open,
     complete: open.length === 0,
     inactiveAnswers: Object.keys(doc.answers).filter((k) => !(k in choices)),
@@ -578,6 +611,11 @@ interface Prepared {
   hasAnswer: boolean;
   /** Picks of the answer that count for the character (pick choices). */
   counted: string[];
+}
+
+/** Choices whose picks mark things the character has instead of giving them (`options.owned`). */
+function marksOnly(choice: Choice): boolean {
+  return (choice.kind === "pickOne" || choice.kind === "pickMany") && choice.options.owned === true;
 }
 
 function prepareChoice(
@@ -611,11 +649,16 @@ function prepareChoice(
   switch (choice.kind) {
     case "pickOne":
     case "pickMany": {
-      // Offered: matches the source, its condition holds, and the character does not have it yet.
+      // Offered: matches the source, its condition holds, and the character does not have it yet;
+      // with `owned` the other way round: only what the character has by now.
+      const owned = choice.options.owned ?? false;
       const options: string[] = [];
       for (const t of selectThings(pkg, choice.options)) {
         for (const r of thingsIn(t.requires)) refs.add(r);
-        if (character.held.has(t.id) && !t.repeatable) continue;
+        if (owned) {
+          refs.add(t.id);
+          if (!character.held.has(t.id)) continue;
+        } else if (character.held.has(t.id) && !t.repeatable) continue;
         if (t.requires !== undefined && !evaluateCondition(t.requires, scope)) continue;
         options.push(t.id);
       }
@@ -661,10 +704,12 @@ function prepareChoice(
       break;
     }
     case "distribute": {
-      const rec = choice.recommend?.find((r) => r.when === undefined || evaluateCondition(r.when, scope));
       const raise = choice.methods[0]?.method === "raise" ? choice.methods[0] : undefined;
+      // A raise sees the values as they are at its own level (see Character.scopeAt).
+      const at = raise ? character.scopeAt(atLevel) : scope;
+      const rec = choice.recommend?.find((r) => r.when === undefined || evaluateCondition(r.when, at));
       if (raise) {
-        const raiseState = raiseFor(pkg, choice.targets, raise, character);
+        const raiseState = raiseFor(pkg, choice.targets, raise, character, atLevel);
         state.raise = raiseState;
         ctx.raise = raiseState;
         state.remaining = raise.points;
@@ -730,25 +775,28 @@ function answerChoice(
   // Picks that fit count even if others in the same answer do not; inputs only from a fitting answer.
   for (const id of p.counted) {
     taken?.add(id);
-    character.give(id, { pickedIn: p.id }, stepId, state.atLevel, granted);
+    // A pick among what the character has marks the thing; it is not given a second time.
+    if (marksOnly(choice)) character.mark(id, p.id);
+    else character.give(id, { pickedIn: p.id }, stepId, state.atLevel, granted);
   }
   if (j.status !== "invalid" && j.inputs) character.setInputs(j.inputs, p.id);
-  if (j.status !== "invalid" && j.raises) character.addRaises(j.raises, p.id);
+  if (j.status !== "invalid" && j.raises) character.addRaises(j.raises, p.id, state.atLevel);
 }
 
-/** What each target of a raise can take, worked out before the choice counts. */
+/** What each target of a raise can take, worked out before the choice counts, at the choice's level. */
 function raiseFor(
   pkg: ContentPackage,
   targets: readonly string[],
   raise: Extract<Choice, { kind: "distribute" }>["methods"][number] & { method: "raise" },
   character: Character,
+  atLevel: number,
 ): RaiseState {
-  const cap = raise.cap !== undefined ? evaluateNumber(raise.cap, character.scope) : Infinity;
+  const cap = raise.cap !== undefined ? evaluateNumber(raise.cap, character.scopeAt(atLevel)) : Infinity;
   const per = raise.maxPerTarget ?? raise.points;
   const before: Record<string, number> = {};
   const most: Record<string, number> = {};
   for (const t of targets) {
-    before[t] = character.value(t);
+    before[t] = character.value(t, atLevel);
     const top = Math.min(cap, indexes(pkg).values.get(t)?.max ?? Infinity);
     most[t] = Math.max(0, Math.min(per, Math.floor(top - before[t])));
   }
