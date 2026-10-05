@@ -44,7 +44,7 @@ else is derived by the rule core and returned with every response:
 {
   "draft": { "id", "packageId", "version", "status": "draft|finished", "level", "answers", ... },
   "packageAvailable": true,
-  "evaluation": { "steps", "choices", "things", "values", "open", "complete", "inactiveAnswers" },
+  "evaluation": { "level", "steps", "choices", "things", "values", "inputs", "raises", "open", "complete", "inactiveAnswers" },
   "summary": { "name", "level", "complete", "line" }
 }
 ```
@@ -68,6 +68,33 @@ Answer shapes by choice kind: `pickOne` `{ "pick": "thing.key" }`,
 `{ "method": 0, "assign": { "value": 8 } }` (index into `methods`),
 `number` `{ "value": 20 }`, `text` `{ "text": "..." }`. `info` choices take
 no answer. A partial `pickMany` answer is allowed; the choice stays open.
+
+**Raising values** (format 0.9, a `distribute` choice whose method is
+`raise`): the same shape, `{ "method": 0, "assign": { "heart": 2 } }` or
+`{ "method": 0, "assign": { "wit": 1, "heart": 1 } }`. `assign` names only
+the values that get points; the points are added on top of the value as it
+is before this choice (they do not set its base). Refused with
+`answerDoesNotFit` and `badAssignment` (not a target, or below 0),
+`outOfRange` (more than the value may take here) or `overBudget` (more
+points than there are). Fewer points than `points` leave the choice open
+(`incomplete`, `remaining`), unless no value can take another one.
+
+**Copies of a choice** (format 0.9, things with `repeatable`): a choice
+granted by a repeatable thing is asked once per pick of that thing, under
+the id `<choice>@<where the thing was picked>`, for example
+`boon-raise@boon-8`. It is answered like any choice
+(`PUT /api/drafts/:id/answers/boon-raise%40boon-8`); its rules and texts are
+those of the declared choice (`copyOf` in the evaluation).
+
+### Fields of `evaluation` for levels (format 0.9)
+
+| Where                              | Field         | Meaning                                                                                                                                                                                            |
+| ---------------------------------- | ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `steps[]`, `choices.*`, `things[]` | `atLevel`     | Character level from which the step, choice or thing is there: `flow.level.min` for flow steps, else the level at which its grant applies. Raising from level n adds the steps with `atLevel > n`. |
+| `choices.*` (raise)                | `raise`       | `{ points, before: { value: n }, most: { value: n } }`: points to give, each value before this choice, most points each value can take here (cap and the value's `max` included).                  |
+| `choices.*` (raise)                | `recommended` | `{ method, assign }`, always a full answer: the package's assignment as far as it fits, the rest in order.                                                                                         |
+| `choices.*` (copy)                 | `copyOf`      | The declared choice a copy uses for rules and texts.                                                                                                                                               |
+| `raises`                           | —             | Per value, the points added by raise answers in step order: `{ "heart": [{ "amount": 2, "choice": "boon-raise@boon-4" }] }`.                                                                       |
 
 A finished character stays finished while it is complete; a change that
 leaves something open makes it a draft again.
