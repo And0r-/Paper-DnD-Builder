@@ -133,8 +133,8 @@ describe("building a character over the API", () => {
     const pool = await client.call("PUT", `/api/drafts/${id}/pools/folk`, { version: 1, picks: [] });
     expect(pool.status).toBe(422);
     expect(pool.json.error.reason).toEqual({ code: "unknownStep" });
-    const level = await client.call("PATCH", `/api/drafts/${id}`, { version: 1, level: 9 });
-    expect(level.json.error.reason).toEqual({ code: "levelOutOfRange", min: 1, max: 3 });
+    const level = await client.call("PATCH", `/api/drafts/${id}`, { version: 1, level: 21 });
+    expect(level.json.error.reason).toEqual({ code: "levelOutOfRange", min: 1, max: 20 });
     const unknownPackage = await client.call("POST", "/api/drafts", { packageId: "nope" });
     expect(unknownPackage.status).toBe(404);
   });
@@ -221,7 +221,7 @@ describe("building a character over the API", () => {
 
   it("serves the package structure and the texts of exactly one language", async () => {
     const pkg = await client.call("GET", "/api/packages/demo");
-    expect(pkg.json.package.flow.level).toEqual({ min: 1, max: 3, default: 1 });
+    expect(pkg.json.package.flow.level).toEqual({ min: 1, max: 20, default: 1 });
     expect(pkg.json.package).not.toHaveProperty("texts");
     const de = await client.call("GET", "/api/packages/demo/texts/de");
     expect(de.json.texts["package.name"]).toBe("Nebelland");

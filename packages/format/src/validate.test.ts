@@ -45,8 +45,9 @@ describe("demo package", () => {
     expect(count("path")).toBe(3);
     expect(count("folk")).toBe(3);
     expect(count("upbringing")).toBe(2);
-    expect(count("knack")).toBe(20);
-    expect(p.flow.level).toEqual({ min: 1, max: 3, default: 1 });
+    expect(count("knack")).toBe(29);
+    expect(count("boon")).toBe(3);
+    expect(p.flow.level).toEqual({ min: 1, max: 20, default: 1 });
     expect(p.manifest.languages).toEqual(["de", "en"]);
     expect(new Set(p.flow.choices.map((c) => c.kind))).toEqual(
       new Set(["pickOne", "pickMany", "distribute", "number", "text", "info"]),
@@ -227,7 +228,7 @@ describe("cross-file rules", () => {
     [
       "choice both fixed and granted",
       (f) => f.get("flow.json").steps.push({ id: "gear", choices: ["gear"] }),
-      'flow.json steps[12].choices[0]: choice "gear" is granted by "calling.herbalist" and cannot also be a fixed step',
+      'flow.json steps[13].choices[0]: choice "gear" is granted by "calling.herbalist" and cannot also be a fixed step',
     ],
     [
       "card without layout",
@@ -247,17 +248,17 @@ describe("cross-file rules", () => {
     [
       "use boxes from a stat the selected things lack",
       (f) => (f.get("sheet.json").sections.find((s: { id: string }) => s.id === "knacks").uses = "weight"),
-      'sheet.json sections[5].uses: none of the things selected here has a stat "weight"',
+      'sheet.json sections[6].uses: none of the things selected here has a stat "weight"',
     ],
     [
       "use boxes from a quantity",
       (f) => (thing(f, "talents-and-traits", "trait.stone-steady").stats.uses = { amount: 5, unit: "ft" }),
-      'things/talents-and-traits.json [9].stats.uses: sections[4].uses draws use boxes from this stat; it must be a whole number ≥ 0 or {"text": …}',
+      'things/talents-and-traits.json [9].stats.uses: sections[5].uses draws use boxes from this stat; it must be a whole number ≥ 0 or {"text": …}',
     ],
     [
       "use boxes from a fraction",
       (f) => (thing(f, "knacks", "knack.spark-shower").stats.uses = 1.5),
-      'things/knacks.json [0].stats.uses: sections[5].uses draws use boxes from this stat; it must be a whole number ≥ 0 or {"text": …}',
+      'things/knacks.json [0].stats.uses: sections[6].uses draws use boxes from this stat; it must be a whole number ≥ 0 or {"text": …}',
     ],
     [
       "check list note from true/false",
@@ -272,12 +273,12 @@ describe("cross-file rules", () => {
     [
       "section condition on an unknown value",
       (f) => (f.get("sheet.json").sections.find((s: { id: string }) => s.id === "path").when = "glow > 0"),
-      'sheet.json sections[6].when: expression "glow > 0" uses unknown value "glow"',
+      'sheet.json sections[9].when: expression "glow > 0" uses unknown value "glow"',
     ],
     [
       "section condition that does not parse",
       (f) => (f.get("sheet.json").sections.find((s: { id: string }) => s.id === "path").when = "level >="),
-      'sheet.json sections[6].when: cannot read expression "level >=": unexpected end of expression (at character 9)',
+      'sheet.json sections[9].when: cannot read expression "level >=": unexpected end of expression (at character 9)',
     ],
     [
       "box condition on an unknown thing",
@@ -446,7 +447,7 @@ describe("gather", () => {
         gatherKnacks(f);
         f.get("flow.json").steps.push({ id: "knacks-again", gather: "knacks" });
       },
-      'flow.json steps[12].gather: group "knacks" is already gathered in step "knacks"',
+      'flow.json steps[13].gather: group "knacks" is already gathered in step "knacks"',
     ],
     [
       "a list step with a choice that is not picked from a list",
@@ -479,7 +480,7 @@ describe("gather", () => {
     [
       "a gather step without choices",
       (f) => f.get("flow.json").steps.push({ id: "spare", gather: "spare" }),
-      'flow.json steps[12].gather: no choice is gathered in group "spare"; the step is never shown',
+      'flow.json steps[13].gather: no choice is gathered in group "spare"; the step is never shown',
     ],
   ])("warns about %s", (_name, change, expected) => {
     expect(messages(mutate(change), "warnings")).toContain(expected);

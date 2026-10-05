@@ -308,7 +308,11 @@ describe("a complete level 3 character", () => {
       of: "calling",
       thing: "calling.lantern-bearer",
       things: ["item.lantern-staff", "item.provisions", "trait.steady-flame"],
-      values: [{ value: "stamina", add: 18 }],
+      values: [
+        { value: "stamina", add: 18 },
+        { value: "lanternSlots1", add: 2 },
+        { value: "lanternSlots2", add: 1 },
+      ],
       choices: ["talents-lantern-bearer", "gear", "knacks-lantern", "extra-talent", "path"],
     });
   });
@@ -339,7 +343,7 @@ describe("a complete level 3 character", () => {
     const ev = evaluateDraft(withFormula, build(3, LANTERN_BEARER_L3));
     const bonus = ev.values["heartBonus"]!;
     expect(bonus).not.toBe(evaluateDraft(withFormula, draft(3)).values["heartBonus"]);
-    expect(ev.choices["calling-gifts"]!.info!.values).toEqual([{ value: "stamina", add: 18 + bonus * 3 }]);
+    expect(ev.choices["calling-gifts"]!.info!.values[0]).toEqual({ value: "stamina", add: 18 + bonus * 3 });
   });
 
   it("summarizes name and summary line", () => {
@@ -396,9 +400,9 @@ describe("applyChange", () => {
   const base = () => build(1, [["calling", { pick: "calling.river-runner" }]]);
 
   it("rejects a level outside the package's range", () => {
-    expect(applyChange(pkg, base(), { type: "setLevel", level: 4 })).toEqual({
+    expect(applyChange(pkg, base(), { type: "setLevel", level: 21 })).toEqual({
       ok: false,
-      error: { code: "levelOutOfRange", min: 1, max: 3 },
+      error: { code: "levelOutOfRange", min: 1, max: 20 },
     });
     expect(newDraft(pkg, 0).ok).toBe(false);
   });

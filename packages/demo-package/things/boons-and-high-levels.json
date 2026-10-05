@@ -1,0 +1,44 @@
+[
+  {
+    "id": "boon.raise",
+    "kind": "boon",
+    "source": "mistland",
+    "repeatable": true,
+    "grants": [{ "choice": "boon-raise" }]
+  },
+  {
+    "id": "boon.keen-senses",
+    "kind": "boon",
+    "source": "mistland",
+    "grants": [{ "choice": "keen-senses-raise" }, { "value": "nerve", "add": 1 }]
+  },
+  {
+    "id": "boon.sure-step",
+    "kind": "boon",
+    "source": "mistland",
+    "grants": [
+      { "value": "pace", "add": 5 },
+      { "value": "stamina", "add": "level" }
+    ]
+  },
+  { "id": "trait.bright-beacon", "kind": "trait", "source": "mistland", "stats": { "uses": 1 } },
+  { "id": "trait.vow-of-dawn", "kind": "trait", "source": "mistland", "stats": { "uses": 1 } },
+  { "id": "trait.vow-of-dusk", "kind": "trait", "source": "mistland", "stats": { "uses": 1 } },
+  {
+    "id": "trait.undying-flame",
+    "kind": "trait",
+    "source": "mistland",
+    "stats": { "uses": { "text": "stat-value.always" } }
+  },
+  { "id": "trait.current-sense", "kind": "trait", "source": "mistland" },
+  {
+    "id": "trait.flood-stride",
+    "kind": "trait",
+    "source": "mistland",
+    "grants": [{ "value": "pace", "add": 10 }]
+  },
+  { "id": "trait.river-heart", "kind": "trait", "source": "mistland", "stats": { "uses": 1 } },
+  { "id": "trait.deep-roots", "kind": "trait", "source": "mistland" },
+  { "id": "trait.bloom-ward", "kind": "trait", "source": "mistland", "stats": { "uses": 2 } },
+  { "id": "trait.old-growth", "kind": "trait", "source": "mistland", "stats": { "uses": 1 } }
+]

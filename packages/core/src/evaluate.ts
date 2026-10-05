@@ -623,6 +623,10 @@ function prepareChoice(
       }
       const rec = choice.recommend?.find((r) => r.when === undefined || evaluateCondition(r.when, scope));
       let recommended = rec?.pick.filter((p) => options.includes(p));
+      // A count that grows with the level would need a recommendation per
+      // count: the package's picks come first, the options fill up the rest.
+      if (recommended && state.count !== undefined)
+        recommended = [...new Set([...recommended, ...options])].slice(0, state.count);
       if (choice.held) {
         // Options about something the character already has are the better
         // pick; the package's own recommendation fills the remaining places.
@@ -829,5 +833,7 @@ function infoFor(
       else content.values.push({ value: g.value, add });
     }
   }
+  // A table that gives nothing yet at this level is no gift.
+  content.values = content.values.filter((v) => v.add !== 0);
   return content;
 }

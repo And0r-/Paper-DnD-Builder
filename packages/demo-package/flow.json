@@ -1,5 +1,5 @@
 {
-  "level": { "min": 1, "max": 3, "default": 1 },
+  "level": { "min": 1, "max": 20, "default": 1 },
   "steps": [
     { "id": "character", "choices": ["name", "concept"] },
     { "id": "calling", "choices": ["calling"] },
@@ -8,6 +8,7 @@
     { "id": "upbringing", "choices": ["upbringing"] },
     { "id": "paths", "gather": "path" },
     { "id": "scores", "choices": ["scores"] },
+    { "id": "boons", "gather": "boons" },
     { "id": "talents", "gather": "talents", "together": "list" },
     { "id": "knacks", "gather": "knacks", "together": "sections" },
     { "id": "equipment", "gather": "gear" },
@@ -106,7 +107,7 @@
       "kind": "pickMany",
       "source": "mistland",
       "options": { "kind": "knack", "tags": ["lantern"] },
-      "count": "if(level >= 2, 3, 2)",
+      "count": { "byLevel": [2, 3, 3, 4, 4, 4, 5, 5, 5, 6, 6, 6, 7, 7, 7, 8, 8, 8, 8, 8] },
       "recommend": [
         { "when": "level >= 2", "pick": ["knack.warm-glow", "knack.glow-thread", "knack.quiet-word"] },
         { "pick": ["knack.warm-glow", "knack.glow-thread"] }
@@ -118,7 +119,7 @@
       "kind": "pickMany",
       "source": "mistland",
       "options": { "kind": "knack", "tags": ["current"] },
-      "count": "if(level >= 2, 3, 2)",
+      "count": "min(8, if(level >= 2, 3 + floor((level - 2) / 3), 2))",
       "recommend": [
         { "when": "level >= 2", "pick": ["knack.fog-hop", "knack.dew-breath", "knack.wave-push"] },
         { "pick": ["knack.fog-hop", "knack.dew-breath"] }
@@ -130,7 +131,7 @@
       "kind": "pickMany",
       "source": "mistland",
       "options": { "kind": "knack", "tags": ["root"] },
-      "count": "if(level >= 2, 3, 2)",
+      "count": { "byLevel": [2, 3, 3, 4, 4, 4, 5, 5, 5, 6, 6, 6, 7, 7, 7, 8, 8, 8, 8, 8] },
       "recommend": [
         { "when": "level >= 2", "pick": ["knack.herb-scent", "knack.root-grip", "knack.moss-bed"] },
         { "pick": ["knack.herb-scent", "knack.root-grip"] }
@@ -251,6 +252,78 @@
       "options": { "kind": "talent", "tags": ["for-coastfolk"] },
       "recommend": [{ "pick": ["talent.listening"] }],
       "gather": "talents"
+    },
+    {
+      "id": "boon-4",
+      "kind": "pickOne",
+      "source": "mistland",
+      "options": { "kind": "boon" },
+      "recommend": [{ "pick": ["boon.raise"] }],
+      "gather": "boons"
+    },
+    {
+      "id": "boon-8",
+      "kind": "pickOne",
+      "source": "mistland",
+      "options": { "kind": "boon" },
+      "recommend": [{ "pick": ["boon.raise"] }],
+      "gather": "boons"
+    },
+    {
+      "id": "boon-12",
+      "kind": "pickOne",
+      "source": "mistland",
+      "options": { "kind": "boon" },
+      "recommend": [{ "pick": ["boon.raise"] }],
+      "gather": "boons"
+    },
+    {
+      "id": "boon-16",
+      "kind": "pickOne",
+      "source": "mistland",
+      "options": { "kind": "boon" },
+      "recommend": [{ "pick": ["boon.raise"] }],
+      "gather": "boons"
+    },
+    {
+      "id": "boon-19",
+      "kind": "pickOne",
+      "source": "mistland",
+      "options": { "kind": "boon" },
+      "recommend": [{ "pick": ["boon.raise"] }],
+      "gather": "boons"
+    },
+    {
+      "id": "boon-raise",
+      "kind": "distribute",
+      "source": "mistland",
+      "targets": ["might", "grace", "wit", "heart"],
+      "methods": [{ "method": "raise", "points": 2, "maxPerTarget": 2, "cap": 15 }],
+      "recommend": [
+        { "when": "has('calling.lantern-bearer') and heart <= 13", "assign": { "heart": 2 } },
+        { "when": "has('calling.lantern-bearer')", "assign": { "wit": 2 } },
+        { "when": "has('calling.river-runner') and grace <= 13", "assign": { "grace": 2 } },
+        { "when": "has('calling.river-runner')", "assign": { "might": 2 } },
+        { "when": "wit <= 13", "assign": { "wit": 2 } },
+        { "assign": { "heart": 1, "might": 1 } }
+      ]
+    },
+    {
+      "id": "keen-senses-raise",
+      "kind": "distribute",
+      "source": "mistland",
+      "targets": ["wit", "heart"],
+      "methods": [{ "method": "raise", "points": 1, "cap": "10 + practice" }],
+      "recommend": [{ "assign": { "wit": 1 } }]
+    },
+    {
+      "id": "lantern-vow",
+      "kind": "pickOne",
+      "source": "mistland",
+      "options": { "ids": ["trait.vow-of-dawn", "trait.vow-of-dusk"] },
+      "recommend": [{ "pick": ["trait.vow-of-dawn"] }],
+      "textVariants": [{ "id": "late", "when": "level >= 17" }],
+      "gather": "path"
     }
   ],
   "characterName": "name",
