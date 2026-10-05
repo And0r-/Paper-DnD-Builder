@@ -43,6 +43,8 @@ export default function OverviewPage() {
   const openSteps = entries.filter((e) => e.kind === "step" && e.status !== "done");
   // During a level up the earlier steps stay here, to look at and to change.
   const steps = allEntries.filter((e) => e.kind !== "overview");
+  // Each score is summed up once, at the first step that sets it; later steps show their part.
+  const summed = new Set<string>();
 
   const onFinish = async () => {
     if (!ev.complete) {
@@ -111,14 +113,14 @@ export default function OverviewPage() {
                   const state = ev.choices[c]!;
                   const choice = choiceOf(lp, c);
                   const assign = (state.answer as { assign?: Record<string, number> } | undefined)?.assign;
-                  // Each score on its own line, with what else adds to it ("15 + 2 from … = 17").
+                  // Each score on its own line: the whole sum once ("15 from … + 2 from … = 17"), later only "+ 2".
                   if (choice?.kind === "distribute" && assign && state.status !== "invalid") {
                     // Raised values: only those that got points.
                     const raise = choice.methods[0]?.method === "raise";
                     const targets = raise
                       ? choice.targets.filter((v) => (assign[v] ?? 0) > 0)
                       : choice.targets;
-                    return distributeLines(lp, ctx, ev, state, targets, assign, { t, list });
+                    return distributeLines(lp, ctx, ev, state, targets, assign, { t, list }, summed);
                   }
                   const text = describeAnswer(lp, ctx, state, list, grown);
                   const prefix = s.choices.length > 1 ? `${choiceTexts(lp, c, state, ctx).title}: ` : "";

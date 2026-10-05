@@ -14,6 +14,7 @@ import { Disclosure, Segmented, TextField } from "../components/Fields.tsx";
 import { Icon } from "../components/Icon.tsx";
 import { RichText, useMeasure } from "../components/RichText.tsx";
 import {
+  choiceTargetText,
   choiceTexts,
   distributeMethodLabels,
   formatValue,
@@ -27,7 +28,7 @@ import {
 } from "../package-text.ts";
 import type { LoadedPackage } from "../packages.ts";
 import { useDraft } from "./draft-state.tsx";
-import { laterSteps, sumText } from "./explain.ts";
+import { laterSteps, rowEffect, rowIsBase, rowName, rowSum, rowValues, sumText } from "./explain.ts";
 import { fillArray, forcedArray, freeMarks } from "./array-fill.ts";
 import { useExplain } from "./frame.tsx";
 import { useGuardedChange } from "./guard.tsx";
@@ -477,6 +478,7 @@ export function DistributeChoice({
         <PointBuy
           key={`pb-${method}-${round}`}
           lp={lp}
+          state={state}
           targets={choice.targets}
           costs={m.costs}
           budget={m.budget}
@@ -488,6 +490,7 @@ export function DistributeChoice({
         <ArrayAssign
           key={`ar-${method}-${round}`}
           lp={lp}
+          state={state}
           targets={choice.targets}
           values={m.values}
           initial={stored?.method === method ? stored.assign : undefined}
@@ -501,8 +504,38 @@ export function DistributeChoice({
   );
 }
 
+/**
+ * The point rule in one sentence, from the costs: "Each + costs 1 point,
+ * from 14 on it costs 2 points."
+ */
+function pointRule(costs: Record<string, number>, t: ReturnType<typeof useApp>["tc"]): string {
+  const scores = Object.keys(costs)
+    .map(Number)
+    .sort((a, b) => a - b);
+  const steps: { from: number; cost: number }[] = [];
+  for (let i = 1; i < scores.length; i++) {
+    const cost = costs[String(scores[i])]! - costs[String(scores[i - 1])]!;
+    if (steps.at(-1)?.cost !== cost) steps.push({ from: scores[i]!, cost });
+  }
+  const [first, ...rest] = steps;
+  if (!first) return "";
+  return (
+    [t("dist.rule", first.cost), ...rest.map((s) => t("dist.ruleFrom", s.cost, { score: s.from }))].join(
+      ", ",
+    ) + "."
+  );
+}
+
+/**
+ * Points spent on values. Each row says what its number does for this
+ * character: the score with what else adds to it, the number the sheet
+ * prints next to it (a bonus), and a sentence from the package; rows that
+ * matter most for the character carry the package's badge. The rule and the
+ * points left stand above the rows.
+ */
 function PointBuy({
   lp,
+  state,
   targets,
   costs,
   budget,
@@ -511,6 +544,7 @@ function PointBuy({
   tc,
 }: {
   lp: LoadedPackage;
+  state: ChoiceState;
   targets: string[];
   costs: Record<string, number>;
   budget: number;
@@ -518,7 +552,9 @@ function PointBuy({
   onSave: (assign: Record<string, number>) => void;
   tc: ReturnType<typeof useApp>["tc"];
 }) {
-  const { t } = useApp();
+  const { t, list } = useApp();
+  const { ev } = useDraft();
+  const ctx = useMeasure(lp);
   const scores = Object.keys(costs)
     .map(Number)
     .sort((a, b) => a - b);
@@ -546,9 +582,18 @@ function PointBuy({
   return (
     <div className="pointbuy">
       <p className={left === 0 ? "pointbuy__left pointbuy__left--done" : "pointbuy__left"} aria-live="polite">
-        {left === 0 && <Icon name="check" size={20} />}
-        {left === 0 ? t("dist.allSpent") : tc("dist.left", left)}
+        {left === 0 ? (
+          <>
+            <Icon name="check" size={20} />
+            {t("dist.allSpent")}
+          </>
+        ) : (
+          <>
+            <span className="pointbuy__count">{left}</span> {tc("dist.leftUnit", left)}
+          </>
+        )}
       </p>
+      <p className="pointbuy__rule">{pointRule(costs, tc)}</p>
       {hint && (
         <p className="pointbuy__hint" role="status">
           {hint}
@@ -557,18 +602,24 @@ function PointBuy({
       <ul className="pointbuy__rows">
         {targets.map((v) => {
           const score = assign[v] ?? low;
-          const name = ptext(lp, `value.${v}.name`) ?? v;
+          const name = rowName(lp, v);
+          const sum = rowSum(lp, ctx, ev, state.id, v, score, { t, list });
+          const effect = rowEffect(lp, ctx, ev, state.id, v, score, { t, list });
+          const badge = state.badges?.[v];
+          const explain = choiceTargetText(lp, state.id, v, rowValues(lp, v).total, state);
           // Too expensive is shown before the tap; tapping anyway explains why (the hint).
           const affordable = (costs[String(score + 1)] ?? Infinity) - (costs[String(score)] ?? 0) <= left;
           return (
-            <li className="pointbuy__row" key={v}>
+            <li className={badge ? "pointbuy__row pointbuy__row--key" : "pointbuy__row"} key={v}>
               <div className="pointbuy__label">
-                <span className="pointbuy__name" id={`pb-${v}`}>
-                  {name}
+                <span className="pointbuy__name">
+                  <span id={`pb-${v}`}>{name}</span>
+                  {badge && <span className="badge">{ptext(lp, badge)}</span>}
                 </span>
-                {ptext(lp, `value.${v}.explain`) && (
-                  <span className="pointbuy__explain">
-                    <RichText lp={lp} text={ptext(lp, `value.${v}.explain`)} />
+                {(sum || effect) && (
+                  <span className="pointbuy__gives" id={`pb-${v}-effect`}>
+                    {sum && <span className="pointbuy__sum">{sum}</span>}
+                    {effect && <span className="pointbuy__effect">{effect}</span>}
                   </span>
                 )}
               </div>
@@ -582,7 +633,12 @@ function PointBuy({
                 >
                   <Icon name="minus" />
                 </button>
-                <output className="stepper__value" aria-labelledby={`pb-${v}`} aria-live="polite">
+                <output
+                  className="stepper__value"
+                  aria-labelledby={`pb-${v}`}
+                  aria-describedby={sum || effect ? `pb-${v}-effect` : undefined}
+                  aria-live="polite"
+                >
                   {score}
                 </output>
                 <button
@@ -595,6 +651,11 @@ function PointBuy({
                   <Icon name="plus" />
                 </button>
               </div>
+              {explain && (
+                <span className="pointbuy__explain">
+                  <RichText lp={lp} text={explain} />
+                </span>
+              )}
             </li>
           );
         })}
@@ -723,6 +784,7 @@ function RaisePoints({
  */
 function ArrayAssign({
   lp,
+  state,
   targets,
   values,
   initial,
@@ -731,6 +793,7 @@ function ArrayAssign({
   onClear,
 }: {
   lp: LoadedPackage;
+  state: ChoiceState;
   targets: string[];
   values: number[];
   initial: Record<string, number> | undefined;
@@ -739,7 +802,9 @@ function ArrayAssign({
   onSave: (assign: Record<string, number>) => void;
   onClear: () => void;
 }) {
-  const { t } = useApp();
+  const { t, list } = useApp();
+  const { ev } = useDraft();
+  const ctx = useMeasure(lp);
   const lowest = Math.min(...values);
   // Only the numbers given by a tap are kept; the lowest number fills the rest.
   const [taps, setTaps] = useState<Record<string, number>>(() =>
@@ -791,17 +856,31 @@ function ArrayAssign({
       </p>
       <ul className="array-assign__rows">
         {targets.map((v) => {
-          const name = ptext(lp, `value.${v}.name`) ?? v;
-          const explain = ptext(lp, `value.${v}.explain`);
+          const name = rowName(lp, v);
+          const explain = choiceTargetText(lp, state.id, v, rowValues(lp, v).total, state);
           const value = assign[v];
+          // The row as a sum while numbers are handed out: "15 + 2 = 17", and what the score gives.
+          // A bonus not given yet reads "+ 0"; a base without its number shows no sum.
+          const amount = value ?? (rowIsBase(lp, v) ? undefined : 0);
+          const sum =
+            amount === undefined ? undefined : rowSum(lp, ctx, ev, state.id, v, amount, { t, list });
+          const effect = rowEffect(lp, ctx, ev, state.id, v, amount, { t, list });
+          const badge = state.badges?.[v];
           const fixed = implicit.includes(v);
           const suggested = !complete && tip?.[v] !== undefined && tip[v] !== lowest ? tip[v] : undefined;
           const head = (
             <>
               <span className="array-assign__label">
                 <span className="array-assign__name">{name}</span>
+                {badge && <span className="badge">{ptext(lp, badge)}</span>}
                 {suggested !== undefined && (
                   <span className="array-assign__tip">{t("dist.tip", { value: String(suggested) })}</span>
+                )}
+                {(sum || effect) && (
+                  <span className="array-assign__gives">
+                    {sum && <span className="array-assign__sum">{sum}</span>}
+                    {effect && <span className="array-assign__effect">{effect}</span>}
+                  </span>
                 )}
               </span>
               <span
