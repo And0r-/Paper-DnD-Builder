@@ -172,6 +172,16 @@ describe("options", () => {
     expect(ev.choices["folk"]!.badges).toBeUndefined();
   });
 
+  it("resolves row badges of a distribute choice by target, while their condition holds", () => {
+    const lantern = evaluateDraft(pkg, draft(1, { calling: { pick: "calling.lantern-bearer" } }));
+    expect(lantern.choices["scores"]!.badges).toEqual({
+      heartBase: "choice.scores.badge.lantern-bearer",
+      witBase: "choice.scores.badge.lantern-bearer",
+    });
+    const herbalist = evaluateDraft(pkg, draft(1, { calling: { pick: "calling.herbalist" } }));
+    expect(herbalist.choices["scores"]!.badges).toBeUndefined();
+  });
+
   describe("held", () => {
     const riverRunner = (answers: Record<string, unknown>, p: ContentPackage = pkg) =>
       evaluateDraft(p, draft(1, { calling: { pick: "calling.river-runner" }, ...answers }));
@@ -435,19 +445,21 @@ describe("applyChange", () => {
     expect(problem("name", { text: "x".repeat(41) })).toBe("tooLong");
     expect(problem("name", { text: "Two\nlines" })).toBe("badCharacters");
     expect(problem("looks", { text: "Tall.\nGreen coat." })).toBe("ok");
-    expect(problem("scores", { method: 0, assign: { mightBase: 12, graceBase: 12, witBase: 6, heartBase: 6 } })).toBe(
-      "overBudget",
-    );
-    expect(problem("scores", { method: 0, assign: { mightBase: 13, graceBase: 6, witBase: 6, heartBase: 6 } })).toBe(
-      "outOfRange",
-    );
-    expect(problem("scores", { method: 1, assign: { mightBase: 11, graceBase: 11, witBase: 9, heartBase: 7 } })).toBe(
+    expect(
+      problem("scores", { method: 0, assign: { mightBase: 12, graceBase: 12, witBase: 6, heartBase: 6 } }),
+    ).toBe("overBudget");
+    expect(
+      problem("scores", { method: 0, assign: { mightBase: 13, graceBase: 6, witBase: 6, heartBase: 6 } }),
+    ).toBe("outOfRange");
+    expect(
+      problem("scores", { method: 1, assign: { mightBase: 11, graceBase: 11, witBase: 9, heartBase: 7 } }),
+    ).toBe("badAssignment");
+    expect(problem("scores", { method: 1, assign: { mightBase: 11, graceBase: 10, witBase: 9 } })).toBe(
       "badAssignment",
     );
-    expect(problem("scores", { method: 1, assign: { mightBase: 11, graceBase: 10, witBase: 9 } })).toBe("badAssignment");
-    expect(problem("scores", { method: 5, assign: { mightBase: 11, graceBase: 10, witBase: 9, heartBase: 7 } })).toBe(
-      "badMethod",
-    );
+    expect(
+      problem("scores", { method: 5, assign: { mightBase: 11, graceBase: 10, witBase: 9, heartBase: 7 } }),
+    ).toBe("badMethod");
   });
 
   it("accepts partial picks, but the choice stays open; leftover points are only reported", () => {

@@ -260,7 +260,11 @@ const pickRecommendation = z.strictObject({ when: expr.optional(), pick: z.array
 const badge = z.strictObject({ things: z.array(id).min(1), text: textKey });
 
 /** A short label (text key) on rows of a distribute choice. */
-const targetBadge = z.strictObject({ when: expr.optional(), targets: z.array(valueId).min(1), text: textKey });
+const targetBadge = z.strictObject({
+  when: expr.optional(),
+  targets: z.array(valueId).min(1),
+  text: textKey,
+});
 
 /**
  * Prefer options whose `about` thing the character already has: they are

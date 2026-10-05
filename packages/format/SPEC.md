@@ -122,7 +122,7 @@ people who distribute packages.
 
 ```json
 {
-  "formatVersion": "0.11",
+  "formatVersion": "0.12",
   "id": "demo",
   "version": "0.1.0",
   "languages": ["de", "en"],
@@ -649,9 +649,10 @@ and things like `{ "id": "handling.rope", "kind": "handling", "about": "item.rop
 How the builder shows a row (no field needed): the row is named after the
 value the target adds up to, if exactly one value is a plain sum using it
 (`"strength": "strengthBase + strengthBonus"`); otherwise after the target.
-It shows that value's sum ("15 + 2 from … = 17") and, if a `statBoxes` box
-of `sheet.json` shows that value with a `derived` value, the derived number
-too, so a player sees what the number does while choosing it.
+It shows that value's sum ("15 + 2 from … = 17") and, if a `scoreColumn`
+entry of `sheet.json` prints that value (or a value that is a plain sum of
+it) with a `derived` value, the derived number too, so a player sees what
+the number does while choosing it.
 
 `badges` (optional) puts a short label on rows: each entry lists `targets`
 (of this choice), a `text` key and an optional `when`. The first entry whose
@@ -1130,7 +1131,7 @@ are removed (saved characters may lose picks). Keys are never renamed.
 | 0.7     | 2026-10-04 | Optional `about` on things and `held` on `pickOne` and `pickMany` choices: recommend and name what the character has.                                                                                                                                                                                                                                                                       | Set `formatVersion` to `"0.7"`. Nothing else changes: both fields are optional, so every valid 0.6 package is a valid 0.7 package.                                                                                                                                                                                                                                                |
 | 0.9     | 2026-10-05 | Levels up to 20: `distribute` method `raise` (points on top of values, `maxPerTarget`, `cap`); tables by level (`byLevel` on values, `{ "byLevel": [...] }` for a grant's `add` and a `pickMany` `count`); `repeatable` on things (choices asked again per pick as `<choice>@<where>`). A `pickMany` recommendation is cut to `count` and filled up from the options.                       | Set `formatVersion` to `"0.9"`. Nothing else changes: every field is optional, and a recommendation that already had `count` picks is the same, so every valid 0.8 package is a valid 0.9 package.                                                                                                                                                                                |
 | 0.10    | 2026-10-05 | Stats `{ "value": "<value>" }`: show the character's value, and give use boxes that grow with the level. `"owned": true` in a pick choice's `options`: pick among what the character has; a pick marks the thing instead of giving it, `answers` sections print the picks. A `raise` sees the values, `cap` and `recommend` conditions at the choice's level, not at the character's level. | Set `formatVersion` to `"0.10"`. The new fields are optional. A `raise` on a level below the character's no longer counts what later levels give: a package that worked around this (for example a second value for the printed score) can drop the workaround. Saved raises stay valid; a raise that left points over because a later bonus filled the cap may now ask for them. |
-| 0.11    | 2026-10-05 | Optional `badges` on `distribute` choices (a label on rows while `when` holds); optional row texts `choice.<id>.target.<target>` and `choice.<id>.variant.<variant>.target.<target>`.                                                                                                                                                                                                       | Set `formatVersion` to `"0.11"`. Nothing else changes: the field and the texts are optional, so every valid 0.10 package is a valid 0.11 package.                                                                                                                                                                                                                                 |
+| 0.12    | 2026-10-05 | Optional `badges` on `distribute` choices (a label on rows while `when` holds); optional row texts `choice.<id>.target.<target>` and `choice.<id>.variant.<variant>.target.<target>`.                                                                                                                                                                                                       | Set `formatVersion` to `"0.12"`. Nothing else changes: the field and the texts are optional, so every valid 0.11 package is a valid 0.12 package.                                                                                                                                                                                                                                 |
 | 0.8     | 2026-10-04 | Gather steps (`gather`, optional `together`: `sections` or one shared `list`) in `flow.steps`, optional `gather` on choices, optional text `choice.<id>.from`.                                                                                                                                                                                                                              | Set `formatVersion` to `"0.8"`. Nothing else changes: a package without gather steps builds the same steps as before, so every valid 0.7 package is a valid 0.8 package.                                                                                                                                                                                                          |
 
 ## 16. A minimal package
@@ -1142,7 +1143,7 @@ language. The validator accepts it as is.
 
 ```json
 {
-  "formatVersion": "0.11",
+  "formatVersion": "0.12",
   "id": "tiny",
   "version": "1.0.0",
   "languages": ["en"],

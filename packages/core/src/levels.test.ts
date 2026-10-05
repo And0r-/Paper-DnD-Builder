@@ -323,7 +323,10 @@ describe("raising values", () => {
     expect(ev.choices["boon-raise@boon-8"]!.recommended).toEqual({ method: 0, assign: { heart: 2 } });
     const high = {
       ...at15,
-      answers: { ...at15.answers, scores: { method: 0, assign: { mightBase: 8, graceBase: 7, witBase: 9, heartBase: 12 } } },
+      answers: {
+        ...at15.answers,
+        scores: { method: 0, assign: { mightBase: 8, graceBase: 7, witBase: 9, heartBase: 12 } },
+      },
     };
     // Heart 12 + 2 = 14: still at most 13 is false, so the package says wit; heart could take only 1.
     const ev2 = evaluateDraft(pkg, high);

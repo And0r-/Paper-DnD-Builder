@@ -127,7 +127,7 @@ describe("cross-file rules", () => {
     [
       "format version",
       (f) => (f.get("manifest.json").formatVersion = "0.3"),
-      "manifest.json formatVersion: package is written for format 0.3, this builder understands 0.11",
+      "manifest.json formatVersion: package is written for format 0.3, this builder understands 0.12",
     ],
     [
       "duplicate thing",
@@ -595,6 +595,18 @@ describe("levels 1 to 20 (format 0.9)", () => {
       (f) => (choice(f, "scores").targets[0] = "knackRank"),
       () =>
         `flow.json choices[${choiceIndex("scores")}].targets[0]: value "knackRank" has a formula and cannot take input`,
+    ],
+    [
+      "a row badge on a value the choice does not set",
+      (f) => choice(f, "scores").badges[0].targets.push("luck"),
+      () =>
+        `flow.json choices[${choiceIndex("scores")}].badges[0].targets[2]: "luck" is not a target of this choice`,
+    ],
+    [
+      "a row badge whose condition uses an unknown value",
+      (f) => (choice(f, "scores").badges[0].when = "hart > 2"),
+      () =>
+        `flow.json choices[${choiceIndex("scores")}].badges[0].when: expression "hart > 2" uses unknown value "hart"`,
     ],
   ])("rejects %s", (_name, change, expected) => {
     const r = mutate(change);
