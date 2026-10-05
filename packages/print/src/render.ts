@@ -328,6 +328,7 @@ const S = {
   bigValue: { font: "bold", size: 22 },
   scoreValue: { font: "bold", size: 20 },
   fieldName: { font: "bold", size: 9 },
+  boxValue: { font: "bold", size: 9 },
   body: { size: 9 },
   small: { size: 8.5 },
   hint: { size: 7, color: "#333" },
@@ -433,17 +434,19 @@ function drawSection(pen: Pen, s: SheetSection, x: number, top: number, w: numbe
         const name = pen.label(item.name, S.body, cw - 15 - (noteW > 0 ? noteW + 2 : 0));
         const note = pen.label(item.note, S.hint, Math.max(noteW, 1));
         const lh = pen.lineHeight(name.style, 1.15);
-        // A name or note that needs more lines makes its row taller.
-        const extra = Math.max(
-          (name.lines.length - 1) * lh,
-          (note.lines.length - 1) * pen.lineHeight(note.style, 1.15),
-        );
-        return { item, name, note, lh, extra };
+        // Where the number in the box comes from, small under the name.
+        const parts = item.total.parts === "" ? [] : pen.wrap(item.total.parts, S.hint, cw - 10.5);
+        const partsLh = pen.lineHeight(S.hint, 1.15);
+        // A name, note or origin that needs more lines makes its row taller.
+        const extra =
+          Math.max((name.lines.length - 1) * lh, (note.lines.length - 1) * pen.lineHeight(note.style, 1.15)) +
+          parts.length * partsLh;
+        return { item, name, note, lh, parts, partsLh, extra };
       });
       let rowTop = y;
       for (let r = 0; r * columns < laid.length; r++) {
         const row = laid.slice(r * columns, (r + 1) * columns);
-        for (const [c, { item, name, note, lh }] of row.entries()) {
+        for (const [c, { item, name, note, lh, parts, partsLh }] of row.entries()) {
           const cx = x + c * (cw + 4);
           const cy = rowTop + 4.5;
           pen.circle(cx + 2, cy - 1.3, 1.6, { fill: item.marked });
@@ -451,6 +454,10 @@ function drawSection(pen: Pen, s: SheetSection, x: number, top: number, w: numbe
           const noteLh = pen.lineHeight(note.style, 1.15);
           note.lines.forEach((l, j) => pen.text(l, cx + cw - 9.5, cy + j * noteLh, note.style, "right"));
           pen.rect(cx + cw - 7.5, cy - 4.2, 7, 5.5, { width: 0.5, radius: 0.8 });
+          const total = item.total.text;
+          pen.text(total, cx + cw - 4, cy, pen.fit(total, S.boxValue, 6.4), "center");
+          const partsTop = cy + (name.lines.length - 1) * lh + 0.9;
+          parts.forEach((l, j) => pen.text(l, cx + 5.5, partsTop + (j + 0.8) * partsLh, S.hint));
         }
         rowTop += 7 + Math.max(...row.map((l) => l.extra));
       }
@@ -474,6 +481,9 @@ function drawSection(pen: Pen, s: SheetSection, x: number, top: number, w: numbe
       }
       break;
     }
+    case "statTable":
+      y = drawStatTable(pen, s, x, y, w);
+      break;
     case "list": {
       for (const item of s.items) {
         pen.text(item, x + 1, y + 4.3, pen.fit(item, S.body, w - 2));
@@ -517,6 +527,49 @@ function drawSection(pen: Pen, s: SheetSection, x: number, top: number, w: numbe
   }
   y = hint(pen, s.hint, x, y, w);
   return y - top;
+}
+
+/**
+ * A row per thing: its name, then one column per stat. Each column is as
+ * wide as its label and longest entry need, so a number or a dice roll is
+ * never broken; what is left goes to the names.
+ */
+function drawStatTable(
+  pen: Pen,
+  s: Extract<SheetSection, { kind: "statTable" }>,
+  x: number,
+  y: number,
+  w: number,
+): number {
+  const gap = 2.5;
+  const natural = s.columns.map((label, i) =>
+    Math.max(pen.width(label, S.cardLabel), ...s.rows.map((r) => pen.width(r.cells[i]!, S.fieldName))),
+  );
+  const minName = Math.min(28, w * 0.3);
+  const room = w - minName - s.columns.length * gap;
+  const scale = Math.min(1, room / natural.reduce((a, b) => a + b, 0));
+  const widths = natural.map((n) => n * scale);
+  const nameW = w - widths.reduce((a, b) => a + b, 0) - s.columns.length * gap;
+  const left = widths.map((_, i) => x + nameW + gap + widths.slice(0, i).reduce((a, b) => a + b + gap, 0));
+  const labels = s.columns.map((label, i) => pen.label(label, S.cardLabel, widths[i]!));
+  const labelLh = pen.lineHeight(S.cardLabel, 1.15);
+  labels.forEach((l, i) => l.lines.forEach((t, j) => pen.text(t, left[i]!, y + 2.5 + j * labelLh, l.style)));
+  y += 1 + Math.max(1, ...labels.map((l) => l.lines.length)) * labelLh;
+  pen.line(x, y, x + w, y, 0.5, "#777");
+  for (const row of s.rows) {
+    const top = y + 0.8;
+    let bottom = pen.lines(pen.wrap(row.name, S.fieldName, nameW - 1), x, top, S.fieldName, 1.2);
+    row.cells.forEach((cell, i) => {
+      bottom = Math.max(
+        bottom,
+        pen.lines(pen.wrap(cell, S.fieldName, widths[i]!), left[i]!, top, S.fieldName, 1.2),
+      );
+    });
+    y = bottom + 1.4;
+    pen.line(x, y, x + w, y, 0.3, "#BBB");
+    y += 0.6;
+  }
+  return y;
 }
 
 /** A help text written as "1. … 2. …" in one string is printed one step per line. */
@@ -597,6 +650,7 @@ function partCount(s: SheetSection): number {
     case "checkList":
       return s.items.length;
     case "featureTable":
+    case "statTable":
     case "answers":
       return s.rows.length;
     case "list":
@@ -634,6 +688,11 @@ function splitSection(s: SheetSection, n: number, m: Messages): [SheetSection, S
       return [
         { ...head, kind: s.kind, rows: s.rows.slice(0, n) },
         { ...tail, kind: s.kind, rows: s.rows.slice(n) },
+      ];
+    case "statTable":
+      return [
+        { ...s, hint: "", rows: s.rows.slice(0, n) },
+        { ...s, title: tail.title, rows: s.rows.slice(n) },
       ];
     case "answers":
       return [

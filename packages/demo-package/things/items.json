@@ -7,8 +7,18 @@
       "weight": {
         "amount": 4,
         "unit": "lb"
+      },
+      "hit": {
+        "value": "lanternStaffHit"
+      },
+      "harm": {
+        "text": "stat-value.item.lantern-staff.harm",
+        "vars": {
+          "bonus": "lanternStaffHarm"
+        }
       }
-    }
+    },
+    "tags": ["armed"]
   },
   {
     "id": "item.boat-hook",
@@ -18,8 +28,18 @@
       "weight": {
         "amount": 5,
         "unit": "lb"
+      },
+      "hit": {
+        "value": "boatHookHit"
+      },
+      "harm": {
+        "text": "stat-value.item.boat-hook.harm",
+        "vars": {
+          "bonus": "boatHookHarm"
+        }
       }
-    }
+    },
+    "tags": ["armed"]
   },
   {
     "id": "item.herb-satchel",
@@ -130,6 +150,30 @@
       "weight": {
         "amount": 3,
         "unit": "lb"
+      }
+    }
+  },
+  {
+    "id": "item.sling",
+    "kind": "item",
+    "source": "mistland",
+    "tags": ["gear-choice", "armed"],
+    "stats": {
+      "weight": {
+        "amount": 1,
+        "unit": "lb"
+      },
+      "hit": {
+        "value": "slingHit"
+      },
+      "harm": {
+        "text": "stat-value.item.sling.harm",
+        "vars": {
+          "bonus": "slingHarm"
+        }
+      },
+      "range": {
+        "text": "stat-value.item.sling.range"
       }
     }
   }

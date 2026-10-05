@@ -1,5 +1,5 @@
 import type { DraftDocument } from "@builder/core";
-import { evaluateDraft } from "@builder/core";
+import { applyChange, evaluateDraft } from "@builder/core";
 import type { ContentPackage, TextValue } from "@builder/format";
 import PDFDocument from "pdfkit";
 import { getDocument } from "pdfjs-dist/legacy/build/pdf.mjs";
@@ -269,10 +269,24 @@ describe("printed character (demo package)", () => {
     // Level 1: the level-3 "path" section is left out (`when`), so notes end up alone
     // on a sheet without the sections for higher levels.
     const level1 = demoCharacter(pkg, 1);
-    const lower = new Set(["rolls", "lantern-slots", "lantern-slots-high"]);
+    // Without the half-width boxes after the gear, and a few more blank gear lines to fill
+    // the first page, only the notes move on.
+    const lower = new Set([
+      "rolls",
+      "lantern-slots",
+      "lantern-slots-high",
+      "attacks",
+      "how-to-play",
+      "about",
+    ]);
     const early = {
       ...pkg,
-      sheet: { ...pkg.sheet, sections: pkg.sheet.sections.filter((s) => !lower.has(s.id)) },
+      sheet: {
+        ...pkg.sheet,
+        sections: pkg.sheet.sections
+          .filter((s) => !lower.has(s.id))
+          .map((s) => (s.id === "gear" && s.kind === "list" ? { ...s, blankLines: s.blankLines + 4 } : s)),
+      },
     };
     const { pdf } = await print("de", {}, early, level1);
     const last = pdf.sheetLayout.at(-1)!;
@@ -315,6 +329,61 @@ describe("printed character (demo package)", () => {
     const plainKnacks = plain.sections.find((s) => s.id === "knacks")!;
     expect(plainKnacks.hint).toBe("");
     expect(plain.cards.every((c) => c.uses === null)).toBe(true);
+  });
+
+  it("prints an attack table and the talent totals, worked out by the package's values", async () => {
+    // River runner, level 3: might 9 (bonus 1), grace 12 (bonus 2), practice 2.
+    // Boat hook: the better of might and grace bonus (2) + practice 2 = +4, harm 1d4 + 2.
+    // Sling: grace bonus 2 + practice 2 = +4, harm 1d4 + 2, range 30/120 ft.
+    const r = applyChange(pkg, demoCharacter(pkg, 3, "Mira Fennwick", "calling.river-runner"), {
+      type: "answer",
+      choice: "gear",
+      answer: { pick: "item.sling" },
+    });
+    if (!r.ok) throw new Error(JSON.stringify(r.error));
+    const attacks = (language: string, units: Record<string, string>) => {
+      const model = buildPrintModel(pkg, r.doc, { language, units, createdAt });
+      const s = model.sections.find((x) => x.id === "attacks")!;
+      if (s.kind !== "statTable") throw new Error("demo sheet changed");
+      return { model, s };
+    };
+    const de = attacks("de", { length: "m" });
+    expect(de.s.title).toBe("Angriffe");
+    expect(de.s.hint).toBe("Zum Treffen: 2W6 + diese Zahl. Schaden: diese Würfel.");
+    expect(de.s.columns).toEqual(["Treffer", "Schaden", "Reichweite"]);
+    expect(de.s.rows).toEqual([
+      { name: "Bootshaken", cells: ["+4", "1W4 +2, spitz", "—"] },
+      { name: "Schleuder", cells: ["+4", "1W4 +2, stumpf", "9 m / 36 m"] },
+    ]);
+    const en = attacks("en", { length: "ft" });
+    expect(en.s.rows.map((row) => row.cells)).toEqual([
+      ["+4", "1d4 +2, pointed", "—"],
+      ["+4", "1d4 +2, blunt", "30 ft / 120 ft"],
+    ]);
+
+    // Talents: the total is in the box, trained or not; where it comes from is under the name.
+    const talents = de.model.sections.find((x) => x.id === "talents")!;
+    if (talents.kind !== "checkList") throw new Error("demo sheet changed");
+    const talent = (name: string) => talents.items.find((i) => i.name === name)!;
+    expect(talent("Schleichen")).toMatchObject({ marked: true, total: { text: "+4" } }); // grace 2 + practice 2
+    expect(talent("Schleichen").total.parts).toBe("Geschick-Bonus +2 · Übung +2");
+    expect(talent("Sagenkunde")).toMatchObject({ marked: false, total: { text: "+0", parts: "" } });
+    expect(talents.hint).not.toContain("2");
+
+    // On paper: one table on the first page, two rows, the numbers in it.
+    const pdf = await renderPdf(de.model);
+    const first = (await extract(pdf)).pageTexts[0]!;
+    for (const word of [
+      "ANGRIFFE",
+      "Bootshaken",
+      "Schleuder",
+      "1W4 +2, spitz",
+      "9 m / 36 m",
+      "Geschick-Bonus +2 · Übung +2",
+    ])
+      expect(first).toContain(word);
+    const placed = pdf.sheetLayout[0]!.find((p) => p.section.id === "attacks")!;
+    expect(placed.section.kind === "statTable" && placed.section.rows).toHaveLength(2);
   });
 
   it("prints use boxes from a value that grows, and the picks among what the character has", async () => {
@@ -544,7 +613,23 @@ describe("printed character (demo package)", () => {
         id: "long-checks",
         kind: "checkList",
         title: "Haken",
-        items: names("Haken").map((name) => ({ name, marked: false, note: "" })),
+        items: names("Haken").map((name) => ({
+          name,
+          marked: false,
+          note: "",
+          total: { text: "", parts: "" },
+        })),
+      },
+      {
+        ...base,
+        id: "long-stat-table",
+        kind: "statTable",
+        title: "Spalten",
+        columns: ["Zahl", "Text"],
+        rows: names("Reihe").map((name) => ({
+          name,
+          cells: ["+3", "ein Text"],
+        })),
       },
       {
         ...base,

@@ -122,7 +122,7 @@ people who distribute packages.
 
 ```json
 {
-  "formatVersion": "0.10",
+  "formatVersion": "0.11",
   "id": "demo",
   "version": "0.1.0",
   "languages": ["de", "en"],
@@ -225,6 +225,30 @@ with a value `{ "id": "bloomWardUses", "byLevel": [0, 0, ..., 2, 2, 3, 3] }`
 (or a formula, or `practice` itself for "as often as your practice").
 The use boxes on the sheet and the cards follow that value
 ([13](#13-print-sheet-and-cards)).
+
+**Texts with the character's numbers.** A `{text}` stat may name values
+to fill in: `{ "text": "<key>", "vars": { "<name>": "<value>" } }`. The
+text writes `{{var:<name>}}` (the number as it is) or
+`{{var:<name>|signed}}` (always with its sign: "+3", "+0", "-1") where
+the character's value goes ([10.4](#104-placeholders)). Use it for a
+fact that is partly fixed and partly the character's, for example the
+harm of an item: dice and kind of harm are the item's, the bonus is the
+character's.
+
+```json
+{
+  "id": "item.sling",
+  "kind": "item",
+  "stats": {
+    "hit": { "value": "slingHit" },
+    "harm": { "text": "stat-value.item.sling.harm", "vars": { "bonus": "slingHarm" } }
+  }
+}
+```
+
+with the text `"1d4 {{var:bonus|signed}}, blunt"`, printed "1d4 +2, blunt"
+for a character whose `slingHarm` is 2. The builder knows no rules: what
+is added to what is the package's formula for the value.
 
 ### Grants
 
@@ -824,6 +848,7 @@ validator flags texts that write a unit as plain text next to a number
 | `{{length:30\|short}}`          | the same with the short form: "9 m" / "30 ft"                                                                  |
 | `[[glossary:stamina\|Stamina]]` | "Stamina", marked as a glossary link to entry `stamina`                                                        |
 | `{{var:name}}`                  | a value the screen supplies (table below)                                                                      |
+| `{{var:name\|signed}}`          | the same, a number always with its sign: "+3", "+0", "-1"                                                      |
 
 | Text                                                              | Variables                                                             |
 | ----------------------------------------------------------------- | --------------------------------------------------------------------- |
@@ -832,6 +857,7 @@ validator flags texts that write a unit as plain text next to a number
 | `choice.<id>.missing`                                             | `remaining` (how many are still missing), `count` (how many in total) |
 | `choice.<id>.title`, `.question`, `.intro` of a `pickMany` choice | `count` (how many to pick, worked out for this character)             |
 | the `held` text of a choice                                       | `things` (names of the things the character has: "A, B and C")        |
+| a `{text}` stat with `vars` ([6](#6-things))                      | the names in `vars`, each the character's value                       |
 
 The same variables apply to the texts of a text variant.
 
@@ -937,17 +963,18 @@ The sheet is a 12-column grid. Sections fill it row by row; `span` is the
 width (3, 4, 6, 8 or 12). The first section should be the header. Section
 kinds:
 
-| Kind           | Shows                                                                                                                                     | Fields                                     |
-| -------------- | ----------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------ |
-| `header`       | character name, `summary.line`, "played by", package name                                                                                 | —                                          |
-| `statBoxes`    | up to 6 large boxes; `number` = computed value, `pencil` = value as a starting number to overwrite, `circles` = that many circles to tick | `boxes[]: { value, style, label?, when? }` |
-| `scoreColumn`  | stacked boxes: value large, `derived` value small                                                                                         | `scores[]: { value, derived? }`            |
-| `checkList`    | all things selected; marked if the character has them; `note` stat small next to the name                                                 | `things` (like `options`), `note?`         |
-| `featureTable` | the selected things the character has: name, `short`, use boxes from the `uses` stat                                                      | `things`, `uses?`                          |
-| `list`         | the selected things the character has, plus blank lines                                                                                   | `things`, `blankLines`                     |
-| `answers`      | answers to text and number choices, and the picks of choices with `owned` options                                                         | `choices[]`                                |
-| `helpBox`      | the text `sheet.<id>.text`                                                                                                                | —                                          |
-| `notes`        | blank lines                                                                                                                               | `lines`                                    |
+| Kind           | Shows                                                                                                                                     | Fields                                       |
+| -------------- | ----------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------- |
+| `header`       | character name, `summary.line`, "played by", package name                                                                                 | —                                            |
+| `statBoxes`    | up to 6 large boxes; `number` = computed value, `pencil` = value as a starting number to overwrite, `circles` = that many circles to tick | `boxes[]: { value, style, label?, when? }`   |
+| `scoreColumn`  | stacked boxes: value large, `derived` value small                                                                                         | `scores[]: { value, derived? }`              |
+| `checkList`    | all things selected; marked if the character has them; `note` stat small next to the name; `total` value in the box                       | `things` (like `options`), `note?`, `total?` |
+| `statTable`    | the selected things the character has, one row each: name, then one column per stat                                                       | `things`, `columns[]: { stat, signed? }`     |
+| `featureTable` | the selected things the character has: name, `short`, use boxes from the `uses` stat                                                      | `things`, `uses?`                            |
+| `list`         | the selected things the character has, plus blank lines                                                                                   | `things`, `blankLines`                       |
+| `answers`      | answers to text and number choices, and the picks of choices with `owned` options                                                         | `choices[]`                                  |
+| `helpBox`      | the text `sheet.<id>.text`                                                                                                                | —                                            |
+| `notes`        | blank lines                                                                                                                               | `lines`                                      |
 
 **Conditions** (`when`, on every section and on each box of a
 `statBoxes` section). An expression (section 8) evaluated with the
@@ -1002,6 +1029,37 @@ at the value's own name, so the word exists only once:
 are errors; at least one selected thing must have the stat; things
 without it show no note.
 
+**Total** (`total`, on `checkList` sections). Names a stat key; each
+selected thing's stat must be `{ "value": "<value>" }`. The character's
+value is printed in the thing's box, always with its sign ("+5"), and,
+if it is made of two parts or more, where it comes from small under the
+name ("Grace bonus +2 · Practice +2"), taken apart from the value's
+formula as on screen. Things without
+the stat get an empty box. Typical use: the number a skill adds to a
+roll, so a player at the table reads it instead of adding it up. The
+formula decides what counts, for example
+`graceBonus + if(has('talent.sneaking'), practice, 0)`.
+
+**Tables** (`statTable`). One row per selected thing the character has:
+its name, then one column per entry of `columns` (1 to 4), headed by
+`stat.<stat>.name`. A cell shows the thing's stat as a card field does
+(quantities converted, `{text}` with its `vars` filled in, `{value}` as
+the character's value); `signed: true` writes numbers with their sign.
+A row is kept to one line (no origins under the numbers), so a handful of
+rows fits next to other sections. A thing without the stat shows "—". Each column must be a stat that at least one
+selected thing has and that is not true/false. Typical use: what a
+character attacks with, how well it hits and how much harm it does.
+
+```json
+{
+  "id": "attacks",
+  "kind": "statTable",
+  "span": 6,
+  "things": { "tags": ["armed"] },
+  "columns": [{ "stat": "hit", "signed": true }, { "stat": "harm" }, { "stat": "range" }]
+}
+```
+
 **Cards.** Every thing with `card: true` gets a card. `cards.<kind>.fields`
 names exactly four stat keys for the 2×2 grid on the card; quantities are
 converted. A card shows `card.<kind>.typeLine`, the name, the four stats,
@@ -1040,7 +1098,8 @@ well-formed does the second stage check the rules between files:
   values, tags, glossary entries, units;
 - every expression parses and refers to existing values and things;
   formulas are not circular;
-- `{value}` stats name existing values;
+- `{value}` stats and the `vars` of `{text}` stats name existing values; a
+  stat text with `vars` uses no other variable;
 - option sources select at least one thing; recommendations are among the
   options; badges name options, at most one per thing, and their texts
   exist in every language; `about` names another existing thing; `held`
@@ -1057,7 +1116,8 @@ well-formed does the second stage check the rules between files:
 - sheet sections and card fields refer to existing values, choices and
   stats; section and box conditions (`when`) parse and refer to existing
   values and things; box labels (`label`) exist in every language; things with `card: true` have a layout; `uses` stats are whole
-  numbers or texts, `note` stats are not true/false;
+  numbers or texts, `note` stats and table columns are not true/false,
+  `total` stats are `{value}`;
 - text variants: ids unique per choice, conditions parse; a variant text
   that exists in one language exists in every language;
 - units: every language has defaults; every stated amount can be converted;
@@ -1108,6 +1168,7 @@ are removed (saved characters may lose picks). Keys are never renamed.
 | 0.7     | 2026-10-04 | Optional `about` on things and `held` on `pickOne` and `pickMany` choices: recommend and name what the character has.                                                                                                                                                                                                                                                                       | Set `formatVersion` to `"0.7"`. Nothing else changes: both fields are optional, so every valid 0.6 package is a valid 0.7 package.                                                                                                                                                                                                                                                |
 | 0.9     | 2026-10-05 | Levels up to 20: `distribute` method `raise` (points on top of values, `maxPerTarget`, `cap`); tables by level (`byLevel` on values, `{ "byLevel": [...] }` for a grant's `add` and a `pickMany` `count`); `repeatable` on things (choices asked again per pick as `<choice>@<where>`). A `pickMany` recommendation is cut to `count` and filled up from the options.                       | Set `formatVersion` to `"0.9"`. Nothing else changes: every field is optional, and a recommendation that already had `count` picks is the same, so every valid 0.8 package is a valid 0.9 package.                                                                                                                                                                                |
 | 0.10    | 2026-10-05 | Stats `{ "value": "<value>" }`: show the character's value, and give use boxes that grow with the level. `"owned": true` in a pick choice's `options`: pick among what the character has; a pick marks the thing instead of giving it, `answers` sections print the picks. A `raise` sees the values, `cap` and `recommend` conditions at the choice's level, not at the character's level. | Set `formatVersion` to `"0.10"`. The new fields are optional. A `raise` on a level below the character's no longer counts what later levels give: a package that worked around this (for example a second value for the printed score) can drop the workaround. Saved raises stay valid; a raise that left points over because a later bonus filled the cap may now ask for them. |
+| 0.11    | 2026-10-05 | `total` on `checkList` sections: the character's value in each box, with where it comes from. Section kind `statTable`: the things the character has, one column per stat. `{text}` stats may fill in values (`vars`); placeholder `{{var:name\|signed}}` writes a number with its sign.                                                                                                    | Set `formatVersion` to `"0.11"`. Nothing else changes: every field is optional and the placeholder is new, so every valid 0.10 package is a valid 0.11 package.                                                                                                                                                                                                                   |
 | 0.8     | 2026-10-04 | Gather steps (`gather`, optional `together`: `sections` or one shared `list`) in `flow.steps`, optional `gather` on choices, optional text `choice.<id>.from`.                                                                                                                                                                                                                              | Set `formatVersion` to `"0.8"`. Nothing else changes: a package without gather steps builds the same steps as before, so every valid 0.7 package is a valid 0.8 package.                                                                                                                                                                                                          |
 
 ## 16. A minimal package
@@ -1119,7 +1180,7 @@ language. The validator accepts it as is.
 
 ```json
 {
-  "formatVersion": "0.10",
+  "formatVersion": "0.11",
   "id": "tiny",
   "version": "1.0.0",
   "languages": ["en"],
@@ -1216,7 +1277,7 @@ language. The validator accepts it as is.
 
 ## 17. Reserved for later versions
 
-Not part of 0.10; listed so nobody builds on a different idea:
+Not part of 0.11; listed so nobody builds on a different idea:
 
 - **Packages that extend other packages** (an expansion adding things to a
   base package). Planned: `manifest.dependsOn` and keys of the form

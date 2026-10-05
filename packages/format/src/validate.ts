@@ -379,6 +379,7 @@ export function validatePackageFiles(files: PackageFiles): ValidationResult {
   const grantedChoices = new Map<string, string>(); // choice id → granting thing id
   const statKeys = new Set<string>();
   const statTextKeys = new Set<string>();
+  const statTextVars = new Map<string, Set<string>>(); // stat text key → var names its stats supply
   const groups = new Set<string>();
   for (const { thing: t, file, index } of thingsAt) {
     const p = `[${index}]`;
@@ -398,7 +399,15 @@ export function validatePackageFiles(files: PackageFiles): ValidationResult {
     for (const [k, s] of Object.entries(t.stats ?? {})) {
       statKeys.add(k);
       if (typeof s === "object" && "amount" in s) checkAmount(file, `${p}.stats.${k}`, s.amount, s.unit);
-      if (typeof s === "object" && "text" in s) statTextKeys.add(s.text);
+      if (typeof s === "object" && "text" in s) {
+        statTextKeys.add(s.text);
+        for (const [name, v] of Object.entries(s.vars ?? {})) {
+          if (!isValueRef(v)) err(file, `${p}.stats.${k}.vars.${name}`, `unknown value ${lit(v)}`);
+          let names = statTextVars.get(s.text);
+          if (!names) statTextVars.set(s.text, (names = new Set()));
+          names.add(name);
+        }
+      }
       if (typeof s === "object" && "value" in s && !isValueRef(s.value))
         err(file, `${p}.stats.${k}.value`, `unknown value ${lit(s.value)}`);
     }
@@ -658,9 +667,14 @@ export function validatePackageFiles(files: PackageFiles): ValidationResult {
   );
   if (sheet.sections[0]?.kind !== "header") warn(S, "sections[0]", "the first section should be the header");
   const thingPlace = new Map(thingsAt.map((at) => [at.thing.id, at]));
-  // A sheet field that names a stat ("uses", "note"): some selected thing must have it,
-  // and every value must be printable in that place.
-  const checkStatRef = (path: string, key: string, selected: Thing[], role: "uses" | "note") => {
+  // A sheet field that names a stat ("uses", "note", "total", a table column): some
+  // selected thing must have it, and every value must be printable in that place.
+  const checkStatRef = (
+    path: string,
+    key: string,
+    selected: Thing[],
+    role: "uses" | "note" | "total" | "column",
+  ) => {
     const having = selected.filter((t) => t.stats?.[key] !== undefined);
     if (having.length === 0) {
       err(
@@ -678,16 +692,18 @@ export function validatePackageFiles(files: PackageFiles): ValidationResult {
         role === "uses"
           ? (typeof v === "number" && Number.isInteger(v) && v >= 0) ||
             (typeof v === "object" && ("text" in v || "value" in v))
-          : typeof v !== "boolean";
+          : role === "total"
+            ? typeof v === "object" && "value" in v
+            : typeof v !== "boolean";
       if (ok) continue;
       const at = thingPlace.get(t.id)!;
-      err(
-        at.file,
-        `[${at.index}].stats.${key}`,
-        role === "uses"
-          ? `${path} draws use boxes from this stat; it must be a whole number ≥ 0, {"text": …} or {"value": …}`
-          : `${path} prints this stat next to the name; it cannot be true/false`,
-      );
+      const problem = {
+        uses: `${path} draws use boxes from this stat; it must be a whole number ≥ 0, {"text": …} or {"value": …}`,
+        note: `${path} prints this stat next to the name; it cannot be true/false`,
+        total: `${path} prints the character's value in the box; this stat must be {"value": …}`,
+        column: `${path} prints this stat in a table column; it cannot be true/false`,
+      }[role];
+      err(at.file, `[${at.index}].stats.${key}`, problem);
     }
   };
   sheet.sections.forEach((s, i) => {
@@ -711,6 +727,15 @@ export function validatePackageFiles(files: PackageFiles): ValidationResult {
       case "checkList": {
         const selected = checkOptionSource(S, `${p}.things`, s.things);
         if (s.note !== undefined) checkStatRef(`${p}.note`, s.note, selected, "note");
+        if (s.total !== undefined) checkStatRef(`${p}.total`, s.total, selected, "total");
+        break;
+      }
+      case "statTable": {
+        const selected = checkOptionSource(S, `${p}.things`, s.things);
+        s.columns.forEach((c, j) => checkStatRef(`${p}.columns[${j}].stat`, c.stat, selected, "column"));
+        duplicates(s.columns.map((c) => c.stat)).forEach((k) =>
+          err(S, `${p}.columns`, `stat ${lit(k)} is a column twice`),
+        );
         break;
       }
       case "featureTable": {
@@ -946,6 +971,11 @@ export function validatePackageFiles(files: PackageFiles): ValidationResult {
           throw e;
         }
         for (const part of parts) {
+          // A stat text gets its variables from the stat's `vars`; any other name stays empty.
+          const supplied = statTextVars.get(key);
+          if (part.type === "var" && supplied && !supplied.has(part.name)) {
+            err(file, p, `uses {{var:${part.name}}}, but no stat with this text supplies ${lit(part.name)}`);
+          }
           if (part.type === "glossary" && !glossaryIds.has(part.id)) {
             err(file, p, `links unknown glossary entry ${lit(part.id)}`);
           }

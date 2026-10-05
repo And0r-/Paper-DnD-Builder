@@ -132,6 +132,19 @@ describe("a level-20 lantern bearer, worked out by hand", () => {
       carry: 40, // 8 * 5
       practice: 6, // floor(19 / 4) + 2
       sneakRoll: 0, // grace bonus 0, sneaking not trained
+      climbingRoll: 6, // might bonus 0 + practice 6 (trained)
+      hagglingRoll: 9, // heart bonus 3 + 6
+      trackingRoll: 3, // wit bonus 3, not trained
+      mendingRoll: 9,
+      listeningRoll: 9,
+      legendsRoll: 3, // not trained
+      weatherSenseRoll: 9,
+      lanternStaffHit: 6, // might bonus 0 + practice 6 (lantern bearer)
+      lanternStaffHarm: 0,
+      boatHookHit: 0, // better of might and grace bonus, 0; not a river runner
+      boatHookHarm: 0,
+      slingHit: 6, // grace bonus 0 + practice 6
+      slingHarm: 0,
       knackRank: 5,
       bloomWardUses: 3, // a herbalist's table; the value is there for everyone
       lanternSlots1: 3,

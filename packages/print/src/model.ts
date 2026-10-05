@@ -12,6 +12,7 @@ import {
   evaluateDraft,
   evaluationScope,
   effectiveUnits,
+  explainValue,
   formatMeasure,
   renderText,
   selectThings,
@@ -19,6 +20,7 @@ import {
   type DraftDocument,
   type Evaluation,
   type MeasureContext,
+  type PartSource,
 } from "@builder/core";
 import type { ContentPackage, Section, StatValue, Thing } from "@builder/format/pure";
 import { isCard } from "./cards.ts";
@@ -42,6 +44,12 @@ export interface StatBox {
   hint: string;
 }
 
+/** A number on paper and, small under it, where it comes from ("Grace +2 · Practice +2"); "" if nothing to say. */
+export interface Figure {
+  text: string;
+  parts: string;
+}
+
 /**
  * Use boxes (SPEC 13 `uses`): n boxes to tick, a word like "always", or nothing.
  * More than MAX_USE_BOXES do not fit a row: then the number is printed with a field to write what is left.
@@ -57,7 +65,12 @@ export type SheetSection = { id: string; span: number; title: string; hint: stri
       kind: "scoreColumn";
       scores: { label: string; value: string; derivedLabel: string; derived: string | null }[];
     }
-  | { kind: "checkList"; items: { name: string; marked: boolean; note: string }[] }
+  | {
+      kind: "checkList";
+      /** `total`: the number in the box; empty text for a box to fill in by hand. */
+      items: { name: string; marked: boolean; note: string; total: Figure }[];
+    }
+  | { kind: "statTable"; columns: string[]; rows: { name: string; cells: string[] }[] }
   | { kind: "featureTable"; rows: { name: string; text: string; uses: Uses }[] }
   | { kind: "list"; items: string[]; blankLines: number }
   | { kind: "answers"; rows: { label: string; text: string }[] }
@@ -203,7 +216,12 @@ export function buildPrintModel(
     if (v === undefined) return "—";
     if (typeof v === "number") return numberFormat.format(v);
     if (typeof v === "boolean") return v ? messages.yes : messages.no;
-    if ("text" in v) return text(v.text) || "—";
+    // `vars` fill the text with the character's values ("1d8 +3").
+    if ("text" in v)
+      return (
+        text(v.text, Object.fromEntries(Object.entries(v.vars ?? {}).map(([n, id]) => [n, valueOf(id)]))) ||
+        "—"
+      );
     if ("value" in v) return valueText(v.value);
     return formatMeasure(measure, v, "short");
   };
@@ -218,6 +236,37 @@ export function buildPrintModel(
     }
     if (typeof v === "object" && "text" in v) return { text: text(v.text) };
     return null;
+  };
+  const list = new Intl.ListFormat(language, { type: "conjunction" });
+  const partLabel = (source: PartSource): string => {
+    switch (source.kind) {
+      case "values":
+        return list.format(source.values.map(valueLabel));
+      case "thing":
+        return thingName(source.thing);
+      case "choice":
+        return text(`choice.${source.choice.split("@")[0]}.title`);
+      case "start":
+      case "unclear":
+        return "";
+    }
+  };
+  /**
+   * The character's value as a figure: signed if asked, with its parts as in
+   * the builder's explanations. A number of one part has nothing to take
+   * apart ("Wit bonus +1" under a +1): paper is short, so it stays alone.
+   */
+  const figure = (id: string, sign: boolean): Figure => {
+    const shown = sign ? signed.format(valueOf(id)) : valueText(id);
+    const exp = explainValue(pkg, ev, id);
+    const parts = (exp?.parts ?? []).map((p) => ({ label: partLabel(p.source), amount: p.amount }));
+    if (parts.length < 2 || parts.every((p) => p.label === "")) return { text: shown, parts: "" };
+    return {
+      text: shown,
+      parts: parts
+        .map((p) => (p.label ? `${p.label} ${signed.format(p.amount)}` : signed.format(p.amount)))
+        .join(" · "),
+    };
   };
   // SPEC 13 `when`: a section or box whose condition is false is not printed at all.
   const scope = evaluationScope(pkg, ev);
@@ -289,12 +338,33 @@ export function buildPrintModel(
           kind: "checkList",
           items: selectThings(pkg, s.things).map((t) => {
             const note = s.note === undefined ? undefined : t.stats?.[s.note];
+            const total = s.total === undefined ? undefined : t.stats?.[s.total];
             return {
               name: thingName(t.id),
               marked: held.has(t.id),
               note: note === undefined ? "" : statText(note),
+              // A roll is added to: the number goes in with its sign ("+5").
+              total:
+                typeof total === "object" && "value" in total
+                  ? figure(total.value, true)
+                  : { text: "", parts: "" },
             };
           }),
+        };
+      case "statTable":
+        return {
+          ...base,
+          kind: "statTable",
+          columns: s.columns.map((c) => text(`stat.${c.stat}.name`)),
+          rows: heldOf(s.things).map((t) => ({
+            name: thingName(t.id),
+            // Numbers only: a table row is one line, so a few weapons still fit beside other boxes.
+            cells: s.columns.map((c) => {
+              const v = t.stats?.[c.stat];
+              const n = typeof v === "object" && "value" in v ? valueOf(v.value) : v;
+              return c.signed && typeof n === "number" ? signed.format(n) : statText(v);
+            }),
+          })),
         };
       case "featureTable": {
         const rows = heldOf(s.things).map((t) => ({

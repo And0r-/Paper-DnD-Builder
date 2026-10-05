@@ -67,7 +67,28 @@
       "things": {
         "kind": "talent"
       },
-      "note": "score"
+      "note": "score",
+      "total": "roll"
+    },
+    {
+      "id": "attacks",
+      "kind": "statTable",
+      "span": 8,
+      "things": {
+        "tags": ["armed"]
+      },
+      "columns": [
+        {
+          "stat": "hit",
+          "signed": true
+        },
+        {
+          "stat": "harm"
+        },
+        {
+          "stat": "range"
+        }
+      ]
     },
     {
       "id": "rolls",

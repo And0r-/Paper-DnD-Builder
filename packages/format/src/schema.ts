@@ -171,13 +171,17 @@ export const statValueSchema = z.union(
     z.number(),
     z.boolean(),
     quantitySchema,
-    z.strictObject({ text: textKey }),
+    z.strictObject({
+      text: textKey,
+      /** Character values filled into the text: `{{var:<name>}}` takes the value with this id. */
+      vars: z.record(z.string().regex(VALUE_ID_PATTERN), z.string().min(1)).optional(),
+    }),
     /** The character's value with this key, e.g. uses that grow with the level. */
     z.strictObject({ value: z.string().min(1) }),
   ],
   {
     error:
-      'must be a number, true/false, {"amount": n, "unit": "u"}, {"text": "text.key"} or {"value": "valueKey"}',
+      'must be a number, true/false, {"amount": n, "unit": "u"}, {"text": "text.key", "vars"?: {…}} or {"value": "valueKey"}',
   },
 );
 
@@ -443,6 +447,8 @@ export const sectionSchema = z.discriminatedUnion("kind", [
     things: optionSourceSchema,
     /** Stat shown small next to each name (for example the score a skill is rolled with). */
     note: statKey.optional(),
+    /** Stat naming a value ({"value": …}) printed in the box, with where it comes from. */
+    total: statKey.optional(),
   }),
   z.strictObject({
     ...sectionBase,
@@ -450,6 +456,16 @@ export const sectionSchema = z.discriminatedUnion("kind", [
     things: optionSourceSchema,
     /** Stat that gives the use boxes: a whole number n draws n boxes, a {text} stat prints the text. */
     uses: statKey.optional(),
+  }),
+  z.strictObject({
+    ...sectionBase,
+    kind: z.literal("statTable"),
+    things: optionSourceSchema,
+    /** One column per stat, after the name. `signed`: numbers with their sign ("+5"). */
+    columns: z
+      .array(z.strictObject({ stat: statKey, signed: z.boolean().optional() }))
+      .min(1)
+      .max(4),
   }),
   z.strictObject({
     ...sectionBase,
