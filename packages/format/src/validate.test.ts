@@ -95,7 +95,7 @@ describe("structure errors", () => {
       /flow\.json choices\[0\]\.kind: Invalid discriminator value\. Expected 'pickOne' \| 'pickMany'/,
     );
     expect(messages(r)).toContain(
-      'things/knacks.json [8].stats.reach: must be a number, true/false, {"amount": n, "unit": "u"}, {"text": "text.key"} or {"value": "valueKey"}',
+      'things/knacks.json [8].stats.reach: must be a number, true/false, {"amount": n, "unit": "u"}, {"text": "text.key", "vars"?: {…}} or {"value": "valueKey"}',
     );
     expect(messages(r)).toContain('manifest.json : Unrecognized key: "extra"');
   });
@@ -248,17 +248,17 @@ describe("cross-file rules", () => {
     [
       "use boxes from a stat the selected things lack",
       (f) => (f.get("sheet.json").sections.find((s: { id: string }) => s.id === "knacks").uses = "weight"),
-      'sheet.json sections[6].uses: none of the things selected here has a stat "weight"',
+      'sheet.json sections[7].uses: none of the things selected here has a stat "weight"',
     ],
     [
       "use boxes from a quantity",
       (f) => (thing(f, "talents-and-traits", "trait.stone-steady").stats.uses = { amount: 5, unit: "ft" }),
-      'things/talents-and-traits.json [9].stats.uses: sections[5].uses draws use boxes from this stat; it must be a whole number ≥ 0, {"text": …} or {"value": …}',
+      'things/talents-and-traits.json [9].stats.uses: sections[6].uses draws use boxes from this stat; it must be a whole number ≥ 0, {"text": …} or {"value": …}',
     ],
     [
       "use boxes from a fraction",
       (f) => (thing(f, "knacks", "knack.spark-shower").stats.uses = 1.5),
-      'things/knacks.json [0].stats.uses: sections[6].uses draws use boxes from this stat; it must be a whole number ≥ 0, {"text": …} or {"value": …}',
+      'things/knacks.json [0].stats.uses: sections[7].uses draws use boxes from this stat; it must be a whole number ≥ 0, {"text": …} or {"value": …}',
     ],
     [
       "check list note from true/false",
@@ -271,14 +271,41 @@ describe("cross-file rules", () => {
       'sheet.json sections[3].note: no thing has a stat "basis"',
     ],
     [
+      "check list total from a text",
+      (f) => (thing(f, "talents-and-traits", "talent.climbing").stats.roll = { text: "value.might.name" }),
+      'things/talents-and-traits.json [0].stats.roll: sections[3].total prints the character\'s value in the box; this stat must be {"value": …}',
+    ],
+    [
+      "table column from a stat nobody has",
+      (f) =>
+        (f.get("sheet.json").sections.find((s: { id: string }) => s.id === "attacks").columns[2].stat =
+          "colour"),
+      'sheet.json sections[4].columns[2].stat: no thing has a stat "colour"',
+    ],
+    [
+      "table column from true/false",
+      (f) => (thing(f, "items", "item.sling").stats.range = true),
+      "things/items.json [10].stats.range: sections[4].columns[2].stat prints this stat in a table column; it cannot be true/false",
+    ],
+    [
+      "stat text filled from an unknown value",
+      (f) => (thing(f, "items", "item.sling").stats.harm.vars.bonus = "slingPower"),
+      'things/items.json [10].stats.harm.vars.bonus: unknown value "slingPower"',
+    ],
+    [
+      "stat text with a variable no stat supplies",
+      (f) => (f.get("texts/de/core.json").entries["stat-value.item.sling.harm"] = "1W4 {{var:power|signed}}"),
+      'texts/de/core.json entries.stat-value.item.sling.harm: uses {{var:power}}, but no stat with this text supplies "power"',
+    ],
+    [
       "section condition on an unknown value",
       (f) => (f.get("sheet.json").sections.find((s: { id: string }) => s.id === "path").when = "glow > 0"),
-      'sheet.json sections[9].when: expression "glow > 0" uses unknown value "glow"',
+      'sheet.json sections[10].when: expression "glow > 0" uses unknown value "glow"',
     ],
     [
       "section condition that does not parse",
       (f) => (f.get("sheet.json").sections.find((s: { id: string }) => s.id === "path").when = "level >="),
-      'sheet.json sections[9].when: cannot read expression "level >=": unexpected end of expression (at character 9)',
+      'sheet.json sections[10].when: cannot read expression "level >=": unexpected end of expression (at character 9)',
     ],
     [
       "box condition on an unknown thing",
