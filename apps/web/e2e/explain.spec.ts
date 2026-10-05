@@ -30,6 +30,40 @@ async function draftWith(page: Page, answers: [string, unknown][]): Promise<stri
 
 type Lang = "de" | "en";
 
+/**
+ * The value boxes on the overview sit two side by side on a phone: no text
+ * runs out of them (AND-45), not even a word far longer than any in the
+ * demo package.
+ */
+async function expectNothingSpills(page: Page, lang: Lang) {
+  const spills = () =>
+    page
+      .locator(".value")
+      .evaluateAll((boxes) =>
+        boxes.flatMap((box) =>
+          [box, ...box.querySelectorAll("*")]
+            .filter((el) => el.scrollWidth > el.clientWidth + 1)
+            .map((el) => `${el.className}: ${el.textContent}`),
+        ),
+      );
+  expect(await spills()).toEqual([]);
+  await page
+    .locator(".value__from")
+    .first()
+    .evaluate((el) => {
+      el.dataset["was"] = el.textContent ?? "";
+      el.textContent = "16 aus Nebelfährmannslaternenträgerinnenzunftabzeichen";
+    });
+  expect(await spills()).toEqual([]);
+  await shot(page, `52-ueberblick-langes-wort-${lang}`);
+  await page
+    .locator(".value__from")
+    .first()
+    .evaluate((el) => {
+      el.textContent = el.dataset["was"] ?? "";
+    });
+}
+
 const WORDS = {
   de: {
     score: /Geschick: 7 \+ 1 aus Kindheit Fährkind = 8/,
@@ -75,6 +109,7 @@ async function checkAll(page: Page, id: string, early: string, lang: Lang) {
   await expect(page.getByText(w.score)).toBeVisible();
   await expect(page.getByRole("heading", { name: m["origins.title"] })).toBeVisible();
   await expect(page.getByText(w.origin, { exact: true })).toBeVisible();
+  await expectNothingSpills(page, lang);
   await expectOneLanguage(page, lang);
   await shot(page, `52-ueberblick-${lang}`);
 

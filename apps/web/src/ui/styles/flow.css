@@ -865,6 +865,8 @@
   border: 1px solid var(--color-line);
   border-radius: var(--radius-md);
   background: var(--color-surface);
+  overflow-wrap: anywhere;
+  hyphens: auto;
 }
 
 .gift__name {
@@ -910,6 +912,9 @@
   border: 1px solid var(--color-line);
   border-radius: var(--radius-md);
   background: var(--color-surface);
+  /* Two boxes side by side on a phone are narrow; long compound words break, never spill. */
+  overflow-wrap: anywhere;
+  hyphens: auto;
 }
 
 .value__number {

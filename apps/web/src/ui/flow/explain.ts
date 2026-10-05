@@ -41,6 +41,7 @@ export function partLabel(
 ): string | undefined {
   switch (source.kind) {
     case "start":
+    case "unclear":
       return undefined;
     case "thing":
       return thingLabel(lp, source.thing, w);
@@ -90,7 +91,7 @@ export function valueOrigin(
   w: Words,
 ): string | undefined {
   const exp = explainValue(lp.pkg, ev, valueId);
-  if (!exp || exp.parts.every((p) => p.source.kind === "start")) return undefined;
+  if (!exp || exp.parts.every((p) => partLabel(lp, ev, p.source, w) === undefined)) return undefined;
   if (exp.parts.length === 1) {
     const label = partLabel(lp, ev, exp.parts[0]!.source, w);
     return label ? w.t("explain.from", { source: label }) : undefined;

@@ -69,6 +69,11 @@ export function evaluateParsed(expr: Expr, scope: ExprScope): number {
   return num(evalNode(expr, scope), "term");
 }
 
+/** Evaluates an already parsed condition (the test of an `if`). */
+export function evaluateParsedCondition(expr: Expr, scope: ExprScope): boolean {
+  return bool(evalNode(expr, scope), "condition");
+}
+
 function num(v: ExprResult, what: string): number {
   if (typeof v !== "number") throw new RuleError(`${what} needs a number, got ${typeof v}`);
   return v;
