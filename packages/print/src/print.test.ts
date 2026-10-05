@@ -757,10 +757,8 @@ describe("printed character (demo package)", () => {
     const card = model.cards[0]!;
     expect(card.fields.length).toBeGreaterThanOrEqual(2);
     const long = "V, M (eine Laternenscherbe und ein Faden aus gesponnenem Nebelgarn)";
-    const fields = card.fields.map((f, i) => ({
-      ...f,
-      value: i % 2 === 0 ? "Gebündelte Aufmerksamkeit, bis zu 1 Minute" : long,
-    }));
+    const short = "Gebündelt, bis 1 Minute";
+    const fields = card.fields.map((f, i) => ({ ...f, value: i % 2 === 0 ? short : long }));
     const attribution = Array.from(
       { length: 6 },
       (_, i) => `Satz ${i + 1} der Quellenangabe, frei erfunden.`,
@@ -785,18 +783,47 @@ describe("printed character (demo package)", () => {
     expect(text).toContain("Satz 6 der Quellenangabe");
     for (const item of cards.flat()) expect(item.x + item.w).toBeLessThanOrEqual(210 - 10.5 + 0.2);
 
-    // Card texts stay in their half of the card: grid starts 10.5 mm from the left, cards are 63 mm wide.
+    // Card texts stay on their card: grid starts 10.5 mm from the left, cards are 63 mm wide.
     const grid = { x: 10.5, y: (297 - 3 * 88) / 2, w: 63, pad: 4 };
-    for (const item of cards[0]!.filter((p) => p.y > grid.y && p.y < grid.y + 3 * 88)) {
-      const col = Math.floor((item.x - grid.x) / grid.w);
-      const left = grid.x + col * grid.w + grid.pad;
-      const half = (grid.w - 2 * grid.pad) / 2;
-      const inSecondHalf = item.x >= left + half - 0.2;
+    const half = (grid.w - 2 * grid.pad) / 2;
+    const first = cards[0]!.filter((p) => p.y > grid.y && p.y < grid.y + 88 && p.x < grid.x + grid.w);
+    for (const item of first) {
+      const left = grid.x + grid.w * Math.floor((item.x - grid.x) / grid.w) + grid.pad;
       expect(item.x + item.w, item.str).toBeLessThanOrEqual(left + 2 * half + 0.2);
-      // A value in the first column never runs into the second one.
-      const isValue = fields.some((f) => f.value.includes(item.str));
-      if (!inSecondHalf && isValue) expect(item.x + item.w, item.str).toBeLessThanOrEqual(left + half);
+      // A short value in the first column never runs into the second one.
+      if (short.includes(item.str) && item.x < left + half - 0.2)
+        expect(item.x + item.w, item.str).toBeLessThanOrEqual(left + half);
     }
+    // A value that would take more than two lines in half the card gets a row
+    // of its own across it: some of its lines are wider than half the card.
+    const longLines = first.filter((p) => long.includes(p.str) && p.str.length > 3);
+    expect(longLines.length).toBeGreaterThan(0);
+    expect(longLines.some((p) => p.w > half)).toBe(true);
+  });
+
+  it("keeps a card's head above its footer when a field is a whole sentence", async () => {
+    // A casting time like a sentence, in half the card, used to push "at the
+    // table" over the hint and the footer.
+    const model = buildPrintModel(pkg, doc, { language: "de", createdAt });
+    const card = model.cards[0]!;
+    const sentence =
+      "Reaktion, die du ausführst, wenn eine Laterne im Abstand von bis zu zwölf Schritten von dir erlischt und du es sehen kannst";
+    const fields = card.fields.map((f, i) => (i === 0 ? { ...f, value: sentence } : f));
+    const table = "Kostet eine Reaktion. Der Nebel weicht drei Schritte zurück, und du siehst wieder klar.";
+    const pdf = await renderPdf({
+      ...model,
+      cards: [{ ...card, fields, table, hint: "HINWEIS am Fuss." }, ...model.cards.slice(1)],
+    });
+    const grid = { x: 10.5, y: (297 - 3 * 88) / 2, w: 63, pad: 4 };
+    const footLine = grid.y + 88 - grid.pad - 5;
+    const page = (await positions(pdf))[pdf.sheetPages]!;
+    const onFirst = page.filter((p) => p.x < grid.x + grid.w && p.y > grid.y && p.y < grid.y + 88);
+    const tableEnd = onFirst.filter((p) => p.str.includes("klar."));
+    expect(tableEnd).toHaveLength(1);
+    expect(tableEnd[0]!.y).toBeLessThan(footLine);
+    // The hint gives way where it would be printed over "at the table"; if it is there, it is below it.
+    const hint = onFirst.find((p) => p.str.startsWith("HINWEIS"));
+    if (hint) expect(hint.y).toBeGreaterThan(tableEnd[0]!.y + 2);
   });
 
   it("wraps labels too long for their box instead of running out of it", async () => {
