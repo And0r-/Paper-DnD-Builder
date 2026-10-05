@@ -16,6 +16,7 @@ import { Icon } from "../../../../src/ui/components/Icon.tsx";
 import { useDraft } from "../../../../src/ui/flow/draft-state.tsx";
 import { usePageTitle } from "../../../../src/ui/flow/frame.tsx";
 import { firstOpen } from "../../../../src/ui/flow/model.ts";
+import { typedLevel } from "../../../../src/ui/flow/typed-level.ts";
 import { levelWord, ptext } from "../../../../src/ui/package-text.ts";
 
 export default function RaisePage() {
@@ -78,6 +79,15 @@ export default function RaisePage() {
     setText(String(clamped));
     setFailed(false);
   };
+  // A typed level counts at once, so the button and the hint never name another level than the field.
+  const type = (value: string) => {
+    setText(value);
+    const typed = typedLevel(value, min, max);
+    if (typed.level !== undefined) {
+      setTarget(typed.level);
+      setFailed(false);
+    }
+  };
   const commit = () => {
     const n = Number(text);
     if (text.trim() !== "" && Number.isFinite(n)) pick(n);
@@ -123,6 +133,7 @@ export default function RaisePage() {
     router.push(r === "ok" ? `/c/${draft.id}/done` : `/c/${draft.id}/overview`);
   };
 
+  const invalid = typedLevel(text, min, max).invalid;
   const oneUp = Math.min(max, base + 1);
   const otherChosen = other || target !== oneUp;
   return (
@@ -204,7 +215,8 @@ export default function RaisePage() {
                       value={text}
                       aria-label={levelName}
                       aria-describedby={`${otherId}-range`}
-                      onChange={(e) => setText(e.target.value)}
+                      aria-invalid={invalid || undefined}
+                      onChange={(e) => type(e.target.value)}
                       onKeyDown={(e) => {
                         if (e.key === "Enter") commit();
                       }}
@@ -221,7 +233,7 @@ export default function RaisePage() {
                       <Icon name="plus" />
                     </button>
                   </div>
-                  <p className="field__help" id={`${otherId}-range`}>
+                  <p className={invalid ? "field__error" : "field__help"} id={`${otherId}-range`}>
                     {t("number.range", { min, max })}
                   </p>
                 </div>

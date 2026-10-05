@@ -1018,6 +1018,10 @@
   font-variant-numeric: tabular-nums;
 }
 
+.stepper__input[aria-invalid="true"] {
+  border-color: var(--color-danger);
+}
+
 .number {
   display: flex;
   flex-direction: column;
