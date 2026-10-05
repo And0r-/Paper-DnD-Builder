@@ -202,16 +202,37 @@ export interface LevelGrowth {
   byThing: { thing: string; values: string[] }[];
 }
 
+/** Values each thing names in a stat (`"uses": {"value": "…"}`), by value. */
+function statUsers(lp: LoadedPackage): Map<string, Set<string>> {
+  const users = new Map<string, Set<string>>();
+  for (const x of lp.pkg.things) {
+    for (const s of Object.values(x.stats ?? {})) {
+      if (typeof s !== "object" || !("value" in s)) continue;
+      const set = users.get(s.value) ?? new Set<string>();
+      set.add(x.id);
+      users.set(s.value, set);
+    }
+  }
+  return users;
+}
+
 /**
  * Numbers that grow with the level and nothing else, for "what grows with
  * your level": "Practice 6, because level 20". Values that also depend on
  * choices (stamina from a score) are explained with their own sums instead.
+ * A table by level that things name in a stat (uses of one ability) belongs
+ * to those things: it only shows when the character has one of them.
  */
 export function levelGrowth(lp: LoadedPackage, ev: Evaluation): LevelGrowth {
   const named = (id: string) => ptext(lp, `value.${id}.name`) !== undefined && (ev.values[id] ?? 0) !== 0;
+  const users = statUsers(lp);
+  const held = new Set(ev.things.map((h) => h.id));
   const own = lp.pkg.values
     .filter((v) => {
-      if (v.byLevel !== undefined) return true;
+      if (v.byLevel !== undefined) {
+        const by = users.get(v.id);
+        return by === undefined || [...by].some((x) => held.has(x));
+      }
       if (v.formula === undefined) return false;
       const refs = collectRefs(parseExpr(v.formula));
       return refs.values.size === 1 && refs.values.has("level");
