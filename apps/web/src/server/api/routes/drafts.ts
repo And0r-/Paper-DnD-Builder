@@ -4,7 +4,15 @@
  * made on. If the draft moved on in the meantime (another tab, later a
  * helper on the same draft), the change is refused with the current state.
  */
-import { applyChange, evaluateDraft, newDraft, summarize, type DraftChange } from "@builder/core";
+import {
+  applyChange,
+  evaluateDraft,
+  levelUp,
+  levelUpState,
+  newDraft,
+  summarize,
+  type DraftChange,
+} from "@builder/core";
 import type { ContentPackage } from "@builder/format";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
@@ -16,8 +24,14 @@ import type { RequestContext, Route } from "../router.ts";
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const version = z.number().int().min(1);
 
-export function draftView(row: DraftRow, pkg: ContentPackage | undefined) {
+/**
+ * The draft as every route answers it. `raisedFrom` names the level a raise
+ * started from when the draft no longer keeps it (a raise that finished the
+ * character at once), so the level-up answer always says what it brought.
+ */
+export function draftView(row: DraftRow, pkg: ContentPackage | undefined, raisedFrom?: number) {
   const evaluation = pkg ? evaluateDraft(pkg, row.document) : null;
+  const from = row.document.levelBefore ?? raisedFrom;
   return {
     draft: {
       id: row.id,
@@ -26,6 +40,8 @@ export function draftView(row: DraftRow, pkg: ContentPackage | undefined) {
       version: row.version,
       status: row.finished_at ? "finished" : "draft",
       level: row.document.level,
+      /** The level a raise started from, until the character is finished again. */
+      levelBefore: row.document.levelBefore ?? null,
       answers: row.document.answers,
       createdAt: row.created_at.toISOString(),
       updatedAt: row.updated_at.toISOString(),
@@ -35,6 +51,8 @@ export function draftView(row: DraftRow, pkg: ContentPackage | undefined) {
     packageAvailable: pkg !== undefined,
     evaluation,
     summary: pkg && evaluation ? summarize(pkg, row.document, evaluation) : null,
+    /** While a character is being raised: the new steps and choices, and what is still open. */
+    levelUp: evaluation && from !== undefined ? levelUpState(evaluation, from) : null,
   };
 }
 
@@ -65,15 +83,21 @@ function conflict(row: DraftRow, pkg: ContentPackage): HttpError {
 async function change(
   ctx: RequestContext,
   expectedVersion: number,
-  edit: (pkg: ContentPackage, row: DraftRow) => { doc: DraftRow["document"]; finish?: boolean },
+  edit: (
+    pkg: ContentPackage,
+    row: DraftRow,
+  ) => { doc: DraftRow["document"]; finish?: boolean; raisedFrom?: number | undefined },
 ): Promise<Response> {
   const { row, accountId } = await loadDraft(ctx);
   const pkg = packageOf(ctx.app, row);
   if (row.version !== expectedVersion) throw conflict(row, pkg);
-  const { doc, finish } = edit(pkg, row);
-  const complete = evaluateDraft(pkg, doc).complete;
+  const edited = edit(pkg, row);
+  const complete = evaluateDraft(pkg, edited.doc).complete;
   const now = ctx.app.now();
-  const finishedAt = finish ? now : complete ? row.finished_at : null;
+  const finishedAt = edited.finish ? now : complete ? row.finished_at : null;
+  // A raise ends when the character is finished again.
+  const { levelBefore: _, ...rest } = edited.doc;
+  const doc = finishedAt ? rest : edited.doc;
   const updated = await ctx.app.store.updateDraft(row.id, accountId, expectedVersion, {
     document: doc,
     finishedAt,
@@ -87,7 +111,7 @@ async function change(
     throw conflict(current, pkg);
   }
   ctx.app.draftEvents.publish({ draftId: updated.id, accountId, version: updated.version });
-  return json(200, draftView(updated, pkg));
+  return json(200, draftView(updated, pkg, edited.raisedFrom));
 }
 
 function applyOrReject(pkg: ContentPackage, row: DraftRow, c: DraftChange) {
@@ -179,6 +203,29 @@ export const draftRoutes: Route[] = [
       return change(ctx, body.version, (pkg, row) =>
         applyOrReject(pkg, row, { type: "pool", step, picks: body.picks }),
       );
+    },
+  },
+  {
+    // Raise a finished character to a higher level. Every answer stays; only
+    // what the new levels add is open. With nothing to answer, the character
+    // is finished again at once.
+    method: "POST",
+    path: "/api/drafts/:id/level-up",
+    handler: async (ctx) => {
+      const body = await readJson(ctx.req, z.strictObject({ version, level: z.number().int() }));
+      return change(ctx, body.version, (pkg, row) => {
+        // A raise that is not finished yet may go higher still; any other draft is built first.
+        if (!row.finished_at && row.document.levelBefore === undefined) {
+          throw new HttpError(409, "notFinished", { open: evaluateDraft(pkg, row.document).open });
+        }
+        const r = levelUp(pkg, row.document, body.level);
+        if (!r.ok) throw new HttpError(422, "changeRejected", { reason: r.error });
+        return {
+          doc: r.doc,
+          finish: evaluateDraft(pkg, r.doc).complete,
+          raisedFrom: r.doc.levelBefore,
+        };
+      });
     },
   },
   {
