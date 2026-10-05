@@ -56,6 +56,20 @@ export function thingName(lp: LoadedPackage, id: string): string {
 }
 
 /**
+ * One sentence about a thing, for its name standing alone: its short text,
+ * else the first sentence of what it is. Undefined when the package says
+ * nothing about it.
+ */
+export function thingHint(lp: LoadedPackage, ctx: MeasureContext, id: string): string | undefined {
+  const short = plain(ctx, ptext(lp, `${id}.short`)).trim();
+  if (short) return short;
+  const what = plain(ctx, ptext(lp, `${id}.explain.what`)).trim();
+  if (!what) return undefined;
+  const first = /^.*?[.!?…](?=\s|$)/su.exec(what)?.[0];
+  return first ?? what;
+}
+
+/**
  * The definition of a choice as asked. A copy (`<choice>@<where>`, asked
  * again for a repeatable thing) gets the declared choice under its own id,
  * so answers go to the copy and texts come from the declared choice.

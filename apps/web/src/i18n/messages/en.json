@@ -1,5 +1,6 @@
 {
   "app.name": "Character Builder",
+  "app.about": "A tool that helps you build a character for a role-playing game step by step and print it as a sheet.",
   "common.skipToContent": "Skip to content",
   "common.back": "Back",
   "common.next": "Next",
@@ -13,6 +14,7 @@
   "common.moreInfo": "Learn more",
   "common.lessInfo": "Show less",
   "common.unnamed": "No name yet",
+  "common.whatIsThis": "What does this mean?",
   "common.yes": "yes",
   "common.no": "no",
   "common.toStart": "To the start page",
@@ -246,6 +248,7 @@
   "done.text": "Print the sheet and the cards. Take them to your game night.",
   "done.textSheetOnly": "Print the sheet. Take it to your game night.",
   "done.download": "Download PDF",
+  "done.pdfHint": "A PDF is a file that looks the same on every device and is easy to print.",
   "done.preparing": "Creating the PDF …",
   "done.pdfError": "The PDF could not be created.",
   "done.pdfNotYet": "Printing comes with the next version. Your character is saved and stays saved.",

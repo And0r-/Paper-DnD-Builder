@@ -6,6 +6,7 @@
  */
 import { useId } from "react";
 import { useApp } from "../app-state.tsx";
+import { fillNodes, listNodes, ThingLabel, ThingName } from "../components/ThingName.tsx";
 import { useDraft } from "./draft-state.tsx";
 import { originGroups } from "./explain.ts";
 
@@ -25,8 +26,15 @@ export function Origins({ headingLevel = 2 }: { headingLevel?: 2 | 3 }) {
       <ul className="origins__list">
         {groups.map((g) => (
           <li className="origins__group" key={g.from}>
-            <p className="origins__from">{t("origins.from", { source: g.label })}</p>
-            <p className="origins__things">{list(g.things)}</p>
+            <p className="origins__from">
+              {fillNodes((m) => t("origins.from", m), { source: <ThingLabel lp={lp} id={g.from} t={t} /> })}
+            </p>
+            <p className="origins__things">
+              {listNodes(
+                t,
+                g.things.map((id) => <ThingName key={id} lp={lp} id={id} />),
+              )}
+            </p>
           </li>
         ))}
       </ul>

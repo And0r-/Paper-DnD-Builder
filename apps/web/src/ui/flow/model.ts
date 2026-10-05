@@ -290,23 +290,13 @@ export function describeAnswer(
   const choice = choiceOf(lp, state.id);
   if (!choice) return undefined;
   switch (state.kind) {
-    case "info": {
-      const info = state.info;
-      if (!info) return undefined;
-      const parts = [
-        ...info.things.map((id) => thingName(lp, id)),
-        ...info.values
-          .filter((v) => !skipValues.has(v.value))
-          .map((v) => grantedValue(lp, ctx, v.value, v.add)),
-      ];
+    case "info":
+    case "pickOne":
+    case "pickMany": {
+      const p = answerThings(lp, ctx, state, skipValues);
+      const parts = p ? [...p.things.map((id) => thingName(lp, id)), ...p.values] : [];
       return parts.length > 0 ? list(parts) : undefined;
     }
-    case "pickOne":
-      return typeof answer?.["pick"] === "string" ? thingName(lp, answer["pick"]) : undefined;
-    case "pickMany":
-      return Array.isArray(answer?.["picks"]) && answer["picks"].length > 0
-        ? list((answer["picks"] as string[]).map((id) => thingName(lp, id)))
-        : undefined;
     case "distribute": {
       const assign = answer?.["assign"] as Record<string, number> | undefined;
       if (!assign || choice.kind !== "distribute") return undefined;
@@ -328,6 +318,38 @@ export function describeAnswer(
       return typeof answer?.["text"] === "string" && answer["text"].trim()
         ? answer["text"].trim()
         : undefined;
+  }
+}
+
+/**
+ * The things an answer names (picked or brought along) and, for what a
+ * thing brings, the values it adds. Undefined for answers that are no things.
+ */
+export function answerThings(
+  lp: LoadedPackage,
+  ctx: MeasureContext,
+  state: ChoiceState,
+  skipValues: ReadonlySet<string> = new Set(),
+): { things: string[]; values: string[] } | undefined {
+  const answer = state.answer as Record<string, unknown> | undefined;
+  switch (state.kind) {
+    case "info":
+      return state.info
+        ? {
+            things: state.info.things,
+            values: state.info.values
+              .filter((v) => !skipValues.has(v.value))
+              .map((v) => grantedValue(lp, ctx, v.value, v.add)),
+          }
+        : undefined;
+    case "pickOne":
+      return typeof answer?.["pick"] === "string" ? { things: [answer["pick"]], values: [] } : undefined;
+    case "pickMany":
+      return Array.isArray(answer?.["picks"])
+        ? { things: answer["picks"] as string[], values: [] }
+        : undefined;
+    default:
+      return undefined;
   }
 }
 

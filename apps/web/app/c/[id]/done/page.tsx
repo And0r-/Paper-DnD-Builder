@@ -8,11 +8,13 @@
  */
 import { cardCount } from "@builder/print/cards";
 import { useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useApp } from "../../../../src/ui/app-state.tsx";
 import { Button, ButtonLink } from "../../../../src/ui/components/Button.tsx";
 import { Callout, EmptyState } from "../../../../src/ui/components/Feedback.tsx";
+import { Explained } from "../../../../src/ui/components/Explained.tsx";
 import { Icon } from "../../../../src/ui/components/Icon.tsx";
+import { fillNodes, listNodes, ThingName } from "../../../../src/ui/components/ThingName.tsx";
 import { useDraft } from "../../../../src/ui/flow/draft-state.tsx";
 import { usePageTitle } from "../../../../src/ui/flow/frame.tsx";
 import { Origins } from "../../../../src/ui/flow/origins.tsx";
@@ -60,6 +62,14 @@ export default function DonePage() {
   }, [from, lp, ev, doc]);
   const capped = (items: string[]) =>
     list(
+      items.length > NEWS_MAX
+        ? [...items.slice(0, NEWS_MAX - 1), t("done.moreItems", { count: items.length - NEWS_MAX + 1 })]
+        : items,
+    );
+  // The same with names that explain themselves.
+  const cappedNodes = (items: ReactNode[]) =>
+    listNodes(
+      t,
       items.length > NEWS_MAX
         ? [...items.slice(0, NEWS_MAX - 1), t("done.moreItems", { count: items.length - NEWS_MAX + 1 })]
         : items,
@@ -121,8 +131,12 @@ export default function DonePage() {
           {params.get("asked") === "0" && <p>{t("done.raisedNothing", { levelName, level: ev.level })}</p>}
           {news.things.length > 0 && (
             <p>
-              {t("done.newThings", {
-                things: capped(news.things.map((id) => thingName(lp, id)).filter(Boolean)),
+              {fillNodes((m) => t("done.newThings", m), {
+                things: cappedNodes(
+                  news.things
+                    .filter((id) => thingName(lp, id))
+                    .map((id) => <ThingName key={id} lp={lp} id={id} />),
+                ),
               })}
             </p>
           )}
@@ -147,15 +161,17 @@ export default function DonePage() {
         {from !== undefined ? t("done.reprint") : t(hasCards ? "done.text" : "done.textSheetOnly")}
       </p>
       <div className="done__pdf">
-        <Button
-          icon="printer"
-          block
-          busy={pdf === "preparing"}
-          busyLabel={t("done.preparing")}
-          onClick={download}
-        >
-          {t("done.download")}
-        </Button>
+        <Explained hint={t("done.pdfHint")} block>
+          <Button
+            icon="printer"
+            block
+            busy={pdf === "preparing"}
+            busyLabel={t("done.preparing")}
+            onClick={download}
+          >
+            {t("done.download")}
+          </Button>
+        </Explained>
         <div aria-live="polite">
           {pdf === "error" && (
             <Callout tone="danger" role="alert">
