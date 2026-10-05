@@ -54,7 +54,7 @@ test("phone: Next pressed while saving goes on once saved, one tap is enough", a
   const seen = await slowServer(page);
 
   await page.locator(".shortcuts").getByRole("button", { name: m["flow.chooseForMe"] }).click();
-  await expect(page.getByText("Noch 2 Punkte übrig")).toBeVisible();
+  await expect(page.getByText("2 Punkte übrig", { exact: true })).toBeVisible();
   await expect(page.locator(".save-status")).toHaveText(m["save.saving"]);
 
   // One tap while saving: the button waits visibly, the step stays until saved.
@@ -80,7 +80,7 @@ test("phone: Next pressed while saving goes on once saved, one tap is enough", a
   await page.unroute("**/api/drafts/*/**");
   await page.unroute(/\/step\/[^/?]+\?_rsc=/);
   await page.goto(`/c/${id}/step/scores`);
-  await expect(page.getByText("Noch 2 Punkte übrig")).toBeVisible();
+  await expect(page.getByText("2 Punkte übrig", { exact: true })).toBeVisible();
 });
 
 test("phone: Back while Next waits for saving: Back wins, nothing is lost", async ({ page, foreign }) => {
