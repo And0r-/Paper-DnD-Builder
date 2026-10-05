@@ -136,5 +136,6 @@ test("a long build: the step list groups the steps a higher level brings", async
   await page.goto(`/c/${id}/step/folk`);
   await page.getByRole("button", { name: m["menu.open"] }).click();
   await expect(page.locator(".steplist").first().getByText("Ab Stufe 8", { exact: true })).toHaveCount(0);
-  await expect(page.locator(".progress__text")).toContainText("von 14");
+  // Demo 0.10.0: the mastery step (level 18) makes it 15 steps.
+  await expect(page.locator(".progress__text")).toContainText("von 15");
 });
