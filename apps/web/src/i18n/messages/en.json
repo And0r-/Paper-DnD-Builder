@@ -98,6 +98,7 @@
   "flow.status.needsAttention": "needs a new choice",
   "flow.overview": "Overview",
   "flow.later": "Decide later",
+  "flow.going": "Loading …",
   "flow.chooseForMe": "Choose for me",
   "flow.chooseForMeHint": "Takes a good suggestion. You can change it afterwards.",
   "flow.choseForMe": "Done. You can see the choice below and change it.",
