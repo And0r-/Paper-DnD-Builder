@@ -122,7 +122,7 @@ people who distribute packages.
 
 ```json
 {
-  "formatVersion": "0.8",
+  "formatVersion": "0.9",
   "id": "demo",
   "version": "0.1.0",
   "languages": ["de", "en"],
@@ -941,7 +941,7 @@ language. The validator accepts it as is.
 
 ```json
 {
-  "formatVersion": "0.8",
+  "formatVersion": "0.9",
   "id": "tiny",
   "version": "1.0.0",
   "languages": ["en"],

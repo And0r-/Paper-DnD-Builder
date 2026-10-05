@@ -126,7 +126,7 @@ describe("cross-file rules", () => {
     [
       "format version",
       (f) => (f.get("manifest.json").formatVersion = "0.3"),
-      "manifest.json formatVersion: package is written for format 0.3, this builder understands 0.8",
+      "manifest.json formatVersion: package is written for format 0.3, this builder understands 0.9",
     ],
     [
       "duplicate thing",

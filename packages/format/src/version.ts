@@ -6,7 +6,7 @@
  * version is 0, every minor bump may break packages and must ship a
  * migration note in SPEC.md.
  */
-export const PACKAGE_FORMAT_VERSION = "0.8";
+export const PACKAGE_FORMAT_VERSION = "0.9";
 
 export function parseFormatVersion(v: string): { major: number; minor: number } | undefined {
   const m = /^(\d+)\.(\d+)$/.exec(v);

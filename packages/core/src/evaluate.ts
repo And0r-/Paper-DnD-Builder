@@ -13,7 +13,10 @@
  */
 import {
   collectRefs,
+  COPY_SEPARATOR,
+  declaredChoiceId,
   parseExpr,
+  type Amount,
   type Choice,
   type ContentPackage,
   type OptionSource,
@@ -27,7 +30,10 @@ import { assignPicks, fillPicks, type PoolSlot } from "./pool.ts";
 export type ChoiceStatus = "answered" | "incomplete" | "missing" | "invalid" | "info";
 
 export interface ChoiceState {
+  /** The choice id; for a copy (a repeatable thing picked again) `<choice>@<where picked>`. */
   id: string;
+  /** Copies only: the declared choice whose rules and texts this copy uses. */
+  copyOf?: string;
   kind: Choice["kind"];
   /** Step the choice is shown on. */
   step: string;
@@ -63,6 +69,19 @@ export interface ChoiceState {
   textVariant?: string;
   /** Things that grant this choice (granted choices), in grant order. */
   grantedBy?: string[];
+  /** Character level from which the choice is asked (the level of its step). */
+  atLevel: number;
+  /** Distribute choices with the method `raise`: what each target can still take. */
+  raise?: RaiseState;
+}
+
+export interface RaiseState {
+  /** Points to give in all. */
+  points: number;
+  /** Each target's value before this choice. */
+  before: Record<string, number>;
+  /** Most points each target can take here: `maxPerTarget`, less if the cap (or the value's max) is near. */
+  most: Record<string, number>;
 }
 
 export interface InfoContent {
@@ -89,6 +108,13 @@ export interface StepState {
   gather?: { group: string; together: "sections" | "list" };
   /** Steps with `together: "list"`: the shared list of options. */
   pool?: PoolState;
+  /**
+   * Character level from which the step is asked: `flow.level.min` for flow
+   * steps; for granted steps the level at which the grant applies (through
+   * every grant on the way). A character raised from level n gets the steps
+   * with `atLevel > n` added.
+   */
+  atLevel: number;
 }
 
 /**
@@ -123,6 +149,8 @@ export interface HeldThing {
   grantedBy?: string;
   /** Step that brought it to the character. */
   step: string;
+  /** Character level from which the character has it. */
+  atLevel: number;
 }
 
 export interface Evaluation {
@@ -134,6 +162,8 @@ export interface Evaluation {
   values: Record<string, number>;
   /** Values set directly by an answer (distribute, number), with the choice that set them. */
   inputs: Record<string, { amount: number; choice: string }>;
+  /** Points added to values by `raise` answers, per value in step order, with the choice that gave them. */
+  raises: Record<string, { amount: number; choice: string }[]>;
   /** Choices that still need an answer (missing, incomplete or invalid, not optional). */
   open: string[];
   complete: boolean;
@@ -169,6 +199,8 @@ class Character {
   readonly inputs = new Map<string, number>();
   /** The choice that set each input. */
   readonly inputChoices = new Map<string, string>();
+  /** Points added by raise answers, per value. */
+  readonly raises = new Map<string, { amount: number; choice: string }[]>();
   private memo = new Map<string, number>();
   private computing = new Set<string>();
 
@@ -182,19 +214,51 @@ class Character {
     this.level = level;
   }
 
-  /** Gives a thing and everything it grants up to the level. Returns the choices granted on the way. */
-  give(id: string, via: { pickedIn?: string; grantedBy?: string }, step: string, choices: Grant[]): void {
-    if (this.held.has(id)) return;
+  /**
+   * Gives a thing and everything it grants up to the level; the choices
+   * granted on the way are added to `choices`. `atLevel` is the level from
+   * which the character has it.
+   */
+  give(
+    id: string,
+    via: { pickedIn?: string; grantedBy?: string },
+    step: string,
+    atLevel: number,
+    choices: Grant[],
+  ): void {
     const thing = this.ix.things.get(id);
     // A key that vanished from a newer package version simply stops counting.
     if (!thing) return;
-    this.held.set(id, { id, kind: thing.kind, ...via, step });
-    this.memo.clear();
+    const again = this.held.has(id);
+    // A thing counts once; only a repeatable one asks its choices again, once per pick.
+    if (again && !thing.repeatable) return;
+    if (!again) {
+      this.held.set(id, { id, kind: thing.kind, ...via, step, atLevel });
+      this.memo.clear();
+    }
+    const copy = thing.repeatable ? (via.pickedIn ?? via.grantedBy) : undefined;
     for (const g of thing.grants ?? []) {
       if ((g.atLevel ?? 1) > this.level) continue;
-      if (g.thing !== undefined) this.give(g.thing, { grantedBy: id }, step, choices);
-      else if (g.choice !== undefined) choices.push({ choice: g.choice, by: id });
+      const from = Math.max(atLevel, g.atLevel ?? 1);
+      if (g.thing !== undefined && !again) this.give(g.thing, { grantedBy: id }, step, from, choices);
+      else if (g.choice !== undefined)
+        choices.push({ choice: copy ? `${g.choice}${COPY_SEPARATOR}${copy}` : g.choice, by: id, atLevel: from });
     }
+  }
+
+  addRaises(raises: Record<string, number>, choice: string): void {
+    for (const [k, amount] of Object.entries(raises)) {
+      if (amount === 0) continue;
+      const list = this.raises.get(k) ?? [];
+      list.push({ amount, choice });
+      this.raises.set(k, list);
+    }
+    this.memo.clear();
+  }
+
+  /** A number, an expression or a table by level, worked out for this character. */
+  amount(src: Amount): number {
+    return typeof src === "object" ? byLevel(this.pkg, src.byLevel, this.level) : evaluateNumber(src, this.scope);
   }
 
   setInputs(inputs: Record<string, number>, choice: string): void {
@@ -227,14 +291,15 @@ class Character {
       let result =
         def.formula !== undefined
           ? evaluateNumber(def.formula, this.scope)
-          : (this.inputs.get(name) ?? def.default ?? 0);
+          : def.byLevel !== undefined
+            ? byLevel(this.pkg, def.byLevel, this.level)
+            : (this.inputs.get(name) ?? def.default ?? 0);
       for (const h of this.held.values()) {
         for (const g of this.ix.things.get(h.id)?.grants ?? []) {
-          if (g.value === name && (g.atLevel ?? 1) <= this.level) {
-            result += evaluateNumber(g.add!, this.scope);
-          }
+          if (g.value === name && (g.atLevel ?? 1) <= this.level) result += this.amount(g.add!);
         }
       }
+      for (const r of this.raises.get(name) ?? []) result += r.amount;
       if (def.min !== undefined) result = Math.max(def.min, result);
       if (def.max !== undefined) result = Math.min(def.max, result);
       this.memo.set(name, result);
@@ -249,9 +314,22 @@ class Character {
   }
 }
 
+/** The entry of a table by level for a level (the last one if the level is past its end). */
+export function byLevel(pkg: ContentPackage, table: readonly number[], level: number): number {
+  const i = Math.min(Math.max(level - pkg.flow.level.min, 0), table.length - 1);
+  return table[i]!;
+}
+
 interface Grant {
   choice: string;
   by: string;
+  atLevel: number;
+}
+
+interface Gathered {
+  choice: string;
+  by: string[];
+  atLevel: number;
 }
 
 interface PendingStep {
@@ -260,8 +338,9 @@ interface PendingStep {
   when?: string;
   origin: "flow" | "granted";
   grantedBy: string[];
+  atLevel: number;
   /** Gather steps: the group, how they are shown, and the choices gathered so far. */
-  gather?: { group: string; together?: "sections" | "list"; gathered: { choice: string; by: string[] }[] };
+  gather?: { group: string; together?: "sections" | "list"; gathered: Gathered[] };
 }
 
 /** Things matching an option source, in package order. */
@@ -307,6 +386,8 @@ function thingsIn(src: string | undefined): string[] {
  */
 export function evaluateDraft(pkg: ContentPackage, doc: DraftDocument): Evaluation {
   const ix = indexes(pkg);
+  /** The declared choice of an id, also of a copy. */
+  const choiceOf = (id: string) => ix.choices.get(declaredChoiceId(id));
   const character = new Character(pkg, ix, doc.level);
   const choices: Record<string, ChoiceState> = {};
   const steps: StepState[] = [];
@@ -321,6 +402,7 @@ export function evaluateDraft(pkg: ContentPackage, doc: DraftDocument): Evaluati
       ...(s.when !== undefined ? { when: s.when } : {}),
       origin: "flow",
       grantedBy: [],
+      atLevel: pkg.flow.level.min,
     };
     if ("gather" in s) {
       pending.gather = {
@@ -349,12 +431,14 @@ export function evaluateDraft(pkg: ContentPackage, doc: DraftDocument): Evaluati
             choices: [g.choice],
             origin: "granted",
             grantedBy: g.by,
+            atLevel: g.atLevel,
           })),
         );
         continue;
       }
       step.choices = gathered.map((g) => g.choice);
       step.grantedBy = [...new Set(gathered.flatMap((g) => g.by))];
+      step.atLevel = Math.min(...gathered.map((g) => g.atLevel));
     } else if (!shown) continue;
 
     const granted: Grant[] = [];
@@ -364,10 +448,12 @@ export function evaluateDraft(pkg: ContentPackage, doc: DraftDocument): Evaluati
     const grantedByChoice = new Map((step.gather?.gathered ?? []).map((g) => [g.choice, g.by]));
     if (step.origin === "granted") grantedByChoice.set(step.id, step.grantedBy);
     const prepared: Prepared[] = [];
+    const atLevelOf = new Map((step.gather?.gathered ?? []).map((g) => [g.choice, g.atLevel]));
     for (const choiceId of step.choices) {
-      const choice = ix.choices.get(choiceId);
+      const choice = choiceOf(choiceId);
       if (!choice) continue;
-      const p = prepareChoice(pkg, choice, step.id, doc, character, choices, refs);
+      const at = atLevelOf.get(choiceId) ?? step.atLevel;
+      const p = prepareChoice(pkg, choice, choiceId, step.id, at, doc, character, choices, refs);
       const by = grantedByChoice.get(choiceId);
       if (by) p.state.grantedBy = by;
       choices[choiceId] = p.state;
@@ -409,28 +495,38 @@ export function evaluateDraft(pkg: ContentPackage, doc: DraftDocument): Evaluati
         ? { gather: { group: step.gather.group, together: step.gather.together } }
         : {}),
       ...(pool ? { pool } : {}),
+      atLevel: step.atLevel,
     });
 
     // SPEC 9.4: one step per newly granted choice, right after this step, in
     // grant order; a choice with a gather group whose step is still ahead waits there.
     const inserted: PendingStep[] = [];
     for (const g of granted) {
-      const group = ix.choices.get(g.choice)?.gather;
+      const group = choiceOf(g.choice)?.gather;
       const gatherStep = group !== undefined ? gatherAhead.get(group) : undefined;
       const waiting = gatherStep?.gather!.gathered.find((w) => w.choice === g.choice);
       if (waiting) {
         if (!waiting.by.includes(g.by)) waiting.by.push(g.by);
+        waiting.atLevel = Math.min(waiting.atLevel, g.atLevel);
         continue;
       }
       const existing = inserted.find((p) => p.id === g.choice);
       if (existing) {
         existing.grantedBy.push(g.by);
+        existing.atLevel = Math.min(existing.atLevel, g.atLevel);
         continue;
       }
       if (scheduled.has(g.choice)) continue;
       scheduled.add(g.choice);
-      if (gatherStep) gatherStep.gather!.gathered.push({ choice: g.choice, by: [g.by] });
-      else inserted.push({ id: g.choice, choices: [g.choice], origin: "granted", grantedBy: [g.by] });
+      if (gatherStep) gatherStep.gather!.gathered.push({ choice: g.choice, by: [g.by], atLevel: g.atLevel });
+      else
+        inserted.push({
+          id: g.choice,
+          choices: [g.choice],
+          origin: "granted",
+          grantedBy: [g.by],
+          atLevel: g.atLevel,
+        });
     }
     queue.unshift(...inserted);
   }
@@ -439,9 +535,8 @@ export function evaluateDraft(pkg: ContentPackage, doc: DraftDocument): Evaluati
   // formula may use a value set by a later step (scores picked after the
   // calling), so it is worked out again once every step has been walked.
   for (const state of Object.values(choices)) {
-    const choice = ix.choices.get(state.id);
-    if (choice?.kind === "info" && state.info)
-      state.info = infoFor(pkg, choice.of, choices, character.level, character.scope);
+    const choice = choiceOf(state.id);
+    if (choice?.kind === "info" && state.info) state.info = infoFor(pkg, choice.of, choices, character);
   }
 
   const open = Object.values(choices)
@@ -456,6 +551,7 @@ export function evaluateDraft(pkg: ContentPackage, doc: DraftDocument): Evaluati
     inputs: Object.fromEntries(
       [...character.inputs].map(([k, amount]) => [k, { amount, choice: character.inputChoices.get(k)! }]),
     ),
+    raises: Object.fromEntries(character.raises),
     open,
     complete: open.length === 0,
     inactiveAnswers: Object.keys(doc.answers).filter((k) => !(k in choices)),
@@ -468,6 +564,8 @@ function isSettled(c: ChoiceState): boolean {
 
 /** A choice worked out against the character so far, before its answer counts. */
 interface Prepared {
+  /** The choice id as asked: the declared id, or a copy's id. */
+  id: string;
   choice: Choice;
   state: ChoiceState;
   ctx: ChoiceContext;
@@ -479,7 +577,9 @@ interface Prepared {
 function prepareChoice(
   pkg: ContentPackage,
   choice: Choice,
+  id: string,
   stepId: string,
+  atLevel: number,
   doc: DraftDocument,
   character: Character,
   earlier: Record<string, ChoiceState>,
@@ -487,18 +587,20 @@ function prepareChoice(
 ): Prepared {
   const scope = character.scope;
   const state: ChoiceState = {
-    id: choice.id,
+    id,
+    ...(id !== choice.id ? { copyOf: choice.id } : {}),
     kind: choice.kind,
     step: stepId,
     optional: choice.optional ?? false,
     status: "missing",
+    atLevel,
   };
   const variant = choice.textVariants?.find((v) => evaluateCondition(v.when, scope));
   if (variant) state.textVariant = variant.id;
-  const hasAnswer = Object.hasOwn(doc.answers, choice.id) && doc.answers[choice.id] !== null;
-  if (hasAnswer) state.answer = doc.answers[choice.id];
+  const hasAnswer = Object.hasOwn(doc.answers, id) && doc.answers[id] !== null;
+  if (hasAnswer) state.answer = doc.answers[id];
   const ctx: ChoiceContext = {};
-  const prepared: Prepared = { choice, state, ctx, hasAnswer, counted: [] };
+  const prepared: Prepared = { id, choice, state, ctx, hasAnswer, counted: [] };
 
   switch (choice.kind) {
     case "pickOne":
@@ -507,14 +609,14 @@ function prepareChoice(
       const options: string[] = [];
       for (const t of selectThings(pkg, choice.options)) {
         for (const r of thingsIn(t.requires)) refs.add(r);
-        if (character.held.has(t.id)) continue;
+        if (character.held.has(t.id) && !t.repeatable) continue;
         if (t.requires !== undefined && !evaluateCondition(t.requires, scope)) continue;
         options.push(t.id);
       }
       state.options = options;
       ctx.options = options;
       if (choice.kind === "pickMany") {
-        state.count = evaluateNumber(choice.count, scope);
+        state.count = character.amount(choice.count);
         state.upTo = choice.upTo ?? false;
         ctx.count = state.count;
         state.remaining = state.count;
@@ -550,6 +652,15 @@ function prepareChoice(
     }
     case "distribute": {
       const rec = choice.recommend?.find((r) => r.when === undefined || evaluateCondition(r.when, scope));
+      const raise = choice.methods[0]?.method === "raise" ? choice.methods[0] : undefined;
+      if (raise) {
+        const raiseState = raiseFor(pkg, choice.targets, raise, character);
+        state.raise = raiseState;
+        ctx.raise = raiseState;
+        state.remaining = raise.points;
+        state.recommended = { method: 0, assign: fillRaise(choice.targets, raiseState, rec?.assign ?? {}) };
+        break;
+      }
       if (rec) {
         const method = choice.methods.findIndex(
           (_, i) => judgeAnswer(choice, { method: i, assign: rec.assign }, {}).status !== "invalid",
@@ -570,7 +681,7 @@ function prepareChoice(
       break;
     case "info": {
       state.status = "info";
-      state.info = infoFor(pkg, choice.of, earlier, character.level, scope);
+      state.info = infoFor(pkg, choice.of, earlier, character);
       prepared.hasAnswer = false;
       break;
     }
@@ -609,9 +720,53 @@ function answerChoice(
   // Picks that fit count even if others in the same answer do not; inputs only from a fitting answer.
   for (const id of p.counted) {
     taken?.add(id);
-    character.give(id, { pickedIn: choice.id }, stepId, granted);
+    character.give(id, { pickedIn: p.id }, stepId, state.atLevel, granted);
   }
-  if (j.status !== "invalid" && j.inputs) character.setInputs(j.inputs, choice.id);
+  if (j.status !== "invalid" && j.inputs) character.setInputs(j.inputs, p.id);
+  if (j.status !== "invalid" && j.raises) character.addRaises(j.raises, p.id);
+}
+
+/** What each target of a raise can take, worked out before the choice counts. */
+function raiseFor(
+  pkg: ContentPackage,
+  targets: readonly string[],
+  raise: Extract<Choice, { kind: "distribute" }>["methods"][number] & { method: "raise" },
+  character: Character,
+): RaiseState {
+  const cap = raise.cap !== undefined ? evaluateNumber(raise.cap, character.scope) : Infinity;
+  const per = raise.maxPerTarget ?? raise.points;
+  const before: Record<string, number> = {};
+  const most: Record<string, number> = {};
+  for (const t of targets) {
+    before[t] = character.value(t);
+    const top = Math.min(cap, indexes(pkg).values.get(t)?.max ?? Infinity);
+    most[t] = Math.max(0, Math.min(per, Math.floor(top - before[t])));
+  }
+  return { points: raise.points, before, most };
+}
+
+/**
+ * A full raise for "choose for me": the package's assignment as far as it
+ * fits, then the points left in the order of that assignment and of the
+ * targets. Leaves points over only if no target can take more.
+ */
+export function fillRaise(
+  targets: readonly string[],
+  raise: Pick<RaiseState, "points" | "most">,
+  wanted: Record<string, number>,
+): Record<string, number> {
+  const assign: Record<string, number> = {};
+  let left = raise.points;
+  const give = (t: string, n: number) => {
+    const room = (raise.most[t] ?? 0) - (assign[t] ?? 0);
+    const k = Math.max(0, Math.min(n, room, left));
+    if (k === 0) return;
+    assign[t] = (assign[t] ?? 0) + k;
+    left -= k;
+  };
+  for (const [t, n] of Object.entries(wanted)) if (targets.includes(t)) give(t, n);
+  for (const t of [...Object.keys(wanted), ...targets]) if (targets.includes(t)) give(t, left);
+  return assign;
 }
 
 /** The shared list of a list step, after its answers counted. */
@@ -623,7 +778,7 @@ function poolFor(pkg: ContentPackage, prepared: Prepared[], before: HeldThing[])
     offers: new Set(p.state.options),
   }));
   const choices = picks.map((p, i) => ({
-    choice: p.choice.id,
+    choice: p.id,
     count: slots[i]!.count,
     upTo: p.state.upTo ?? false,
     picks: p.counted,
@@ -655,9 +810,9 @@ function infoFor(
   pkg: ContentPackage,
   of: string,
   earlier: Record<string, ChoiceState>,
-  level: number,
-  scope: ExprScope,
+  character: Character,
 ): InfoContent {
+  const level = character.level;
   const source = earlier[of];
   const pick =
     source?.status === "answered" ? (source.answer as { pick?: unknown } | undefined)?.pick : undefined;
@@ -668,7 +823,7 @@ function infoFor(
     if (g.thing !== undefined) content.things.push(g.thing);
     else if (g.choice !== undefined) content.choices.push(g.choice);
     else if (g.value !== undefined) {
-      const add = evaluateNumber(g.add!, scope);
+      const add = character.amount(g.add!);
       const existing = content.values.find((v) => v.value === g.value);
       if (existing) existing.add += add;
       else content.values.push({ value: g.value, add });

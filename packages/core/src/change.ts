@@ -3,7 +3,7 @@
  * client, goes through {@link applyChange}: the server applies it, stores
  * the result and (later) tells everyone else watching the same draft.
  */
-import type { ContentPackage } from "@builder/format/pure";
+import { declaredChoiceId, type ContentPackage } from "@builder/format/pure";
 import type { DraftChange, DraftDocument } from "./draft.ts";
 import { evaluateDraft, type Evaluation } from "./evaluate.ts";
 import { judgeAnswer, type Problem } from "./judge.ts";
@@ -46,7 +46,8 @@ export function applyChange(pkg: ContentPackage, doc: DraftDocument, change: Dra
 
   if (change.type === "pool") return applyPool(pkg, doc, change.step, change.picks);
 
-  const choice = pkg.flow.choices.find((c) => c.id === change.choice);
+  const declared = declaredChoiceId(change.choice);
+  const choice = pkg.flow.choices.find((c) => c.id === declared);
   if (!choice) return { ok: false, error: { code: "unknownChoice" } };
   if (change.answer === null || change.answer === undefined) {
     const answers = { ...doc.answers };
@@ -66,6 +67,7 @@ export function applyChange(pkg: ContentPackage, doc: DraftDocument, change: Dra
     ...(state.count !== undefined ? { count: state.count } : {}),
     ...(state.min !== undefined ? { min: state.min } : {}),
     ...(state.max !== undefined ? { max: state.max } : {}),
+    ...(state.raise ? { raise: state.raise } : {}),
   };
   const j = judgeAnswer(choice, change.answer, ctx);
   if (j.status === "invalid") {
