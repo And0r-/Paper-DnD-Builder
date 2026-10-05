@@ -37,6 +37,8 @@ export interface FlowEntry {
   parts: number;
   /** Key of the section's first entry. */
   sectionKey: string;
+  /** Character level from which the entry is asked (`level.min` for the flow's own steps). */
+  atLevel: number;
   /**
    * Name of the whole section when it differs from the first entry's title:
    * the package's title for a gather step whose choices stand one by one.
@@ -71,6 +73,7 @@ export function buildFlow(
       part: 1,
       parts: 1,
       sectionKey: LEVEL_KEY,
+      atLevel: lp.pkg.flow.level.min,
     },
   ];
   let section = 0;
@@ -79,11 +82,15 @@ export function buildFlow(
   for (const s of ev.steps) {
     const gathered = gatherGroupOf(lp, s);
     const opens = s.origin === "flow" || (gathered !== undefined && gathered !== group);
+    // The group changes only with a new section: a part that a gathered step
+    // brought along (a raise after a boon) keeps the group, so the next step
+    // of that group joins the same section, and the count stays the same when
+    // an answer brings such a part.
     if (opens) {
       section++;
       sectionKey = s.id;
+      group = gathered;
     }
-    group = gathered;
     const sectionTitle = opens && gathered !== undefined ? gatherTitle(lp, gathered) : undefined;
     entries.push({
       key: s.id,
@@ -96,6 +103,7 @@ export function buildFlow(
       part: 1,
       parts: 1,
       sectionKey,
+      atLevel: s.atLevel,
       ...(sectionTitle !== undefined && { sectionTitle }),
     });
   }
@@ -110,6 +118,7 @@ export function buildFlow(
     part: 1,
     parts: 1,
     sectionKey: OVERVIEW_KEY,
+    atLevel: lp.pkg.flow.level.min,
   });
   for (const e of entries) {
     const same = entries.filter((x) => x.section === e.section);
@@ -256,6 +265,8 @@ export function describeAnswer(
   ctx: MeasureContext,
   state: ChoiceState,
   list: Translator["list"],
+  /** Values said elsewhere on the screen (what grows with the level), left out here. */
+  skipValues: ReadonlySet<string> = new Set(),
 ): string | undefined {
   const answer = state.answer as Record<string, unknown> | undefined;
   const choice = choiceOf(lp, state.id);
@@ -266,7 +277,9 @@ export function describeAnswer(
       if (!info) return undefined;
       const parts = [
         ...info.things.map((id) => thingName(lp, id)),
-        ...info.values.map((v) => grantedValue(lp, ctx, v.value, v.add)),
+        ...info.values
+          .filter((v) => !skipValues.has(v.value))
+          .map((v) => grantedValue(lp, ctx, v.value, v.add)),
       ];
       return parts.length > 0 ? list(parts) : undefined;
     }
