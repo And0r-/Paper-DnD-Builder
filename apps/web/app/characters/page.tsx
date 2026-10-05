@@ -3,22 +3,18 @@
  * My characters (flow spec 4.2): unfinished first, each with where it
  * stands. Deleting asks first and can be undone for 10 seconds.
  */
-import { evaluateDraft } from "@builder/core";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useApp } from "../../src/ui/app-state.tsx";
 import { api, type DraftListEntry } from "../../src/ui/api.ts";
-import { Button, ButtonLink } from "../../src/ui/components/Button.tsx";
+import { ButtonLink } from "../../src/ui/components/Button.tsx";
 import { ConfirmDialog } from "../../src/ui/components/Dialog.tsx";
 import { EmptyState, ErrorState, Loading } from "../../src/ui/components/Feedback.tsx";
 import { Toast } from "../../src/ui/components/Fields.tsx";
-import { Icon } from "../../src/ui/components/Icon.tsx";
 import { AppShell } from "../../src/ui/components/Shell.tsx";
+import { CharacterCard, describeCharacter, packagesFor } from "../../src/ui/characters.tsx";
 import { usePageTitle } from "../../src/ui/flow/frame.tsx";
-import { firstOpen, progressOf } from "../../src/ui/flow/model.ts";
-import { flowOf } from "../../src/ui/flow/raise.ts";
 import { RequireAccount } from "../../src/ui/guards.tsx";
-import { levelWord, plain, measureContext, thingName, ptext } from "../../src/ui/package-text.ts";
-import { loadPackage, type LoadedPackage } from "../../src/ui/packages.ts";
+import type { LoadedPackage } from "../../src/ui/packages.ts";
 
 const UNDO_MS = 10_000;
 
@@ -45,11 +41,7 @@ function Characters() {
     let live = true;
     (async () => {
       const { drafts } = await api<{ drafts: DraftListEntry[] }>("GET", "/api/drafts");
-      const packages = new Map<string, LoadedPackage>();
-      for (const id of new Set(drafts.filter((d) => d.packageAvailable).map((d) => d.packageId))) {
-        packages.set(id, await loadPackage(id, lang));
-      }
-      return { lang, drafts, packages };
+      return { lang, drafts, packages: await packagesFor(drafts, lang) };
     })().then(
       (d) => {
         if (!live) return;
@@ -103,7 +95,7 @@ function Characters() {
   } else {
     const items = data.drafts
       .filter((d) => !hidden.current.has(d.id))
-      .map((d) => describe(d, data.packages.get(d.packageId)))
+      .map((d) => describeCharacter(d, data.packages.get(d.packageId), t))
       .sort((a, b) => Number(a.finished) - Number(b.finished));
     content =
       items.length === 0 ? (
@@ -128,44 +120,6 @@ function Characters() {
           </ul>
         </>
       );
-  }
-
-  function describe(d: DraftListEntry, lp: LoadedPackage | undefined) {
-    const name = d.summary?.name || t("common.unnamed");
-    if (!lp)
-      return { id: d.id, name, line: "", finished: false, status: t("characters.packageMissing"), href: "" };
-    const doc = {
-      level: d.level,
-      answers: d.answers,
-      ...(d.levelBefore !== null && { levelBefore: d.levelBefore }),
-    };
-    const ev = evaluateDraft(lp.pkg, doc);
-    const { entries, raise } = flowOf(d.id, lp, doc, ev, t);
-    const finished = d.status === "finished" && ev.complete;
-    // The line only makes sense once everything it names is chosen.
-    const vars: Record<string, string | number> = {};
-    let whole = true;
-    for (const [k, v] of Object.entries(d.summary?.line ?? {})) {
-      if (v === null) whole = false;
-      else vars[k] = typeof v === "string" ? thingName(lp, v) : v;
-    }
-    const ctx = measureContext(lp, undefined);
-    const p = progressOf(entries);
-    return {
-      id: d.id,
-      name,
-      line: whole ? plain(ctx, ptext(lp, "summary.line"), vars) : "",
-      finished,
-      status: finished
-        ? t("characters.finished")
-        : raise
-          ? t("characters.raising", { ...p, levelName: levelWord(lp), level: raise.to })
-          : t("characters.progress", p),
-      href: finished ? `/c/${d.id}/overview` : firstOpen(entries).href,
-      doneHref: `/c/${d.id}/done`,
-      // A finished character below the highest level can go up.
-      raiseHref: finished && ev.level < lp.pkg.flow.level.max ? `/c/${d.id}/raise` : undefined,
-    };
   }
 
   return (
@@ -201,84 +155,5 @@ function Characters() {
         />
       )}
     </AppShell>
-  );
-}
-
-function CharacterCard({
-  item,
-  onDelete,
-}: {
-  item: {
-    id: string;
-    name: string;
-    line: string;
-    finished: boolean;
-    status: string;
-    href: string;
-    doneHref?: string;
-    raiseHref?: string | undefined;
-  };
-  onDelete: () => void;
-}) {
-  const { t } = useApp();
-  const [menu, setMenu] = useState(false);
-  return (
-    <article className="character">
-      <div className="character__main">
-        <h2 className="character__name">{item.name}</h2>
-        {item.line && <p className="character__line">{item.line}</p>}
-        <p className={`character__status${item.finished ? " character__status--done" : ""}`}>
-          {item.finished && <Icon name="check" size={18} />}
-          <span>{item.status}</span>
-        </p>
-      </div>
-      <div className="character__actions">
-        {item.href && (
-          <ButtonLink href={item.href} variant={item.finished ? "secondary" : "primary"}>
-            {item.finished ? t("characters.view") : t("characters.continue")}
-          </ButtonLink>
-        )}
-        {item.finished && item.doneHref && (
-          <ButtonLink href={item.doneHref} variant="secondary" icon="printer">
-            {t("characters.print")}
-          </ButtonLink>
-        )}
-        {item.raiseHref && (
-          <ButtonLink
-            href={item.raiseHref}
-            variant="secondary"
-            icon="arrowUp"
-            aria-label={t("raise.buttonLabel", { name: item.name })}
-          >
-            {t("raise.button")}
-          </ButtonLink>
-        )}
-        <div className="character__more">
-          <button
-            type="button"
-            className="icon-button"
-            aria-expanded={menu}
-            aria-label={t("characters.more", { name: item.name })}
-            onClick={() => setMenu((m) => !m)}
-          >
-            <Icon name="more" />
-          </button>
-          {menu && (
-            <div className="popover">
-              <Button
-                variant="ghost"
-                className="btn--danger-text"
-                onClick={() => {
-                  setMenu(false);
-                  onDelete();
-                }}
-              >
-                {t("characters.delete")}
-              </Button>
-            </div>
-          )}
-        </div>
-      </div>
-    </article>
   );
 }

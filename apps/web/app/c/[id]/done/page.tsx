@@ -65,6 +65,8 @@ export default function DonePage() {
         : items,
     );
   const canRaise = ev.level < lp.pkg.flow.level.max;
+  // A game master built this for a player: say whose it is, and lead back to the campaigns.
+  const forPlayer = draft.access === "gameMaster";
   usePageTitle([title]);
   // Only promise cards when the PDF has some: not every character has things that are cards.
   const hasCards = useMemo(() => cardCount(lp.pkg, ev) > 0, [lp.pkg, ev]);
@@ -113,6 +115,7 @@ export default function DonePage() {
       <h1 className="done__title" tabIndex={-1} ref={headingRef}>
         {title}
       </h1>
+      {forPlayer && <p className="done__owner">{t("done.forPlayer", { email: draft.owner.email })}</p>}
       {news && (
         <div className="done__news">
           {params.get("asked") === "0" && <p>{t("done.raisedNothing", { levelName, level: ev.level })}</p>}
@@ -174,12 +177,20 @@ export default function DonePage() {
             {t("raise.button")}
           </ButtonLink>
         )}
-        <ButtonLink href="/characters" variant="secondary">
-          {t("done.toList")}
-        </ButtonLink>
-        <ButtonLink href="/new" variant="secondary" icon="plus">
-          {t("done.another")}
-        </ButtonLink>
+        {forPlayer ? (
+          <ButtonLink href="/campaigns" variant="secondary">
+            {t("menu.campaigns")}
+          </ButtonLink>
+        ) : (
+          <>
+            <ButtonLink href="/characters" variant="secondary">
+              {t("done.toList")}
+            </ButtonLink>
+            <ButtonLink href="/new" variant="secondary" icon="plus">
+              {t("done.another")}
+            </ButtonLink>
+          </>
+        )}
       </div>
     </div>
   );

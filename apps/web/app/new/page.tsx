@@ -3,11 +3,14 @@
  * A new character. With one game loaded, this screen is skipped and the
  * draft starts at once (flow spec 4.3, Hick's law). With several, the
  * player picks the game first; that cannot be changed later.
+ *
+ * `?campaign=<id>&player=<id>`: a game master builds for a player of their
+ * campaign. The character is the player's from the start.
  */
-import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useCallback, useEffect, useId, useRef, useState } from "react";
 import { useApp } from "../../src/ui/app-state.tsx";
-import { api, type DraftView, type PackageListEntry } from "../../src/ui/api.ts";
+import { api, ApiError, type CampaignView, type DraftView, type PackageListEntry } from "../../src/ui/api.ts";
 import { Button, ButtonLink } from "../../src/ui/components/Button.tsx";
 import { Callout, EmptyState, ErrorState, Loading } from "../../src/ui/components/Feedback.tsx";
 import { AppShell } from "../../src/ui/components/Shell.tsx";
@@ -16,12 +19,47 @@ import { RequireAccount } from "../../src/ui/guards.tsx";
 import { loadPackageList } from "../../src/ui/packages.ts";
 
 export default function NewPage() {
-  return <RequireAccount>{() => <NewCharacter />}</RequireAccount>;
+  return (
+    <Suspense>
+      <RequireAccount>{() => <NewCharacter />}</RequireAccount>
+    </Suspense>
+  );
+}
+
+/** Whom a game master builds for; `null` while loading, `"missing"` if not a player of a campaign they lead. */
+type ForPlayer = { campaignId: string; playerId: string; email: string };
+
+function useForPlayer(): ForPlayer | null | "missing" | undefined {
+  const params = useSearchParams();
+  const campaignId = params.get("campaign");
+  const playerId = params.get("player");
+  const [found, setFound] = useState<{ key: string; value: ForPlayer | "missing" }>();
+  const key = `${campaignId}/${playerId}`;
+  useEffect(() => {
+    if (!campaignId || !playerId) return;
+    let live = true;
+    api<CampaignView>("GET", `/api/campaigns/${encodeURIComponent(campaignId)}`).then(
+      (v) => {
+        const p = v.players?.find((x) => x.id === playerId);
+        if (live) setFound({ key, value: p ? { campaignId, playerId, email: p.email } : "missing" });
+      },
+      (e) => {
+        if (live && e instanceof ApiError && e.status < 500 && !e.isNetwork)
+          setFound({ key, value: "missing" });
+      },
+    );
+    return () => {
+      live = false;
+    };
+  }, [campaignId, playerId, key]);
+  if (!campaignId || !playerId) return undefined;
+  return found?.key === key ? found.value : null;
 }
 
 function NewCharacter() {
   const { t, lang } = useApp();
   const router = useRouter();
+  const forPlayer = useForPlayer();
   usePageTitle([t("new.question")]);
   const [list, setList] = useState<PackageListEntry[] | null>(null);
   const [failed, setFailed] = useState(false);
@@ -37,7 +75,14 @@ function NewCharacter() {
       setBusy(true);
       setProblem(undefined);
       try {
-        const r = await api<DraftView>("POST", "/api/drafts", { packageId });
+        const r =
+          forPlayer && forPlayer !== "missing"
+            ? await api<DraftView>(
+                "POST",
+                `/api/campaigns/${forPlayer.campaignId}/players/${forPlayer.playerId}/drafts`,
+                { packageId },
+              )
+            : await api<DraftView>("POST", "/api/drafts", { packageId });
         router.replace(`/c/${r.draft.id}/level`);
       } catch {
         setProblem(t("common.loadError"));
@@ -45,8 +90,10 @@ function NewCharacter() {
         started.current = false;
       }
     },
-    [router, t],
+    [router, t, forPlayer],
   );
+  // Building for a player waits until the player is known.
+  const ready = forPlayer !== null && forPlayer !== "missing";
 
   useEffect(() => {
     let live = true;
@@ -60,15 +107,23 @@ function NewCharacter() {
   }, [lang, attempt]);
 
   useEffect(() => {
-    if (list?.length === 1 && !started.current) {
+    if (list?.length === 1 && ready && !started.current) {
       started.current = true;
       void create(list[0]!.id);
     }
-  }, [list, create]);
+  }, [list, create, ready]);
+
+  const back = forPlayer && forPlayer !== "missing" ? `/campaigns/${forPlayer.campaignId}` : "/characters";
 
   let content;
-  if (failed) content = <ErrorState onRetry={() => setAttempt((n) => n + 1)} />;
-  else if (!list || (list.length === 1 && !problem)) content = <Loading shape="page" count={2} />;
+  if (forPlayer === "missing") {
+    content = (
+      <EmptyState title={t("campaign.notFound")}>
+        <ButtonLink href="/campaigns">{t("menu.campaigns")}</ButtonLink>
+      </EmptyState>
+    );
+  } else if (failed) content = <ErrorState onRetry={() => setAttempt((n) => n + 1)} />;
+  else if (!list || !ready || (list.length === 1 && !problem)) content = <Loading shape="page" count={2} />;
   else if (list.length === 0) {
     content = (
       <EmptyState title={t("new.noneTitle")}>
@@ -90,6 +145,7 @@ function NewCharacter() {
         }}
       >
         <QuestionHeader id={headingId} question={t("new.question")} intro={t("new.intro")} />
+        {forPlayer && <Callout tone="info">{t("new.forPlayer", { email: forPlayer.email })}</Callout>}
         <fieldset className="options" aria-labelledby={headingId}>
           <div className="options__list">
             {list.map((p) => (
@@ -123,7 +179,7 @@ function NewCharacter() {
         <p className="note">{t("new.note")}</p>
         {problem && <Callout tone="warning">{problem}</Callout>}
         <div className="step-footer__bar">
-          <ButtonLink href="/characters" variant="secondary" icon="arrowLeft">
+          <ButtonLink href={back} variant="secondary" icon="arrowLeft">
             {t("common.back")}
           </ButtonLink>
           <Button type="submit" busy={busy} busyLabel={t("new.creating")} iconAfter="arrowRight">

@@ -170,11 +170,19 @@ export async function shot(page: Page, name: string): Promise<void> {
 
 /** A finished level-3 character made through the API, so a test can visit every screen quickly. */
 export async function makeCharacter(page: Page, finish = true): Promise<string> {
-  const req = page.request;
-  const created = await req.post("/api/drafts", { data: { packageId: "demo" } });
+  const created = await page.request.post("/api/drafts", { data: { packageId: "demo" } });
   expect(created.status()).toBe(201);
-  let view = (await created.json()) as { draft: { id: string; version: number } };
-  const id = view.draft.id;
+  const id = ((await created.json()) as { draft: { id: string } }).draft.id;
+  await answerCharacter(page, id, finish);
+  return id;
+}
+
+/** Answers an existing draft (one's own, or a player's as their game master) as {@link makeCharacter} does. */
+export async function answerCharacter(page: Page, id: string, finish = true): Promise<void> {
+  const req = page.request;
+  let view = (await (await req.get(`/api/drafts/${id}`)).json()) as {
+    draft: { id: string; version: number };
+  };
   const patch = await req.patch(`/api/drafts/${id}`, { data: { version: view.draft.version, level: 3 } });
   view = await patch.json();
   const answers: [string, unknown][] = [
@@ -202,7 +210,6 @@ export async function makeCharacter(page: Page, finish = true): Promise<string> 
     const r = await req.post(`/api/drafts/${id}/finish`, { data: { version: view.draft.version } });
     expect(r.status()).toBe(200);
   }
-  return id;
 }
 
 interface DraftView {
