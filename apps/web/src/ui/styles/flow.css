@@ -416,6 +416,18 @@
   gap: var(--space-3);
 }
 
+/* The dock lies over the list while it scrolls. Only what is in it takes a
+   tap: a tap on its empty part goes to the card under it (which then comes
+   into view, choices.tsx), so a card cut off at the bar never ignores a tap. */
+.step .step-footer {
+  pointer-events: none;
+}
+
+.step .step-footer__bar > *,
+.step .step-footer__reason > * {
+  pointer-events: auto;
+}
+
 /* Larger screens: the dock sticks to the bottom edge while the list
    scrolls. Pressed too early, Next moves focus up to the open choice; the
    reason and "Choose for me" stay in view right above Next. The shadow
