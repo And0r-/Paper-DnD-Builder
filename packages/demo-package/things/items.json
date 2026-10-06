@@ -15,7 +15,13 @@
         "text": "stat-value.item.lantern-staff.harm",
         "vars": {
           "bonus": "lanternStaffHarm"
-        }
+        },
+        "variants": [
+          {
+            "when": "level >= 5",
+            "text": "stat-value.item.lantern-staff.harm.bright"
+          }
+        ]
       },
       "traits": {
         "text": "stat-value.item.lantern-staff.traits"

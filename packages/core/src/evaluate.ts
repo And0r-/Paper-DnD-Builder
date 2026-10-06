@@ -19,6 +19,7 @@ import {
   type Amount,
   type Choice,
   type ContentPackage,
+  type FilledText,
   type OptionSource,
   type Thing,
 } from "@builder/format/pure";
@@ -441,6 +442,14 @@ export function evaluationScope(pkg: ContentPackage, ev: Evaluation): ExprScope 
     has: (id) => held.has(id),
     count: (tag) => ev.things.filter((h) => ix.things.get(h.id)?.tags?.includes(tag)).length,
   };
+}
+
+/**
+ * Text key of a text filled with character values (SPEC 6, stats): the first
+ * variant whose `when` holds, else `text`. Its `vars` fill either.
+ */
+export function filledTextKey(v: FilledText, scope: ExprScope): string {
+  return v.variants?.find((x) => evaluateCondition(x.when, scope))?.text ?? v.text;
 }
 
 /** Things referenced by `has()` in an expression. */

@@ -17,6 +17,7 @@ import {
   thingsFileSchema,
   unitsSchema,
   valuesSchema,
+  type FilledText,
   type Flow,
   type GatherStep,
   type GlossaryEntry,
@@ -394,6 +395,23 @@ export function validatePackageFiles(files: PackageFiles): ValidationResult {
   const statKeys = new Set<string>();
   const statTextKeys = new Set<string>();
   const statTextVars = new Map<string, Set<string>>(); // stat text key → var names its stats supply
+  /** A text filled with character values: its texts must exist and use only the names in `vars`. */
+  const checkFilledText = (file: string, path: string, ft: FilledText) => {
+    for (const [name, v] of Object.entries(ft.vars ?? {})) {
+      if (!isValueRef(v)) err(file, `${path}.vars.${name}`, `unknown value ${lit(v)}`);
+    }
+    ft.variants?.forEach((v, j) => checkExpr(file, `${path}.variants[${j}].when`, v.when));
+    const keys = [ft.text, ...(ft.variants ?? []).map((v) => v.text)];
+    duplicates(keys).forEach((key) => err(file, `${path}.variants`, `text ${lit(key)} is named twice`));
+    for (const key of keys) {
+      statTextKeys.add(key);
+      // A variant text is checked even without `vars`: it may not use a name nothing fills.
+      if (ft.vars === undefined && key === ft.text) continue;
+      let names = statTextVars.get(key);
+      if (!names) statTextVars.set(key, (names = new Set()));
+      for (const name of Object.keys(ft.vars ?? {})) names.add(name);
+    }
+  };
   const groups = new Set<string>();
   for (const { thing: t, file, index } of thingsAt) {
     const p = `[${index}]`;
@@ -413,15 +431,7 @@ export function validatePackageFiles(files: PackageFiles): ValidationResult {
     for (const [k, s] of Object.entries(t.stats ?? {})) {
       statKeys.add(k);
       if (typeof s === "object" && "amount" in s) checkAmount(file, `${p}.stats.${k}`, s.amount, s.unit);
-      if (typeof s === "object" && "text" in s) {
-        statTextKeys.add(s.text);
-        for (const [name, v] of Object.entries(s.vars ?? {})) {
-          if (!isValueRef(v)) err(file, `${p}.stats.${k}.vars.${name}`, `unknown value ${lit(v)}`);
-          let names = statTextVars.get(s.text);
-          if (!names) statTextVars.set(s.text, (names = new Set()));
-          names.add(name);
-        }
-      }
+      if (typeof s === "object" && "text" in s) checkFilledText(file, `${p}.stats.${k}`, s);
       if (typeof s === "object" && "value" in s && !isValueRef(s.value))
         err(file, `${p}.stats.${k}.value`, `unknown value ${lit(s.value)}`);
     }
@@ -755,13 +765,7 @@ export function validatePackageFiles(files: PackageFiles): ValidationResult {
           if (b.text !== undefined) {
             if (b.style === "pencil")
               err(S, `${p}.boxes[${j}].text`, "a pencil box has no text, only a field");
-            statTextKeys.add(b.text.text);
-            for (const [name, v] of Object.entries(b.text.vars ?? {})) {
-              if (!isValueRef(v)) err(S, `${p}.boxes[${j}].text.vars.${name}`, `unknown value ${lit(v)}`);
-              let names = statTextVars.get(b.text.text);
-              if (!names) statTextVars.set(b.text.text, (names = new Set()));
-              names.add(name);
-            }
+            checkFilledText(S, `${p}.boxes[${j}].text`, b.text);
           }
         });
         break;

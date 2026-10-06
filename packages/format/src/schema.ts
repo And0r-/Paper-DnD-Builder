@@ -175,6 +175,14 @@ export const grantSchema = z
 const filledText = z.strictObject({
   text: textKey,
   vars: z.record(z.string().regex(VALUE_ID_PATTERN), z.string().min(1)).optional(),
+  /**
+   * Other texts while a condition holds. The first entry whose `when` is true
+   * replaces `text`; `vars` fill it the same way.
+   */
+  variants: z
+    .array(z.strictObject({ when: expr, text: textKey }))
+    .min(1)
+    .optional(),
 });
 
 export const statValueSchema = z.union(
@@ -188,7 +196,7 @@ export const statValueSchema = z.union(
   ],
   {
     error:
-      'must be a number, true/false, {"amount": n, "unit": "u"}, {"text": "text.key", "vars"?: {…}} or {"value": "valueKey"}',
+      'must be a number, true/false, {"amount": n, "unit": "u"}, {"text": "text.key", "vars"?: {…}, "variants"?: […]} or {"value": "valueKey"}',
   },
 );
 
@@ -644,6 +652,7 @@ export type Grant = z.infer<typeof grantSchema>;
 export type ByLevel = z.infer<typeof byLevelSchema>;
 export type Amount = z.infer<typeof amountSchema>;
 export type StatValue = z.infer<typeof statValueSchema>;
+export type FilledText = z.infer<typeof filledText>;
 export type Thing = z.infer<typeof thingSchema>;
 export type OptionSource = z.infer<typeof optionSourceSchema>;
 export type ChoiceOptions = z.infer<typeof choiceOptionsSchema>;
