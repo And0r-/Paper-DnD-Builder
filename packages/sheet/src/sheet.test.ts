@@ -129,6 +129,61 @@ describe("sheet model", () => {
     expect(model.rulesTexts.length).toBeGreaterThan(1);
   });
 
+  it("puts on each card the line of the first origin its thing matches (format 0.16)", () => {
+    // A herbalist borrows a knack of another calling at level 2: that one goes by other numbers.
+    // Fixed numbers here, so the borrowed line cannot be mistaken for the calling's.
+    const fixed: ContentPackage = {
+      ...pkg,
+      values: pkg.values.map((v) =>
+        v.id === "borrowedKnackTarget"
+          ? { ...v, formula: "21" }
+          : v.id === "borrowedKnackHit"
+            ? { ...v, formula: "-1" }
+            : v,
+      ),
+    };
+    const doc = demoCharacter(fixed, 3, "Mira Fennwick", "calling.herbalist");
+    const ev = evaluateDraft(fixed, doc);
+    const borrowed = ev.things.filter((h) => h.pickedIn === "borrowed-knack").map((h) => h.id);
+    expect(borrowed).toHaveLength(1);
+    const cards = (p: ContentPackage) => buildSheetModel(p, doc, { language: "de", createdAt }).cards;
+    const own = `Ziel ${ev.values["knackTarget"]} · Treffer +${ev.values["knackHit"]}`;
+    for (const c of cards(fixed)) {
+      // The borrowed knack also came with the calling (its choice did); the entry before wins.
+      if (borrowed.includes(c.id))
+        expect(c.origin).toEqual({ label: "Geliehen, mit Herz", value: "Ziel 21 · Treffer -1" });
+      // A path's knack is labelled with what brought it in the end: the calling.
+      else expect(c.origin).toEqual({ label: "Kräuterkundige", value: own });
+    }
+
+    // The order of the entries decides: the calling's first, and the borrowed knack goes by the calling too.
+    const layout = fixed.sheet.cards["knack"]!;
+    const reordered: ContentPackage = {
+      ...fixed,
+      sheet: {
+        ...fixed.sheet,
+        cards: { knack: { ...layout, origins: [...layout.origins!.slice(1), layout.origins![0]!] } },
+      },
+    };
+    expect(cards(reordered).find((c) => c.id === borrowed[0])?.origin).toEqual({
+      label: "Kräuterkundige",
+      value: own,
+    });
+
+    // No entry matches, no line; no entries at all, neither.
+    const pathOnly = { ...layout, origins: [layout.origins![2]!] };
+    const onlyPath = cards({ ...fixed, sheet: { ...fixed.sheet, cards: { knack: pathOnly } } });
+    const fromPath = ev.things
+      .filter((h) => h.kind === "knack" && h.grantedBy?.startsWith("path."))
+      .map((h) => h.id);
+    expect(fromPath).toHaveLength(1);
+    expect(onlyPath.filter((c) => c.origin !== undefined).map((c) => c.id)).toEqual(fromPath);
+    const { origins: _, ...plain } = layout;
+    expect(
+      cards({ ...fixed, sheet: { ...fixed.sheet, cards: { knack: plain } } }).some((c) => "origin" in c),
+    ).toBe(false);
+  });
+
   it("does not depend on the PDF library", () => {
     const manifest = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"));
     const deps = { ...manifest.dependencies, ...manifest.devDependencies };

@@ -170,6 +170,8 @@ export const cardSchema = z.strictObject({
   typeLine: text,
   name: text,
   fields: z.array(z.strictObject({ label: text, value: text })),
+  /** The line of the card layout's `origins` that matches where the character got the thing; none matches, none. */
+  origin: z.strictObject({ label: text, value: text }).optional(),
   table: text,
   rules: z.array(text),
   uses: usesSchema,

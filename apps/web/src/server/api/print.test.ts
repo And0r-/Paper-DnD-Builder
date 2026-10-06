@@ -322,6 +322,11 @@ describe("the sheet as data", () => {
       units: { length: "m" },
     });
     expect(sheetFields(res.json)).toContain("sheet/primary/stamina");
+    // A knack picked from the calling carries the numbers it is used with, by where it came from.
+    expect(res.json.cards[0].origin).toEqual({
+      label: "Laternenträgerin",
+      value: expect.stringMatching(/^Ziel \d+ · Treffer [+-]\d+$/u),
+    });
 
     await client.call("PATCH", "/api/account/settings", { language: "en", units: { length: "ft" } });
     const en = (await client.call("GET", `/api/drafts/${id}/sheet`)).json;
