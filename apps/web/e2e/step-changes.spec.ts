@@ -79,6 +79,35 @@ test.describe("large screens", () => {
     for (const title of went)
       await expect(list.getByRole("link", { name: title, exact: true })).toHaveCount(0);
   });
+
+  test("a step that keeps its name under another key is neither gone nor new (AND-100)", async ({
+    page,
+    foreign,
+  }) => {
+    void foreign;
+    await login(page, uniqueEmail("steps-same-name"));
+    const id = await newDraft(page);
+    await page.goto(`/c/${id}/step/calling`);
+    const list = page.getByRole("navigation", { name: m["flow.steps"] });
+    await pick(page, "Flussläufer");
+    const handling = list.getByRole("link", { name: /^Handgriffe/ });
+    await expect(handling).toHaveAttribute("href", /handling-river-runner$/);
+    await expect(list.locator("[data-mark]")).toHaveCount(0, { timeout: 4000 });
+    const total = page.locator(".progress__text .progress__count").first();
+    await expect(total).not.toHaveAttribute("data-mark", { timeout: 4000 });
+
+    // The other calling has a step of its own under the same name: to the player it stays.
+    await pick(page, "Kräuterkundige");
+    await expect(handling).toHaveAttribute("href", /handling-herbalist$/);
+    await expect(list.locator("[data-gone]")).toHaveCount(0);
+    await expect(list.locator("[data-mark]")).toHaveCount(0);
+    await expect(handling).toHaveCount(1);
+    // Screen readers hear nothing about it (the calling's other steps may ask more), the count stands.
+    await expect(page.locator(".step-notice")).not.toContainText("Handgriffe");
+    await expect(page.locator(".step-notice")).not.toContainText("fällt weg");
+    await expect(total).not.toHaveAttribute("data-mark");
+    await still(page, "100-gleicher-name-bleibt");
+  });
 });
 
 test("phones: the shut menu and the count show it, a screen reader hears it", async ({ page, foreign }) => {

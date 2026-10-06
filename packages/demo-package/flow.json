@@ -65,6 +65,11 @@
       "when": "has('calling.river-runner')"
     },
     {
+      "id": "handling-herbalist",
+      "choices": ["handling-herbalist"],
+      "when": "has('calling.herbalist')"
+    },
+    {
       "id": "looks",
       "choices": ["age", "looks"]
     }
@@ -523,6 +528,19 @@
       "held": {
         "text": "choice.handling-river-runner.held"
       }
+    },
+    {
+      "id": "handling-herbalist",
+      "kind": "pickOne",
+      "source": "mistland",
+      "options": {
+        "kind": "handling"
+      },
+      "recommend": [
+        {
+          "pick": ["handling.trail-boots"]
+        }
+      ]
     },
     {
       "id": "coastfolk-talent",

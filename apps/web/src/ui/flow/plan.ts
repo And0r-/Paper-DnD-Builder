@@ -162,12 +162,19 @@ export function countByPlan(entries: FlowEntry[], planned: FlowEntry[]): Map<str
  * What a change did to the planned flow, as titles: whole steps that came or
  * went (they change "Step x of y"), and parts that came or went within a
  * step that stays (they change "Part x of y").
+ *
+ * A step that went and one that came under the same name are one step to
+ * the player and are not named (AND-100). `asked` tells, for the flow it
+ * belongs to, whether the parts of a step are worth a word: parts that a
+ * step without an answer has only by its suggestion are left out, so no
+ * one hears of a part of a choice they never made.
  */
 export function planDiff(
   before: FlowEntry[],
   after: FlowEntry[],
+  asked: (head: FlowEntry, side: "before" | "after") => boolean = () => true,
 ): { added: string[]; removed: string[]; addedParts: string[]; removedParts: string[] } {
-  const gone = (from: FlowEntry[], to: FlowEntry[]) => {
+  const gone = (from: FlowEntry[], to: FlowEntry[], side: "before" | "after") => {
     const keys = new Set(to.map((e) => e.key));
     const steps: string[] = [];
     const parts: string[] = [];
@@ -175,12 +182,27 @@ export function planDiff(
       if (keys.has(e.key)) continue;
       // A step none of whose entries is on the other side is a whole step; else a part of one.
       const section = from.filter((x) => x.section === e.section);
-      if (section.some((x) => keys.has(x.key))) parts.push(e.title);
-      else if (e === section[0]) steps.push(e.sectionTitle ?? e.title);
+      if (section.some((x) => keys.has(x.key))) {
+        if (asked(section[0]!, side)) parts.push(e.title);
+      } else if (e === section[0]) steps.push(e.sectionTitle ?? e.title);
     }
     return { steps, parts };
   };
-  const added = gone(after, before);
-  const removed = gone(before, after);
-  return { added: added.steps, removed: removed.steps, addedParts: added.parts, removedParts: removed.parts };
+  const added = gone(after, before, "after");
+  const removed = gone(before, after, "before");
+  const [addedSteps, removedSteps] = withoutSame(added.steps, removed.steps);
+  const [addedParts, removedParts] = withoutSame(added.parts, removed.parts);
+  return { added: addedSteps, removed: removedSteps, addedParts, removedParts };
+}
+
+/** Both lists without the names they share, each as often as both have it. */
+function withoutSame(a: string[], b: string[]): [string[], string[]] {
+  const rest = [...b];
+  const kept = a.filter((name) => {
+    const i = rest.indexOf(name);
+    if (i < 0) return true;
+    rest.splice(i, 1);
+    return false;
+  });
+  return [kept, rest];
 }

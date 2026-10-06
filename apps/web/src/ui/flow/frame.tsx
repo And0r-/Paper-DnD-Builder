@@ -27,7 +27,13 @@ import { AppShell } from "../components/Shell.tsx";
 import { levelWord, ptext } from "../package-text.ts";
 import { useDraft } from "./draft-state.tsx";
 import { nextOpen, OVERVIEW_KEY, positionOf, progressFraction, type FlowEntry } from "./model.ts";
-import { stepChange, stepsSignature, type GoneEntry, type StepChange } from "./step-changes.ts";
+import {
+  answeredParts,
+  stepChange,
+  stepsSignature,
+  type GoneEntry,
+  type StepChange,
+} from "./step-changes.ts";
 
 // ------------------------------------------------------------ explanation
 
@@ -75,14 +81,20 @@ const ChangeCtx = createContext<ShownChange | null>(null);
  * step list, so the list in the menu shows it too when the menu is opened
  * in that moment, and the menu button can show it while the menu is shut.
  */
-function useStepChange(entries: FlowEntry[]): ShownChange | null {
+function useStepChange(entries: FlowEntry[], answers: Record<string, unknown>): ShownChange | null {
   const sig = stepsSignature(entries);
   const [seen, setSeen] = useState({ sig, entries });
+  // The answers as the last shown list had them: answers can change without the steps.
+  const shownAnswers = useRef(answers);
+  useEffect(() => {
+    shownAnswers.current = answers;
+  }, [answers]);
   const [shown, setShown] = useState<{ change: StepChange; phase: "show" | "leave" } | null>(null);
   if (seen.sig !== sig) {
     // Compared during render, so the new step is green in the very frame it appears.
     setSeen({ sig, entries });
-    const change = stepChange(seen.entries, entries);
+    const asked = answeredParts({ before: shownAnswers.current, after: answers });
+    const change = stepChange(seen.entries, entries, asked);
     setShown(change && { change, phase: "show" });
   }
   useEffect(() => {
@@ -333,8 +345,8 @@ function StepItem({
 /** The layout of /c/[id]: shell with step list in the menu and as a left column. */
 export function FlowLayout({ current, children }: { current: string | undefined; children: ReactNode }) {
   const { t } = useApp();
-  const { lp, ev, draft, entries } = useDraft();
-  const change = useStepChange(entries);
+  const { lp, ev, draft, doc, entries } = useDraft();
+  const change = useStepChange(entries, doc.answers);
   const [content, setContent] = useState<ReactNode>(null);
   const explain = useMemo<ExplainApi>(() => ({ content, show: setContent }), [content]);
   const nameState = ev.choices[lp.pkg.flow.characterName];

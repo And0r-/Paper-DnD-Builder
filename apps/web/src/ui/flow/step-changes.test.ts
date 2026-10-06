@@ -1,17 +1,17 @@
 import { describe, expect, it } from "vitest";
 import type { FlowEntry } from "./model.ts";
-import { stepChange, stepsSignature } from "./step-changes.ts";
+import { answeredParts, stepChange, stepsSignature } from "./step-changes.ts";
 
 /** Entries from [key, section, choices] triples; parts of a section follow its first entry. */
-function flow(...specs: [key: string, section: number, choices?: number][]): FlowEntry[] {
-  return specs.map(([key, section, choices = 1]) => {
+function flow(...specs: [key: string, section: number, choices?: number, title?: string][]): FlowEntry[] {
+  return specs.map(([key, section, choices = 1, title = `Title ${key}`]) => {
     const same = specs.filter((s) => s[1] === section);
     const part = same.findIndex((s) => s[0] === key) + 1;
     return {
       key,
       kind: "step",
       href: `/c/x/step/${key}`,
-      title: `Title ${key}`,
+      title,
       status: "open",
       choices: Array.from({ length: choices }, (_, i) => `${key}.${i}`),
       section,
@@ -54,5 +54,46 @@ describe("stepChange", () => {
       flow(["a", 0], ["a3", 0], ["b", 1]),
     )!;
     expect(c.gone).toEqual([{ key: "a2", title: "Title a2", whole: false, section: "a", after: "a" }]);
+  });
+
+  it("does not show a step as gone and new when it keeps its name under another key (AND-100)", () => {
+    const c = stepChange(
+      flow(["a", 0], ["way-1", 1, 1, "Way"], ["x", 2]),
+      flow(["a", 0], ["way-2", 1, 1, "Way"], ["y", 2]),
+    )!;
+    expect([...c.added]).toEqual(["y"]);
+    expect(c.gone.map((g) => g.key)).toEqual(["x"]);
+    expect(
+      stepChange(flow(["a", 0], ["way-1", 1, 1, "Way"]), flow(["a", 0], ["way-2", 1, 1, "Way"])),
+    ).toBeNull();
+  });
+
+  it("pairs a part with a part of the same name in the same step", () => {
+    const c = stepChange(
+      flow(["a", 0], ["p-1", 0, 1, "Part"], ["b", 1], ["q", 1, 1, "Part"]),
+      flow(["a", 0], ["p-2", 0, 1, "Part"], ["b", 1]),
+    )!;
+    // The part of step a kept its name; the part of step b went.
+    expect([...c.added]).toEqual([]);
+    expect(c.gone.map((g) => g.key)).toEqual(["q"]);
+  });
+
+  it("does not mark parts of a step the player has not answered (AND-100)", () => {
+    const before = flow(["a", 0], ["b", 1], ["b-x", 1], ["c", 2]);
+    const after = flow(["a", 0], ["b", 1], ["b-y", 1], ["d", 2]);
+    // Step b has no answer: its parts follow a suggestion; whole steps still show.
+    const none = answeredParts({ before: {}, after: {} });
+    const c = stepChange(before, after, none)!;
+    expect([...c.added]).toEqual(["d"]);
+    expect(c.gone.map((g) => g.key)).toEqual(["c"]);
+    // Once b is answered its parts show.
+    const given = answeredParts({ before: { "b.0": 1 }, after: { "b.0": 2 } });
+    const d = stepChange(before, after, given)!;
+    expect([...d.added]).toEqual(["b-y", "d"]);
+    expect(d.gone.map((g) => g.key)).toEqual(["b-x", "c"]);
+    // Only parts of an unanswered step changed: nothing to show.
+    expect(
+      stepChange(flow(["a", 0], ["b", 1], ["b-x", 1]), flow(["a", 0], ["b", 1], ["b-y", 1]), none),
+    ).toBeNull();
   });
 });
