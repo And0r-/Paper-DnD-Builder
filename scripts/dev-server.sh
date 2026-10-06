@@ -24,7 +24,6 @@ state="$root/.dev-server"
 pidfile="$state/server.pid"
 portfile="$state/server.port"
 logfile="$state/server.log"
-tools_env=${BUILDER_TOOLS_ENV:-/paperclip/instances/default/workspaces/_tools/env.sh}
 
 # Port ranges per agent, so parallel review servers never pick the same
 # port. Unknown callers share the last range.
@@ -117,12 +116,10 @@ cmd_start() {
     exit 1
   fi
 
-  # Chromium variables for Playwright runs against this server; values that
-  # are already set win (env.sh only fills in missing ones).
-  if [[ -f "$tools_env" ]]; then
-    # shellcheck source=/dev/null
-    . "$tools_env"
-  fi
+  # Shared Playwright browsers for runs against this server; a value that is
+  # already set wins.
+  : "${PLAYWRIGHT_BROWSERS_PATH:=/paperclip/.ms-playwright}"
+  export PLAYWRIGHT_BROWSERS_PATH
 
   mkdir -p "$state/outbox"
   if [[ "$mode" == start && ( "$build" == yes || ! -f "$web/.next/BUILD_ID" ) ]]; then
