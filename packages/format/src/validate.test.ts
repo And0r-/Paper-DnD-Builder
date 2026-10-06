@@ -25,6 +25,8 @@ function mutate(change: (files: RawFiles) => void): ValidationResult {
 const texts = (files: RawFiles, lang: string) => files.get(`texts/${lang}/core.json`).entries;
 const thing = (files: RawFiles, file: string, id: string) =>
   files.get(`things/${file}.json`).find((t: any) => t.id === id);
+const knacksSection = (files: RawFiles) =>
+  files.get("sheet.json").sections.find((s: any) => s.id === "knacks");
 /* eslint-enable @typescript-eslint/no-explicit-any */
 
 const messages = (r: ValidationResult, level: "errors" | "warnings" = "errors") =>
@@ -127,7 +129,7 @@ describe("cross-file rules", () => {
     [
       "format version",
       (f) => (f.get("manifest.json").formatVersion = "0.3"),
-      "manifest.json formatVersion: package is written for format 0.3, this builder understands 0.12",
+      "manifest.json formatVersion: package is written for format 0.3, this builder understands 0.13",
     ],
     [
       "duplicate thing",
@@ -318,6 +320,50 @@ describe("cross-file rules", () => {
       'texts/en/ sheet.primary.nerve: missing text (label of box "nerve" in sheet section "primary")',
     ],
     [
+      "mark sign without text",
+      (f) => delete texts(f, "de")["sheet.knacks.mark.steady"],
+      'texts/de/ sheet.knacks.mark.steady: missing text (sign of a mark in sheet section "knacks")',
+    ],
+    [
+      "mark legend without text",
+      (f) => delete texts(f, "en")["sheet.knacks.mark.path.legend"],
+      'texts/en/ sheet.knacks.mark.path.legend: missing text (legend of a mark in sheet section "knacks")',
+    ],
+    [
+      "mark on a tag no thing carries",
+      (f) => (knacksSection(f).marks[2].tags = ["shaky"]),
+      'sheet.json sections[7].marks[2].tags[0]: no thing carries tag "shaky"',
+    ],
+    [
+      "mark from things that do not exist",
+      (f) => (knacksSection(f).marks[0].from = { kind: "guild" }),
+      'sheet.json sections[7].marks[0].from.kind: unknown kind "guild"',
+    ],
+    [
+      "mark that says nothing about the rows",
+      (f) =>
+        (knacksSection(f).marks[0] = {
+          text: "sheet.knacks.mark.calling",
+          legend: "sheet.knacks.mark.calling.legend",
+        }),
+      'sheet.json sections[7].marks[0]: a mark needs "tags", "how" or "from"',
+    ],
+    [
+      "groups by rank without a word for rank",
+      (f) => delete texts(f, "en")["rank.name"],
+      'texts/en/ rank.name: missing text (word for rank, heading the groups of sheet section "knacks")',
+    ],
+    [
+      "groups by rank, but nothing has a rank",
+      (f) => (f.get("sheet.json").sections.find((s: { id: string }) => s.id === "traits").byRank = true),
+      "sheet.json sections[6].byRank: none of the things selected here has a rank",
+    ],
+    [
+      "lead on things that do not exist",
+      (f) => (knacksSection(f).lead.things = { tags: ["guild"] }),
+      'sheet.json sections[7].lead.things.tags[0]: no thing carries tag "guild"',
+    ],
+    [
       "language without unit defaults",
       (f) => delete f.get("units.json").languageDefaults.en,
       'units.json languageDefaults.en: no default length unit for language "en"',
@@ -401,6 +447,11 @@ describe("warnings", () => {
       "different quantities across languages",
       (f) => (texts(f, "en")["knack.eddy.explain.what"] = "Water swirls up to {{length:30}} away."),
       "texts/ knack.eddy.explain.what: languages state different quantities (de: length:20; en: length:30)",
+    ],
+    [
+      "lead text for a thing the lead does not select",
+      (f) => (texts(f, "de")["knack.eddy.knacks.change"] = "Tauschen."),
+      "texts/de/core.json entries.knack.eddy.knacks.change: text is not used by anything in the package",
     ],
     [
       "name too long",

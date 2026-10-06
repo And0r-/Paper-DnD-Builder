@@ -19,6 +19,7 @@ import {
   summarize,
   type DraftDocument,
   type Evaluation,
+  type HeldThing,
   type MeasureContext,
   type PartSource,
 } from "@builder/core";
@@ -71,12 +72,35 @@ export type SheetSection = { id: string; span: number; title: string; hint: stri
       items: { name: string; marked: boolean; note: string; total: Figure }[];
     }
   | { kind: "statTable"; columns: string[]; rows: { name: string; cells: string[] }[] }
-  | { kind: "featureTable"; rows: { name: string; text: string; uses: Uses }[] }
+  | {
+      kind: "featureTable";
+      /** Sentences above the rows (`lead`). */
+      lead: string[];
+      rows: FeatureRow[];
+      /** What the marks on the rows mean: "C = …", one entry per mark that is on a row. */
+      legend: string[];
+    }
   | { kind: "list"; items: string[]; blankLines: number }
   | { kind: "answers"; rows: { label: string; text: string }[] }
   | { kind: "helpBox"; paragraphs: string[] }
   | { kind: "notes"; lines: number }
 );
+
+/** A group of rows under one heading (`byRank`): rows of the same group follow each other. */
+export interface RowGroup {
+  key: string;
+  title: string;
+  hint: string;
+}
+
+export interface FeatureRow {
+  name: string;
+  /** The row's mark signs, in the package's order, joined by spaces; "" for none. */
+  marks: string;
+  text: string;
+  uses: Uses;
+  group: RowGroup | null;
+}
 
 export interface Card {
   typeLine: string;
@@ -276,6 +300,15 @@ export function buildPrintModel(
     const selected = new Set(selectThings(pkg, source).map((t) => t.id));
     return ev.things.filter((h) => selected.has(h.id)).map((h) => things.get(h.id)!);
   };
+  const heldById = new Map(ev.things.map((h) => [h.id, h]));
+  /** The things behind a held thing: the one that granted it, or those that granted the choice it was picked in. */
+  const origins = (h: HeldThing): string[] =>
+    h.grantedBy !== undefined
+      ? [h.grantedBy]
+      : h.pickedIn !== undefined
+        ? (ev.choices[h.pickedIn]?.grantedBy ?? [])
+        : [];
+  const collator = new Intl.Collator(language);
 
   const summary = summarize(pkg, doc, ev);
   const name = summary.name || messages.unnamed;
@@ -367,14 +400,63 @@ export function buildPrintModel(
           })),
         };
       case "featureTable": {
-        const rows = heldOf(s.things).map((t) => ({
-          name: thingName(t.id),
-          text: text(`${t.id}.short`),
-          uses: uses(t, s.uses),
-        }));
+        const marks = s.marks ?? [];
+        const markOn = marks.map((m) => {
+          const from = m.from === undefined ? undefined : new Set(selectThings(pkg, m.from).map((t) => t.id));
+          return (t: Thing): boolean => {
+            const h = heldById.get(t.id)!;
+            return (
+              (m.tags ?? []).every((tag) => t.tags?.includes(tag)) &&
+              (m.how === undefined || (m.how === "picked" ? h.pickedIn : h.grantedBy) !== undefined) &&
+              (from === undefined || origins(h).some((o) => from.has(o)))
+            );
+          };
+        });
+        let held = heldOf(s.things);
+        if (s.byRank) {
+          // Lowest rank first, by name inside a rank; things without a rank last, as they came.
+          const ranked = held
+            .filter((t) => t.rank !== undefined)
+            .sort((a, b) => a.rank! - b.rank! || collator.compare(thingName(a.id), thingName(b.id)));
+          held = [...ranked, ...held.filter((t) => t.rank === undefined)];
+        }
+        const used = new Set<number>();
+        const rows = held.map((t): FeatureRow => {
+          const on = markOn.flatMap((matches, i) => (matches(t) ? [i] : []));
+          on.forEach((i) => used.add(i));
+          const rank = s.byRank ? t.rank : undefined;
+          return {
+            name: thingName(t.id),
+            marks: on.map((i) => text(marks[i]!.text)).join(" "),
+            text: text(`${t.id}.short`),
+            uses: uses(t, s.uses),
+            group:
+              rank === undefined
+                ? null
+                : {
+                    key: `rank-${rank}`,
+                    title: text(`rank.${rank}.name`) || `${text("rank.name")} ${numberFormat.format(rank)}`,
+                    hint: text(`sheet.${s.id}.rank.${rank}.hint`),
+                  },
+          };
+        });
+        const legend = marks.flatMap((m, i) => (used.has(i) ? [`${text(m.text)} = ${text(m.legend)}`] : []));
+        const lead =
+          s.lead === undefined
+            ? []
+            : heldOf(s.lead.things)
+                .map((t) => text(`${t.id}.${s.lead!.text}`))
+                .filter((l) => l !== "");
         // The hint explains the boxes (SPEC 13); without boxes it would point at nothing.
         const boxes = rows.some((r) => r.uses !== null && "boxes" in r.uses);
-        return { ...base, hint: s.uses !== undefined && !boxes ? "" : base.hint, kind: "featureTable", rows };
+        return {
+          ...base,
+          hint: s.uses !== undefined && !boxes ? "" : base.hint,
+          kind: "featureTable",
+          lead,
+          rows,
+          legend,
+        };
       }
       case "list":
         return {
@@ -417,7 +499,6 @@ export function buildPrintModel(
   // SPEC 13 / print layout 3.4: one card per held thing with `card: true`;
   // in step order, then by rank, then by name.
   const stepIndex = new Map(ev.steps.map((s, i) => [s.id, i]));
-  const collator = new Intl.Collator(language);
   const cards: Card[] = ev.things
     .map((h) => ({ h, t: things.get(h.id)! }))
     .filter(({ t }) => isCard(pkg, t))

@@ -122,7 +122,7 @@ people who distribute packages.
 
 ```json
 {
-  "formatVersion": "0.12",
+  "formatVersion": "0.13",
   "id": "demo",
   "version": "0.1.0",
   "languages": ["de", "en"],
@@ -991,18 +991,18 @@ The sheet is a 12-column grid. Sections fill it row by row; `span` is the
 width (3, 4, 6, 8 or 12). The first section should be the header. Section
 kinds:
 
-| Kind           | Shows                                                                                                                                     | Fields                                       |
-| -------------- | ----------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------- |
-| `header`       | character name, `summary.line`, "played by", package name                                                                                 | —                                            |
-| `statBoxes`    | up to 6 large boxes; `number` = computed value, `pencil` = value as a starting number to overwrite, `circles` = number + tickable circles | `boxes[]: { value, style, label?, when? }`   |
-| `scoreColumn`  | stacked boxes: value large, `derived` value small                                                                                         | `scores[]: { value, derived? }`              |
-| `checkList`    | all things selected; marked if the character has them; `note` stat small next to the name; `total` value in the box                       | `things` (like `options`), `note?`, `total?` |
-| `statTable`    | the selected things the character has, one row each: name, then one column per stat                                                       | `things`, `columns[]: { stat, signed? }`     |
-| `featureTable` | the selected things the character has: name, `short`, use boxes from the `uses` stat                                                      | `things`, `uses?`                            |
-| `list`         | the selected things the character has, plus blank lines                                                                                   | `things`, `blankLines`                       |
-| `answers`      | answers to text and number choices, and the picks of choices with `owned` options                                                         | `choices[]`                                  |
-| `helpBox`      | the text `sheet.<id>.text`                                                                                                                | —                                            |
-| `notes`        | blank lines                                                                                                                               | `lines`                                      |
+| Kind           | Shows                                                                                                                                     | Fields                                          |
+| -------------- | ----------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------- |
+| `header`       | character name, `summary.line`, "played by", package name                                                                                 | —                                               |
+| `statBoxes`    | up to 6 large boxes; `number` = computed value, `pencil` = value as a starting number to overwrite, `circles` = number + tickable circles | `boxes[]: { value, style, label?, when? }`      |
+| `scoreColumn`  | stacked boxes: value large, `derived` value small                                                                                         | `scores[]: { value, derived? }`                 |
+| `checkList`    | all things selected; marked if the character has them; `note` stat small next to the name; `total` value in the box                       | `things` (like `options`), `note?`, `total?`    |
+| `statTable`    | the selected things the character has, one row each: name, then one column per stat                                                       | `things`, `columns[]: { stat, signed? }`        |
+| `featureTable` | the selected things the character has: name, `short`, use boxes from the `uses` stat; grouped by rank, marked, with a lead sentence       | `things`, `uses?`, `byRank?`, `marks?`, `lead?` |
+| `list`         | the selected things the character has, plus blank lines                                                                                   | `things`, `blankLines`                          |
+| `answers`      | answers to text and number choices, and the picks of choices with `owned` options                                                         | `choices[]`                                     |
+| `helpBox`      | the text `sheet.<id>.text`                                                                                                                | —                                               |
+| `notes`        | blank lines                                                                                                                               | `lines`                                         |
 
 **Conditions** (`when`, on every section and on each box of a
 `statBoxes` section). An expression (section 8) evaluated with the
@@ -1047,6 +1047,61 @@ the level is a `{value}` stat ([6](#6-things)); the builder rounds the
 value and prints at most 12 boxes.
 Explain the boxes in the section hint (`sheet.<id>.hint`, for example
 "□ = used once: tick it. Erase after a rest.").
+
+**Groups by rank** (`byRank: true`, on `featureTable` sections). The
+rows are grouped by the things' `rank`, lowest first, by name inside a
+group; things without a rank come last, without a heading. Each group is
+headed by `rank.<n>.name` if the package has it (for example a word of its
+own for rank 0), else by `rank.name` and the number ("Rank 2"); `rank.name`
+is then required. `sheet.<section>.rank.<n>.hint`, if present, is printed
+small beside the heading (for example what that rank costs to use). A table
+that goes on on the next page repeats the heading of the group it is in.
+Typical use: a long list of things of several ranks, read rank by rank,
+next to the boxes that count the uses per rank.
+
+**Marks** (`marks`, on `featureTable` sections). Short signs (a letter or
+two, the text `text`) printed next to a row's name, and explained under the
+table: one entry "sign = legend" (the text `legend`) per mark that is on at
+least one row. A mark is on every row whose thing matches all of its fields:
+
+| Field  | The row's thing                                                                                       |
+| ------ | ----------------------------------------------------------------------------------------------------- |
+| `tags` | carries all these tags                                                                                |
+| `how`  | `picked`: was picked in a choice; `granted`: was given by another thing                               |
+| `from` | came from one of these things (like `options`): the thing that granted it, or that granted its choice |
+
+A mark needs at least one of them. A row may carry several marks, in the
+order of `marks`. Typical use: where something comes from (picked from the
+calling, given by the path, from a boon), and a property worth seeing at a
+glance (a tag such as "lasts while you stay steady").
+
+```json
+{
+  "id": "knacks",
+  "kind": "featureTable",
+  "span": 8,
+  "things": { "kind": "knack" },
+  "byRank": true,
+  "marks": [
+    {
+      "text": "sheet.knacks.mark.calling",
+      "legend": "sheet.knacks.mark.calling.legend",
+      "how": "picked",
+      "from": { "kind": "calling" }
+    },
+    { "text": "sheet.knacks.mark.path", "legend": "sheet.knacks.mark.path.legend", "how": "granted" },
+    { "text": "sheet.knacks.mark.steady", "legend": "sheet.knacks.mark.steady.legend", "tags": ["steady"] }
+  ],
+  "lead": { "things": { "kind": "calling" }, "text": "knacks.change" }
+}
+```
+
+**Lead** (`lead`, on `featureTable` sections). A sentence above the rows
+for each thing the character has among `lead.things`: the text
+`<thing>.<lead.text>`, for example `calling.lantern-bearer.knacks.change`
+("After each long rest you may swap one knack."). A thing without that text
+adds no sentence, so the package writes it only where it has something to
+say.
 
 **Note** (`note`, on `checkList` sections). Names a stat key; its value is
 printed small next to each name, formatted like a card field (numbers as
@@ -1145,7 +1200,9 @@ well-formed does the second stage check the rules between files:
   stats; section and box conditions (`when`) parse and refer to existing
   values and things; box labels (`label`) exist in every language; things with `card: true` have a layout; `uses` stats are whole
   numbers or texts, `note` stats and table columns are not true/false,
-  `total` stats are `{value}`;
+  `total` stats are `{value}`; `byRank` tables select things with a rank
+  and `rank.name` exists; mark tags and `from`, and `lead.things`, select
+  things; mark signs and legends exist in every language;
 - text variants: ids unique per choice, conditions parse; a variant text
   that exists in one language exists in every language;
 - units: every language has defaults; every stated amount can be converted;
@@ -1198,6 +1255,7 @@ are removed (saved characters may lose picks). Keys are never renamed.
 | 0.10    | 2026-10-05 | Stats `{ "value": "<value>" }`: show the character's value, and give use boxes that grow with the level. `"owned": true` in a pick choice's `options`: pick among what the character has; a pick marks the thing instead of giving it, `answers` sections print the picks. A `raise` sees the values, `cap` and `recommend` conditions at the choice's level, not at the character's level. | Set `formatVersion` to `"0.10"`. The new fields are optional. A `raise` on a level below the character's no longer counts what later levels give: a package that worked around this (for example a second value for the printed score) can drop the workaround. Saved raises stay valid; a raise that left points over because a later bonus filled the cap may now ask for them. |
 | 0.11    | 2026-10-05 | `total` on `checkList` sections: the character's value in each box, with where it comes from. Section kind `statTable`: the things the character has, one column per stat. `{text}` stats may fill in values (`vars`); placeholder `{{var:name\|signed}}` writes a number with its sign.                                                                                                    | Set `formatVersion` to `"0.11"`. Nothing else changes: every field is optional and the placeholder is new, so every valid 0.10 package is a valid 0.11 package.                                                                                                                                                                                                                   |
 | 0.12    | 2026-10-05 | Optional `badges` on `distribute` choices (a label on rows while `when` holds); optional row texts `choice.<id>.target.<target>` and `choice.<id>.variant.<variant>.target.<target>`.                                                                                                                                                                                                       | Set `formatVersion` to `"0.12"`. Nothing else changes: the field and the texts are optional, so every valid 0.11 package is a valid 0.12 package.                                                                                                                                                                                                                                 |
+| 0.13    | 2026-10-06 | Optional `byRank`, `marks` and `lead` on `featureTable` sections: rows grouped by rank under `rank.<n>.name` or `rank.name` with an optional `sheet.<id>.rank.<n>.hint`, short signs with a legend by tags, picked or granted, and where a row came from, and a sentence `<thing>.<text>` above the rows.                                                                                   | Set `formatVersion` to `"0.13"`. Nothing else changes: every field is optional, so every valid 0.12 package is a valid 0.13 package.                                                                                                                                                                                                                                              |
 | 0.8     | 2026-10-04 | Gather steps (`gather`, optional `together`: `sections` or one shared `list`) in `flow.steps`, optional `gather` on choices, optional text `choice.<id>.from`.                                                                                                                                                                                                                              | Set `formatVersion` to `"0.8"`. Nothing else changes: a package without gather steps builds the same steps as before, so every valid 0.7 package is a valid 0.8 package.                                                                                                                                                                                                          |
 
 ## 16. A minimal package
@@ -1209,7 +1267,7 @@ language. The validator accepts it as is.
 
 ```json
 {
-  "formatVersion": "0.12",
+  "formatVersion": "0.13",
   "id": "tiny",
   "version": "1.0.0",
   "languages": ["en"],

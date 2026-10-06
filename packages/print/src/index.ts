@@ -10,8 +10,10 @@ export {
   printLanguages,
   PrintError,
   type Card,
+  type FeatureRow,
   type PrintModel,
   type PrintSettings,
+  type RowGroup,
   type SheetSection,
   type Uses,
 } from "./model.ts";

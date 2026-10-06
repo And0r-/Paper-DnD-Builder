@@ -11,7 +11,7 @@
 import { fileURLToPath } from "node:url";
 import PDFDocument from "pdfkit";
 import type { Messages } from "./messages.ts";
-import type { Card, PrintModel, SheetSection, StatBox, Uses } from "./model.ts";
+import type { Card, PrintModel, RowGroup, SheetSection, StatBox, Uses } from "./model.ts";
 
 const PT_PER_MM = 72 / 25.4;
 /** Size of one typographic point in millimetres. */
@@ -333,6 +333,8 @@ const S = {
   body: { size: 9 },
   small: { size: 8.5 },
   hint: { size: 7, color: "#333" },
+  mark: { font: "bold", size: 7.5, color: "#333" },
+  rowGroup: { font: "bold", size: 7.5, caps: true, spacing: 0.06 },
   meta: { size: 7.5, color: "#444" },
   footer: { size: 7, color: "#444" },
   cardType: { size: 7, caps: true, color: "#333", spacing: 0.06 },
@@ -384,6 +386,25 @@ function drawUses(pen: Pen, uses: Uses, right: number, y: number, s: TextStyle):
   }
   for (let i = 0; i < uses.boxes; i++)
     pen.rect(right - USE_BOX - i * (USE_BOX + USE_BOX_GAP), top, USE_BOX, USE_BOX, { width: 0.5 });
+}
+
+/**
+ * The heading of a group of table rows: its title and, on the same line if
+ * it fits, its hint ("Rank 2 · no slot needed"). Returns the new top.
+ */
+function drawRowGroup(pen: Pen, group: RowGroup, x: number, y: number, w: number): number {
+  const top = y + 1.2;
+  const baseline = top + S.rowGroup.size * 0.8 * MM_PER_PT;
+  const title = pen.fit(group.title, S.rowGroup, w);
+  pen.text(group.title, x, baseline, title);
+  let bottom = top + pen.lineHeight(S.rowGroup, 1.2);
+  if (group.hint !== "") {
+    const after = pen.width(group.title, title) + 3;
+    if (pen.width(group.hint, S.hint) <= w - after) pen.text(group.hint, x + after, baseline, S.hint);
+    else bottom = pen.paragraph(group.hint, x, bottom, w, S.hint, 1.2);
+  }
+  pen.line(x, bottom + 0.4, x + w, bottom + 0.4, 0.5, "#777");
+  return bottom + 1;
 }
 
 /** Draws one section (or only measures it, if the pen is dry). Returns its height. */
@@ -470,9 +491,17 @@ function drawSection(pen: Pen, s: SheetSection, x: number, top: number, w: numbe
       // A column for the use boxes, as wide as the widest row needs.
       const usesW = Math.max(0, ...s.rows.map((r) => usesWidth(pen, r.uses, S.small)));
       const textW = w - nameW - (usesW > 0 ? usesW + 3 : 0);
+      // The marks take the right end of the name column, so the text column stays where it was.
+      const marksW = Math.max(0, ...s.rows.map((r) => pen.width(r.marks, S.mark)));
+      for (const lead of s.lead) y = pen.paragraph(lead, x, y, w, S.small) + 1;
+      let group: string | null = null;
       for (const row of s.rows) {
-        const nameLines = pen.wrap(row.name, S.fieldName, nameW - 2);
+        if (row.group !== null && row.group.key !== group) y = drawRowGroup(pen, row.group, x, y, w);
+        group = row.group?.key ?? null;
+        const nameLines = pen.wrap(row.name, S.fieldName, nameW - 2 - (marksW > 0 ? marksW + 1.5 : 0));
         const textLines = pen.wrap(row.text, S.small, textW);
+        if (row.marks !== "")
+          pen.text(row.marks, x + nameW - 2, y + 0.8 + S.fieldName.size * 0.8 * MM_PER_PT, S.mark, "right");
         const nameBottom = pen.lines(nameLines, x, y + 0.8, S.fieldName, 1.2);
         const textBottom = pen.lines(textLines, x + nameW, y + 0.9, S.small, 1.25);
         drawUses(pen, row.uses, x + w, y + 0.9 + S.small.size * 0.8 * MM_PER_PT, S.small);
@@ -480,6 +509,7 @@ function drawSection(pen: Pen, s: SheetSection, x: number, top: number, w: numbe
         pen.line(x, y, x + w, y, 0.3, "#BBB");
         y += 0.6;
       }
+      if (s.legend.length > 0) y = pen.paragraph(s.legend.join(" · "), x, y + 0.6, w, S.hint);
       break;
     }
     case "statTable":
@@ -699,9 +729,10 @@ function splitSection(s: SheetSection, n: number, m: Messages): [SheetSection, S
         { ...tail, kind: s.kind, items: s.items.slice(n) },
       ];
     case "featureTable":
+      // The lead stays above the first rows, the legend under the last ones, like the hint.
       return [
-        { ...head, kind: s.kind, rows: s.rows.slice(0, n) },
-        { ...tail, kind: s.kind, rows: s.rows.slice(n) },
+        { ...head, kind: s.kind, lead: s.lead, rows: s.rows.slice(0, n), legend: [] },
+        { ...tail, kind: s.kind, lead: [], rows: s.rows.slice(n), legend: s.legend },
       ];
     case "statTable":
       return [
