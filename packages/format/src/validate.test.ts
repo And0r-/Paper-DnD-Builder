@@ -456,7 +456,7 @@ describe("warnings", () => {
     [
       "name too long",
       (f) => (texts(f, "de")["knack.eddy.name"] = "Ein sehr langer Name für einen Kniff"),
-      "texts/de/core.json entries.knack.eddy.name: is 36 characters long; the style limit is 30",
+      "texts/de/core.json entries.knack.eddy.name: is 36 characters long as shown; the style limit is 30",
     ],
     [
       "choice never asked",
@@ -472,6 +472,59 @@ describe("warnings", () => {
     const r = mutate(change);
     expect(r.ok).toBe(true);
     expect(messages(r, "warnings")).toContain(expected);
+  });
+});
+
+describe("style limits of short texts", () => {
+  /** Three sentences, exactly n characters. */
+  const sized = (n: number) => {
+    const head = "Your light guards everyone close to you. Once per rest you may shine. Everyone near you";
+    return `${head}${" glows".repeat(40)}`.slice(0, n - 1) + ".";
+  };
+  const warnings = (change: (f: RawFiles) => void) => messages(mutate(change), "warnings");
+
+  it("allows 3 sentences and 240 characters for a thing a feature table prints without a card", () => {
+    expect(warnings((f) => (texts(f, "en")["path.lightwarden.short"] = sized(240)))).toEqual([]);
+  });
+
+  it("warns above 240 characters as shown", () => {
+    expect(warnings((f) => (texts(f, "en")["path.lightwarden.short"] = sized(242)))).toContain(
+      "texts/en/core.json entries.path.lightwarden.short: is 242 characters long as shown; the style limit is 240",
+    );
+  });
+
+  it("warns above 3 sentences", () => {
+    expect(
+      warnings((f) => (texts(f, "en")["path.lightwarden.short"] = "Glow. Shine. Guard. Rest.")),
+    ).toContain("texts/en/core.json entries.path.lightwarden.short: has 4 sentences; the style limit is 3");
+  });
+
+  it("counts a glossary link as its words", () => {
+    const linked = sized(230).replace("guards", "[[glossary:guard|guards]]");
+    expect(linked.length).toBeGreaterThan(240);
+    expect(warnings((f) => (texts(f, "en")["path.lightwarden.short"] = linked))).toEqual([]);
+  });
+
+  it("keeps 120 characters for a thing with a card", () => {
+    expect(warnings((f) => (texts(f, "en")["knack.eddy.short"] = sized(130)))).toContain(
+      "texts/en/core.json entries.knack.eddy.short: is 130 characters long as shown; the style limit is 120",
+    );
+  });
+
+  it("lets the package name be longer than a thing name", () => {
+    expect(
+      warnings((f) => (texts(f, "en")["package.name"] = "Mistland, a made-up world for testing")),
+    ).toEqual([]);
+  });
+
+  it("counts plain units in official rules texts once per file", () => {
+    const w = warnings((f) => {
+      texts(f, "en")["knack.eddy.rules"] = "Water swirls up to 6 m away.";
+      texts(f, "en")["knack.whirlpool.rules"] = "A whirlpool 9 m wide.";
+    });
+    expect(w).toEqual([
+      "texts/en/core.json : 2 official rules text(s) state a unit as plain text; they stay verbatim, so readers see that unit unconverted",
+    ]);
   });
 });
 

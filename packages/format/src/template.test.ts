@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseTemplate, TemplateSyntaxError } from "./template.ts";
+import { parseTemplate, sentences, TemplateSyntaxError, visibleText } from "./template.ts";
 
 describe("parseTemplate", () => {
   it("splits text, quantities, variables and glossary links", () => {
@@ -40,5 +40,33 @@ describe("parseTemplate", () => {
   ])("rejects %j", (src, message) => {
     expect(() => parseTemplate(src)).toThrow(TemplateSyntaxError);
     expect(() => parseTemplate(src)).toThrow(message);
+  });
+});
+
+describe("visibleText", () => {
+  it("keeps the words of a glossary link and counts placeholders at a fixed width", () => {
+    expect(visibleText("Gain [[glossary:stamina|Stamina]] within {{length:30}}, {{var:count}} times.")).toBe(
+      "Gain Stamina within 00000000, 00 times.",
+    );
+  });
+
+  it("returns a text that does not parse unchanged", () => {
+    expect(visibleText("Broken {{nope}}")).toBe("Broken {{nope}}");
+  });
+});
+
+describe("sentences", () => {
+  it("splits at the end of a sentence before a capital or a digit, also inside a quote", () => {
+    expect(sentences("Once per rest. Ölig wird es! 3 Mal? „Brot!“ Du lachst.")).toEqual([
+      "Once per rest.",
+      "Ölig wird es!",
+      "3 Mal?",
+      "„Brot!“",
+      "Du lachst.",
+    ]);
+  });
+
+  it("does not split inside a sentence", () => {
+    expect(sentences("Up to 1.5 m, e.g. here.")).toHaveLength(1);
   });
 });

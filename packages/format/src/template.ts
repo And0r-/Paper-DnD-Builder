@@ -67,3 +67,32 @@ export function parseTemplate(src: string): TemplatePart[] {
   }
   return parts;
 }
+
+/** Characters a placeholder counts as in style limits: a quantity like "9 meters", a variable like "+3". */
+export const PLACEHOLDER_WIDTH = { quantity: 8, var: 2 } as const;
+
+/**
+ * A text roughly as the reader sees it, for style limits: glossary links
+ * become their words, placeholders PLACEHOLDER_WIDTH digits.
+ * A text that does not parse is returned unchanged.
+ */
+export function visibleText(src: string): string {
+  let parts: TemplatePart[];
+  try {
+    parts = parseTemplate(src);
+  } catch (e) {
+    if (e instanceof TemplateSyntaxError) return src;
+    throw e;
+  }
+  return parts
+    .map((p) => (p.type === "text" || p.type === "glossary" ? p.text : "0".repeat(PLACEHOLDER_WIDTH[p.type])))
+    .join("");
+}
+
+/** Sentences of a visible text: a sentence ends at . ! or ? (maybe inside a quote) before a capital or digit. */
+export function sentences(text: string): string[] {
+  return text
+    .split(/(?<=[.!?]["“”»«]?)\s+(?=[\p{Lu}„"“»«0-9])/u)
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+}

@@ -821,7 +821,7 @@ Text keys follow from the keys of the things they belong to.
 | `rank.name`, `rank.<n>.name`                                             | no                                                                  | headings of a long list grouped by rank (10.2.1)        |
 | `kind.<kind>.name`                                                       | yes                                                                 | name of a kind (card type line, headings)               |
 | `<thing>.name`                                                           | yes                                                                 | name, at most 30 characters                             |
-| `<thing>.short`                                                          | yes                                                                 | one sentence, at most 120 characters                    |
+| `<thing>.short`                                                          | yes                                                                 | one sentence, at most 120 characters; see 10.3          |
 | `<thing>.explain.what`                                                   | yes                                                                 | plain language: what it is                              |
 | `<thing>.explain.table`                                                  | yes                                                                 | plain language: what you do with it at the table        |
 | `<thing>.explain.example`                                                | no                                                                  | a small scene                                           |
@@ -876,6 +876,22 @@ sentences, "you", active voice, numbers as digits, no unexplained jargon
 (link it to the glossary), no units written out (use placeholders). The
 validator flags texts that write a unit as plain text next to a number
 (`9 m`), using the package's own unit words.
+
+Length limits count characters as the reader sees them: a glossary link
+counts as its words, a quantity as 8 characters ("9 meters"), a variable as
+2 ("+3"). They are warnings:
+
+| Text                          | Limit                                                                                                                                                                                                             |
+| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `<thing>.name`                | 30 characters (`package.name` has no limit; the sheet header fits it to its box)                                                                                                                                  |
+| `<thing>.short`               | 120 characters                                                                                                                                                                                                    |
+| `<thing>.short` printed alone | 3 sentences and 240 characters, for a thing a `featureTable` section lists and that has no `card`: at the table its short text is all there is, so it carries every limit of the rule (how often, when, how many) |
+| `<thing>.goodIf`              | 80 characters                                                                                                                                                                                                     |
+| `<thing>.explain.*`           | 400 characters for `what`, `table` and `example` together                                                                                                                                                         |
+
+`<thing>.rules` is an official text and stays verbatim, so units written in
+it are not listed one by one; the validator counts them in one warning per
+file.
 
 ### 10.4 Placeholders
 
