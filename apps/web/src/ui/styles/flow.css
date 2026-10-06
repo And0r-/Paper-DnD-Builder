@@ -418,7 +418,9 @@
 
 /* Larger screens: the dock sticks to the bottom edge while the list
    scrolls. Pressed too early, Next moves focus up to the open choice; the
-   reason and "Choose for me" stay in view right above Next. */
+   reason and "Choose for me" stay in view right above Next. The shadow
+   shows the cards going under the bar, so a card cut off at its edge does
+   not look like it ends there (and a tap aims above the bar). */
 @media (min-width: 600px) {
   .step .step-footer {
     position: sticky;
@@ -427,6 +429,7 @@
     padding: var(--space-3) 0;
     background: var(--color-bg);
     border-top: 1px solid var(--color-line);
+    box-shadow: 0 -2px 8px rgb(29 28 26 / 0.06);
   }
 }
 
