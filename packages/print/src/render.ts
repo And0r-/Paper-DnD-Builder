@@ -148,7 +148,8 @@ class Pen {
 
   /**
    * Breaks text into lines no wider than `width`. A word longer than a line
-   * is split after a hyphen or slash if it has one, else between letters
+   * is split after a hyphen or slash, or at a soft hyphen (which the package
+   * puts where a compound word joins), if it has one; else between letters
    * with a hyphen added.
    */
   wrap(text: string, s: TextStyle, width: number): string[] {
@@ -176,24 +177,48 @@ class Pen {
 
   /** Where to split a word that is wider than `width`, and what to print at the end of the first part. */
   private cut(word: string, s: TextStyle, width: number): { at: number; mark: string } {
-    for (let at = word.length - 1; at > 0; at--)
-      if (/[-/\u2010-\u2012]/u.test(word[at - 1]!) && this.width(word.slice(0, at), s) <= width)
-        return { at, mark: "" };
+    for (let at = word.length - 1; at > 0; at--) {
+      const soft = word[at - 1] === "\u00ad";
+      if (!soft && !/[-/\u2010-\u2012]/u.test(word[at - 1]!)) continue;
+      const mark = soft ? "-" : "";
+      if (this.width(word.slice(0, at) + mark, s) <= width) return { at, mark };
+    }
+    // Between letters, at least three on either side, so no "\u2026stellu-ng";
+    // only if not even that fits, wherever it fits.
+    const letters = (t: string) => t.match(/\p{L}/gu)?.length ?? 0;
+    const fits = (at: number) => this.width(`${word.slice(0, at)}-`, s) <= width;
     let at = word.length - 1;
-    while (at > 1 && this.width(`${word.slice(0, at)}-`, s) > width) at--;
+    while (at > 1 && !(fits(at) && letters(word.slice(0, at)) >= 3 && letters(word.slice(at)) >= 3)) at--;
+    if (at === 1) {
+      at = word.length - 1;
+      while (at > 1 && !fits(at)) at--;
+    }
     const between = /\p{L}/u.test(word[at - 1]!) && /\p{L}/u.test(word[at]!);
     return { at, mark: between ? "-" : "" };
   }
 
   /**
    * A label at the largest size from `s.size` down to `min` that fits on one
-   * line; if it does not fit even at `min`, wrapped at `min`.
+   * line; if it does not fit even at `min`, wrapped as {@link wrapWords} does.
    */
   label(text: string, s: TextStyle, width: number, min = 7): { style: TextStyle; lines: string[] } {
     const style = this.fit(text, s, width, min);
     if (this.width(text, style) <= width) return { style, lines: [text] };
-    // Rather a smaller size, tighter letters or no capitals than a word split between letters.
-    const pieces = text.split(BREAKS).flatMap((w) => w.split(/(?<=[-/\u2010-\u2012])/u));
+    return this.wrapWords(text, s, width, min);
+  }
+
+  /**
+   * Text wrapped at the largest size from `s.size` down to `min` at which
+   * every word fits on a line, so lines break only between words, after a
+   * hyphen or slash, or at a soft hyphen. Rather a smaller size, tighter
+   * letters or no capitals than a word split between letters; that happens
+   * only if a word is too long even at `min`.
+   */
+  wrapWords(text: string, s: TextStyle, width: number, min = 7): { style: TextStyle; lines: string[] } {
+    const pieces = text
+      .split(BREAKS)
+      .flatMap((w) => w.split(/(?<=[-/\u2010-\u2012\u00ad])/u))
+      .map((p) => p.replace(/\u00ad$/u, "-"));
     const tries: TextStyle[] = [];
     for (let size = s.size; size >= min; size -= 0.5) tries.push({ ...s, size });
     if (s.spacing) tries.push({ ...s, size: min, spacing: 0 });
@@ -201,6 +226,7 @@ class Pen {
     for (const t of tries)
       if (pieces.every((p) => this.width(p, t) <= width))
         return { style: t, lines: this.wrap(text, t, width) };
+    const style = { ...s, size: Math.min(s.size, min) };
     return { style, lines: this.wrap(text, style, width) };
   }
 
@@ -522,11 +548,11 @@ function drawSection(pen: Pen, s: SheetSection, x: number, top: number, w: numbe
         if (row.group !== null && row.group.key !== group)
           y = drawRowGroup(pen, row.group, x, y, w, row === s.rows[0]);
         group = row.group?.key ?? null;
-        const nameLines = pen.wrap(row.name, S.fieldName, nameW - 2 - markRoom);
+        const name = pen.wrapWords(row.name, S.fieldName, nameW - 2 - markRoom);
         const textLines = pen.wrap(row.text, S.small, textW);
         if (row.marks !== "")
           pen.text(row.marks, x + nameW - 2, y + 0.8 + S.fieldName.size * 0.8 * MM_PER_PT, S.mark, "right");
-        let nameBottom = pen.lines(nameLines, x, y + 0.8, S.fieldName, 1.2);
+        let nameBottom = pen.lines(name.lines, x, y + 0.8, name.style, 1.2);
         if (row.note)
           nameBottom = pen.lines(pen.wrap(row.note, S.hint, nameW - 2), x, nameBottom, S.hint, 1.2);
         const textBottom = pen.lines(textLines, x + nameW, y + 0.9, S.small, 1.25);
@@ -633,7 +659,8 @@ function drawStatTable(
   pen.line(x, y, x + w, y, 0.5, "#777");
   for (const row of s.rows) {
     const top = y + 0.8;
-    let bottom = pen.lines(pen.wrap(row.name, S.fieldName, nameW - 1), x, top, S.fieldName, 1.2);
+    const name = pen.wrapWords(row.name, S.fieldName, nameW - 1);
+    let bottom = pen.lines(name.lines, x, top, name.style, 1.2);
     row.cells.forEach((cell, i) => {
       bottom = Math.max(
         bottom,
