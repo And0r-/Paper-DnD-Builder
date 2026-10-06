@@ -152,6 +152,111 @@
   color: var(--color-ink-muted);
 }
 
+/*
+ * What an answer did to the steps (AND-96): a step that came slides in with
+ * a green frame, a step that went turns red, struck through, and then folds
+ * away. The colour holds about 2.5 s (MARK_MS in frame.tsx). Reduced
+ * motion: the same colours, nothing moves, nothing fades.
+ */
+/* Background stays quick, so hover does not lag. */
+.steplist__link {
+  transition:
+    box-shadow 600ms ease-out,
+    color 600ms ease-out;
+}
+
+.progress__count {
+  transition:
+    box-shadow 600ms ease-out,
+    background-color 600ms ease-out,
+    color 600ms ease-out;
+}
+
+.steplist__link--new {
+  background: var(--color-success-soft);
+  box-shadow: inset 0 0 0 2px var(--color-success);
+  animation: steplist-in 350ms ease-out;
+}
+
+.steplist__link--lost,
+.steplist__link--gone {
+  background: var(--color-danger-soft);
+  box-shadow: inset 0 0 0 2px var(--color-danger);
+}
+
+.steplist__link--gone {
+  color: var(--color-danger);
+  text-decoration: line-through;
+}
+
+.steplist__link--gone .steplist__mark {
+  color: var(--color-danger);
+}
+
+.steplist__ghost {
+  overflow: hidden;
+}
+
+.steplist__ghost--leaving {
+  animation: steplist-out 400ms ease-in forwards;
+}
+
+@keyframes steplist-in {
+  from {
+    opacity: 0;
+    transform: translateX(-0.75rem);
+  }
+}
+
+@keyframes steplist-out {
+  from {
+    max-height: 4rem;
+    opacity: 1;
+  }
+  to {
+    max-height: 0;
+    opacity: 0;
+  }
+}
+
+.progress__count {
+  border-radius: var(--radius-sm);
+}
+
+.progress__count--new,
+.progress__count--lost {
+  padding: 0 var(--space-1);
+  font-weight: var(--weight-semibold);
+}
+
+.progress__count--new {
+  color: var(--color-success);
+  background: var(--color-success-soft);
+  box-shadow: 0 0 0 2px var(--color-success);
+}
+
+.progress__count--lost {
+  color: var(--color-danger);
+  background: var(--color-danger-soft);
+  box-shadow: 0 0 0 2px var(--color-danger);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .steplist__link,
+  .progress__count {
+    transition: none;
+  }
+
+  .steplist__link--new {
+    animation: none;
+  }
+
+  .steplist__ghost--leaving {
+    animation: none;
+    display: none;
+  }
+}
+
 /* --------------------------------------------------------------- frame */
 
 .step {

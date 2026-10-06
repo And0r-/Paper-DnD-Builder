@@ -1,8 +1,9 @@
 /**
  * An honest step count (AND-77): "Step x of y" and "Part x of y" stand from
  * the first screen on. Going through the build with "choose for me" the
- * total never changes; a pick that brings more steps says so on the screen,
- * in the same moment. The bar moves on every screen, the parts of a long
+ * total never changes; a pick that brings more steps says so in the same
+ * moment: the step list and the count in colour (AND-96), one sentence for
+ * screen readers. The bar moves on every screen, the parts of a long
  * step too.
  */
 import type { Page } from "@playwright/test";
@@ -19,7 +20,7 @@ interface Screen {
   part: number;
   parts: number;
   bar: number;
-  /** The note about added or removed steps, if one shows. */
+  /** The sentence for screen readers about added or removed steps, if there is one. */
   note: string;
 }
 
@@ -43,7 +44,7 @@ async function read(page: Page, m: Messages): Promise<Screen> {
   const bar = await page
     .locator(".progress__fill")
     .evaluate((el) => parseFloat((el as HTMLElement).style.width));
-  const note = (await page.locator(".step-notice").allInnerTexts()).join(" ");
+  const note = (await page.locator(".step-notice").allTextContents()).join(" ").trim();
   return {
     text,
     current: Number(step[1]),
@@ -149,7 +150,7 @@ test("a pick that brings a step says so, and the total holds from then on", asyn
   expectHonest(screens);
   const grew = screens.find((s) => s.after.total > s.before.total)!;
   expect(grew.after.total).toBe(first.total + 1);
-  expect(grew.after.note).toContain("Deine Wahl bringt einen Schritt dazu.");
+  expect(grew.after.note).toMatch(/^Ein Schritt dazu: .+\.$/);
 });
 
 test("in English: the same count and the same note", async ({ page, foreign }) => {
@@ -160,7 +161,7 @@ test("in English: the same count and the same note", async ({ page, foreign }) =
   const screens = await walk(page, en, { "How does your character earn a living?": "River Runner" });
   expectHonest(screens);
   const grew = screens.find((s) => s.after.total > s.before.total)!;
-  expect(grew.after.note).toContain("Your choice adds a step.");
+  expect(grew.after.note).toMatch(/^One more step: .+\.$/);
   await expectOneLanguage(page, "en");
 });
 
@@ -185,7 +186,7 @@ test("a pick that takes a part away says so, and the parts hold from then on (AN
   const fell = screens.find((s) => s.after.parts < s.before.parts)!;
   expect(fell.before.text).toContain("Teil 7 von 10");
   expect(fell.after.text).toContain("Teil 7 von 9");
-  expect(fell.after.note).toContain(de["flow.partsRemoved.one"]);
+  expect(fell.after.note).toMatch(/^Ein Teil fällt weg: .+\.$/);
   // From there on every part of the boons counts to 9.
   const later = screens
     .slice(screens.indexOf(fell) + 1)
