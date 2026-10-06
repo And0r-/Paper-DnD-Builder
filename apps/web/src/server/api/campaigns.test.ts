@@ -230,6 +230,7 @@ describe("who sees what", () => {
       ["POST", `${p}/finish`, { version: 1 }],
       ["POST", `${p}/level-up`, { version: 1, level: 2 }],
       ["GET", `${p}/pdf`, undefined],
+      ["GET", `${p}/sheet`, undefined],
       ["DELETE", p, undefined],
     ] as const) {
       const res = await stranger.call(method, path, body);
@@ -303,6 +304,9 @@ describe("who sees what", () => {
     const pdf = await gm.request("GET", `/api/drafts/${id}/pdf`);
     expect(pdf.status).toBe(200);
     expect(pdf.headers.get("content-type")).toBe("application/pdf");
+    const sheet = await gm.call("GET", `/api/drafts/${id}/sheet`);
+    expect(sheet.status).toBe(200);
+    expect(sheet.json.origin).toMatchObject({ kind: "original", level: 3 });
     const up = await gm.call("POST", `/api/drafts/${id}/level-up`, {
       version: done.json.draft.version,
       level: 4,
