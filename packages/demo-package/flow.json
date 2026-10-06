@@ -720,6 +720,20 @@
       "gather": "path"
     },
     {
+      "id": "herb-craft",
+      "kind": "pickOne",
+      "source": "mistland",
+      "options": {
+        "ids": ["trait.leaf-lore", "trait.root-lore"]
+      },
+      "recommend": [
+        {
+          "pick": ["trait.leaf-lore"]
+        }
+      ],
+      "gather": "path"
+    },
+    {
       "id": "lantern-mastery",
       "kind": "pickMany",
       "source": "mistland",

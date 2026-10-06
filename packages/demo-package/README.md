@@ -43,6 +43,7 @@ Every feature of format 0.10 is used at least once (see
 | Step condition          | step `handling-river-runner` has `when: has('calling.river-runner')`                                                            |
 | Same name, other key    | steps `handling-river-runner` and `handling-herbalist` share the title "Handling": a calling change keeps the step in the list  |
 | Gather steps            | `paths` (each choice its own step), `talents` (`list`), `knacks` (`sections`), `equipment`                                      |
+| Levels out of order     | `paths` ("Your way"): the herbalist's `path` (level 3) comes before `herb-craft` (level 1), in grant order                      |
 | One shared list         | `talents`: calling, folk (coastfolk, overlapping list) and level 2; upbringing talents held                                     |
 
 ## Layout

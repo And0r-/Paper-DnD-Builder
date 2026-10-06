@@ -26,6 +26,7 @@ import { RichText } from "../components/RichText.tsx";
 import { AppShell } from "../components/Shell.tsx";
 import { levelWord, ptext } from "../package-text.ts";
 import { useDraft } from "./draft-state.tsx";
+import { levelHeading, levelSpan } from "./level-runs.ts";
 import { nextOpen, OVERVIEW_KEY, positionOf, progressFraction, type FlowEntry } from "./model.ts";
 import {
   answeredParts,
@@ -215,6 +216,7 @@ function LevelRuns({
   const { lp } = useDraft();
   const change = useContext(ChangeCtx);
   const word = levelWord(lp);
+  const min = lp.pkg.flow.level.min;
   const keys = new Set(items.map((e) => e.key));
   // Parts that went from this step; one that followed an entry not listed here stands at the top.
   const gone = (change?.gone ?? [])
@@ -227,13 +229,15 @@ function LevelRuns({
     <ol className="steplist__parts">
       {goneAfter(gone, undefined, leaving)}
       {items.map((e, i) => {
-        const prev = i === 0 ? from : items[i - 1]!.atLevel;
+        const heading = levelHeading(i === 0 ? from : items[i - 1]!.atLevel, e.atLevel, min);
         return (
           <Fragment key={e.key}>
             <li className="steplist__item">
-              {e.atLevel !== prev && e.atLevel > lp.pkg.flow.level.min && (
+              {heading && (
                 <p className="steplist__level">
-                  {t("flow.fromLevel", { levelName: word, level: e.atLevel })}
+                  {heading === "from"
+                    ? t("flow.fromLevel", { levelName: word, level: e.atLevel })
+                    : t("flow.atLevel", { levelName: ptext(lp, "level.name") ?? "", level: e.atLevel })}
                 </p>
               )}
               <StepLink entry={e} current={current} mark={lit?.has(e.key) ? "new" : undefined} />
@@ -254,12 +258,11 @@ function LevelRuns({
  */
 export function StepList({ current }: { current: string | undefined }) {
   const { t } = useApp();
-  const { lp, entries } = useDraft();
+  const { entries } = useDraft();
   const change = useContext(ChangeCtx);
   const list = useRef<HTMLDivElement>(null);
   const here = entries.find((e) => e.key === current);
   const heads = entries.filter((e) => e.part === 1);
-  const word = levelWord(lp);
   const leaving = change?.phase === "leave";
   const lit = change?.phase === "show" ? change : undefined;
   const wholeGone = (change?.gone ?? []).filter((g) => g.whole);
@@ -285,7 +288,7 @@ export function StepList({ current }: { current: string | undefined }) {
         {goneAfter(wholeGone, undefined, leaving)}
         {heads.map((head) => (
           <Fragment key={head.key}>
-            <StepItem head={head} current={current} here={here} markOf={markOf} word={word} />
+            <StepItem head={head} current={current} here={here} markOf={markOf} />
             {goneAfter(wholeGone, head.key, leaving)}
           </Fragment>
         ))}
@@ -300,13 +303,11 @@ function StepItem({
   current,
   here,
   markOf,
-  word,
 }: {
   head: FlowEntry;
   current: string | undefined;
   here: FlowEntry | undefined;
   markOf: (head: FlowEntry, all: FlowEntry[], open: boolean) => "new" | "lost" | undefined;
-  word: string;
 }) {
   const { t } = useApp();
   const { lp, entries } = useDraft();
@@ -323,11 +324,9 @@ function StepItem({
     );
   }
   // A gathered group: its own name, the levels it spans, and its steps inside.
-  const levels = [...new Set(all.map((e) => e.atLevel))];
-  const span =
-    levels.length > 1
-      ? t("flow.levelSpan", { levelName: word, from: levels[0]!, to: levels.at(-1)! })
-      : undefined;
+  const levels = levelSpan(all.map((e) => e.atLevel));
+  // The span starts its line: the level's name as the package writes it ("Level 1 to 3").
+  const span = levels && t("flow.levelSpan", { levelName: ptext(lp, "level.name") ?? "", ...levels });
   const target = all.find((e) => e.status !== "done") ?? head;
   return (
     <li className="steplist__item">

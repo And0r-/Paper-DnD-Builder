@@ -310,7 +310,10 @@ export function originGroups(lp: LoadedPackage, ev: Evaluation, w: Words): Origi
       g = { from, label: thingLabel(lp, from, w), things: [] };
       groups.set(from, g);
     }
-    if (thingName(lp, h.id)) g.things.push(h.id);
+    // A feature that brings a thing of the same name (a feature that teaches
+    // a language called like it) is named once.
+    const name = thingName(lp, h.id);
+    if (name && !g.things.some((id) => thingName(lp, id) === name)) g.things.push(h.id);
   }
   return [...groups.values()].filter((g) => g.things.length > 0);
 }
