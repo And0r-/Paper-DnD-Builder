@@ -242,6 +242,7 @@ describe("openapi.json", () => {
         "alreadyPlayer",
         "cannotAddYourself",
         "ownerOnly",
+        "copyNotFound",
       ]) {
         expect(codes, code).toContain(code);
       }
@@ -376,7 +377,24 @@ async function walk(server: TestServer): Promise<void> {
   }
   view = (await call("POST", `/api/drafts/${id}/finish`, { version: view.draft.version }, k)).json;
   await c.request("GET", `/api/drafts/${id}/pdf`, undefined, k);
-  await call("GET", `/api/drafts/${id}/sheet`, undefined, k);
+  const sheet = (await call("GET", `/api/drafts/${id}/sheet`, undefined, k)).json;
+
+  // Kept copies of the sheet and the play state.
+  const copies = `/api/drafts/${id}/sheet-copies`;
+  const kept = (await call("POST", copies, {}, k)).json;
+  await call("POST", copies, { name: "Mit Hausregeln", model: { ...sheet, name: "Mira" } }, k);
+  await call("GET", copies, undefined, k);
+  const copy = `${copies}/${kept.copy.id}`;
+  await call("GET", copy, undefined, k);
+  await call("PUT", copy, { version: 1, name: "Neu", model: kept.model }, k);
+  await call("PUT", copy, { version: 1, name: "Alt" }, k);
+  await call("GET", `${copies}/00000000-0000-4000-8000-000000000000`, undefined, k);
+  await call("DELETE", copy, undefined, k);
+  await call("GET", `/api/drafts/${id}/state`, undefined, k);
+  await call("PUT", `/api/drafts/${id}/state`, { version: 0, state: { a: 3, b: "x", c: { checks: 2 } } }, k);
+  await call("PUT", `/api/drafts/${id}/state`, { version: 0, state: {} }, k);
+  await call("PUT", `/api/drafts/${id}/state`, { version: 1, clearChecks: true }, k);
+
   await call("GET", "/api/drafts", undefined, k);
   view = (await call("POST", `/api/drafts/${id}/level-up`, { version: view.draft.version, level: 4 }, k))
     .json;

@@ -208,15 +208,27 @@ const isoDate = z.iso.datetime();
 
 /**
  * Which sheet this is: the original, made from the character as it is now,
- * or a copy the player kept (filled from part 4 of the sheet work on).
+ * or a copy the player kept. The original says when the character last
+ * changed and from which package version; a copy keeps both of the
+ * original it was made from. Any difference means "the original changed
+ * since", without comparing two models.
  */
 export const sheetOriginSchema = z.discriminatedUnion("kind", [
-  z.strictObject({ kind: z.literal("original"), level: z.number().int(), builtAt: isoDate }),
+  z.strictObject({
+    kind: z.literal("original"),
+    level: z.number().int(),
+    builtAt: isoDate,
+    packageVersion: z.string(),
+    /** When the character last changed in the builder; absent where nobody stores it (a test sheet). */
+    changedAt: isoDate.optional(),
+  }),
   z.strictObject({
     kind: z.literal("copy"),
     name: z.string(),
     createdAt: isoDate,
     fromLevel: z.number().int(),
+    fromPackageVersion: z.string(),
+    fromChangedAt: isoDate.optional(),
   }),
 ]);
 
