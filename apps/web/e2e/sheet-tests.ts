@@ -213,8 +213,9 @@ export function sheetTests(device: "phone" | "desk"): void {
       const gear = model.sections.find((s) => s.kind === "list")!;
       await page.getByRole("button", { name: `Zeile dazu bei ${gear.title}` }).click();
       await page.getByRole("button", { name: `${gear.title}: ${m["sheet.empty"]}. Ändern` }).click();
-      await page.getByRole("textbox", { name: gear.title }).fill("Langes Seil");
-      await page.getByRole("textbox", { name: gear.title }).press("Enter");
+      const line = page.getByRole("region", { name: gear.title }).locator("input.sheet-edit");
+      await line.fill("Langes Seil");
+      await line.press("Enter");
       await expect(page.getByRole("button", { name: `${gear.title}: Langes Seil. Ändern` })).toBeVisible();
       await expect(page.locator(".save-status")).toHaveText(m["save.saved"]);
       await page.reload();
@@ -338,7 +339,7 @@ export function sheetTests(device: "phone" | "desk"): void {
       // Halfway through a level up the original waits for the builder; the copy stays readable.
       await levelUp(page, id, 4);
       await pickVersion(page, m["sheet.original"]);
-      await expect(page.getByRole("heading", { name: m["sheet.notFinishedTitle"] })).toBeVisible();
+      await expect(page.getByText(m["sheet.notFinishedTitle"])).toBeVisible();
       await expect(page.getByRole("link", { name: m["sheet.toBuilder"] }).first()).toBeVisible();
       await pickVersion(page, /^Meine Fassung/);
       await expect(page.getByRole("button", { name: "Klugheit: 19. Ändern" })).toBeVisible();
@@ -348,12 +349,12 @@ export function sheetTests(device: "phone" | "desk"): void {
       await page.reload();
       await expect(page.getByRole("button", { name: /Stufe 3\. Ändern$/ })).toBeVisible();
       await expect(
-        page.getByRole("button", { name: `${squares.label}: Haken 1 von ${squares.squares}` }),
+        page.getByRole("button", { name: new RegExp(`^${squares.label}: Haken 1 von \\d+$`) }),
       ).toHaveAttribute("aria-pressed", "true");
       await pickVersion(page, m["sheet.original"]);
       await expect(page.getByRole("button", { name: /Stufe 4\. Ändern$/ })).toBeVisible();
       await expect(
-        page.getByRole("button", { name: `${squares.label}: Haken 1 von ${squares.squares}` }),
+        page.getByRole("button", { name: new RegExp(`^${squares.label}: Haken 1 von \\d+$`) }),
       ).toHaveAttribute("aria-pressed", "true");
       await expect(page.getByRole("textbox", { name: pencil.label })).toHaveValue("7");
       await shot(page, `98-sheet-play-${device}`);

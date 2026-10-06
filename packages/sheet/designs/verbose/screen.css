@@ -475,7 +475,8 @@
   .vsheet__title {
     display: flex;
     align-items: center;
-    height: var(--vs-title-h);
+    /* Grows only where a title to tap needs 24 px (WCAG 2.2). */
+    min-height: var(--vs-title-h);
     margin-bottom: 2mm;
     padding: 0 2mm;
     background: #ededed;

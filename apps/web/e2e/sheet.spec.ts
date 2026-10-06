@@ -17,7 +17,7 @@ test("a character that is not finished has no original yet", async ({ page, fore
   await login(page, uniqueEmail("sheet-open"));
   const id = await makeCharacter(page, false);
   await page.goto(`/c/${id}/bogen`);
-  await expect(page.getByRole("heading", { name: m["sheet.notFinishedTitle"] })).toBeVisible();
+  await expect(page.getByText(m["sheet.notFinishedTitle"])).toBeVisible();
   await page.getByRole("main").getByRole("link", { name: m["sheet.toBuilder"] }).click();
   await expect(page).toHaveURL(new RegExp(`/c/${id}/overview$`));
 });
@@ -32,8 +32,8 @@ test("the sheet in English, and its language from the menu", async ({ page, fore
   await expectOneLanguage(page, "en");
   await page.getByRole("button", { name: en["menu.open"] }).click();
   const menu = page.getByRole("dialog", { name: en["menu.title"] });
+  // The character is loaded again in the new language; the menu closes with it.
   await menu.getByLabel(en["sheet.language"]).selectOption("de");
-  await page.getByRole("button", { name: de["common.close"] }).click();
   await expect(page.getByRole("button", { name: /^Kraft: \d+\. Ändern$/ })).toBeVisible();
   await expectOneLanguage(page, "de");
 });

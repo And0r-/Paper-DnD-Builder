@@ -12,6 +12,8 @@
 
 .sheet-screen {
   display: grid;
+  /* As wide as the screen: a wide table scrolls in its section instead. */
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-4);
 }
 
