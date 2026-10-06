@@ -31,8 +31,31 @@ export function stepsSignature(entries: readonly FlowEntry[]): string {
   return entries.map((e) => `${e.key}:${e.choices.length}`).join("|");
 }
 
+/**
+ * Whether the parts of a step are worth a mark, given its first entry and
+ * the side it stands on: parts a step without an answer has only by its
+ * suggestion are not (AND-100).
+ */
+export type PartsAsked = (head: FlowEntry, side: "before" | "after") => boolean;
+
+/**
+ * Parts are worth a mark once the player answered their step, or when the
+ * step gathers its parts by level (it has a name of its own).
+ */
+export function answeredParts(answers: {
+  before: Readonly<Record<string, unknown>>;
+  after: Readonly<Record<string, unknown>>;
+}): PartsAsked {
+  return (head, side) =>
+    head.sectionTitle !== undefined || head.choices.some((c) => answers[side][c] !== undefined);
+}
+
 /** The change from `before` to `after`, or null if the same steps stand in both. */
-export function stepChange(before: readonly FlowEntry[], after: readonly FlowEntry[]): StepChange | null {
+export function stepChange(
+  before: readonly FlowEntry[],
+  after: readonly FlowEntry[],
+  asked: PartsAsked = () => true,
+): StepChange | null {
   const was = new Map(before.map((e) => [e.key, e]));
   const now = new Map(after.map((e) => [e.key, e]));
   const added = new Set(
@@ -73,8 +96,19 @@ export function stepChange(before: readonly FlowEntry[], after: readonly FlowEnt
     gone.push({ key: e.key, title: e.title, whole: false, section, after: inSection });
   }
   const left = gone.filter((g) => !takeSameTitle(g, after, was, added));
-  if (added.size === 0 && left.length === 0) return null;
-  return { added, gone: left };
+  // Parts of a step the player has not answered come and go with the suggestion: not marked.
+  for (const key of added) {
+    const e = now.get(key)!;
+    const head = after.find((x) => x.section === e.section)!;
+    if (was.has(head.key) && !asked(head, "after")) added.delete(key);
+  }
+  const shown = left.filter((g) => {
+    if (g.whole) return true;
+    const head = before.find((x) => x.section === was.get(g.key)!.section)!;
+    return asked(head, "before");
+  });
+  if (added.size === 0 && shown.length === 0) return null;
+  return { added, gone: shown };
 }
 
 /**
