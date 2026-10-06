@@ -33,3 +33,9 @@ fromLevel, fromPackageVersion, fromChangedAt? }`, the same facts of the
 The builder's own words ("played by", "page 1 of 2") are in
 `src/messages.ts`; a language without an entry there has no sheet, rather
 than one mixed with another language.
+
+**Designs** (`designs/`): the geometry of each sheet design as plain data
+(`@builder/sheet/designs/verbose`: page, margins, twelve columns, gaps,
+type sizes), with grid helpers in `@builder/sheet/designs`. The PDF
+painter in [`@builder/print`](../print) and the screen read the same
+file, so a box is the same size on paper and on screen.

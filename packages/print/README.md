@@ -4,7 +4,16 @@ The printed character: the character sheet (A4) followed by cards
 (63 × 88 mm, nine per A4 page, with cut lines and crop marks), as one PDF
 made on the server.
 
-- `renderPdf(model)` — lays out a sheet model and returns the PDF bytes.
+- `renderPdf(model, { parts, design, play })` — lays out a sheet model
+  (the original or a kept copy) and returns the PDF bytes: the parts asked
+  for, the sheet in its design, the play state written into the fields if
+  given. `fields` in the result lists every field drawn, in order, with
+  what went into it.
+
+Files: `pen.ts` (drawing in millimetres, text, use boxes; shared),
+`verbose.ts` (the verbose sheet on the grid of
+`@builder/sheet/designs/verbose`), `render.ts` (cards, rules texts, the
+document).
 
 The model comes from [`@builder/sheet`](../sheet) (`buildSheetModel`):
 everything that goes on paper, as plain strings in exactly one language,
