@@ -330,7 +330,15 @@ function ReadyDraft({
       // it speaks exactly when "Step x of y" or "Part x of y" changes.
       const before = evaluateDraft(pkg, plannedDraft(lp, docRef.current));
       const after = evaluateDraft(pkg, plannedDraft(lp, r.doc));
-      const diff = planDiff(buildFlow("", lp, before, t), buildFlow("", lp, after, t));
+      // Parts of a step are said only once the player answered it, or when the
+      // step gathers its parts by level: not those a suggestion brings (AND-100).
+      const given = { before: docRef.current, after: r.doc };
+      const diff = planDiff(
+        buildFlow("", lp, before, t),
+        buildFlow("", lp, after, t),
+        (head, side) =>
+          head.sectionTitle !== undefined || head.choices.some((c) => given[side].answers[c] !== undefined),
+      );
       const grown = stepDiff(before, after).grown.map((s) => stepTitle(lp, after, s));
       if (
         diff.added.length > 0 ||

@@ -41,6 +41,7 @@ Every feature of format 0.10 is used at least once (see
 | Text variants           | `talents-*`: hillfolk (tag `bonus-talent`) pick one more; `textVariants` and `{{var:count}}`                                    |
 | What the character has  | `handling-river-runner` (`held`): `things/handling.json` are `about` items the character has                                    |
 | Step condition          | step `handling-river-runner` has `when: has('calling.river-runner')`                                                            |
+| Same name, other key    | steps `handling-river-runner` and `handling-herbalist` share the title "Handling": a calling change keeps the step in the list  |
 | Gather steps            | `paths` (each choice its own step), `talents` (`list`), `knacks` (`sections`), `equipment`                                      |
 | One shared list         | `talents`: calling, folk (coastfolk, overlapping list) and level 2; upbringing talents held                                     |
 

@@ -228,7 +228,7 @@ describe("cross-file rules", () => {
     [
       "choice both fixed and granted",
       (f) => f.get("flow.json").steps.push({ id: "gear", choices: ["gear"] }),
-      'flow.json steps[15].choices[0]: choice "gear" is granted by "calling.herbalist" and cannot also be a fixed step',
+      'flow.json steps[16].choices[0]: choice "gear" is granted by "calling.herbalist" and cannot also be a fixed step',
     ],
     [
       "card without layout",
@@ -474,7 +474,7 @@ describe("gather", () => {
         gatherKnacks(f);
         f.get("flow.json").steps.push({ id: "knacks-again", gather: "knacks" });
       },
-      'flow.json steps[15].gather: group "knacks" is already gathered in step "knacks"',
+      'flow.json steps[16].gather: group "knacks" is already gathered in step "knacks"',
     ],
     [
       "a list step with a choice that is not picked from a list",
@@ -507,7 +507,7 @@ describe("gather", () => {
     [
       "a gather step without choices",
       (f) => f.get("flow.json").steps.push({ id: "spare", gather: "spare" }),
-      'flow.json steps[15].gather: no choice is gathered in group "spare"; the step is never shown',
+      'flow.json steps[16].gather: no choice is gathered in group "spare"; the step is never shown',
     ],
   ])("warns about %s", (_name, change, expected) => {
     expect(messages(mutate(change), "warnings")).toContain(expected);
