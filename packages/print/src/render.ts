@@ -1,5 +1,5 @@
 /**
- * Lays out a {@link PrintModel} on A4 and writes the PDF.
+ * Lays out a {@link SheetModel} on A4 and writes the PDF.
  *
  * All measures are in millimetres and follow the print layout spec (12 mm
  * margins, a 12-column grid, 63 × 88 mm cards in a 3 × 3 grid with cut lines
@@ -10,8 +10,16 @@
  */
 import { fileURLToPath } from "node:url";
 import PDFDocument from "pdfkit";
-import type { Messages } from "./messages.ts";
-import type { Card, PrintModel, RowGroup, SheetSection, StatBox, Uses } from "./model.ts";
+import {
+  MESSAGES,
+  type Card,
+  type Messages,
+  type RowGroup,
+  type SheetModel,
+  type SheetSection,
+  type StatBox,
+  type Uses,
+} from "@builder/sheet";
 
 const PT_PER_MM = 72 / 25.4;
 /** Size of one typographic point in millimetres. */
@@ -1151,8 +1159,8 @@ function cardFaces(pen: Pen, card: Card, messages: Messages): CardFace[] {
   );
 }
 
-function drawCard(pen: Pen, face: CardFace, model: PrintModel, x: number, y: number): void {
-  const m = model.messages;
+function drawCard(pen: Pen, face: CardFace, model: SheetModel, x: number, y: number): void {
+  const m = pen.messages;
   const left = x + CARD_PAD;
   pen.rect(x, y, CARD_W, CARD_H, { stroke: "#999", width: 0.3 });
   pen.text(face.typeLine, left, y + CARD_PAD + 3.8, pen.fit(face.typeLine, S.cardType, CARD_INNER_W));
@@ -1224,7 +1232,13 @@ export interface RenderedPdf {
 }
 
 /** The character sheet followed by the cards, as one A4 PDF. */
-export async function renderPdf(model: PrintModel): Promise<RenderedPdf> {
+export async function renderPdf(model: SheetModel): Promise<RenderedPdf> {
+  const m = MESSAGES[model.language];
+  if (!m) throw new Error(`no page words in "${model.language}"`);
+  // The PDF is dated like the sheet: the original when it was made, a copy when it was kept.
+  const createdAt = new Date(
+    model.origin.kind === "original" ? model.origin.builtAt : model.origin.createdAt,
+  );
   const fonts: Record<FontName, string> = {
     regular: fileURLToPath(FONTS.regular),
     semibold: fileURLToPath(FONTS.semibold),
@@ -1244,8 +1258,8 @@ export async function renderPdf(model: PrintModel): Promise<RenderedPdf> {
       Title: model.name,
       Creator: "Character Builder",
       Producer: "Character Builder",
-      CreationDate: model.createdAt,
-      ModDate: model.createdAt,
+      CreationDate: createdAt,
+      ModDate: createdAt,
     },
   });
   const chunks: Buffer[] = [];
@@ -1255,8 +1269,7 @@ export async function renderPdf(model: PrintModel): Promise<RenderedPdf> {
     doc.on("error", reject);
   });
 
-  const pen = new Pen(doc, model.language, model.messages, fonts);
-  const m = model.messages;
+  const pen = new Pen(doc, model.language, m, fonts);
 
   // The source and license line is wrapped, never cut; on the sheet it needs
   // room above the footer if the sheet's last page is the document's last.

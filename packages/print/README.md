@@ -4,17 +4,14 @@ The printed character: the character sheet (A4) followed by cards
 (63 × 88 mm, nine per A4 page, with cut lines and crop marks), as one PDF
 made on the server.
 
-- `buildPrintModel(pkg, draft, { language, units })` — everything that goes
-  on paper, as plain strings in exactly one language, with every quantity
-  converted by the package's unit tables. This is the only place that reads
-  package texts, so "one language per document" is decided here.
-- `renderPdf(model)` — lays the model out and returns the PDF bytes.
+- `renderPdf(model)` — lays out a sheet model and returns the PDF bytes.
 
-The package says what goes where (`sheet.json`, see the format SPEC,
-section 13); this module owns the visual design and knows nothing about
-any game. Its own words on paper ("page 1 of 2", "played by") are in
-`src/messages.ts`; a language without an entry there cannot be printed,
-rather than being mixed with another one.
+The model comes from [`@builder/sheet`](../sheet) (`buildSheetModel`):
+everything that goes on paper, as plain strings in exactly one language,
+with every quantity converted by the package's unit tables. This package
+never reads the package itself; it only places what the model says. The
+package says what goes where (`sheet.json`, see the format SPEC, section
+13); this module owns the visual design and knows nothing about any game.
 
 **Why pdfkit.** The layout is a fixed grid measured in millimetres, and the
 cards need exact sizes and crop marks. Drawing the PDF directly gives exact

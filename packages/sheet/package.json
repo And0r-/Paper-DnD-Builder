@@ -1,0 +1,24 @@
+{
+  "name": "@builder/sheet",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The character sheet as plain data in one language and one set of units: shared by screen, PDF and stored copies.",
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./cards": "./src/cards.ts",
+    "./testing": "./src/testing.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p ."
+  },
+  "dependencies": {
+    "@builder/core": "workspace:*",
+    "@builder/format": "workspace:*",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@builder/demo-package": "workspace:*"
+  }
+}

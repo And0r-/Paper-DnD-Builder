@@ -1,13 +1,15 @@
 /**
- * What goes on paper, in one language and one set of units.
+ * The character sheet, in one language and one set of units.
  *
- * `buildPrintModel` turns a package, a draft and the reader's settings into
+ * `buildSheetModel` turns a package, a draft and the reader's settings into
  * plain strings and numbers: every text is looked up in the reader's
- * language, every quantity converted by the package's tables. The layout
- * (render.ts) only places what is here; it never looks at the package. So
- * "no other language on the page" is decided in this one file.
+ * language, every quantity converted by the package's tables, every
+ * condition decided. Screen, PDF and stored copies only show what is here;
+ * none of them looks at the package. So "no other language on the sheet"
+ * is decided in this one file.
  */
 import {
+  dependentValues,
   evaluateCondition,
   evaluateDraft,
   evaluationScope,
@@ -32,145 +34,49 @@ import {
   type StatValue,
   type Thing,
 } from "@builder/format/pure";
+import type { z } from "zod";
 import { isCard } from "./cards.ts";
-import { MESSAGES, type Messages } from "./messages.ts";
+import { MESSAGES } from "./messages.ts";
+import type {
+  cardSchema,
+  featureRowSchema,
+  figureSchema,
+  rowGroupSchema,
+  rulesGroupSchema,
+  sheetModelSchema,
+  sheetOriginSchema,
+  sheetSectionSchema,
+  sheetValueSchema,
+  statBoxSchema,
+  usesSchema,
+} from "./schema.ts";
 
-export interface PrintSettings {
+export interface SheetSettings {
   language: string;
   /** Unit per dimension from the account; missing dimensions follow the language. */
   units?: Readonly<Record<string, string>>;
-  /** Date printed in the footer and stored in the PDF. */
+  /** When the sheet is made: printed in the footer and stored in the PDF. */
   createdAt?: Date;
 }
 
-export interface StatBox {
-  label: string;
-  style: "number" | "pencil" | "circles" | "boxes";
-  /** The big number, with unit if it has one ("9 m"), or the box's own text ("5 × d10"); "" for none. */
-  text: string;
-  /** Circles to tick (`circles`). */
-  circles: number;
-  /** Squares to tick (`boxes`). */
-  squares: number;
-  hint: string;
-}
+export type StatBox = z.infer<typeof statBoxSchema>;
+export type Figure = z.infer<typeof figureSchema>;
+export type Uses = z.infer<typeof usesSchema>;
+export type SheetSection = z.infer<typeof sheetSectionSchema>;
+export type RowGroup = z.infer<typeof rowGroupSchema>;
+export type FeatureRow = z.infer<typeof featureRowSchema>;
+export type Card = z.infer<typeof cardSchema>;
+export type SheetValue = z.infer<typeof sheetValueSchema>;
+export type RulesGroup = z.infer<typeof rulesGroupSchema>;
+export type SheetOrigin = z.infer<typeof sheetOriginSchema>;
+export type SheetModel = z.infer<typeof sheetModelSchema>;
 
 /** Most squares a `boxes` box draws; a larger value is printed as a number instead. */
 export const MAX_SQUARES = 24;
 
-/** A number on paper and, small under it, where it comes from ("Grace +2 · Practice +2"); "" if nothing to say. */
-export interface Figure {
-  text: string;
-  parts: string;
-}
-
-/**
- * Use boxes (SPEC 13 `uses`): n boxes to tick, a word like "always", or nothing.
- * More than MAX_USE_BOXES do not fit a row: then the number is printed with a field to write what is left.
- */
-export type Uses = { boxes: number } | { count: number } | { text: string } | null;
-
 export const MAX_USE_BOXES = 12;
 
-export type SheetSection = { id: string; span: number; title: string; hint: string } & (
-  | {
-      kind: "header";
-      name: string;
-      summary: string;
-      packageName: string;
-      /** Answers under the summary line ("Folk: Fenfolk"); empty text for an open choice. */
-      fields: { label: string; text: string }[];
-    }
-  | { kind: "statBoxes"; boxes: StatBox[] }
-  | {
-      kind: "scoreColumn";
-      scores: {
-        label: string;
-        value: string;
-        derivedLabel: string;
-        derived: string | null;
-        /** A further number made with the score, small beside it. */
-        extra?: { label: string; value: string } | null;
-      }[];
-    }
-  | {
-      kind: "checkList";
-      /**
-       * `total`: the number in the box; empty text for a box to fill in by hand.
-       * `strong`: marked a second time (a thing of the section's `strong` is about it).
-       */
-      items: { name: string; marked: boolean; strong?: boolean; note: string; total: Figure }[];
-      /** What ◉ means (`strongLegend`), if a row is marked twice; else empty. */
-      legend: string[];
-    }
-  | {
-      kind: "statTable";
-      columns: string[];
-      /** Per column: text that takes the room left and wraps. */
-      wrap?: boolean[];
-      rows: { name: string; cells: string[] }[];
-    }
-  | {
-      kind: "featureTable";
-      /** Sentences above the rows (`lead`). */
-      lead: string[];
-      rows: FeatureRow[];
-      /** What the marks on the rows mean: "C = …", one entry per mark that is on a row. */
-      legend: string[];
-    }
-  | { kind: "list"; items: string[]; blankLines: number }
-  | { kind: "answers"; rows: { label: string; text: string }[] }
-  | { kind: "helpBox"; paragraphs: string[] }
-  | { kind: "notes"; lines: number }
-);
-
-/** A group of rows under one heading (`byRank`): rows of the same group follow each other. */
-export interface RowGroup {
-  key: string;
-  title: string;
-  hint: string;
-}
-
-export interface FeatureRow {
-  name: string;
-  /** The row's mark signs, in the package's order, joined by spaces; "" for none. */
-  marks: string;
-  /** The `note` stat, small under the name; "" for none. */
-  note?: string;
-  text: string;
-  uses: Uses;
-  group: RowGroup | null;
-}
-
-export interface Card {
-  typeLine: string;
-  name: string;
-  fields: { label: string; value: string }[];
-  table: string;
-  rules: string[];
-  uses: Uses;
-  /** The kind's hint (`card.<kind>.hint`), printed above the footer of every card; "" for none. */
-  hint: string;
-}
-
-export interface PrintModel {
-  language: string;
-  messages: Messages;
-  name: string;
-  /** "Stufe 3" / "Level 3". */
-  levelLabel: string;
-  packageName: string;
-  /** "Einheiten: Meter, Kilogramm". */
-  unitsLine: string;
-  attribution: string;
-  createdAt: Date;
-  /** Formatted for the footer, in the reader's language. */
-  createdOn: string;
-  sections: SheetSection[];
-  cards: Card[];
-}
-
-export class PrintError extends Error {
+export class SheetError extends Error {
   readonly code: "languageNotSupported";
   constructor(code: "languageNotSupported", message: string) {
     super(message);
@@ -214,24 +120,30 @@ export function firstSentence(s: string, language: string): string {
   return (m ? m[0] : s).trim();
 }
 
-/** Languages a package can be printed in: it has texts for them and the builder has page words. */
-export function printLanguages(pkg: ContentPackage): string[] {
+/** Languages a sheet of the package can be made in: it has texts for them and the builder has page words. */
+export function sheetLanguages(pkg: ContentPackage): string[] {
   return pkg.manifest.languages.filter((l) => l in MESSAGES && pkg.texts[l] !== undefined);
 }
 
-export function buildPrintModel(
+/**
+ * Where a field is: package keys joined by "/", which no key contains.
+ * "sheet/<section>/<value or thing>/<what>" or "cards/<thing>/uses".
+ */
+const fieldId = (...keys: string[]): string => keys.join("/");
+
+export function buildSheetModel(
   pkg: ContentPackage,
   doc: DraftDocument,
-  settings: PrintSettings,
+  settings: SheetSettings,
   evaluation: Evaluation = evaluateDraft(pkg, doc),
-): PrintModel {
+): SheetModel {
   const language = settings.language;
   const messages = MESSAGES[language];
   const texts = pkg.texts[language];
   if (!messages || !texts || !pkg.manifest.languages.includes(language)) {
-    throw new PrintError(
+    throw new SheetError(
       "languageNotSupported",
-      `cannot print package "${pkg.manifest.id}" in "${language}"`,
+      `cannot make a sheet of package "${pkg.manifest.id}" in "${language}"`,
     );
   }
   const ev = evaluation;
@@ -297,6 +209,8 @@ export function buildPrintModel(
     if (typeof v === "object" && "text" in v) return { text: text(v.text) };
     return null;
   };
+  /** Uses that are ticked or counted down by hand; a word ("always") is only read. */
+  const counts = (u: Uses): boolean => u !== null && !("text" in u);
   const list = new Intl.ListFormat(language, { type: "conjunction" });
   const partLabel = (source: PartSource): string => {
     switch (source.kind) {
@@ -407,6 +321,8 @@ export function buildPrintModel(
   );
   const createdAt = settings.createdAt ?? new Date();
 
+  /** A value without a name of its own is called after the sheet row that shows it (a talent's total). */
+  const shownAs = new Map<string, string>();
   const section = (s: Section): SheetSection => {
     const base = {
       id: s.id,
@@ -422,6 +338,7 @@ export function buildPrintModel(
           name,
           summary: text("summary.line", lineVars),
           packageName,
+          playedByField: fieldId("sheet", s.id, "playedBy"),
           fields: (s.fields ?? []).map((f) =>
             "choice" in f
               ? { label: text(f.label ?? `choice.${f.choice}.title`), text: answerText(f.choice) }
@@ -433,14 +350,22 @@ export function buildPrintModel(
                 },
           ),
         };
-      case "statBoxes":
+      case "statBoxes": {
+        // Two boxes of one value in a section are told apart by their place among the package's boxes, not the shown ones.
+        const field = (b: (typeof s.boxes)[number]): string => {
+          const same = s.boxes.filter((x) => x.value === b.value);
+          return same.length > 1
+            ? fieldId("sheet", s.id, b.value, String(same.indexOf(b) + 1))
+            : fieldId("sheet", s.id, b.value);
+        };
         return {
           ...base,
           kind: "statBoxes",
-          boxes: s.boxes.filter(shown).map((b) => {
+          boxes: s.boxes.filter(shown).map((b): StatBox => {
             const n = Math.max(0, Math.round(valueOf(b.value)));
             const squares = b.style === "boxes" && n <= MAX_SQUARES ? n : 0;
             return {
+              valueId: b.value,
               label: b.label !== undefined ? text(b.label) : valueLabel(b.value),
               style: b.style,
               // Squares say how many on their own; too many to draw, the number says it.
@@ -453,16 +378,20 @@ export function buildPrintModel(
               circles: b.style === "circles" ? Math.min(12, n) : 0,
               squares,
               hint: b.style === "pencil" ? messages.startValue(valueText(b.value)) : valueHint(b.value),
+              ...(b.style === "number" ? {} : { field: field(b) }),
             };
           }),
         };
+      }
       case "scoreColumn":
         return {
           ...base,
           kind: "scoreColumn",
           scores: s.scores.map((sc) => ({
+            valueId: sc.value,
             label: valueLabel(sc.value),
             value: valueText(sc.value),
+            ...(sc.derived ? { derivedId: sc.derived } : {}),
             derivedLabel: sc.derived ? valueLabel(sc.derived) : "",
             derived: sc.derived ? signed.format(valueOf(sc.derived)) : null,
             extra: sc.extra
@@ -480,7 +409,10 @@ export function buildPrintModel(
         const items = selectThings(pkg, s.things).map((t) => {
           const note = s.note === undefined ? undefined : t.stats?.[s.note];
           const total = s.total === undefined ? undefined : t.stats?.[s.total];
+          const byHand = !(typeof total === "object" && "value" in total);
+          if (!byHand && !shownAs.has(total.value)) shownAs.set(total.value, thingName(t.id));
           return {
+            id: t.id,
             name: thingName(t.id),
             marked: held.has(t.id),
             strong: held.has(t.id) && strong.has(t.id),
@@ -490,6 +422,7 @@ export function buildPrintModel(
               typeof total === "object" && "value" in total
                 ? figure(total.value, true)
                 : { text: "", parts: "" },
+            ...(byHand ? { field: fieldId("sheet", s.id, t.id, "total") } : {}),
           };
         });
         return {
@@ -553,12 +486,15 @@ export function buildPrintModel(
           const rank = s.byRank ? t.rank : undefined;
           const from = originOf.get(t.id);
           const note = s.note === undefined ? undefined : t.stats?.[s.note];
+          const rowUses = uses(t, s.uses);
           return {
+            id: t.id,
             name: thingName(t.id),
             marks: on.map((i) => text(signs[i]!.text)).join(" "),
             note: note === undefined ? "" : statText(note),
             text: text(`${t.id}.short`),
-            uses: uses(t, s.uses),
+            uses: rowUses,
+            ...(counts(rowUses) ? { usesField: fieldId("sheet", s.id, t.id, "uses") } : {}),
             group:
               from !== undefined
                 ? { key: `origin-${from}`, title: thingName(from), hint: "" }
@@ -595,6 +531,7 @@ export function buildPrintModel(
           kind: "list",
           items: heldOf(s.things).map((t) => counted(t.id)),
           blankLines: s.blankLines,
+          ...(s.blankLines > 0 ? { field: fieldId("sheet", s.id, "lines") } : {}),
         };
       case "answers":
         return {
@@ -608,7 +545,7 @@ export function buildPrintModel(
       case "helpBox":
         return { ...base, kind: "helpBox", paragraphs: paragraphs(`sheet.${s.id}.text`) };
       case "notes":
-        return { ...base, kind: "notes", lines: s.lines };
+        return { ...base, kind: "notes", lines: s.lines, field: fieldId("sheet", s.id, "notes") };
     }
   };
 
@@ -650,42 +587,120 @@ export function buildPrintModel(
     .filter(({ t }) => isCard(pkg, t))
     .map(({ h, t }) => ({ t, step: stepIndex.get(h.step) ?? 0, name: thingName(t.id) }))
     .sort((a, b) => a.step - b.step || (a.t.rank ?? 0) - (b.t.rank ?? 0) || collator.compare(a.name, b.name))
-    .map(({ t, name: cardName }) => ({
-      typeLine: text(`card.${t.kind}.typeLine`, {
-        kind: text(`kind.${t.kind}.name`),
-        rank: t.rank ?? 0,
-        level: ev.level,
-      }),
-      name: cardName,
-      fields: pkg.sheet.cards[t.kind]!.fields.map((f) => ({
-        label: text(`stat.${f}.name`),
-        value: statText(t.stats?.[f]),
-      })),
-      table: text(`${t.id}.explain.table`) || text(`${t.id}.short`),
-      rules: paragraphs(`${t.id}.rules`),
-      uses: uses(t, pkg.sheet.cards[t.kind]!.uses),
-      hint: text(`card.${t.kind}.hint`),
+    .map(({ t, name: cardName }): Card => {
+      const cardUses = uses(t, pkg.sheet.cards[t.kind]!.uses);
+      return {
+        id: t.id,
+        typeLine: text(`card.${t.kind}.typeLine`, {
+          kind: text(`kind.${t.kind}.name`),
+          rank: t.rank ?? 0,
+          level: ev.level,
+        }),
+        name: cardName,
+        fields: pkg.sheet.cards[t.kind]!.fields.map((f) => ({
+          label: text(`stat.${f}.name`),
+          value: statText(t.stats?.[f]),
+        })),
+        table: text(`${t.id}.explain.table`) || text(`${t.id}.short`),
+        rules: paragraphs(`${t.id}.rules`),
+        uses: cardUses,
+        ...(counts(cardUses) ? { usesField: fieldId("cards", t.id, "uses") } : {}),
+        hint: text(`card.${t.kind}.hint`),
+      };
+    });
+
+  // A box row whose boxes are all hidden would be a bare title.
+  const sections = pkg.sheet.sections
+    .filter(shown)
+    .map(section)
+    .filter(
+      (s) => (s.kind !== "statBoxes" || s.boxes.length > 0) && (s.kind !== "answers" || s.rows.length > 0),
+    );
+
+  // "These depend on it": only values with a name, or on the sheet under one, can be told to a player.
+  const dependents = dependentValues(pkg, ev);
+  const nameOf = (id: string): string => valueLabel(id) || (shownAs.get(id) ?? "");
+  const values: SheetValue[] = ["level", ...pkg.values.map((v) => v.id)]
+    .filter((id) => nameOf(id) !== "")
+    .map((id) => ({
+      id,
+      label: nameOf(id),
+      text: valueText(id),
+      dependents: (dependents[id] ?? [])
+        .filter((d) => nameOf(d) !== "")
+        .map((d) => ({ id: d, label: nameOf(d) })),
     }));
 
+  // The full texts of every thing in a table or on a card, grouped by what brought it, in step order.
+  const onSheet = new Set([
+    ...sections.flatMap((s) => (s.kind === "featureTable" ? s.rows.map((r) => r.id) : [])),
+    ...cards.map((c) => c.id),
+  ]);
+  const rulesTexts: RulesGroup[] = [];
+  for (const h of ev.things) {
+    if (!onSheet.has(h.id)) continue;
+    const from = origin(h.id);
+    let group = rulesTexts.find((g) => g.origin === from);
+    if (group === undefined) {
+      group = { origin: from, title: thingName(from), entries: [] };
+      rulesTexts.push(group);
+    }
+    group.entries.push({
+      id: h.id,
+      name: thingName(h.id),
+      kindName: text(`kind.${h.kind}.name`),
+      rules: paragraphs(`${h.id}.rules`),
+      explain: ["what", "table", "example"].map((k) => text(`${h.id}.explain.${k}`)).filter((p) => p !== ""),
+    });
+  }
+
   return {
+    version: 1,
     language,
-    messages,
+    origin: { kind: "original", level: ev.level, builtAt: createdAt.toISOString() },
+    packageId: pkg.manifest.id,
     name,
+    level: ev.level,
     levelLabel,
     packageName,
+    units,
     unitsLine,
     attribution: text("sheet.attribution"),
-    createdAt,
     createdOn: messages.createdOn(
       new Intl.DateTimeFormat(language, { dateStyle: "medium" }).format(createdAt),
     ),
-    // A box row whose boxes are all hidden would be a bare title.
-    sections: pkg.sheet.sections
-      .filter(shown)
-      .map(section)
-      .filter(
-        (s) => (s.kind !== "statBoxes" || s.boxes.length > 0) && (s.kind !== "answers" || s.rows.length > 0),
-      ),
+    sections,
     cards,
+    values,
+    rulesTexts,
   };
+}
+
+/** Every field of a sheet, in the order they are on it: sheet first, then the cards. */
+export function sheetFields(model: Pick<SheetModel, "sections" | "cards">): string[] {
+  const out: string[] = [];
+  for (const s of model.sections) {
+    switch (s.kind) {
+      case "header":
+        if (s.playedByField) out.push(s.playedByField);
+        break;
+      case "statBoxes":
+        for (const b of s.boxes) if (b.field) out.push(b.field);
+        break;
+      case "checkList":
+        for (const i of s.items) if (i.field) out.push(i.field);
+        break;
+      case "featureTable":
+        for (const r of s.rows) if (r.usesField) out.push(r.usesField);
+        break;
+      case "list":
+      case "notes":
+        if (s.field) out.push(s.field);
+        break;
+      default:
+        break;
+    }
+  }
+  for (const c of model.cards) if (c.usesField) out.push(c.usesField);
+  return out;
 }
