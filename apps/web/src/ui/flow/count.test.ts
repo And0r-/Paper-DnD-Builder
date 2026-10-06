@@ -47,7 +47,7 @@ interface Screen {
   part: number;
   parts: number;
   percent: number;
-  /** Total or parts changed on the way to this screen (up or down). */
+  /** Total or parts changed on the way to this screen (up or down); a step that showed no part count may show one on its second part. */
   changed: boolean;
 }
 
@@ -73,7 +73,8 @@ function walk(lp: LoadedPackage, start: DraftDocument, picks: Record<string, str
       percent: Math.round(progressFraction(entries, entry) * 100),
       changed:
         before !== undefined &&
-        (p.total !== before.total || (p.current === before.current && p.parts !== before.parts)),
+        (p.total !== before.total ||
+          (p.current === before.current && before.parts > 1 && p.parts !== before.parts)),
     };
     screens.push(screen);
     before = screen;
@@ -114,6 +115,32 @@ const external = process.env["WALK_PACKAGE_DIR"];
 
 describe.skipIf(external !== undefined)("step count on the demo package", async () => {
   const lp = await load(DEMO_PACKAGE_DIR);
+  // The plan gives an open step the parts of its suggestion: before the
+  // player picks, "Part 1 of 2" would count a part another pick does not
+  // bring (AND-189). The first part counts none until the parts are there.
+  it("shows no part count on an open step whose parts only the plan has", () => {
+    let doc = start(lp, 5);
+    const pick = applyChange(lp.pkg, doc, {
+      type: "answer",
+      choice: "calling",
+      answer: { pick: "calling.lantern-bearer" },
+    });
+    if (!pick.ok) throw new Error("calling");
+    doc = pick.doc;
+    const at = (key: string) => {
+      const { entries } = flowOf("x", lp, doc, evaluateDraft(lp.pkg, doc), t);
+      const entry = entries.find((e) => e.key === key)!;
+      return { planned: entry.count?.parts, ...positionOf(entries, entry) };
+    };
+    expect(at("boon-4")).toMatchObject({ planned: 2, part: 1, parts: 1 });
+    for (const c of chooseForMe(lp, doc, evaluateDraft(lp.pkg, doc), "boon-4", () => 0) ?? []) {
+      const r = applyChange(lp.pkg, doc, c);
+      if (r.ok) doc = r.doc;
+    }
+    expect(at("boon-4")).toMatchObject({ part: 1, parts: 2 });
+    expect(at("boon-raise@boon-4")).toMatchObject({ part: 2, parts: 2 });
+  });
+
   for (const level of [1, 5, 20]) {
     it(`never changes on the recommended way, level ${level}`, () => {
       const screens = walk(lp, start(lp, level));

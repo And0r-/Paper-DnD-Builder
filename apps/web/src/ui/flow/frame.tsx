@@ -416,14 +416,15 @@ function MenuMark({ change }: { change: ShownChange | null }) {
 /**
  * Green for a moment when a count grows, red when it shrinks: "Step 3 of
  * 12" says the change in the same colours as the step list, also on
- * phones, where the list is shut in the menu.
+ * phones, where the list is shut in the menu. A count of 0 is not shown:
+ * a count that comes or goes is not marked.
  */
 function useCountMark(count: number): "new" | "lost" | undefined {
   const [seen, setSeen] = useState(count);
   const [mark, setMark] = useState<"new" | "lost" | undefined>(undefined);
   if (seen !== count) {
     setSeen(count);
-    setMark(count > seen ? "new" : "lost");
+    if (seen > 0 && count > 0) setMark(count > seen ? "new" : "lost");
   }
   useEffect(() => {
     if (!mark) return;
@@ -443,7 +444,8 @@ export function ProgressHeader({ entry }: { entry: FlowEntry }) {
   const inFlow = entries.some((e) => e.key === entry.key);
   const pos = positionOf(entries, entry);
   const totalMark = useCountMark(pos.total);
-  const partsMark = useCountMark(pos.parts);
+  // A step that shows no part count yet (AND-189) gets one without a mark on its second part.
+  const partsMark = useCountMark(pos.parts > 1 ? pos.parts : 0);
   // An earlier step opened from the overview during a level up: no count, it is not one of the new questions.
   if (!inFlow) {
     return (
