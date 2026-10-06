@@ -432,6 +432,26 @@ const sectionBase = {
 };
 const statKey = z.string().regex(VALUE_ID_PATTERN, "stat keys are camelCase");
 
+/**
+ * A sign on rows of a `featureTable`. `tags`: the thing carries them all.
+ * `how`: it was picked in a choice or granted by another thing. `from`: the
+ * thing behind it (the thing that granted it, or that granted the choice it
+ * was picked in) is one of these.
+ */
+export const markSchema = z
+  .strictObject({
+    /** The sign, a letter or two. */
+    text: textKey,
+    /** What the sign means, in the legend under the table. */
+    legend: textKey,
+    tags: z.array(id).min(1).optional(),
+    how: z.enum(["picked", "granted"]).optional(),
+    from: optionSourceSchema.optional(),
+  })
+  .refine((m) => m.tags !== undefined || m.how !== undefined || m.from !== undefined, {
+    message: 'a mark needs "tags", "how" or "from"',
+  });
+
 export const sectionSchema = z.discriminatedUnion("kind", [
   z.strictObject({ ...sectionBase, kind: z.literal("header") }),
   z.strictObject({
@@ -471,6 +491,15 @@ export const sectionSchema = z.discriminatedUnion("kind", [
     things: optionSourceSchema,
     /** Stat that gives the use boxes: a whole number n draws n boxes, a {text} stat prints the text. */
     uses: statKey.optional(),
+    /** Rows grouped by the things' `rank`, lowest first, each group under its rank's name. */
+    byRank: z.boolean().optional(),
+    /**
+     * Short signs next to a row's name, explained in a legend under the table.
+     * A mark is on every row whose thing matches all its fields.
+     */
+    marks: z.array(markSchema).min(1).optional(),
+    /** A sentence above the rows per held thing selected by `things`: the text `<thing>.<text>`, if it exists. */
+    lead: z.strictObject({ things: optionSourceSchema, text: textKey }).optional(),
   }),
   z.strictObject({
     ...sectionBase,
@@ -544,6 +573,7 @@ export type Step = Flow["steps"][number];
 export type FixedStep = z.infer<typeof fixedStepSchema>;
 export type GatherStep = z.infer<typeof gatherStepSchema>;
 export type Section = z.infer<typeof sectionSchema>;
+export type Mark = z.infer<typeof markSchema>;
 export type Sheet = z.infer<typeof sheetSchema>;
 export type GlossaryEntry = z.infer<typeof glossarySchema>[number];
 export type TextValue = z.infer<typeof textValueSchema>;

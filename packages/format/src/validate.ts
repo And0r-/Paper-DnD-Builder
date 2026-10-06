@@ -748,6 +748,15 @@ export function validatePackageFiles(files: PackageFiles): ValidationResult {
       case "featureTable": {
         const selected = checkOptionSource(S, `${p}.things`, s.things);
         if (s.uses !== undefined) checkStatRef(`${p}.uses`, s.uses, selected, "uses");
+        if (s.byRank && !selected.some((t) => t.rank !== undefined))
+          err(S, `${p}.byRank`, "none of the things selected here has a rank");
+        s.marks?.forEach((m, j) => {
+          m.tags?.forEach((tag, k) => {
+            if (!allTags.has(tag)) err(S, `${p}.marks[${j}].tags[${k}]`, `no thing carries tag ${lit(tag)}`);
+          });
+          if (m.from !== undefined) checkOptionSource(S, `${p}.marks[${j}].from`, m.from);
+        });
+        if (s.lead !== undefined) checkOptionSource(S, `${p}.lead.things`, s.lead.things);
         break;
       }
       case "list":
@@ -866,6 +875,21 @@ export function validatePackageFiles(files: PackageFiles): ValidationResult {
       for (const b of s.boxes)
         if (b.label !== undefined)
           need(b.label, `label of box ${lit(b.value)} in sheet section ${lit(s.id)}`);
+    if (s.kind === "featureTable") {
+      const selected = resolveOptions(s.things);
+      if (s.byRank) {
+        // Each group is headed by `rank.<n>.name`, or by `rank.name` and the number.
+        need("rank.name", `word for rank, heading the groups of sheet section ${lit(s.id)}`);
+        for (const r of new Set(selected.flatMap((t) => (t.rank !== undefined ? [t.rank] : []))))
+          optional.add(`sheet.${s.id}.rank.${r}.hint`);
+      }
+      for (const m of s.marks ?? []) {
+        need(m.text, `sign of a mark in sheet section ${lit(s.id)}`);
+        need(m.legend, `legend of a mark in sheet section ${lit(s.id)}`);
+      }
+      if (s.lead !== undefined)
+        for (const t of resolveOptions(s.lead.things)) optional.add(`${t.id}.${s.lead.text}`);
+    }
     optional.add(`sheet.${s.id}.hint`);
   }
   for (const kind of Object.keys(sheet.cards)) {

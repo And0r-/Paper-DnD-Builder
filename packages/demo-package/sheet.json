@@ -118,7 +118,34 @@
       "things": {
         "kind": "knack"
       },
-      "uses": "uses"
+      "uses": "uses",
+      "byRank": true,
+      "marks": [
+        {
+          "text": "sheet.knacks.mark.calling",
+          "legend": "sheet.knacks.mark.calling.legend",
+          "how": "picked",
+          "from": {
+            "kind": "calling"
+          }
+        },
+        {
+          "text": "sheet.knacks.mark.path",
+          "legend": "sheet.knacks.mark.path.legend",
+          "how": "granted"
+        },
+        {
+          "text": "sheet.knacks.mark.steady",
+          "legend": "sheet.knacks.mark.steady.legend",
+          "tags": ["steady"]
+        }
+      ],
+      "lead": {
+        "things": {
+          "kind": "calling"
+        },
+        "text": "knacks.change"
+      }
     },
     {
       "id": "lantern-slots",

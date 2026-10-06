@@ -285,7 +285,9 @@ describe("printed character (demo package)", () => {
         ...pkg.sheet,
         sections: pkg.sheet.sections
           .filter((s) => !lower.has(s.id))
-          .map((s) => (s.id === "gear" && s.kind === "list" ? { ...s, blankLines: s.blankLines + 4 } : s)),
+          .map((s) => (s.id === "gear" && s.kind === "list" ? { ...s, blankLines: s.blankLines + 4 } : s))
+          // The knacks as one plain table, so the first page is filled just so.
+          .map((s) => (s.id === "knacks" ? { ...s, byRank: false, marks: undefined, lead: undefined } : s)),
       },
     };
     const { pdf } = await print("de", {}, early, level1);
@@ -329,6 +331,110 @@ describe("printed character (demo package)", () => {
     const plainKnacks = plain.sections.find((s) => s.id === "knacks")!;
     expect(plainKnacks.hint).toBe("");
     expect(plain.cards.every((c) => c.uses === null)).toBe(true);
+  });
+
+  it("groups a table by rank and marks where each row comes from, with a legend and the package's lead", async () => {
+    // Lantern bearer, level 3: three rank-1 knacks picked in the calling's choice
+    // (one of them steady), and the path's own rank-2 knack.
+    const lantern = demoCharacter(pkg, 3, "Mira Fennwick", "calling.lantern-bearer");
+    const { model, pdf, extracted } = await print("de", {}, pkg, lantern);
+    const knacks = model.sections.find((s) => s.id === "knacks")!;
+    if (knacks.kind !== "featureTable") throw new Error("demo sheet changed");
+    const de = pkg.texts["de"]!;
+    const name = (id: string) => de[`${id}.name`] as string;
+    expect(knacks.rows.map((r) => [r.group?.title, r.name, r.marks])).toEqual([
+      ["Rang 1", name("knack.glow-thread"), "B"],
+      ["Rang 1", name("knack.quiet-word"), "B R"],
+      ["Rang 1", name("knack.warm-glow"), "B"],
+      ["Rang 2", name("knack.lantern-call"), "W"],
+    ]);
+    // A rank's own hint, where the package has one.
+    expect(knacks.rows[0]!.group!.hint).toBe(de["sheet.knacks.rank.1.hint"]);
+    expect(knacks.rows[3]!.group!.hint).toBe("");
+    expect(knacks.legend).toEqual([
+      "B = aus deinem Beruf gewählt",
+      "W = von deinem Weg, immer bereit",
+      "R = hält nur, solange du ruhig bleibst",
+    ]);
+    expect(knacks.lead).toEqual([de["calling.lantern-bearer.knacks.change"]]);
+    // All of it on the sheet: the headings, the hint beside the first, the legend and the lead.
+    const sheet = extracted.pageTexts.slice(0, pdf.sheetPages).join(" ").replace(/\s+/gu, " ");
+    expect(sheet).toContain(`RANG 1 ${de["sheet.knacks.rank.1.hint"] as string}`);
+    expect(sheet).toContain("RANG 2");
+    for (const s of [...knacks.legend, ...knacks.lead]) expect(sheet).toContain(s);
+
+    // English: the package's English signs and words.
+    const en = (await print("en", {}, pkg, lantern)).model.sections.find((s) => s.id === "knacks")!;
+    if (en.kind !== "featureTable") throw new Error("demo sheet changed");
+    expect(en.rows.map((r) => r.marks)).toEqual(["C", "C S", "C", "P"]);
+    expect(en.legend[0]).toBe("C = chosen from your calling");
+    expect(en.rows[0]!.group!.title).toBe("Rank 1");
+
+    // No lead text for the herbalist's calling: no sentence. No steady knack: no "R" in the legend.
+    const herbalist = demoCharacter(pkg, 1, "Mira Fennwick", "calling.herbalist");
+    const calm: ContentPackage = {
+      ...pkg,
+      things: pkg.things.map((t) => (t.tags ? { ...t, tags: t.tags.filter((g) => g !== "steady") } : t)),
+    };
+    const plain = buildPrintModel(calm, herbalist, { language: "de", createdAt }).sections.find(
+      (s) => s.id === "knacks",
+    )!;
+    if (plain.kind !== "featureTable") throw new Error("demo sheet changed");
+    expect(plain.lead).toEqual([]);
+    expect(plain.legend).toEqual(["B = aus deinem Beruf gewählt"]);
+    expect(plain.rows.every((r) => r.marks === "B")).toBe(true);
+  });
+
+  it("prints a table without byRank, marks or lead as before: one plain list", async () => {
+    const plainSheet: ContentPackage = {
+      ...pkg,
+      sheet: {
+        ...pkg.sheet,
+        sections: pkg.sheet.sections.map((s) =>
+          s.kind === "featureTable" && s.id === "knacks"
+            ? { id: s.id, kind: s.kind, span: s.span, things: s.things }
+            : s,
+        ),
+      },
+    };
+    const knacks = buildPrintModel(plainSheet, doc, { language: "de", createdAt }).sections.find(
+      (s) => s.id === "knacks",
+    )!;
+    if (knacks.kind !== "featureTable") throw new Error("demo sheet changed");
+    expect(knacks.lead).toEqual([]);
+    expect(knacks.legend).toEqual([]);
+    expect(knacks.rows.every((r) => r.group === null && r.marks === "")).toBe(true);
+  });
+
+  it("keeps a group's heading with its rows and the legend with the last part when a table is split", async () => {
+    const { model } = await print(
+      "de",
+      {},
+      pkg,
+      demoCharacter(pkg, 20, "Mira Fennwick", "calling.lantern-bearer"),
+    );
+    const knacks = model.sections.find((s) => s.id === "knacks")!;
+    if (knacks.kind !== "featureTable") throw new Error("demo sheet changed");
+    // Many rows, split in the middle of a rank: both parts start under the rank's heading.
+    const rows = Array.from({ length: 40 }, (_, i) => ({ ...knacks.rows[0]!, name: `Zeile ${i + 1}` }));
+    const long: PrintModel = {
+      ...model,
+      sections: [model.sections[0]!, { ...knacks, rows }],
+    };
+    const pdf = await renderPdf(long);
+    expect(pdf.sheetPages).toBe(2);
+    const [first, second] = pdf.sheetLayout.map(
+      (page) => page.find((p) => p.section.id === "knacks")!.section,
+    );
+    if (first?.kind !== "featureTable" || second?.kind !== "featureTable") throw new Error("not split");
+    expect(first.lead).toEqual(knacks.lead);
+    expect(first.legend).toEqual([]);
+    expect(second.lead).toEqual([]);
+    expect(second.legend).toEqual(knacks.legend);
+    const pages = (await extract(pdf)).pageTexts;
+    expect(pages[0]!.match(/RANG 1/gu)).toHaveLength(1);
+    expect(pages[1]!.match(/RANG 1/gu)).toHaveLength(1);
+    expect(pages[1]).toContain(knacks.legend[0]);
   });
 
   it("prints an attack table and the talent totals, worked out by the package's values", async () => {
@@ -533,16 +639,24 @@ describe("printed character (demo package)", () => {
     const { model, pdf } = await print("de", {}, pkg, demoCharacter(pkg, 20));
     const row = model.sections.find((x) => x.id === "lantern-slots");
     if (row?.kind !== "statBoxes") throw new Error("no lantern slot row");
-    const page = (await positions(pdf))
-      .slice(0, pdf.sheetPages)
-      .find((p) => p.some((i) => i.str === "RANG 1"))!;
+    const pages = (await positions(pdf)).slice(0, pdf.sheetPages);
     for (const box of row.boxes) {
       expect(box.style).toBe("circles");
-      const label = page.find((p) => p.str === box.label.toLocaleUpperCase("de"))!;
-      const mid = label.x + label.w / 2;
-      // The number sits in the box, under its label and centred on it.
-      const number = page.filter(
-        (p) => p.str === box.text && Math.abs(p.x + p.w / 2 - mid) < 2 && p.y > label.y && p.y < label.y + 12,
+      // The knack groups are headed by the same words ("Rang 1"): look under every one of them.
+      const number = pages.flatMap((page) =>
+        page
+          .filter((p) => p.str === box.label.toLocaleUpperCase("de"))
+          .flatMap((label) => {
+            const mid = label.x + label.w / 2;
+            // The number sits in the box, under its label and centred on it.
+            return page.filter(
+              (p) =>
+                p.str === box.text &&
+                Math.abs(p.x + p.w / 2 - mid) < 2 &&
+                p.y > label.y &&
+                p.y < label.y + 12,
+            );
+          }),
       );
       expect(number, box.label).toHaveLength(1);
     }
@@ -573,8 +687,10 @@ describe("printed character (demo package)", () => {
     const rows = (n: number, prefix: string) =>
       Array.from({ length: n }, (_, i) => ({
         name: `${prefix} ${i + 1}`,
+        marks: "",
         text: "Ein kurzer Text.",
         uses: null,
+        group: null,
       }));
     const base = { span: 12, hint: "" };
     // About a third of a page used, then a table of about two thirds of a page:
@@ -583,8 +699,24 @@ describe("printed character (demo package)", () => {
       ...model,
       sections: [
         model.sections[0]!,
-        { ...base, id: "filler", kind: "featureTable", title: "Vorher", rows: rows(filler, "Vorher") },
-        { ...base, id: "table", kind: "featureTable", title: "Tabelle", rows: rows(28, "Zeile") },
+        {
+          ...base,
+          id: "filler",
+          kind: "featureTable",
+          title: "Vorher",
+          lead: [],
+          rows: rows(filler, "Vorher"),
+          legend: [],
+        },
+        {
+          ...base,
+          id: "table",
+          kind: "featureTable",
+          title: "Tabelle",
+          lead: [],
+          rows: rows(28, "Zeile"),
+          legend: [],
+        },
       ],
     });
     const gap = await renderPdf(sheet(8));
@@ -708,7 +840,15 @@ describe("printed character (demo package)", () => {
         id: "long-table",
         kind: "featureTable",
         title: "Tabelle",
-        rows: names("Zeile").map((name) => ({ name, text: "Ein kurzer Text.", uses: null })),
+        lead: [],
+        rows: names("Zeile").map((name) => ({
+          name,
+          marks: "",
+          text: "Ein kurzer Text.",
+          uses: null,
+          group: null,
+        })),
+        legend: [],
       },
       { ...base, id: "long-list", kind: "list", title: "Liste", items: names("Ding"), blankLines: 3 },
     ];

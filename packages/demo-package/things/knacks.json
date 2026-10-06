@@ -49,7 +49,7 @@
     "source": "mistland",
     "rank": 1,
     "group": "helping",
-    "tags": ["lantern", "root"],
+    "tags": ["lantern", "root", "steady"],
     "stats": {
       "reach": {
         "amount": 10,
@@ -92,7 +92,7 @@
     "source": "mistland",
     "rank": 1,
     "group": "daring",
-    "tags": ["lantern"],
+    "tags": ["lantern", "steady"],
     "stats": {
       "reach": {
         "text": "stat-value.self"
@@ -113,7 +113,7 @@
     "source": "mistland",
     "rank": 2,
     "group": "helping",
-    "tags": ["lantern"],
+    "tags": ["lantern", "steady"],
     "requires": "level >= 3",
     "stats": {
       "reach": {
@@ -179,7 +179,7 @@
     "source": "mistland",
     "rank": 1,
     "group": "daring",
-    "tags": ["current"],
+    "tags": ["current", "steady"],
     "stats": {
       "reach": {
         "amount": 20,
@@ -201,7 +201,7 @@
     "source": "mistland",
     "rank": 1,
     "group": "helping",
-    "tags": ["current"],
+    "tags": ["current", "steady"],
     "stats": {
       "reach": {
         "text": "stat-value.self"
@@ -265,7 +265,7 @@
     "source": "mistland",
     "rank": 2,
     "group": "daring",
-    "tags": ["current"],
+    "tags": ["current", "steady"],
     "requires": "level >= 3",
     "stats": {
       "reach": {
@@ -329,7 +329,7 @@
     "source": "mistland",
     "rank": 1,
     "group": "daring",
-    "tags": ["root"],
+    "tags": ["root", "steady"],
     "stats": {
       "reach": {
         "amount": 10,
@@ -372,7 +372,7 @@
     "source": "mistland",
     "rank": 1,
     "group": "daring",
-    "tags": ["root"],
+    "tags": ["root", "steady"],
     "stats": {
       "reach": {
         "amount": 30,
@@ -416,6 +416,7 @@
     "source": "mistland",
     "rank": 2,
     "group": "daring",
+    "tags": ["steady"],
     "stats": {
       "reach": {
         "amount": 15,
@@ -469,7 +470,7 @@
     "source": "mistland",
     "rank": 5,
     "group": "daring",
-    "tags": ["lantern"],
+    "tags": ["lantern", "steady"],
     "requires": "knackRank >= 5",
     "stats": {
       "reach": { "amount": 120, "unit": "ft" },
@@ -485,7 +486,7 @@
     "source": "mistland",
     "rank": 3,
     "group": "daring",
-    "tags": ["current"],
+    "tags": ["current", "steady"],
     "requires": "knackRank >= 3",
     "stats": {
       "reach": { "amount": 60, "unit": "ft" },
@@ -517,7 +518,7 @@
     "source": "mistland",
     "rank": 5,
     "group": "daring",
-    "tags": ["current"],
+    "tags": ["current", "steady"],
     "requires": "knackRank >= 5",
     "stats": {
       "reach": { "amount": 120, "unit": "ft" },
@@ -565,7 +566,7 @@
     "source": "mistland",
     "rank": 5,
     "group": "daring",
-    "tags": ["root"],
+    "tags": ["root", "steady"],
     "requires": "knackRank >= 5",
     "stats": {
       "reach": { "amount": 120, "unit": "ft" },
