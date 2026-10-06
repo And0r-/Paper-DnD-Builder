@@ -12,7 +12,8 @@
     "./testing": "./src/testing.ts",
     "./designs": "./designs/geometry.ts",
     "./designs/verbose": "./designs/verbose/index.ts",
-    "./designs/screens": "./designs/screens.ts"
+    "./designs/screens": "./designs/screens.ts",
+    "./designs/verbose/screen.css": "./designs/verbose/screen.css"
   },
   "scripts": {
     "typecheck": "tsc --noEmit -p ."

@@ -330,6 +330,14 @@
 
 .vsheet__feature-wrap {
   position: relative;
+  padding-right: var(--sheet-touch);
+}
+
+/* The screen's button to cross a row out, at the row's end. */
+.vsheet__feature-wrap > :last-child:not(.vsheet__feature) {
+  position: absolute;
+  top: 0;
+  right: 0;
 }
 
 .vsheet__feature {
@@ -615,6 +623,14 @@
   .vsheet__table td {
     padding: 0.8mm 1mm;
     border-bottom: 0.1mm solid #bbb;
+  }
+
+  .vsheet__feature-wrap {
+    padding-right: 0;
+  }
+
+  .vsheet__feature-wrap > :last-child:not(.vsheet__feature) {
+    right: -7mm;
   }
 
   .vsheet__feature {

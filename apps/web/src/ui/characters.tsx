@@ -71,7 +71,7 @@ export function describeCharacter(
       : raise
         ? t("characters.raising", { ...p, levelName: levelWord(lp), level: raise.to })
         : t("characters.progress", p),
-    href: finished ? `/c/${d.id}/overview` : firstOpen(entries).href,
+    href: finished ? `/c/${d.id}/bogen` : firstOpen(entries).href,
     doneHref: `/c/${d.id}/done`,
     // A finished character below the highest level can go up.
     raiseHref: finished && ev.level < lp.pkg.flow.level.max ? `/c/${d.id}/raise` : undefined,

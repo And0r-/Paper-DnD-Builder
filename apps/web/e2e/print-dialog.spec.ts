@@ -140,13 +140,11 @@ test("prints a kept copy with the play state filled in, and keeps the play state
   const dialog = page.getByRole("dialog", { name: m["print.title"] });
   const version = dialog.getByRole("combobox", { name: m["print.version"] });
   await expect(version).toHaveValue("original");
-  const when = new Intl.DateTimeFormat("de", {
-    day: "numeric",
-    month: "long",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-  const name = m["print.versionCopy"].replace("{date}", when.format(new Date(made.copy.createdAt)));
+  // Named as on the sheet: "Meine Fassung vom 7. Oktober, 14:20".
+  const at = new Date(made.copy.createdAt);
+  const name = m["sheet.copyName"]
+    .replace("{date}", new Intl.DateTimeFormat("de", { day: "numeric", month: "long" }).format(at))
+    .replace("{time}", new Intl.DateTimeFormat("de", { hour: "2-digit", minute: "2-digit" }).format(at));
   await version.selectOption({ label: name });
   await dialog.getByRole("checkbox", { name: m["print.state"] }).check();
   await expectOneLanguage(page, "de");

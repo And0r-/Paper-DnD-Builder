@@ -28,6 +28,8 @@ export default function DraftLayout({ children }: { children: ReactNode }) {
   const current = currentKey(pathname);
   // The end and the level-up question stand on their own, without the step list.
   const isEnd = pathname.endsWith("/done") || pathname.endsWith("/raise");
+  // The sheet brings its own frame: its tools go into the menu.
+  const isSheet = pathname.endsWith("/bogen");
   return (
     <RequireAccount>
       {() => (
@@ -35,6 +37,7 @@ export default function DraftLayout({ children }: { children: ReactNode }) {
           {(load) => {
             switch (load.state) {
               case "ready":
+                if (isSheet) return children;
                 return isEnd ? (
                   <AppShell>{children}</AppShell>
                 ) : (
