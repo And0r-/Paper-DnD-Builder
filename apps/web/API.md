@@ -225,19 +225,19 @@ the client.
    }
    ```
 
-   | Field                   | Meaning                                                                                                                |
-   | ----------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-   | `kind`                  | The answer shape (see above): `pickOne`, `pickMany`, `distribute`, `number`, `text`; `info` takes no answer.           |
-   | `status`                | `missing`, `incomplete` (fits, more needed; `remaining`), `invalid` (`problem` says why), `answered`, `info`.          |
-   | `options`               | Pick choices: the thing keys that may be picked now. Anything else is refused (`notOffered`).                          |
-   | `count`, `upTo`         | `pickMany`: how many to pick; with `upTo`, fewer is complete too.                                                      |
-   | `recommended`           | Pick choices: good picks, best first. `distribute`: a full answer `{ method, assign }` that can be sent as it is.      |
-   | `min`, `max`            | `number`: the allowed range.                                                                                           |
-   | `raise`                 | `distribute` with `raise`: points to give and the most each value can take (see above).                                |
-   | `badges`                | Pick choices: a text key per option, a short label such as "gentle start".                                             |
-   | `held`                  | Things the character already has that an option is about.                                                              |
-   | `copyOf`, `textVariant` | Which texts to use (below).                                                                                            |
-   | `step`                  | The step the choice is on. If that step has a `pool` in `evaluation.steps`, its choices can also be answered together. |
+   | Field                   | Meaning                                                                                                                                                                                                                                                     |
+   | ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+   | `kind`                  | The answer shape (see above): `pickOne`, `pickMany`, `distribute`, `number`, `text`; `info` takes no answer.                                                                                                                                                |
+   | `status`                | `missing`, `incomplete` (fits, more needed; `remaining`), `invalid` (`problem` says why), `answered`, `info`.                                                                                                                                               |
+   | `options`               | Pick choices: the thing keys that may be picked now. Anything else is refused (`notOffered`). On a step with a `pool` a thing counts for one choice: `options` and `recommended` leave out what another choice of that step holds, also one asked after it. |
+   | `count`, `upTo`         | `pickMany`: how many to pick; with `upTo`, fewer is complete too.                                                                                                                                                                                           |
+   | `recommended`           | Pick choices: good picks, best first. `distribute`: a full answer `{ method, assign }` that can be sent as it is.                                                                                                                                           |
+   | `min`, `max`            | `number`: the allowed range.                                                                                                                                                                                                                                |
+   | `raise`                 | `distribute` with `raise`: points to give and the most each value can take (see above).                                                                                                                                                                     |
+   | `badges`                | Pick choices: a text key per option, a short label such as "gentle start".                                                                                                                                                                                  |
+   | `held`                  | Things the character already has that an option is about.                                                                                                                                                                                                   |
+   | `copyOf`, `textVariant` | Which texts to use (below).                                                                                                                                                                                                                                 |
+   | `step`                  | The step the choice is on. If that step has a `pool` in `evaluation.steps`, its choices can also be answered together.                                                                                                                                      |
 
 3. **Words and explanations** come from the package texts in one language,
    `GET /api/packages/:id/texts/:lang` (key list: package format SPEC,

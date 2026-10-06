@@ -75,7 +75,7 @@ export function suggestedAnswer(
 /** The picks of a shared list: the ones there, then the recommendation, then the list. */
 export function suggestedPool(lp: LoadedPackage, ev: Evaluation, pool: PoolState): string[] {
   const away = heldElsewhere(lp, ev, new Set(pool.choices.map((c) => c.choice)));
-  const slots = pool.choices.map((c) => ({ count: c.count, offers: new Set(ev.choices[c.choice]?.options) }));
+  const slots = pool.choices.map((c) => ({ count: c.count, offers: new Set(c.options) }));
   return fillPicks(
     slots,
     [...pool.picks, ...pool.recommended, ...pool.options].filter(

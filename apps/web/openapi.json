@@ -4906,6 +4906,13 @@
                 "upTo": {
                   "type": "boolean"
                 },
+                "options": {
+                  "description": "What this choice offers, also what another choice of the list holds now (the choice's own options leave those out).",
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
                 "picks": {
                   "type": "array",
                   "items": {
@@ -4916,7 +4923,7 @@
                   "type": "integer"
                 }
               },
-              "required": ["choice", "count", "upTo", "picks", "remaining"],
+              "required": ["choice", "count", "upTo", "options", "picks", "remaining"],
               "additionalProperties": false
             }
           },

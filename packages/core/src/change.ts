@@ -64,11 +64,9 @@ export function applyChange(pkg: ContentPackage, doc: DraftDocument, change: Dra
   const ev = evaluateDraft(pkg, doc);
   const state = ev.choices[change.choice];
   if (!state) return { ok: false, error: { code: "notAsked" } };
-  // On a list step a thing counts for one choice only.
-  const pool = ev.steps.find((s) => s.id === state.step)?.pool;
-  const taken = new Set(pool?.choices.filter((c) => c.choice !== change.choice).flatMap((c) => c.picks));
+  // On a list step the options already leave out what another choice of the list holds.
   const ctx = {
-    ...(state.options ? { options: state.options.filter((o) => !taken.has(o)) } : {}),
+    ...(state.options ? { options: state.options } : {}),
     ...(state.count !== undefined ? { count: state.count } : {}),
     ...(state.min !== undefined ? { min: state.min } : {}),
     ...(state.max !== undefined ? { max: state.max } : {}),
@@ -136,7 +134,7 @@ function applyPool(pkg: ContentPackage, doc: DraftDocument, stepId: string, pick
   if (new Set(picks).size !== picks.length) return doesNotFit("duplicate");
   if (picks.some((p) => !pool.options.includes(p))) return doesNotFit("notOffered");
   if (picks.length > pool.count) return doesNotFit("tooMany");
-  const slots = pool.choices.map((c) => ({ count: c.count, offers: new Set(ev.choices[c.choice]!.options) }));
+  const slots = pool.choices.map((c) => ({ count: c.count, offers: new Set(c.options) }));
   const keep = new Map(pool.choices.flatMap((c, i) => c.picks.map((p) => [p, i] as const)));
   const at = assignPicks(slots, picks, keep);
   if (!at) return doesNotFit("notOffered");
