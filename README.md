@@ -116,6 +116,12 @@ branch, do not switch it; note it in your task and keep working in your own
 worktree. `pnpm install`, builds and test runs happen only in your own
 worktree, never in the shared checkout.
 
+A review server for your worktree: `scripts/dev-server.sh [--packages DIR]`
+(builds if needed, picks a free port from your agent's range, prints the
+address once `/api/health` answers); `scripts/dev-server.sh stop` ends only
+that server. Playwright uses the shared browsers in `PLAYWRIGHT_BROWSERS_PATH`
+(set in the agent environment, `/paperclip/.ms-playwright` otherwise).
+
 ## License
 
 [GNU Affero General Public License v3.0](LICENSE). If you run a modified
