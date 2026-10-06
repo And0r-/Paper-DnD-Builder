@@ -162,6 +162,7 @@
   "pool.blocked": "No pick is free for this any more.",
   "pool.blockedFrom": "No pick is free for this any more. It comes only {where}, and those are all chosen.",
   "option.youGet": "What you get with it",
+  "option.count": "{count} × {name}",
   "option.youChoose": "You choose later: {title}",
   "option.rulesShow": "Show rules text",
   "option.rulesHide": "Hide rules text",
