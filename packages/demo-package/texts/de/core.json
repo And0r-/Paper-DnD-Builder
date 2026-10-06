@@ -5,11 +5,8 @@
     "package.short": "Eine kleine erfundene Welt aus Mooren, Flüssen und Laternenlicht. Gut zum Ausprobieren.",
     "level.name": "Stufe",
     "level.intro": "Die Stufe sagt, wie viel dein Charakter schon erlebt hat. Höhere Stufe heisst: mehr Kniffe, mehr Ausdauer.",
-    "level.hint": "Weisst du es nicht? Frag deine Spielleitung. Sonst nimm Stufe 1.",
+    "level.hint": "Wenn deine Spielleitung nichts anderes sagt, nimm Stufe 1.",
     "rank.name": "Rang",
-    "level.pick.1": "Für den Anfang. Du hast wenig zu wählen und lernst alles nach und nach.",
-    "level.pick.3": "Für ein Abenteuer an einem einzigen Abend. Du kannst schon einiges.",
-    "level.pick.5": "Für ein Abenteuer an einem Abend, wenn es gefährlich wird. Du baust länger, weil es mehr zu wählen gibt.",
     "summary.line": "{{var:calling}} · Stufe {{var:level}}",
     "sheet.attribution": "Nebelland ist eine erfundene Demo-Welt. Lizenz: GNU AGPL 3.0. Fischernetz: Beitrag der Gemeinschaft, CC0.",
 
