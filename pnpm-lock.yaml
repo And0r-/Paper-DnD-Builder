@@ -208,6 +208,9 @@ importers:
       '@builder/print':
         specifier: workspace:*
         version: link:../../packages/print
+      '@builder/sheet':
+        specifier: workspace:*
+        version: link:../../packages/sheet
       '@node-rs/argon2':
         specifier: ^2.2.1
         version: 2.2.1
@@ -288,25 +291,44 @@ importers:
 
   packages/print:
     dependencies:
-      '@builder/core':
+      '@builder/sheet':
         specifier: workspace:*
-        version: link:../core
-      '@builder/format':
-        specifier: workspace:*
-        version: link:../format
+        version: link:../sheet
       pdfkit:
         specifier: ^0.20.2
         version: 0.20.2
     devDependencies:
+      '@builder/core':
+        specifier: workspace:*
+        version: link:../core
       '@builder/demo-package':
         specifier: workspace:*
         version: link:../demo-package
+      '@builder/format':
+        specifier: workspace:*
+        version: link:../format
       '@types/pdfkit':
         specifier: ^0.17.6
         version: 0.17.6
       pdfjs-dist:
         specifier: ^6.3.289
         version: 6.3.289
+
+  packages/sheet:
+    dependencies:
+      '@builder/core':
+        specifier: workspace:*
+        version: link:../core
+      '@builder/format':
+        specifier: workspace:*
+        version: link:../format
+      zod:
+        specifier: ^4.6.5
+        version: 4.6.5
+    devDependencies:
+      '@builder/demo-package':
+        specifier: workspace:*
+        version: link:../demo-package
 
 packages:
 

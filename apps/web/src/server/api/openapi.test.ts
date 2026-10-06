@@ -9,6 +9,8 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
 import { DEMO_PACKAGE_DIR } from "@builder/demo-package";
+import { sheetModelSchema } from "@builder/sheet";
+import { z } from "zod";
 import { GET as health } from "../../../app/api/health/route.ts";
 import { healthReport } from "../health.ts";
 import { loadPackages } from "../packages/loader.ts";
@@ -84,6 +86,11 @@ describe("openapi.json", () => {
   it("describes every route of the server and nothing else", () => {
     const server = [...ROUTES.map((r) => `${r.method} ${toSpecPath(r.path)}`), "GET /api/health"];
     expect(specOperations().sort()).toEqual(server.sort());
+  });
+
+  it("describes the sheet model exactly as the schema a stored sheet is checked with", () => {
+    const { $schema: _, ...schema } = z.toJSONSchema(sheetModelSchema);
+    expect(spec.components.schemas.SheetModel).toEqual(schema);
   });
 
   it("lists every error code the server can send", () => {
@@ -345,6 +352,7 @@ async function walk(server: TestServer): Promise<void> {
   await call("POST", `/api/drafts/${id}/finish`, { version: view.draft.version }, k);
   await call("POST", `/api/drafts/${id}/level-up`, { version: view.draft.version, level: 4 }, k);
   await call("GET", `/api/drafts/${id}/pdf`, undefined, k);
+  await call("GET", `/api/drafts/${id}/sheet`, undefined, k);
 
   for (let guard = 0; view.evaluation.open.length > 0; guard++) {
     if (guard > 80) throw new Error("walk does not end");
@@ -368,6 +376,7 @@ async function walk(server: TestServer): Promise<void> {
   }
   view = (await call("POST", `/api/drafts/${id}/finish`, { version: view.draft.version }, k)).json;
   await c.request("GET", `/api/drafts/${id}/pdf`, undefined, k);
+  await call("GET", `/api/drafts/${id}/sheet`, undefined, k);
   await call("GET", "/api/drafts", undefined, k);
   view = (await call("POST", `/api/drafts/${id}/level-up`, { version: view.draft.version, level: 4 }, k))
     .json;

@@ -6,7 +6,7 @@
  * After a level up (`?from=<old level>`) it names the new level and, in two
  * or three lines, what came with it: new things and the numbers that changed.
  */
-import { cardCount } from "@builder/print/cards";
+import { cardCount } from "@builder/sheet/cards";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useApp } from "../../../../src/ui/app-state.tsx";

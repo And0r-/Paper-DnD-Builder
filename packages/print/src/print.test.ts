@@ -1,14 +1,21 @@
 import type { DraftDocument } from "@builder/core";
 import { applyChange, evaluateDraft } from "@builder/core";
 import type { ContentPackage, TextValue } from "@builder/format";
+import { createHash } from "node:crypto";
 import PDFDocument from "pdfkit";
 import { getDocument } from "pdfjs-dist/legacy/build/pdf.mjs";
 import { beforeAll, describe, expect, it, vi } from "vitest";
-import { cardCount } from "./cards.ts";
-import { MESSAGES } from "./messages.ts";
-import { buildPrintModel, firstSentence, PrintError, type PrintModel, type SheetSection } from "./model.ts";
+import {
+  buildSheetModel,
+  cardCount,
+  firstSentence,
+  MESSAGES,
+  SheetError,
+  type SheetModel,
+  type SheetSection,
+} from "@builder/sheet";
+import { demoCharacter, loadDemoPackage, raisedCharacter } from "@builder/sheet/testing";
 import { renderPdf, type RenderedPdf } from "./render.ts";
-import { demoCharacter, loadDemoPackage, raisedCharacter } from "./testing.ts";
 
 let pkg: ContentPackage;
 let doc: DraftDocument;
@@ -84,7 +91,7 @@ async function positions(pdf: RenderedPdf): Promise<Placed[][]> {
 }
 
 async function print(language: string, units: Record<string, string>, p = pkg, d = doc) {
-  const model = buildPrintModel(p, d, { language, units, createdAt });
+  const model = buildSheetModel(p, d, { language, units, createdAt });
   const pdf = await renderPdf(model);
   return { model, pdf, extracted: await extract(pdf) };
 }
@@ -244,7 +251,7 @@ describe("printed character (demo package)", () => {
 
     // Without the text the card is as before.
     const { [`card.knack.hint`]: _, ...withoutHint } = pkg.texts["de"]!;
-    const plain = buildPrintModel({ ...pkg, texts: { ...pkg.texts, de: withoutHint } }, doc, {
+    const plain = buildSheetModel({ ...pkg, texts: { ...pkg.texts, de: withoutHint } }, doc, {
       language: "de",
       createdAt,
     });
@@ -339,7 +346,7 @@ describe("printed character (demo package)", () => {
       ...pkg,
       things: pkg.things.map((t) => (t.kind === "knack" ? { ...t, stats: { ...t.stats, uses: 0 } } : t)),
     };
-    const plain = buildPrintModel(noUses, doc, { language: "de", createdAt });
+    const plain = buildSheetModel(noUses, doc, { language: "de", createdAt });
     const plainKnacks = plain.sections.find((s) => s.id === "knacks")!;
     expect(plainKnacks.hint).toBe("");
     expect(plain.cards.every((c) => c.uses === null)).toBe(true);
@@ -388,7 +395,7 @@ describe("printed character (demo package)", () => {
       ...pkg,
       things: pkg.things.map((t) => (t.tags ? { ...t, tags: t.tags.filter((g) => g !== "steady") } : t)),
     };
-    const plain = buildPrintModel(calm, herbalist, { language: "de", createdAt }).sections.find(
+    const plain = buildSheetModel(calm, herbalist, { language: "de", createdAt }).sections.find(
       (s) => s.id === "knacks",
     )!;
     if (plain.kind !== "featureTable") throw new Error("demo sheet changed");
@@ -460,7 +467,7 @@ describe("printed character (demo package)", () => {
         ),
       },
     };
-    const one = buildPrintModel(split, herbalist, { language: "de", createdAt }).sections.find(
+    const one = buildSheetModel(split, herbalist, { language: "de", createdAt }).sections.find(
       (s) => s.id === "knacks",
     )!;
     if (one.kind !== "featureTable") throw new Error("demo sheet changed");
@@ -481,7 +488,7 @@ describe("printed character (demo package)", () => {
         ),
       },
     };
-    const knacks = buildPrintModel(plainSheet, doc, { language: "de", createdAt }).sections.find(
+    const knacks = buildSheetModel(plainSheet, doc, { language: "de", createdAt }).sections.find(
       (s) => s.id === "knacks",
     )!;
     if (knacks.kind !== "featureTable") throw new Error("demo sheet changed");
@@ -501,7 +508,7 @@ describe("printed character (demo package)", () => {
     if (knacks.kind !== "featureTable") throw new Error("demo sheet changed");
     // Many rows, split in the middle of a rank: both parts start under the rank's heading.
     const rows = Array.from({ length: 40 }, (_, i) => ({ ...knacks.rows[0]!, name: `Zeile ${i + 1}` }));
-    const long: PrintModel = {
+    const long: SheetModel = {
       ...model,
       sections: [model.sections[0]!, { ...knacks, rows }],
     };
@@ -532,7 +539,7 @@ describe("printed character (demo package)", () => {
     });
     if (!r.ok) throw new Error(JSON.stringify(r.error));
     const attacks = (language: string, units: Record<string, string>) => {
-      const model = buildPrintModel(pkg, r.doc, { language, units, createdAt });
+      const model = buildSheetModel(pkg, r.doc, { language, units, createdAt });
       const s = model.sections.find((x) => x.id === "attacks")!;
       if (s.kind !== "statTable") throw new Error("demo sheet changed");
       return { model, s };
@@ -580,7 +587,7 @@ describe("printed character (demo package)", () => {
   });
 
   it("prints use boxes from a value that grows, and the picks among what the character has", async () => {
-    const traitRow = (model: ReturnType<typeof buildPrintModel>, thing: string) => {
+    const traitRow = (model: ReturnType<typeof buildSheetModel>, thing: string) => {
       const traits = model.sections.find((s) => s.id === "traits")!;
       if (traits.kind !== "featureTable") throw new Error("demo sheet changed");
       return traits.rows.find((r) => r.name === pkg.texts["de"]![`${thing}.name`])!;
@@ -591,12 +598,12 @@ describe("printed character (demo package)", () => {
       [17, 3],
     ] as const) {
       const herbalist = demoCharacter(pkg, level, "Mira Fennwick", "calling.herbalist");
-      const model = buildPrintModel(pkg, herbalist, { language: "de", createdAt });
+      const model = buildSheetModel(pkg, herbalist, { language: "de", createdAt });
       expect(traitRow(model, "trait.bloom-ward").uses).toEqual({ boxes });
     }
     // River heart: as often as practice, 6 at level 20.
     const runner = demoCharacter(pkg, 20, "Mira Fennwick", "calling.river-runner");
-    const runnerModel = buildPrintModel(pkg, runner, { language: "de", createdAt });
+    const runnerModel = buildSheetModel(pkg, runner, { language: "de", createdAt });
     expect(traitRow(runnerModel, "trait.river-heart").uses).toEqual({ boxes: 6 });
 
     // More uses than fit a row as boxes: the number is printed, not cut to twelve boxes.
@@ -661,7 +668,7 @@ describe("printed character (demo package)", () => {
         sections: pkg.sheet.sections.map((s) => (s.id === "practice" ? { ...s, when: undefined } : s)),
       },
     };
-    const plain = buildPrintModel(always, demoCharacter(pkg, 12), { language: "de", units: {}, createdAt });
+    const plain = buildSheetModel(always, demoCharacter(pkg, 12), { language: "de", units: {}, createdAt });
     expect(plain.sections.map((s) => s.id)).not.toContain("practice");
     expect(plain.sections.map((s) => s.id)).toContain("about");
   });
@@ -702,7 +709,7 @@ describe("printed character (demo package)", () => {
         ),
       },
     });
-    const noLuck = buildPrintModel(
+    const noLuck = buildSheetModel(
       withBoxWhen((v) => (v === "luck" ? "luck > 99" : undefined)),
       doc,
       { language: "de", createdAt },
@@ -711,7 +718,7 @@ describe("printed character (demo package)", () => {
     if (primary.kind !== "statBoxes") throw new Error("demo sheet changed");
     expect(primary.boxes.map((b) => b.label)).not.toContain(pkg.texts["de"]!["value.luck.name"]);
     expect(primary.boxes).toHaveLength(5);
-    const none = buildPrintModel(
+    const none = buildSheetModel(
       withBoxWhen(() => "level > 99"),
       doc,
       { language: "de", createdAt },
@@ -745,7 +752,7 @@ describe("printed character (demo package)", () => {
     expect(sheet).toContain("LATERNEN-PLÄTZE, HOHE RÄNGE");
 
     // At level 5 only ranks 1 to 3 have slots; the high row is not printed at all.
-    const low = buildPrintModel(pkg, demoCharacter(pkg, 5), { language: "de", createdAt });
+    const low = buildSheetModel(pkg, demoCharacter(pkg, 5), { language: "de", createdAt });
     const row = low.sections.find((x) => x.id === "lantern-slots");
     expect(row?.kind === "statBoxes" && row.boxes.map((b) => b.label)).toEqual([
       "Rang 1",
@@ -809,9 +816,10 @@ describe("printed character (demo package)", () => {
   });
 
   it("does not leave most of a page white: a section that does not fit is split, not moved", async () => {
-    const model = buildPrintModel(pkg, doc, { language: "de", createdAt });
+    const model = buildSheetModel(pkg, doc, { language: "de", createdAt });
     const rows = (n: number, prefix: string) =>
       Array.from({ length: n }, (_, i) => ({
+        id: `row-${i + 1}`,
         name: `${prefix} ${i + 1}`,
         marks: "",
         text: "Ein kurzer Text.",
@@ -821,7 +829,7 @@ describe("printed character (demo package)", () => {
     const base = { span: 12, hint: "" };
     // About a third of a page used, then a table of about two thirds of a page:
     // it does not fit under it, and is not taller than a page either.
-    const sheet = (filler: number): PrintModel => ({
+    const sheet = (filler: number): SheetModel => ({
       ...model,
       sections: [
         model.sections[0]!,
@@ -871,7 +879,7 @@ describe("printed character (demo package)", () => {
       return original.call(this);
     });
     try {
-      await renderPdf(buildPrintModel(pkg, demoCharacter(pkg, 20), { language: "de", createdAt }));
+      await renderPdf(buildSheetModel(pkg, demoCharacter(pkg, 20), { language: "de", createdAt }));
     } finally {
       end.mockRestore();
     }
@@ -886,7 +894,7 @@ describe("printed character (demo package)", () => {
     const l3 = raisedCharacter(pkg, l2, 3);
     const l5 = raisedCharacter(pkg, l3, 5);
     const l20 = raisedCharacter(pkg, l1, 20);
-    const boxes = (model: PrintModel, id: string) => {
+    const boxes = (model: SheetModel, id: string) => {
       const s = model.sections.find((x) => x.id === id);
       if (s?.kind !== "statBoxes") return [];
       return s.boxes.map((b) => (b.style === "circles" ? b.circles : b.text));
@@ -913,20 +921,20 @@ describe("printed character (demo package)", () => {
       expect(extracted.pages).toBe(pdf.sheetPages + pdf.cardPages);
     }
     // The cards of level 1 are still there after every raise.
-    const first = buildPrintModel(pkg, l1, { language: "de", createdAt }).cards.map((c) => c.name);
+    const first = buildSheetModel(pkg, l1, { language: "de", createdAt }).cards.map((c) => c.name);
     for (const e of expected) {
-      const names = buildPrintModel(pkg, e.doc, { language: "de", createdAt }).cards.map((c) => c.name);
+      const names = buildSheetModel(pkg, e.doc, { language: "de", createdAt }).cards.map((c) => c.name);
       expect(names).toEqual(expect.arrayContaining(first));
     }
     // The same character raised in one go or built at 20 prints the same numbers.
-    const built = buildPrintModel(pkg, demoCharacter(pkg, 20), { language: "de", createdAt });
-    const raised = buildPrintModel(pkg, l20, { language: "de", createdAt });
+    const built = buildSheetModel(pkg, demoCharacter(pkg, 20), { language: "de", createdAt });
+    const raised = buildSheetModel(pkg, l20, { language: "de", createdAt });
     expect(boxes(raised, "primary")).toEqual(boxes(built, "primary"));
     expect(boxes(raised, "lantern-slots-high")).toEqual(boxes(built, "lantern-slots-high"));
   });
 
   it("goes on on the next page with a section longer than a page, for every kind of rows", async () => {
-    const model = buildPrintModel(pkg, doc, { language: "de", createdAt });
+    const model = buildSheetModel(pkg, doc, { language: "de", createdAt });
     const n = 45;
     const names = (prefix: string) => Array.from({ length: n }, (_, i) => `${prefix} ${i + 1}`);
     const base = { span: 4, hint: "Hinweis am Ende" };
@@ -936,7 +944,13 @@ describe("printed character (demo package)", () => {
         id: "long-scores",
         kind: "scoreColumn",
         title: "Werte",
-        scores: names("Wert").map((label) => ({ label, value: "3", derivedLabel: "", derived: null })),
+        scores: names("Wert").map((label) => ({
+          valueId: "score",
+          label,
+          value: "3",
+          derivedLabel: "",
+          derived: null,
+        })),
       },
       {
         ...base,
@@ -944,6 +958,7 @@ describe("printed character (demo package)", () => {
         kind: "checkList",
         title: "Haken",
         items: names("Haken").map((name) => ({
+          id: name,
           name,
           marked: false,
           note: "",
@@ -969,6 +984,7 @@ describe("printed character (demo package)", () => {
         title: "Tabelle",
         lead: [],
         rows: names("Zeile").map((name) => ({
+          id: name,
           name,
           marks: "",
           text: "Ein kurzer Text.",
@@ -979,7 +995,7 @@ describe("printed character (demo package)", () => {
       },
       { ...base, id: "long-list", kind: "list", title: "Liste", items: names("Ding"), blankLines: 3 },
     ];
-    const withLong: PrintModel = { ...model, sections: [...model.sections.slice(0, 3), ...long] };
+    const withLong: SheetModel = { ...model, sections: [...model.sections.slice(0, 3), ...long] };
     const pdf = await renderPdf(withLong);
     const pages = await positions(pdf);
     const sheet = pages.slice(0, pdf.sheetPages);
@@ -1020,7 +1036,7 @@ describe("printed character (demo package)", () => {
   });
 
   it("wraps long card fields, labels and the source line inside their box", async () => {
-    const model = buildPrintModel(pkg, doc, { language: "de", createdAt });
+    const model = buildSheetModel(pkg, doc, { language: "de", createdAt });
     const card = model.cards[0]!;
     expect(card.fields.length).toBeGreaterThanOrEqual(2);
     const long = "V, M (eine Laternenscherbe und ein Faden aus gesponnenem Nebelgarn)";
@@ -1071,7 +1087,7 @@ describe("printed character (demo package)", () => {
   it("keeps a card's head above its footer when a field is a whole sentence", async () => {
     // A casting time like a sentence, in half the card, used to push "at the
     // table" over the hint and the footer.
-    const model = buildPrintModel(pkg, doc, { language: "de", createdAt });
+    const model = buildSheetModel(pkg, doc, { language: "de", createdAt });
     const card = model.cards[0]!;
     const sentence =
       "Reaktion, die du ausführst, wenn eine Laterne im Abstand von bis zu zwölf Schritten von dir erlischt und du es sehen kannst";
@@ -1094,7 +1110,7 @@ describe("printed character (demo package)", () => {
   });
 
   it("wraps labels too long for their box instead of running out of it", async () => {
-    const model = buildPrintModel(pkg, doc, { language: "de", createdAt });
+    const model = buildSheetModel(pkg, doc, { language: "de", createdAt });
     const sections = model.sections.map((s): SheetSection => {
       if (s.kind === "statBoxes")
         return { ...s, boxes: s.boxes.map((b) => ({ ...b, label: "Nebelwiderstandsschwellenwert-Stufe" })) };
@@ -1158,7 +1174,7 @@ describe("printed character (demo package)", () => {
       ...pkg.sheet,
       sections: [pkg.sheet.sections[0]!, trials, ...pkg.sheet.sections.slice(1)],
     };
-    const model = buildPrintModel({ ...pkg, sheet, texts: { ...pkg.texts, de } }, doc, {
+    const model = buildSheetModel({ ...pkg, sheet, texts: { ...pkg.texts, de } }, doc, {
       language: "de",
       createdAt,
     });
@@ -1194,7 +1210,7 @@ describe("printed character (demo package)", () => {
       "Laternen­wiederherstellung",
       "Laternenwiederherstellungsnebelzauberei",
     ];
-    const model = buildPrintModel(pkg, doc, { language: "de", createdAt });
+    const model = buildSheetModel(pkg, doc, { language: "de", createdAt });
     const sections = model.sections.map((s): SheetSection => {
       if (s.kind !== "featureTable" || s.id !== "knacks") return s;
       return { ...s, rows: s.rows.map((r, i) => (i < names.length ? { ...r, name: names[i]! } : r)) };
@@ -1237,12 +1253,12 @@ describe("printed character (demo package)", () => {
   });
 
   it("refuses a language without texts instead of mixing in another one", () => {
-    expect(() => buildPrintModel(pkg, doc, { language: "fr" })).toThrow(PrintError);
+    expect(() => buildSheetModel(pkg, doc, { language: "fr" })).toThrow(SheetError);
   });
 });
 
 describe("what a game master would otherwise write on the sheet by hand (demo package)", () => {
-  const section = <K extends SheetSection["kind"]>(model: PrintModel, id: string, kind: K) => {
+  const section = <K extends SheetSection["kind"]>(model: SheetModel, id: string, kind: K) => {
     const s = model.sections.find((x) => x.id === id);
     if (s?.kind !== kind) throw new Error(`demo sheet changed: ${id}`);
     return s as Extract<SheetSection, { kind: K }>;
@@ -1266,7 +1282,7 @@ describe("what a game master would otherwise write on the sheet by hand (demo pa
 
     const open = applyChange(pkg, doc, { type: "answer", choice: "upbringing", answer: null });
     if (!open.ok) throw new Error(JSON.stringify(open.error));
-    const fields = section(buildPrintModel(pkg, open.doc, { language: "en" }), "header", "header").fields;
+    const fields = section(buildSheetModel(pkg, open.doc, { language: "en" }), "header", "header").fields;
     expect(fields).toEqual([
       { label: "Folk", text: "Moorfolk" },
       { label: "Upbringing", text: "" },
@@ -1299,7 +1315,7 @@ describe("what a game master would otherwise write on the sheet by hand (demo pa
     const { extracted } = await print("de", { length: "m" });
     expect(extracted.pageTexts[0]).toMatch(/WUCHS\s+zierlich/u);
     const header = (d: typeof doc) =>
-      section(buildPrintModel(pkg, d, { language: "de" }), "header", "header");
+      section(buildSheetModel(pkg, d, { language: "de" }), "header", "header");
     const hill = applyChange(pkg, doc, { type: "answer", choice: "folk", answer: { pick: "folk.hillfolk" } });
     if (!hill.ok) throw new Error(JSON.stringify(hill.error));
     expect(header(hill.doc).fields[2]).toEqual({ label: "Wuchs", text: "stämmig" });
@@ -1318,13 +1334,13 @@ describe("what a game master would otherwise write on the sheet by hand (demo pa
         ),
       },
     };
-    expect(section(buildPrintModel(labelled, doc, { language: "en" }), "header", "header").fields).toEqual([
+    expect(section(buildSheetModel(labelled, doc, { language: "en" }), "header", "header").fields).toEqual([
       { label: "Folk", text: "slight" },
     ]);
   });
 
   it("groups features under the name of what brought them: the calling, the folk", () => {
-    const model = buildPrintModel(pkg, doc, { language: "de" });
+    const model = buildSheetModel(pkg, doc, { language: "de" });
     const rows = section(model, "traits", "featureTable").rows;
     expect([...new Set(rows.map((r) => r.group?.title))]).toEqual(["Laternenträgerin", "Moorvolk"]);
     // A thing picked in a choice its calling grants still counts for the calling.
@@ -1338,7 +1354,7 @@ describe("what a game master would otherwise write on the sheet by hand (demo pa
 
   it("prints rest dice as text and squares to tick, as many as the level, in more rows when many", async () => {
     const boxes = (d: DraftDocument) =>
-      section(buildPrintModel(pkg, d, { language: "de" }), "recovery", "statBoxes").boxes;
+      section(buildSheetModel(pkg, d, { language: "de" }), "recovery", "statBoxes").boxes;
     const [dice, made, missed] = boxes(doc);
     expect(dice).toMatchObject({ label: "Rastwürfel", style: "boxes", text: "3 × W8", squares: 3 });
     // Close calls: three squares each, no number (the squares say how many).
@@ -1350,7 +1366,7 @@ describe("what a game master would otherwise write on the sheet by hand (demo pa
     expect(extracted.pageTexts[0]).toContain("3 × W8");
     expect(extracted.pageTexts[0]).toContain("RASTWÜRFEL");
     // Twenty squares do not fit a row of a third of the page: the box grows a row, all boxes with it.
-    const high = await renderPdf(buildPrintModel(pkg, raisedCharacter(pkg, doc, 20), { language: "de" }));
+    const high = await renderPdf(buildSheetModel(pkg, raisedCharacter(pkg, doc, 20), { language: "de" }));
     const height = (r: RenderedPdf) => {
       const at = r.sheetLayout[0]!.findIndex((p) => p.section.id === "recovery");
       return r.sheetLayout[0]![at + 1]!.y - r.sheetLayout[0]![at]!.y;
@@ -1361,7 +1377,7 @@ describe("what a game master would otherwise write on the sheet by hand (demo pa
       ...pkg,
       values: pkg.values.map((v) => (v.id === "restDice" ? { ...v, formula: "level * 9" } : v)),
     };
-    const [tooMany] = section(buildPrintModel(many, doc, { language: "de" }), "recovery", "statBoxes").boxes;
+    const [tooMany] = section(buildSheetModel(many, doc, { language: "de" }), "recovery", "statBoxes").boxes;
     expect(tooMany).toMatchObject({ text: "27 × W8", squares: 0 });
   });
 
@@ -1384,7 +1400,7 @@ describe("what a game master would otherwise write on the sheet by hand (demo pa
   });
 
   it("marks a talent the character has a flair for a second time, and says so in the legend", () => {
-    const model = buildPrintModel(pkg, doc, { language: "de" });
+    const model = buildSheetModel(pkg, doc, { language: "de" });
     const talents = section(model, "talents", "checkList");
     const strong = talents.items.filter((i) => i.strong).map((i) => i.name);
     expect(strong).toEqual(["Feilschen"]);
@@ -1402,7 +1418,7 @@ describe("what a game master would otherwise write on the sheet by hand (demo pa
     expect(extracted.pageTexts[0]).toContain("= mit Kniff: Übung doppelt.");
     const plain = applyChange(pkg, doc, { type: "answer", choice: "upbringing", answer: null });
     if (!plain.ok) throw new Error(JSON.stringify(plain.error));
-    const talents = section(buildPrintModel(pkg, plain.doc, { language: "de" }), "talents", "checkList");
+    const talents = section(buildSheetModel(pkg, plain.doc, { language: "de" }), "talents", "checkList");
     expect(talents.items.some((i) => i.strong)).toBe(false);
     expect(talents.legend).toEqual([]);
     const { extracted: without } = await print("de", { length: "m" }, pkg, plain.doc);
@@ -1426,14 +1442,14 @@ describe("what a game master would otherwise write on the sheet by hand (demo pa
   });
 
   it("prints a stat small under each name of a feature table", () => {
-    const model = buildPrintModel(pkg, doc, { language: "de", units: { length: "m" } });
+    const model = buildSheetModel(pkg, doc, { language: "de", units: { length: "m" } });
     const knacks = section(model, "knacks", "featureTable");
     expect(knacks.rows.every((r) => r.note !== "")).toBe(true);
     expect(knacks.rows.find((r) => r.name === "Laternenruf")?.note).toBe("30 m");
   });
 
   it("keeps the source line's room off every page but the last, so page 1 holds as much without cards", async () => {
-    const model = buildPrintModel(pkg, doc, { language: "de", createdAt });
+    const model = buildSheetModel(pkg, doc, { language: "de", createdAt });
     const withCards = await renderPdf(model);
     const without = await renderPdf({ ...model, cards: [] });
     expect(without.sheetPages).toBe(withCards.sheetPages);
@@ -1457,7 +1473,7 @@ describe("what a game master would otherwise write on the sheet by hand (demo pa
     expect(gear.items).toContain("5 × Proviant");
     expect(gear.items).toContain("Seil");
     expect(extracted.text).toContain("5 × Proviant");
-    const en = buildPrintModel(pkg, doc, { language: "en" });
+    const en = buildSheetModel(pkg, doc, { language: "en" });
     expect(section(en, "gear", "list").items).toContain("5 × Provisions");
   });
 });
@@ -1471,3 +1487,23 @@ function demoCardThing(): string {
   const ev = evaluateDraft(pkg, doc);
   return ev.things.find((h) => pkg.things.find((t) => t.id === h.id)?.card)!.id;
 }
+
+describe("the PDF made from the sheet model", () => {
+  // The model moved out of this package into @builder/sheet (AND-178); the
+  // PDF stayed byte for byte what it was. A deliberate change to the layout
+  // or the demo package changes these: then check the sample PDFs and
+  // update them.
+  const before = {
+    de: { pages: 4, sha256: "7ed11acdfdc54207d53592d5c57a2f0a5c3ad3e08030f3ef864a3b400c7696bb" },
+    en: { pages: 4, sha256: "de1881a9a3d64e09bc57d5524dcbe8aec4109f15ded9180b10232a9646a98efc" },
+  };
+
+  it("is unchanged for the level 20 demo character with cards", async () => {
+    const level20 = demoCharacter(pkg, 20);
+    for (const language of ["de", "en"] as const) {
+      const pdf = await renderPdf(buildSheetModel(pkg, level20, { language, createdAt }));
+      const sha256 = createHash("sha256").update(pdf.bytes).digest("hex");
+      expect({ pages: (await extract(pdf)).pages, sha256 }, language).toEqual(before[language]);
+    }
+  });
+});

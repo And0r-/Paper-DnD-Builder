@@ -1,3 +1,4 @@
+import { sheetFields, sheetModelSchema } from "@builder/sheet";
 import { beforeEach, describe, expect, it } from "vitest";
 import { Client, signIn, startTestServer, type TestServer } from "../testing.ts";
 
@@ -104,5 +105,51 @@ describe("printing a character", () => {
     const res = await client.call("GET", `/api/drafts/${id}/pdf`);
     expect(res.status).toBe(429);
     expect(res.headers.get("retry-after")).not.toBeNull();
+  });
+});
+
+describe("the sheet as data", () => {
+  it("gives a finished character's sheet model, in the account's language and units", async () => {
+    const id = await character();
+    const res = await client.call("GET", `/api/drafts/${id}/sheet`);
+    expect(res.status).toBe(200);
+    expect(res.headers.get("cache-control")).toBe("no-store");
+    expect(sheetModelSchema.safeParse(res.json).error?.issues ?? []).toEqual([]);
+    expect(res.json).toMatchObject({
+      language: "de",
+      name: "Mira Fennwick",
+      level: 3,
+      packageId: "demo",
+      origin: { kind: "original", level: 3 },
+      units: { length: "m" },
+    });
+    expect(sheetFields(res.json)).toContain("sheet/primary/stamina");
+
+    await client.call("PATCH", "/api/account/settings", { language: "en", units: { length: "ft" } });
+    const en = (await client.call("GET", `/api/drafts/${id}/sheet`)).json;
+    expect(en).toMatchObject({ language: "en", units: { length: "ft" } });
+    // The same places, whatever the language.
+    expect(sheetFields(en).sort()).toEqual(sheetFields(res.json).sort());
+  });
+
+  it("refuses a character that is not finished, someone else's, and anyone not logged in", async () => {
+    const open = await character(false);
+    const res = await client.call("GET", `/api/drafts/${open}/sheet`);
+    expect(res.status).toBe(409);
+    expect(res.json.error.code).toBe("notFinished");
+
+    const id = await character();
+    const other = new Client(server, "198.51.100.9");
+    await signIn(other, server, "someone-else@example.org");
+    expect((await other.call("GET", `/api/drafts/${id}/sheet`)).status).toBe(404);
+    expect((await new Client(server).call("GET", `/api/drafts/${id}/sheet`)).status).toBe(401);
+  });
+
+  it("is not held back by the PDF's limit", async () => {
+    const id = await character();
+    const account = (await server.db.query<{ id: string }>("SELECT id FROM accounts"))[0]!.id;
+    for (let i = 0; i < 20; i++)
+      server.app.limiter.record(`pdf:account:${account}`, { max: 20, windowMs: 600_000 });
+    expect((await client.call("GET", `/api/drafts/${id}/sheet`)).status).toBe(200);
   });
 });

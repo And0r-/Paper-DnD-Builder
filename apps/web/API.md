@@ -327,18 +327,18 @@ routes (they know the campaign exists); anyone else `404 campaignNotFound`.
 
 **Who may do what**
 
-| Call                                                                                          | Game master            | Player                 | Anyone else     |
-| --------------------------------------------------------------------------------------------- | ---------------------- | ---------------------- | --------------- |
-| `GET /api/campaigns`                                                                          | sees it (`gameMaster`) | sees it (`player`)     | does not see it |
-| `GET /api/campaigns/:id`                                                                      | `200`, with players    | `200`, `players: null` | `404`           |
-| `PATCH`, `DELETE /api/campaigns/:id`                                                          | `200` / `204`          | `403`                  | `404`           |
-| `POST /api/campaigns/:id/players`                                                             | `201`                  | `403`                  | `404`           |
-| `DELETE /api/campaigns/:id/players/:playerId`                                                 | `204` (any player)     | `204` (`me` only)      | `404`           |
-| `POST /api/campaigns/:id/players/:playerId/drafts`                                            | `201`                  | `403`                  | `404`           |
-| `GET /api/drafts`                                                                             | own only               | own only               | own only        |
-| `GET`, `PATCH /api/drafts/:id`, answers, pools, finish, level-up, pdf of a player's character | `200`                  | `200` (owner)          | `404`           |
-| `DELETE /api/drafts/:id` of a player's character                                              | `403 ownerOnly`        | `204` (owner)          | `404`           |
-| any draft route on the game master's own character                                            | `200` (owner)          | `404`                  | `404`           |
+| Call                                                                                                 | Game master            | Player                 | Anyone else     |
+| ---------------------------------------------------------------------------------------------------- | ---------------------- | ---------------------- | --------------- |
+| `GET /api/campaigns`                                                                                 | sees it (`gameMaster`) | sees it (`player`)     | does not see it |
+| `GET /api/campaigns/:id`                                                                             | `200`, with players    | `200`, `players: null` | `404`           |
+| `PATCH`, `DELETE /api/campaigns/:id`                                                                 | `200` / `204`          | `403`                  | `404`           |
+| `POST /api/campaigns/:id/players`                                                                    | `201`                  | `403`                  | `404`           |
+| `DELETE /api/campaigns/:id/players/:playerId`                                                        | `204` (any player)     | `204` (`me` only)      | `404`           |
+| `POST /api/campaigns/:id/players/:playerId/drafts`                                                   | `201`                  | `403`                  | `404`           |
+| `GET /api/drafts`                                                                                    | own only               | own only               | own only        |
+| `GET`, `PATCH /api/drafts/:id`, answers, pools, finish, level-up, sheet, pdf of a player's character | `200`                  | `200` (owner)          | `404`           |
+| `DELETE /api/drafts/:id` of a player's character                                                     | `403 ownerOnly`        | `204` (owner)          | `404`           |
+| any draft route on the game master's own character                                                   | `200` (owner)          | `404`                  | `404`           |
 
 A game master prints a player's character in the game master's own
 language and units. Deleting a player's account removes their characters
@@ -348,12 +348,37 @@ Tests: [`campaigns.test.ts`](src/server/api/campaigns.test.ts).
 
 ## Print
 
-| Method & path                | Result                                                                                                                                                                                                                                                                                         |
-| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 🔒 `GET /api/drafts/:id/pdf` | The finished character as one A4 PDF: sheet, then cards. Language and units from the settings of whoever asks (a game master prints in theirs). `409 notFinished` (with `open`), `422 languageNotSupported` (with the package's printable `languages`), `429 tooManyRequests` (`Retry-After`). |
+| Method & path                  | Result                                                                                                                                                                                                                                                                                         |
+| ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 🔒 `GET /api/drafts/:id/sheet` | The finished character's sheet as data (see below). Language and units from the settings of whoever asks, like the PDF. `409 notFinished` (with `open`), `422 languageNotSupported` (with the package's printable `languages`).                                                                |
+| 🔒 `GET /api/drafts/:id/pdf`   | The finished character as one A4 PDF: sheet, then cards. Language and units from the settings of whoever asks (a game master prints in theirs). `409 notFinished` (with `open`), `422 languageNotSupported` (with the package's printable `languages`), `429 tooManyRequests` (`Retry-After`). |
 
 It is a plain `GET` so the screen can offer it as an ordinary download
 link. The PDF is made on every request and never stored.
+
+The sheet model (`components/schemas/SheetModel` in
+[`openapi.json`](openapi.json), the Zod schema `sheetModelSchema` in
+[`packages/sheet`](../../packages/sheet)) is what the PDF is drawn from,
+and what the screen and stored copies show. It is fully resolved: every
+text in one language, every quantity in the account's units, sections in
+the package's order with their conditions decided. It says nothing about
+rules, only sections, words and numbers:
+
+- `origin`: `{ kind: "original", level, builtAt }` for a sheet made now;
+  `{ kind: "copy", name, createdAt, fromLevel }` is reserved for a copy a
+  player keeps.
+- `field`, `usesField`, `playedByField`: an id for every place a player
+  writes or ticks on paper (pencil boxes, squares, circles, use boxes,
+  notes, blank lines, the player's name), such as `sheet/primary/stamina`
+  or `cards/<thing>/uses`. Made of package keys only, so a place keeps its
+  id when the character goes up a level.
+- `values`: for each value with a name on the sheet, its text and the
+  values that change with it (`dependents`), from the package's formulas.
+- `rulesTexts`: the full texts (`rules`, `explain`) of every row and card,
+  grouped by the thing that brought them.
+
+It is made on every request and never stored, like the PDF; it has no
+rate limit, it costs about as much as `GET /api/drafts/:id`.
 
 ## Server
 
@@ -363,45 +388,45 @@ link. The PDF is made on every request and never stored.
 
 ## Error codes
 
-| Status | Code                   | When                                                                                          |
-| ------ | ---------------------- | --------------------------------------------------------------------------------------------- |
-| `400`  | `badJson`              | The body is not JSON.                                                                         |
-| `400`  | `badRequest`           | The body has the wrong shape; `issues` lists `{ path, message }`.                             |
-| `401`  | `notLoggedIn`          | No session cookie and no `Authorization` header.                                              |
-| `401`  | `keyNotValid`          | The access key is unknown, withdrawn or not `Bearer cbk_...`.                                 |
-| `401`  | `wrongMailOrPassword`  | Login failed.                                                                                 |
-| `403`  | `crossSite`            | A change sent from another site.                                                              |
-| `403`  | `keyCannotMakeKeys`    | Making an access key with an access key.                                                      |
-| `403`  | `gameMasterOnly`       | A player of the campaign calls a game master's route.                                         |
-| `403`  | `ownerOnly`            | A game master deletes a player's character; only the owner does.                              |
-| `404`  | `notFound`             | No such API path.                                                                             |
-| `404`  | `draftNotFound`        | No draft with this id that you may reach (someone else's looks the same).                     |
-| `404`  | `campaignNotFound`     | No campaign with this id that you lead or play in.                                            |
-| `404`  | `playerNotFound`       | No such player in this campaign.                                                              |
-| `404`  | `keyNotFound`          | No access key with this id in this account.                                                   |
-| `404`  | `packageNotFound`      | No loaded package with this id.                                                               |
-| `404`  | `languageNotFound`     | The package has no texts in this language.                                                    |
-| `405`  | `methodNotAllowed`     | The path exists, the method does not.                                                         |
-| `409`  | `versionConflict`      | The draft moved on; `current` holds its state now.                                            |
-| `409`  | `notFinished`          | PDF of a draft, or raising a draft that is not in a raise; `open` lists the open choices.     |
-| `409`  | `alreadyPlayer`        | The address is already a player of this campaign.                                             |
-| `409`  | `packageUnavailable`   | The draft's package is not loaded right now; `packageId` names it.                            |
-| `413`  | `bodyTooLarge`         | Body over 64 KiB.                                                                             |
-| `415`  | `jsonRequired`         | Body not `application/json`.                                                                  |
-| `422`  | `changeRejected`       | The rule core refused the change; `reason` is a `ChangeError` (below).                        |
-| `422`  | `incomplete`           | Finishing with open choices; `open` lists them.                                               |
-| `422`  | `languageNotSupported` | The account's language cannot be printed with this package; `languages` lists those that can. |
-| `422`  | `cannotAddYourself`    | A game master adds their own address as a player.                                             |
-| `422`  | `tooManyCampaigns`     | The account leads 50 campaigns (`max`).                                                       |
-| `422`  | `tooManyPlayers`       | The campaign has 50 players (`max`).                                                          |
-| `422`  | `tooManyKeys`          | The account has 20 access keys (`max`).                                                       |
-| `422`  | `unknownUnit`          | No loaded package offers this unit (`dimension`, `unit`).                                     |
-| `429`  | `tooManyAttempts`      | Too many logins, password mails or invitations; `retryAfter`, also `Retry-After`.             |
-| `429`  | `tooManyRequests`      | Too many PDFs; `Retry-After`.                                                                 |
-| `500`  | `internal`             | A bug in the builder.                                                                         |
-| `500`  | `packageRuleError`     | The package's rules could not be worked out (a bug in the package); `message`.                |
-| `502`  | `mailFailed`           | The mail server refused the mail (password or invitation); nothing changed.                   |
-| `503`  | `mailNotConfigured`    | The server has no mail set up.                                                                |
+| Status | Code                   | When                                                                                               |
+| ------ | ---------------------- | -------------------------------------------------------------------------------------------------- |
+| `400`  | `badJson`              | The body is not JSON.                                                                              |
+| `400`  | `badRequest`           | The body has the wrong shape; `issues` lists `{ path, message }`.                                  |
+| `401`  | `notLoggedIn`          | No session cookie and no `Authorization` header.                                                   |
+| `401`  | `keyNotValid`          | The access key is unknown, withdrawn or not `Bearer cbk_...`.                                      |
+| `401`  | `wrongMailOrPassword`  | Login failed.                                                                                      |
+| `403`  | `crossSite`            | A change sent from another site.                                                                   |
+| `403`  | `keyCannotMakeKeys`    | Making an access key with an access key.                                                           |
+| `403`  | `gameMasterOnly`       | A player of the campaign calls a game master's route.                                              |
+| `403`  | `ownerOnly`            | A game master deletes a player's character; only the owner does.                                   |
+| `404`  | `notFound`             | No such API path.                                                                                  |
+| `404`  | `draftNotFound`        | No draft with this id that you may reach (someone else's looks the same).                          |
+| `404`  | `campaignNotFound`     | No campaign with this id that you lead or play in.                                                 |
+| `404`  | `playerNotFound`       | No such player in this campaign.                                                                   |
+| `404`  | `keyNotFound`          | No access key with this id in this account.                                                        |
+| `404`  | `packageNotFound`      | No loaded package with this id.                                                                    |
+| `404`  | `languageNotFound`     | The package has no texts in this language.                                                         |
+| `405`  | `methodNotAllowed`     | The path exists, the method does not.                                                              |
+| `409`  | `versionConflict`      | The draft moved on; `current` holds its state now.                                                 |
+| `409`  | `notFinished`          | PDF or sheet of a draft, or raising a draft that is not in a raise; `open` lists the open choices. |
+| `409`  | `alreadyPlayer`        | The address is already a player of this campaign.                                                  |
+| `409`  | `packageUnavailable`   | The draft's package is not loaded right now; `packageId` names it.                                 |
+| `413`  | `bodyTooLarge`         | Body over 64 KiB.                                                                                  |
+| `415`  | `jsonRequired`         | Body not `application/json`.                                                                       |
+| `422`  | `changeRejected`       | The rule core refused the change; `reason` is a `ChangeError` (below).                             |
+| `422`  | `incomplete`           | Finishing with open choices; `open` lists them.                                                    |
+| `422`  | `languageNotSupported` | The account's language cannot be printed with this package; `languages` lists those that can.      |
+| `422`  | `cannotAddYourself`    | A game master adds their own address as a player.                                                  |
+| `422`  | `tooManyCampaigns`     | The account leads 50 campaigns (`max`).                                                            |
+| `422`  | `tooManyPlayers`       | The campaign has 50 players (`max`).                                                               |
+| `422`  | `tooManyKeys`          | The account has 20 access keys (`max`).                                                            |
+| `422`  | `unknownUnit`          | No loaded package offers this unit (`dimension`, `unit`).                                          |
+| `429`  | `tooManyAttempts`      | Too many logins, password mails or invitations; `retryAfter`, also `Retry-After`.                  |
+| `429`  | `tooManyRequests`      | Too many PDFs; `Retry-After`.                                                                      |
+| `500`  | `internal`             | A bug in the builder.                                                                              |
+| `500`  | `packageRuleError`     | The package's rules could not be worked out (a bug in the package); `message`.                     |
+| `502`  | `mailFailed`           | The mail server refused the mail (password or invitation); nothing changed.                        |
+| `503`  | `mailNotConfigured`    | The server has no mail set up.                                                                     |
 
 `changeRejected` reasons (`error.reason.code`): `levelOutOfRange` (`min`,
 `max`), `levelNotHigher` (`level`), `unknownChoice`, `notAsked` (the choice
