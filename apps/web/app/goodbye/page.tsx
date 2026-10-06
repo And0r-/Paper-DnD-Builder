@@ -2,7 +2,6 @@
 import { useEffect } from "react";
 import { useApp } from "../../src/ui/app-state.tsx";
 import { ButtonLink } from "../../src/ui/components/Button.tsx";
-import { LanguageSelect } from "../../src/ui/components/LanguageSelect.tsx";
 import { GuestShell } from "../../src/ui/components/Shell.tsx";
 import { usePageTitle } from "../../src/ui/flow/frame.tsx";
 
@@ -14,7 +13,7 @@ export default function GoodbyePage() {
     void reloadAccount().catch(() => {});
   }, [reloadAccount]);
   return (
-    <GuestShell corner={<LanguageSelect compact />}>
+    <GuestShell>
       <div className="auth">
         <div className="auth__card">
           <h1 className="auth__title">{t("goodbye.title")}</h1>

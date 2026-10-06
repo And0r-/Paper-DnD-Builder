@@ -7,7 +7,6 @@ import { effectiveUnits, formatMeasure } from "@builder/core";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { isUiLanguage, UI_LANGUAGES, type UiLanguage } from "../../src/i18n/index.ts";
 import { useApp } from "../../src/ui/app-state.tsx";
 import { api, type Account } from "../../src/ui/api.ts";
 import { AccessKeys } from "../../src/ui/components/AccessKeys.tsx";
@@ -73,11 +72,6 @@ function Settings({ account }: { account: Account }) {
     );
   }, [askDelete]);
 
-  // Offer the languages both the builder and every loaded package have.
-  const languages: UiLanguage[] = packages
-    ? UI_LANGUAGES.filter((l) => packages.every((p) => p.pkg.manifest.languages.includes(l)))
-    : [...UI_LANGUAGES];
-
   const dimensions: { dim: string; lp: LoadedPackage }[] = [];
   for (const lp of packages ?? []) {
     for (const dim of Object.keys(lp.pkg.units.dimensions)) {
@@ -104,7 +98,7 @@ function Settings({ account }: { account: Account }) {
           <h2 className="section-title" id="s-language">
             {t("settings.language")}
           </h2>
-          <LanguageSelect languages={languages.filter(isUiLanguage)} onError={fail} />
+          <LanguageSelect onError={fail} />
           <p className="note">{t("settings.languageHint")}</p>
         </section>
 

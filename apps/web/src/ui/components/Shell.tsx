@@ -1,8 +1,8 @@
 "use client";
 /**
- * The frame of every logged-in screen: skip link, top bar with menu, the
- * menu drawer (step list while building, characters, campaigns, settings,
- * MCP, log out).
+ * The frame of every logged-in screen: skip link, top bar with menu and
+ * language switch, the menu drawer (step list while building, characters,
+ * campaigns, settings, MCP, log out).
  */
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -10,6 +10,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useApp } from "../app-state.tsx";
 import { Explained } from "./Explained.tsx";
 import { Icon } from "./Icon.tsx";
+import { LanguageMenu } from "./LanguageSelect.tsx";
 
 export function SkipLink() {
   const { t } = useApp();
@@ -71,6 +72,7 @@ export function AppShell({
           )}
         </div>
         <div className="topbar__status">{status}</div>
+        <LanguageMenu />
       </header>
       <MenuDrawer open={menuOpen} onClose={() => setMenuOpen(false)}>
         {menuExtra}
@@ -174,11 +176,13 @@ function MenuDrawer({
 }
 
 /** Logged-out screens: language switch top right, content centred. */
-export function GuestShell({ children, corner }: { children: ReactNode; corner?: ReactNode }) {
+export function GuestShell({ children }: { children: ReactNode }) {
   return (
     <div className="guest">
       <SkipLink />
-      <header className="guest__head">{corner}</header>
+      <header className="guest__head">
+        <LanguageMenu />
+      </header>
       <main id="main" className="guest__main" tabIndex={-1}>
         {children}
       </main>

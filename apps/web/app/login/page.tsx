@@ -13,7 +13,6 @@ import { Button } from "../../src/ui/components/Button.tsx";
 import { Callout } from "../../src/ui/components/Feedback.tsx";
 import { Explained } from "../../src/ui/components/Explained.tsx";
 import { TextField } from "../../src/ui/components/Fields.tsx";
-import { LanguageSelect } from "../../src/ui/components/LanguageSelect.tsx";
 import { GuestShell } from "../../src/ui/components/Shell.tsx";
 import { usePageTitle } from "../../src/ui/flow/frame.tsx";
 
@@ -161,7 +160,7 @@ export default function LoginPage() {
   );
 
   return (
-    <GuestShell corner={<LanguageSelect compact />}>
+    <GuestShell>
       <div className="auth">
         {/* The name explains itself where it is seen first, as in the top bar after login (AND-90). */}
         <p className="auth__brand">

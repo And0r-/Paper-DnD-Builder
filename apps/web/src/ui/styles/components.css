@@ -415,10 +415,51 @@ textarea.field__input {
   line-height: var(--text-sm-lh);
 }
 
-.language-select--compact .segmented__label {
+/* The language switch in every top bar (AND-153): small, but a full touch target. */
+.language-menu {
+  position: relative;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+}
+
+.language-menu__icon {
+  position: absolute;
+  left: var(--space-2);
+  pointer-events: none;
+  color: var(--color-ink-muted);
+}
+
+.language-menu__select {
   min-height: var(--target-min);
+  padding: var(--space-1) var(--space-2) var(--space-1) calc(var(--space-2) + 20px + var(--space-1));
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: inherit;
+  font: inherit;
   font-size: var(--text-sm);
-  padding: var(--space-1) var(--space-3);
+  cursor: pointer;
+}
+
+.language-menu__select:hover {
+  border-color: var(--color-primary);
+}
+
+.language-menu__select:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* On a phone the word alone; the globe comes back where there is room. */
+@media (max-width: 22.5rem) {
+  .language-menu__icon {
+    display: none;
+  }
+
+  .language-menu__select {
+    padding-left: var(--space-2);
+  }
 }
 
 /* --------------------------------------------------------------- dialogs */
