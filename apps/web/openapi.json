@@ -436,9 +436,9 @@
     "/api/account/settings": {
       "patch": {
         "operationId": "updateSettings",
-        "summary": "Change language or units",
+        "summary": "Change language, units or the print choice",
         "tags": ["Account"],
-        "description": "`units` maps a dimension to a unit; `null` follows the language's default again.",
+        "description": "`units` maps a dimension to a unit; `null` follows the language's default again. `print` keeps what the download dialog offers next time; fields left out stay as they are.",
         "requestBody": {
           "required": true,
           "content": {
@@ -461,6 +461,28 @@
                         }
                       ]
                     }
+                  },
+                  "print": {
+                    "type": "object",
+                    "properties": {
+                      "parts": {
+                        "type": "array",
+                        "items": {
+                          "enum": ["sheet", "cards", "texts"]
+                        },
+                        "minItems": 1,
+                        "maxItems": 3,
+                        "uniqueItems": true,
+                        "description": "In file order."
+                      },
+                      "design": {
+                        "enum": ["classic", "verbose"]
+                      },
+                      "state": {
+                        "enum": ["empty", "filled"]
+                      }
+                    },
+                    "additionalProperties": false
                   }
                 },
                 "required": [],
@@ -503,7 +525,7 @@
             "$ref": "#/components/responses/JsonRequired"
           },
           "422": {
-            "description": "`unknownUnit`",
+            "description": "`unknownUnit`, `designNotAvailable` (a planned design that is not drawn yet)",
             "content": {
               "application/json": {
                 "schema": {
@@ -512,12 +534,15 @@
                     "error": {
                       "properties": {
                         "code": {
-                          "enum": ["unknownUnit"]
+                          "enum": ["unknownUnit", "designNotAvailable"]
                         },
                         "dimension": {
                           "type": "string"
                         },
                         "unit": {
+                          "type": "string"
+                        },
+                        "design": {
                           "type": "string"
                         }
                       }
@@ -2099,12 +2124,70 @@
         }
       }
     },
+    "/api/sheet-designs": {
+      "get": {
+        "operationId": "sheetDesigns",
+        "summary": "Designs a sheet can be printed in",
+        "tags": ["Print"],
+        "description": "The designs the server draws, with a name and one line about each in every screen language, for a choice before printing. `default` is the one used when none is asked for. Cards and rules texts look the same in every design.",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "The designs.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "designs": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "object",
+                            "additionalProperties": {
+                              "type": "string"
+                            },
+                            "description": "Per screen language."
+                          },
+                          "description": {
+                            "type": "object",
+                            "additionalProperties": {
+                              "type": "string"
+                            },
+                            "description": "Per screen language."
+                          }
+                        },
+                        "required": ["id", "name", "description"],
+                        "additionalProperties": false
+                      }
+                    },
+                    "default": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["designs", "default"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
     "/api/drafts/{id}/pdf": {
       "get": {
         "operationId": "pdf",
         "summary": "The printed character",
         "tags": ["Print"],
-        "description": "A4 PDF: sheet, then cards; language and units from the account settings. Made on every request, never stored. A game master prints a player's character in the game master's language and units.",
+        "description": "A4 PDF/A with the parts asked for, always in the order sheet, cards, rules texts; one page count through the file. Without `parts`: the sheet, then the cards, exactly as before parts existed. Language and units from the account settings. Made on every request, never stored. A game master prints a player's character in the game master's language and units.",
         "parameters": [
           {
             "name": "id",
@@ -2114,6 +2197,45 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "parts",
+            "in": "query",
+            "required": false,
+            "description": "Comma-separated, one or more of `sheet` (the character sheet), `cards` (one card per thing marked as a card, with cut lines), `texts` (the full rules texts of every feature and card, two columns, under the name of what brought them). Default: `sheet,cards`.",
+            "schema": {
+              "type": "string",
+              "examples": ["sheet", "sheet,cards,texts"]
+            }
+          },
+          {
+            "name": "design",
+            "in": "query",
+            "required": false,
+            "description": "How the sheet looks; ids from `GET /api/sheet-designs`. Default: the first design there (`verbose`). `classic` is planned and answers `400 designNotAvailable` until it is drawn.",
+            "schema": {
+              "enum": ["classic", "verbose"]
+            }
+          },
+          {
+            "name": "version",
+            "in": "query",
+            "required": false,
+            "description": "Which sheet: `original` (made from the character as it is now). Printing a kept copy comes later; any other value answers `404 versionNotFound`.",
+            "schema": {
+              "type": "string",
+              "default": "original"
+            }
+          },
+          {
+            "name": "state",
+            "in": "query",
+            "required": false,
+            "description": "`empty`: a sheet to write on. `filled` (the play state written in) is planned and answers `400 stateNotAvailable` until it is printed.",
+            "schema": {
+              "enum": ["empty", "filled"],
+              "default": "empty"
+            }
           }
         ],
         "responses": {
@@ -2121,7 +2243,7 @@
             "description": "The PDF.",
             "headers": {
               "Content-Disposition": {
-                "description": "`attachment` with the character's name.",
+                "description": "`attachment` with the character's name; with `parts`, the parts' names after it (\"Mira - Sheet, Cards.pdf\").",
                 "schema": {
                   "type": "string"
                 }
@@ -2136,11 +2258,8 @@
               }
             }
           },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "404": {
-            "description": "`draftNotFound` (also someone else's character: it looks exactly like a missing one)",
+          "400": {
+            "description": "`badQuery` (a parameter with a value the API does not know; `parameter` and `value` name it), `designNotAvailable` (a planned design not drawn yet; `designs` lists those that are), `stateNotAvailable` (the play state is not printed yet)",
             "content": {
               "application/json": {
                 "schema": {
@@ -2149,7 +2268,50 @@
                     "error": {
                       "properties": {
                         "code": {
-                          "enum": ["draftNotFound"]
+                          "enum": ["badQuery", "designNotAvailable", "stateNotAvailable"]
+                        },
+                        "parameter": {
+                          "type": "string"
+                        },
+                        "value": {
+                          "type": "string"
+                        },
+                        "design": {
+                          "type": "string"
+                        },
+                        "designs": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "state": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "description": "`draftNotFound` (also someone else's character: it looks exactly like a missing one), `versionNotFound` (no such version of the sheet to print)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "enum": ["draftNotFound", "versionNotFound"]
+                        },
+                        "version": {
+                          "type": "string"
                         }
                       }
                     }
@@ -4173,16 +4335,20 @@
         "additionalProperties": false
       },
       "ErrorCode": {
-        "description": "Every error code the API answers with. Stable and English; screens word them in the player's language.\n\n- `badJson`: 400. The body is not JSON.\n- `badRequest`: 400. The body has the wrong shape; `issues` lists `{ path, message }`.\n- `notLoggedIn`: 401. No session cookie and no `Authorization` header.\n- `keyNotValid`: 401. The `Authorization` header holds no valid access key (unknown, withdrawn, or not `Bearer <key>`).\n- `wrongMailOrPassword`: 401. Login failed.\n- `crossSite`: 403. A change sent from another site (`Origin` or `Sec-Fetch-Site`).\n- `keyCannotMakeKeys`: 403. Access keys are made on the settings screen only, never with a key.\n- `notFound`: 404. No such API path.\n- `draftNotFound`: 404. No draft with this id in this account.\n- `keyNotFound`: 404. No access key with this id in this account.\n- `packageNotFound`: 404. No loaded package with this id.\n- `languageNotFound`: 404. The package has no texts in this language.\n- `methodNotAllowed`: 405. The path exists, the method does not.\n- `versionConflict`: 409. The draft moved on; `current` holds its state now.\n- `notFinished`: 409. The character is not finished (PDF) or not finished and not in a raise (level-up); `open` lists the open choices.\n- `packageUnavailable`: 409. The draft's package is not loaded right now; `packageId` names it.\n- `bodyTooLarge`: 413. The body is larger than 64 KiB.\n- `jsonRequired`: 415. The body is not `application/json`.\n- `changeRejected`: 422. The rule core refused the change; `reason` says why (see `ChangeError`).\n- `incomplete`: 422. Finishing with open choices; `open` lists them.\n- `languageNotSupported`: 422. The account's language cannot be printed with this package; `languages` lists those that can.\n- `tooManyKeys`: 422. The account has the most access keys allowed (`max`).\n- `unknownUnit`: 422. No loaded package offers this unit for this dimension.\n- `tooManyAttempts`: 429. Too many logins or password mails; `retryAfter` seconds, also in `Retry-After`.\n- `tooManyRequests`: 429. Too many PDFs; see `Retry-After`.\n- `internal`: 500. A bug in the builder.\n- `packageRuleError`: 500. The package's rules could not be worked out (a bug in the package); `message` says where.\n- `mailFailed`: 502. The mail server refused the password mail; nothing was changed.\n- `mailNotConfigured`: 503. The server has no mail set up; nobody can get a password.",
+        "description": "Every error code the API answers with. Stable and English; screens word them in the player's language.\n\n- `badJson`: 400. The body is not JSON.\n- `badRequest`: 400. The body has the wrong shape; `issues` lists `{ path, message }`.\n- `badQuery`: 400. A query parameter has a value the API does not know; `parameter` and `value` name it.\n- `designNotAvailable`: 400 (PDF) or 422 (settings). A planned sheet design that is not drawn yet; `designs` lists those that are.\n- `stateNotAvailable`: 400. The PDF cannot have the play state written in yet.\n- `notLoggedIn`: 401. No session cookie and no `Authorization` header.\n- `keyNotValid`: 401. The `Authorization` header holds no valid access key (unknown, withdrawn, or not `Bearer <key>`).\n- `wrongMailOrPassword`: 401. Login failed.\n- `crossSite`: 403. A change sent from another site (`Origin` or `Sec-Fetch-Site`).\n- `keyCannotMakeKeys`: 403. Access keys are made on the settings screen only, never with a key.\n- `notFound`: 404. No such API path.\n- `draftNotFound`: 404. No draft with this id in this account.\n- `keyNotFound`: 404. No access key with this id in this account.\n- `packageNotFound`: 404. No loaded package with this id.\n- `languageNotFound`: 404. The package has no texts in this language.\n- `versionNotFound`: 404. No such version of the sheet to print; only `original` for now.\n- `methodNotAllowed`: 405. The path exists, the method does not.\n- `versionConflict`: 409. The draft moved on; `current` holds its state now.\n- `notFinished`: 409. The character is not finished (PDF) or not finished and not in a raise (level-up); `open` lists the open choices.\n- `packageUnavailable`: 409. The draft's package is not loaded right now; `packageId` names it.\n- `bodyTooLarge`: 413. The body is larger than 64 KiB.\n- `jsonRequired`: 415. The body is not `application/json`.\n- `changeRejected`: 422. The rule core refused the change; `reason` says why (see `ChangeError`).\n- `incomplete`: 422. Finishing with open choices; `open` lists them.\n- `languageNotSupported`: 422. The account's language cannot be printed with this package; `languages` lists those that can.\n- `tooManyKeys`: 422. The account has the most access keys allowed (`max`).\n- `unknownUnit`: 422. No loaded package offers this unit for this dimension.\n- `tooManyAttempts`: 429. Too many logins or password mails; `retryAfter` seconds, also in `Retry-After`.\n- `tooManyRequests`: 429. Too many PDFs; see `Retry-After`.\n- `internal`: 500. A bug in the builder.\n- `packageRuleError`: 500. The package's rules could not be worked out (a bug in the package); `message` says where.\n- `mailFailed`: 502. The mail server refused the password mail; nothing was changed.\n- `mailNotConfigured`: 503. The server has no mail set up; nobody can get a password.",
         "enum": [
           "alreadyPlayer",
           "badJson",
+          "badQuery",
           "badRequest",
           "bodyTooLarge",
           "campaignNotFound",
           "cannotAddYourself",
           "changeRejected",
+          "copyNotFound",
+          "copyTooLarge",
           "crossSite",
+          "designNotAvailable",
           "draftNotFound",
           "gameMasterOnly",
           "incomplete",
@@ -4199,23 +4365,23 @@
           "notFinished",
           "notFound",
           "notLoggedIn",
+          "originalChanged",
           "ownerOnly",
           "packageNotFound",
           "packageRuleError",
           "packageUnavailable",
           "playerNotFound",
+          "stateNotAvailable",
           "tooManyAttempts",
           "tooManyCampaigns",
+          "tooManyCopies",
           "tooManyKeys",
           "tooManyPlayers",
           "tooManyRequests",
           "unknownUnit",
           "versionConflict",
-          "wrongMailOrPassword",
-          "copyNotFound",
-          "copyTooLarge",
-          "tooManyCopies",
-          "originalChanged"
+          "versionNotFound",
+          "wrongMailOrPassword"
         ]
       },
       "Error": {
@@ -4263,12 +4429,15 @@
             },
             "description": "Chosen unit per dimension; a missing dimension follows the language."
           },
+          "print": {
+            "$ref": "#/components/schemas/PrintChoice"
+          },
           "createdAt": {
             "type": "string",
             "format": "date-time"
           }
         },
-        "required": ["email", "language", "units", "createdAt"],
+        "required": ["email", "language", "units", "print", "createdAt"],
         "additionalProperties": false
       },
       "AccessKey": {
@@ -5571,6 +5740,30 @@
           "updatedAt": { "type": ["string", "null"], "format": "date-time" }
         },
         "required": ["state", "version", "updatedAt"],
+        "additionalProperties": false
+      },
+      "PrintChoice": {
+        "type": "object",
+        "description": "What the download dialog offers first: the last download's choice. Until one was made: only the sheet, in the first design, empty.",
+        "properties": {
+          "parts": {
+            "type": "array",
+            "items": {
+              "enum": ["sheet", "cards", "texts"]
+            },
+            "minItems": 1,
+            "maxItems": 3,
+            "uniqueItems": true,
+            "description": "In file order."
+          },
+          "design": {
+            "enum": ["classic", "verbose"]
+          },
+          "state": {
+            "enum": ["empty", "filled"]
+          }
+        },
+        "required": ["parts", "design", "state"],
         "additionalProperties": false
       }
     }

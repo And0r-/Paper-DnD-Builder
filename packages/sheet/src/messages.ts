@@ -29,6 +29,13 @@ export interface Messages {
   no: string;
   /** "8 × Rope": how many of a thing the character has. */
   count: (n: string, name: string) => string;
+  /** The parts of a printout, as in a file name ("Mira - Sheet.pdf"). */
+  sheet: string;
+  rulesTexts: string;
+  /** Title of the rules texts part. */
+  rulesTextsTitle: string;
+  /** The rules texts part of a character that has no thing with a text. */
+  noRulesTexts: string;
 }
 
 export const MESSAGES: Readonly<Record<string, Messages>> = {
@@ -50,6 +57,10 @@ export const MESSAGES: Readonly<Record<string, Messages>> = {
     yes: "ja",
     no: "nein",
     count: (n, name) => `${n} × ${name}`,
+    sheet: "Bogen",
+    rulesTexts: "Regeltexte",
+    rulesTextsTitle: "Regeltexte zum Nachlesen",
+    noRulesTexts: "Dieser Charakter hat nichts mit einem Regeltext.",
   },
   en: {
     playedBy: "Played by",
@@ -69,6 +80,10 @@ export const MESSAGES: Readonly<Record<string, Messages>> = {
     yes: "yes",
     no: "no",
     count: (n, name) => `${n} × ${name}`,
+    sheet: "Sheet",
+    rulesTexts: "Rules texts",
+    rulesTextsTitle: "Rules texts to read up on",
+    noRulesTexts: "This character has nothing with a rules text.",
   },
 };
 

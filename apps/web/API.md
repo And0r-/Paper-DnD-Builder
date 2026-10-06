@@ -29,15 +29,15 @@ it, so the file and the server cannot drift apart.
 
 ## Login and account
 
-| Method & path                    | Body                    | Result                                                                                                                                                |
-| -------------------------------- | ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `POST /api/auth/password`        | `{ email, language? }`  | `202`. Makes a password and mails it: new account, or new password for an existing one (old one stops working). Same answer either way.               |
-| `POST /api/auth/login`           | `{ email, password }`   | `200 { account }` + session cookie. `401 wrongMailOrPassword`, `429 tooManyAttempts` (`Retry-After`).                                                 |
-| `POST /api/auth/logout`          | —                       | `204`, cookie cleared.                                                                                                                                |
-| 🔒 `GET /api/account`            | —                       | `{ account: { email, language, units, createdAt } }`                                                                                                  |
-| 🔒 `PATCH /api/account/settings` | `{ language?, units? }` | `units` is `{ dimension: unit or null }`; null follows the language again. Units must exist in a loaded package (`422 unknownUnit`).                  |
-| 🔒 `POST /api/account/password`  | —                       | `202`. New password by mail; every other session ends.                                                                                                |
-| 🔒 `DELETE /api/account`         | `{ confirm: true }`     | `204`. Deletes account, sessions, access keys, every draft, the campaigns it leads (players keep their characters) and its places in other campaigns. |
+| Method & path                    | Body                            | Result                                                                                                                                                                                                                                                                                                                   |
+| -------------------------------- | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `POST /api/auth/password`        | `{ email, language? }`          | `202`. Makes a password and mails it: new account, or new password for an existing one (old one stops working). Same answer either way.                                                                                                                                                                                  |
+| `POST /api/auth/login`           | `{ email, password }`           | `200 { account }` + session cookie. `401 wrongMailOrPassword`, `429 tooManyAttempts` (`Retry-After`).                                                                                                                                                                                                                    |
+| `POST /api/auth/logout`          | —                               | `204`, cookie cleared.                                                                                                                                                                                                                                                                                                   |
+| 🔒 `GET /api/account`            | —                               | `{ account: { email, language, units, print, createdAt } }`                                                                                                                                                                                                                                                              |
+| 🔒 `PATCH /api/account/settings` | `{ language?, units?, print? }` | `units` is `{ dimension: unit or null }`; null follows the language again. Units must exist in a loaded package (`422 unknownUnit`). `print` is `{ parts?, design?, state? }`, what the download dialog offers next time (see Print); left-out fields stay. `422 designNotAvailable` for a planned design not drawn yet. |
+| 🔒 `POST /api/account/password`  | —                               | `202`. New password by mail; every other session ends.                                                                                                                                                                                                                                                                   |
+| 🔒 `DELETE /api/account`         | `{ confirm: true }`             | `204`. Deletes account, sessions, access keys, every draft, the campaigns it leads (players keep their characters) and its places in other campaigns.                                                                                                                                                                    |
 
 ## Access keys
 
@@ -292,6 +292,8 @@ done
 # 4. Finish and print.
 curl -s "${H[@]}" -X POST "$BASE/api/drafts/$ID/finish" -d "{\"version\":$(jq .draft.version <<<"$VIEW")}" >/dev/null
 curl -s -H "Authorization: Bearer $KEY" "$BASE/api/drafts/$ID/pdf" -o character.pdf
+# Or each part as its own file: the sheet alone, the cards, the rules texts.
+curl -s -H "Authorization: Bearer $KEY" "$BASE/api/drafts/$ID/pdf?parts=sheet" -o sheet.pdf
 ```
 
 A real helper would ask the player instead of taking the recommendation,
@@ -349,13 +351,39 @@ Tests: [`campaigns.test.ts`](src/server/api/campaigns.test.ts).
 
 ## Print
 
-| Method & path                  | Result                                                                                                                                                                                                                                                                                         |
-| ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 🔒 `GET /api/drafts/:id/sheet` | The finished character's sheet as data (see below). Language and units from the settings of whoever asks, like the PDF. `409 notFinished` (with `open`), `422 languageNotSupported` (with the package's printable `languages`).                                                                |
-| 🔒 `GET /api/drafts/:id/pdf`   | The finished character as one A4 PDF: sheet, then cards. Language and units from the settings of whoever asks (a game master prints in theirs). `409 notFinished` (with `open`), `422 languageNotSupported` (with the package's printable `languages`), `429 tooManyRequests` (`Retry-After`). |
+| Method & path                  | Result                                                                                                                                                                                                                                                                                                                                                      |
+| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 🔒 `GET /api/drafts/:id/sheet` | The finished character's sheet as data (see below). Language and units from the settings of whoever asks, like the PDF. `409 notFinished` (with `open`), `422 languageNotSupported` (with the package's printable `languages`).                                                                                                                             |
+| 🔒 `GET /api/drafts/:id/pdf`   | The finished character as one A4 PDF with the parts asked for (below); without `parts`, the sheet and then the cards. Language and units from the settings of whoever asks (a game master prints in theirs). `409 notFinished` (with `open`), `422 languageNotSupported` (with the package's printable `languages`), `429 tooManyRequests` (`Retry-After`). |
+| `GET /api/sheet-designs`       | `{ designs: [{ id, name, description }], default }`: the designs the server draws, `name` and `description` per screen language (`{ de, en }`). Public. For now only `verbose` ("Detailed").                                                                                                                                                                |
 
 It is a plain `GET` so the screen can offer it as an ordinary download
 link. The PDF is made on every request and never stored.
+
+Query parameters of the PDF, all optional:
+
+- `parts`: comma-separated, one or more of `sheet` (the character sheet),
+  `cards` (one card per thing the package marks as a card, nine to a
+  page, with cut lines) and `texts` (rules texts to read up on: the full
+  texts of every feature and card in two columns, under the name of what
+  brought them, no cut lines). In the file they always come in that order,
+  with one page count through all of them; the file name names them
+  ("Mira - Sheet, Cards.pdf"). **Without `parts` the PDF is exactly what it
+  was before parts existed: the sheet, then the cards.** The download
+  dialog asks for the sheet alone unless the player picks more.
+- `design`: an id from `GET /api/sheet-designs`; default the first one
+  (`verbose`). `classic` is planned and answers `400 designNotAvailable`
+  until it is drawn. Cards and rules texts look the same in every design.
+- `version`: `original` (default), the sheet as the builder makes it now.
+  Kept copies of a sheet come later; any other id answers
+  `404 versionNotFound`.
+- `state`: `empty` (default), a sheet to write on. `filled` (the play
+  state written in) is planned and answers `400 stateNotAvailable`.
+- Any other value answers `400 badQuery` with `parameter` and `value`.
+
+The screen keeps the player's choice of parts and design on the account
+(`print` in `GET /api/account`, changed with `PATCH /api/account/settings`);
+until one is made it is `{ parts: ["sheet"], design: "verbose", state: "empty" }`.
 
 The sheet model (`components/schemas/SheetModel` in
 [`openapi.json`](openapi.json), the Zod schema `sheetModelSchema` in
@@ -439,6 +467,9 @@ Tests: [`sheet-copies.test.ts`](src/server/api/sheet-copies.test.ts).
 | ------ | ---------------------- | -------------------------------------------------------------------------------------------------- |
 | `400`  | `badJson`              | The body is not JSON.                                                                              |
 | `400`  | `badRequest`           | The body has the wrong shape; `issues` lists `{ path, message }`.                                  |
+| `400`  | `badQuery`             | A query parameter has a value the API does not know (`parameter`, `value`).                        |
+| `400`  | `designNotAvailable`   | A planned sheet design not drawn yet (`designs` lists those that are); `422` in the settings.      |
+| `400`  | `stateNotAvailable`    | The PDF cannot have the play state written in yet.                                                 |
 | `401`  | `notLoggedIn`          | No session cookie and no `Authorization` header.                                                   |
 | `401`  | `keyNotValid`          | The access key is unknown, withdrawn or not `Bearer cbk_...`.                                      |
 | `401`  | `wrongMailOrPassword`  | Login failed.                                                                                      |
@@ -454,6 +485,7 @@ Tests: [`sheet-copies.test.ts`](src/server/api/sheet-copies.test.ts).
 | `404`  | `keyNotFound`          | No access key with this id in this account.                                                        |
 | `404`  | `packageNotFound`      | No loaded package with this id.                                                                    |
 | `404`  | `languageNotFound`     | The package has no texts in this language.                                                         |
+| `404`  | `versionNotFound`      | No such copy of the sheet; only `original` for now.                                                |
 | `405`  | `methodNotAllowed`     | The path exists, the method does not.                                                              |
 | `409`  | `versionConflict`      | The draft, copy or play state moved on; `current` holds it now.                                    |
 | `409`  | `notFinished`          | PDF or sheet of a draft, or raising a draft that is not in a raise; `open` lists the open choices. |

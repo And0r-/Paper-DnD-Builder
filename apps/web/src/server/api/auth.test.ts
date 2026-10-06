@@ -225,6 +225,41 @@ describe("settings", () => {
     expect(unit.json.error).toEqual({ code: "unknownUnit", dimension: "length", unit: "kg" });
     expect((await client.call("PATCH", "/api/account/settings", { language: "xx" })).status).toBe(400);
   });
+
+  it("keeps the last download's choice: only the sheet until something else is picked", async () => {
+    await signIn(client, server, EMAIL);
+    const fresh = await client.call("GET", "/api/account");
+    expect(fresh.json.account.print).toEqual({ parts: ["sheet"], design: "verbose", state: "empty" });
+
+    // Parts are kept in file order; what is left out stays as it was.
+    const set = await client.call("PATCH", "/api/account/settings", { print: { parts: ["texts", "sheet"] } });
+    expect(set.status).toBe(200);
+    expect(set.json.account.print).toEqual({ parts: ["sheet", "texts"], design: "verbose", state: "empty" });
+    const language = await client.call("PATCH", "/api/account/settings", { language: "en" });
+    expect(language.json.account.print.parts).toEqual(["sheet", "texts"]);
+    expect((await client.call("GET", "/api/account")).json.account.print.parts).toEqual(["sheet", "texts"]);
+
+    const refuse = async (print: unknown) =>
+      (await client.call("PATCH", "/api/account/settings", { print })).status;
+    expect(await refuse({ parts: [] })).toBe(400);
+    expect(await refuse({ parts: ["sheet", "sheet"] })).toBe(400);
+    expect(await refuse({ parts: ["poster"] })).toBe(400);
+    expect(await refuse({ design: "fancy" })).toBe(400);
+    expect(await refuse({ colour: "red" })).toBe(400);
+    const classic = await client.call("PATCH", "/api/account/settings", { print: { design: "classic" } });
+    expect(classic.status).toBe(422);
+    expect(classic.json.error).toEqual({ code: "designNotAvailable", design: "classic" });
+
+    // Whatever got into the column, the account reads only what is valid now.
+    await server.db.query(
+      `UPDATE accounts SET print_choice = '{"parts":["cards","nope"],"design":"classic","state":"filled"}'`,
+    );
+    expect((await client.call("GET", "/api/account")).json.account.print).toEqual({
+      parts: ["sheet"],
+      design: "verbose",
+      state: "filled",
+    });
+  });
 });
 
 describe("deleting the account", () => {

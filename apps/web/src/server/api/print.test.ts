@@ -1,4 +1,5 @@
-import { sheetFields, sheetModelSchema } from "@builder/sheet";
+import { renderPdf } from "@builder/print";
+import { sheetFields, sheetModelSchema, type PrintPart, type SheetModel } from "@builder/sheet";
 import { beforeEach, describe, expect, it } from "vitest";
 import { Client, signIn, startTestServer, type TestServer } from "../testing.ts";
 
@@ -40,11 +41,11 @@ function answerFor(c: ChoiceState): unknown {
   throw new Error(`no answer for ${c.kind}`);
 }
 
-/** A level 3 demo character, answered step by step over the API; finished unless told otherwise. */
-async function character(finish = true): Promise<string> {
-  let view = (await client.call("POST", "/api/drafts", { packageId: "demo", level: 3 })).json;
+/** A demo character (level 3 unless told), answered step by step over the API; finished unless told otherwise. */
+async function character(finish = true, level = 3): Promise<string> {
+  let view = (await client.call("POST", "/api/drafts", { packageId: "demo", level })).json;
   const id: string = view.draft.id;
-  for (let guard = 0; guard < 50 && !view.evaluation.complete; guard++) {
+  for (let guard = 0; guard < 300 && !view.evaluation.complete; guard++) {
     const open = view.evaluation.steps
       .flatMap((s: { choices: string[] }) => s.choices)
       .map((c: string) => view.evaluation.choices[c] as ChoiceState)
@@ -105,6 +106,88 @@ describe("printing a character", () => {
     const res = await client.call("GET", `/api/drafts/${id}/pdf`);
     expect(res.status).toBe(429);
     expect(res.headers.get("retry-after")).not.toBeNull();
+  });
+});
+
+describe("the parts of a printout", () => {
+  const bytes = async (res: Response) => Buffer.from(await res.arrayBuffer());
+
+  it("gives a level 20 character's sheet, cards and rules texts as three files, and both as before without parts", async () => {
+    const id = await character(true, 20);
+    const model = (await client.call("GET", `/api/drafts/${id}/sheet`)).json as SheetModel;
+    expect(model.level).toBe(20);
+    expect(model.cards.length).toBeGreaterThan(0);
+    const local = async (parts?: PrintPart[]) =>
+      Buffer.from((await renderPdf(model, parts ? { parts } : {})).bytes);
+
+    // Each part on its own, exactly what the print package makes of the sheet model.
+    const files: Record<string, Buffer> = {};
+    for (const [part, word] of [
+      ["sheet", "Bogen"],
+      ["cards", "Karten"],
+      ["texts", "Regeltexte"],
+    ] as const) {
+      const res = await client.request("GET", `/api/drafts/${id}/pdf?parts=${part}`);
+      expect(res.status, part).toBe(200);
+      expect(res.headers.get("content-disposition")).toBe(
+        `attachment; filename="Mira-Fennwick-${word}.pdf"; filename*=UTF-8''${encodeURIComponent(`Mira Fennwick - ${word}.pdf`)}`,
+      );
+      files[part] = await bytes(res);
+      expect(files[part].equals(await local([part])), part).toBe(true);
+    }
+    expect(new Set(Object.values(files).map((f) => f.toString("base64"))).size).toBe(3);
+
+    // Without parts: the sheet and the cards, the file it was before there were parts.
+    const plain = await client.request("GET", `/api/drafts/${id}/pdf`);
+    expect(plain.headers.get("content-disposition")).toContain('filename="Mira-Fennwick.pdf"');
+    const before = await bytes(plain);
+    expect(before.equals(await local(["sheet", "cards"]))).toBe(true);
+    expect(before.equals(await local())).toBe(true);
+
+    // Several parts in one file, always in the order sheet, cards, rules texts.
+    const all = await client.request(
+      "GET",
+      `/api/drafts/${id}/pdf?parts=texts,sheet,cards&design=verbose&version=original&state=empty`,
+    );
+    expect(all.status).toBe(200);
+    expect(all.headers.get("content-disposition")).toContain(
+      "Mira%20Fennwick%20-%20Bogen%2C%20Karten%2C%20Regeltexte.pdf",
+    );
+    expect((await bytes(all)).equals(await local(["sheet", "cards", "texts"]))).toBe(true);
+  });
+
+  it("refuses parts, designs and states it does not know or does not draw yet, and copies it does not have", async () => {
+    const id = await character();
+    const code = async (query: string) => {
+      const res = await client.call("GET", `/api/drafts/${id}/pdf?${query}`);
+      return [res.status, res.json?.error?.code];
+    };
+    expect(await code("parts=")).toEqual([400, "badQuery"]);
+    expect(await code("parts=sheet,poster")).toEqual([400, "badQuery"]);
+    expect(await code("design=fancy")).toEqual([400, "badQuery"]);
+    // Planned: the classic design and the play state come with later parts of the sheet work.
+    expect(await code("design=classic")).toEqual([400, "designNotAvailable"]);
+    expect(await code("state=filled")).toEqual([400, "stateNotAvailable"]);
+    expect(await code("state=half")).toEqual([400, "badQuery"]);
+    expect(await code("version=0b0f0c3e-1d5a-4a8e-9f00-000000000000")).toEqual([404, "versionNotFound"]);
+    // None of these used up the PDF limit.
+    const account = (await server.db.query<{ id: string }>("SELECT id FROM accounts"))[0]!.id;
+    expect(server.app.limiter.take(`pdf:account:${account}`, { max: 1, windowMs: 600_000 }).ok).toBe(true);
+  });
+
+  it("lists the designs to choose from, with names in every screen language, without a login", async () => {
+    const res = await new Client(server).call("GET", "/api/sheet-designs");
+    expect(res.status).toBe(200);
+    expect(res.json).toEqual({
+      default: "verbose",
+      designs: [
+        {
+          id: "verbose",
+          name: { de: "Ausführlich", en: "Detailed" },
+          description: { de: expect.any(String), en: expect.any(String) },
+        },
+      ],
+    });
   });
 });
 

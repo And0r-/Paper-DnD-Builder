@@ -62,8 +62,12 @@ test("a level-20 character with nothing but choose for me, down to the PDF", asy
   await page.getByRole("button", { name: m["overview.finish"] }).click();
   await expect(page.getByRole("heading", { level: 1, name: /ist fertig!$/ })).toBeVisible();
 
-  const download = page.waitForEvent("download");
+  // The dialog offers the sheet alone; cards ticked too, both come in one file.
   await page.getByRole("button", { name: m["done.download"] }).click();
+  const dialog = page.getByRole("dialog", { name: m["print.title"] });
+  await dialog.getByRole("checkbox", { name: m["print.cards"], exact: true }).click();
+  const download = page.waitForEvent("download");
+  await dialog.getByRole("button", { name: m["print.download"], exact: true }).click();
   const pdf = await readFile((await (await download).path())!);
   expect(pdf.subarray(0, 5).toString("latin1")).toBe("%PDF-");
   // Sheet and cards of a level-20 lantern bearer take several pages.

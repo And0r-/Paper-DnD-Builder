@@ -1468,3 +1468,54 @@
   line-height: var(--text-lg-lh);
   color: var(--color-ink-muted);
 }
+
+/* ------------------------------------------------------------ print dialog */
+
+.print-parts {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+
+.print-parts__legend {
+  font-weight: var(--weight-semibold);
+  padding: 0;
+  margin-bottom: var(--space-2);
+}
+
+/* Option cards in a dialog: the same marks, less room. */
+.option--compact {
+  gap: var(--space-1);
+  padding: var(--space-3);
+  box-shadow: none;
+}
+
+.option--compact .option__name {
+  font-size: var(--text-md);
+  line-height: var(--text-md-lh);
+}
+
+.option--compact .option__short {
+  font-size: var(--text-sm);
+  line-height: var(--text-sm-lh);
+}
+
+@media (min-width: 600px) {
+  .option--compact {
+    padding: var(--space-3) var(--space-4);
+  }
+}
+
+.print-line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-2);
+}
+
+.print-line__label {
+  font-weight: var(--weight-semibold);
+}

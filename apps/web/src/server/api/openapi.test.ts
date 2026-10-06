@@ -315,6 +315,9 @@ async function walk(server: TestServer): Promise<void> {
   await call("PATCH", "/api/account/settings", { language: "en", units: { length: null } });
   await call("PATCH", "/api/account/settings", { units: { length: "parsec" } });
   await call("PATCH", "/api/account/settings", { language: "de" });
+  await call("PATCH", "/api/account/settings", { print: { parts: ["sheet", "texts"], design: "verbose" } });
+  await call("PATCH", "/api/account/settings", { print: { design: "classic" } });
+  await call("GET", "/api/sheet-designs");
   await call("POST", "/api/account/password");
 
   // Keys.
@@ -377,6 +380,16 @@ async function walk(server: TestServer): Promise<void> {
   }
   view = (await call("POST", `/api/drafts/${id}/finish`, { version: view.draft.version }, k)).json;
   await c.request("GET", `/api/drafts/${id}/pdf`, undefined, k);
+  await c.request(
+    "GET",
+    `/api/drafts/${id}/pdf?parts=sheet,texts&design=verbose&version=original&state=empty`,
+    undefined,
+    k,
+  );
+  await call("GET", `/api/drafts/${id}/pdf?parts=poster`, undefined, k);
+  await call("GET", `/api/drafts/${id}/pdf?design=classic`, undefined, k);
+  await call("GET", `/api/drafts/${id}/pdf?state=filled`, undefined, k);
+  await call("GET", `/api/drafts/${id}/pdf?version=elsewhere`, undefined, k);
   const sheet = (await call("GET", `/api/drafts/${id}/sheet`, undefined, k)).json;
 
   // Kept copies of the sheet and the play state.
