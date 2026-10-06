@@ -316,9 +316,11 @@ function StepItem({
   const open = here !== undefined && here.section === head.section;
   const mark = markOf(head, all, open);
   if (head.sectionTitle === undefined || all.length === 1) {
+    // Shut, the step is red if a part of it is, and leads there (AND-162).
+    const red = open ? undefined : parts.find((e) => e.status === "needsAttention");
     return (
       <li className="steplist__item">
-        <StepLink entry={head} current={current} mark={mark} />
+        <StepLink entry={red ? { ...red, title: head.title } : head} current={current} mark={mark} />
         {open && <LevelRuns section={head.key} items={parts} current={current} from={head.atLevel} />}
       </li>
     );

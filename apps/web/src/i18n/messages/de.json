@@ -107,6 +107,7 @@
   "flow.backToOverview": "Zurück zum Überblick",
   "flow.missingGeneric": "Triff hier noch eine Wahl.",
   "flow.needsAttention": "Das passt nicht mehr, weil du vorher etwas geändert hast. Wähle bitte neu.",
+  "flow.givenElsewhere": "Das bekommst du schon an anderer Stelle: {thing} (von {by}). Wähle bitte etwas anderes.",
   "flow.stepAdded.one": "Ein Schritt dazu: {steps}.",
   "flow.stepAdded.other": "{count} Schritte dazu: {steps}.",
   "flow.stepRemoved.one": "Ein Schritt fällt weg: {steps}.",

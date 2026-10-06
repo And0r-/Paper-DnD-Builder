@@ -54,6 +54,9 @@
         "choice": "coastfolk-talent"
       },
       {
+        "choice": "coastfolk-flair"
+      },
+      {
         "thing": "build.sturdy"
       }
     ]

@@ -180,6 +180,8 @@ describe("building a character over the API", () => {
       ["talents-river-runner", { picks: ["talent.climbing", "talent.sneaking"] }],
       // Coastfolk add a talent of their own; the bell tower already taught listening.
       ["coastfolk-talent", { pick: "talent.weather-sense" }],
+      // The bell tower gives "listening" already, so haggling is the only flair left.
+      ["coastfolk-flair", { pick: "flair.haggling" }],
       ["gear", { pick: "item.fishing-net" }],
       ["handling-river-runner", { picks: ["handling.boat-hook", "handling.small-bell"] }],
       ["knacks-current", { picks: ["knack.fog-hop", "knack.eddy"] }],

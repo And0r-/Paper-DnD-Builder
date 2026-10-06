@@ -3995,6 +3995,13 @@
             },
             "description": "Things that grant this choice."
           },
+          "givenBy": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Problem `duplicate` because a grant gives a pick anyway (often in a later step): each such pick with the thing that grants it."
+          },
           "atLevel": {
             "type": "integer"
           },

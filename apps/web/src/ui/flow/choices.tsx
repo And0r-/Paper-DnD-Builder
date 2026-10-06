@@ -27,6 +27,7 @@ import {
   thingName,
 } from "../package-text.ts";
 import type { LoadedPackage } from "../packages.ts";
+import { fillNodes, ThingName } from "../components/ThingName.tsx";
 import { useDraft } from "./draft-state.tsx";
 import { laterSteps, rowEffect, rowIsBase, rowName, rowSum, rowValues, sumText } from "./explain.ts";
 import { fillArray, forcedArray, freeMarks } from "./array-fill.ts";
@@ -374,7 +375,16 @@ export function PickChoice({
       )}
       {state.status === "invalid" && (
         <Callout tone="warning" role="status">
-          {t("flow.needsAttention")}
+          {state.givenBy
+            ? Object.entries(state.givenBy).map(([thing, by]) => (
+                <p key={thing} data-given-by={thing}>
+                  {fillNodes((m) => t("flow.givenElsewhere", m), {
+                    thing: <ThingName lp={lp} id={thing} />,
+                    by: <ThingName lp={lp} id={by} />,
+                  })}
+                </p>
+              ))
+            : t("flow.needsAttention")}
         </Callout>
       )}
       {choice.held && state.held && state.held.length > 0 && (

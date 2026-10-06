@@ -107,6 +107,7 @@
   "flow.backToOverview": "Back to the overview",
   "flow.missingGeneric": "Make a choice here first.",
   "flow.needsAttention": "This no longer fits because you changed something earlier. Please choose again.",
+  "flow.givenElsewhere": "You already get this elsewhere: {thing} (from {by}). Please choose something else.",
   "flow.stepAdded.one": "One more step: {steps}.",
   "flow.stepAdded.other": "{count} more steps: {steps}.",
   "flow.stepRemoved.one": "One step drops out: {steps}.",
