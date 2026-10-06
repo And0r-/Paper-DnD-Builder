@@ -463,9 +463,18 @@ export const sectionSchema = z.discriminatedUnion("kind", [
   z.strictObject({
     ...sectionBase,
     kind: z.literal("header"),
-    /** Answers printed small under the summary line, each with a label (default: the choice's title). */
+    /**
+     * Printed small under the summary line, each with a label: the answer of
+     * a choice (default label: the choice's title), or the names of the held
+     * things selected by `things` (default label: the name of its `kind`).
+     */
     fields: z
-      .array(z.strictObject({ choice: id, label: textKey.optional() }))
+      .array(
+        z.union([
+          z.strictObject({ choice: id, label: textKey.optional() }),
+          z.strictObject({ things: optionSourceSchema, label: textKey.optional() }),
+        ]),
+      )
       .min(1)
       .max(4)
       .optional(),
@@ -519,6 +528,8 @@ export const sectionSchema = z.discriminatedUnion("kind", [
      * (printed ◉ instead of ●), e.g. a talent the character is especially good at.
      */
     strong: optionSourceSchema.optional(),
+    /** What ◉ means, printed after the section hint only if a row is marked twice. */
+    strongLegend: textKey.optional(),
   }),
   z.strictObject({
     ...sectionBase,

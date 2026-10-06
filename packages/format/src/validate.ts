@@ -364,7 +364,7 @@ export function validatePackageFiles(files: PackageFiles): ValidationResult {
     );
   const checkOptionSource = (file: string, path: string, o: OptionSource): Thing[] => {
     if (o.kind !== undefined && !manifest.kinds.includes(o.kind))
-      err(file, `${path}.kind`, `unknown kind ${lit(o.kind)}`);
+      err(file, `${path}.kind`, `unknown kind ${lit(o.kind)}${known(manifest.kinds)}`);
     o.ids?.forEach((tid, j) => {
       if (!thingById.has(tid)) err(file, `${path}.ids[${j}]`, `unknown thing ${lit(tid)}`);
     });
@@ -719,8 +719,18 @@ export function validatePackageFiles(files: PackageFiles): ValidationResult {
     switch (s.kind) {
       case "header":
         s.fields?.forEach((f, j) => {
-          if (!choiceById.has(f.choice))
-            err(S, `${p}.fields[${j}].choice`, `unknown choice ${lit(f.choice)}`);
+          if ("choice" in f) {
+            if (!choiceById.has(f.choice))
+              err(S, `${p}.fields[${j}].choice`, `unknown choice ${lit(f.choice)}`);
+            return;
+          }
+          checkOptionSource(S, `${p}.fields[${j}].things`, f.things);
+          if (f.label === undefined && f.things.kind === undefined)
+            err(
+              S,
+              `${p}.fields[${j}]`,
+              'needs a "label": without "things.kind" there is no kind name to print',
+            );
         });
         break;
       case "statBoxes":
@@ -764,6 +774,8 @@ export function validatePackageFiles(files: PackageFiles): ValidationResult {
           if (strong.length > 0 && !strong.some((t) => t.about !== undefined && ids.has(t.about)))
             err(S, `${p}.strong`, "none of these things is `about` a thing listed in this section");
         }
+        if (s.strongLegend !== undefined && s.strong === undefined)
+          err(S, `${p}.strongLegend`, 'explains the double mark, but the section has no "strong"');
         break;
       }
       case "statTable": {
@@ -924,7 +936,13 @@ export function validatePackageFiles(files: PackageFiles): ValidationResult {
     }
     if (s.kind === "header")
       for (const f of s.fields ?? [])
-        if (f.label !== undefined) need(f.label, `label of header field ${lit(f.choice)}`);
+        if (f.label !== undefined)
+          need(
+            f.label,
+            `label of header field ${lit("choice" in f ? f.choice : (f.things.kind ?? "things"))}`,
+          );
+    if (s.kind === "checkList" && s.strongLegend !== undefined)
+      need(s.strongLegend, `legend of the double mark in sheet section ${lit(s.id)}`);
     if (s.kind === "scoreColumn")
       for (const sc of s.scores)
         if (sc.extraLabel !== undefined)

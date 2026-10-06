@@ -10,6 +10,9 @@
       },
       {
         "thing": "trait.mist-sight"
+      },
+      {
+        "thing": "build.slight"
       }
     ]
   },
@@ -29,6 +32,9 @@
       },
       {
         "thing": "trait.stone-steady"
+      },
+      {
+        "thing": "build.sturdy"
       }
     ]
   },
@@ -46,8 +52,21 @@
       },
       {
         "choice": "coastfolk-talent"
+      },
+      {
+        "thing": "build.sturdy"
       }
     ]
+  },
+  {
+    "id": "build.slight",
+    "kind": "build",
+    "source": "mistland"
+  },
+  {
+    "id": "build.sturdy",
+    "kind": "build",
+    "source": "mistland"
   },
   {
     "id": "upbringing.ferry-child",

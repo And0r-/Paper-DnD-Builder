@@ -10,6 +10,11 @@
         },
         {
           "choice": "upbringing"
+        },
+        {
+          "things": {
+            "kind": "build"
+          }
         }
       ]
     },
@@ -113,7 +118,8 @@
       "total": "roll",
       "strong": {
         "kind": "flair"
-      }
+      },
+      "strongLegend": "sheet.talents.strong"
     },
     {
       "id": "attacks",

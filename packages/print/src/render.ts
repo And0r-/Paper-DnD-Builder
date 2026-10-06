@@ -582,7 +582,9 @@ function drawSection(pen: Pen, s: SheetSection, x: number, top: number, w: numbe
       y += 6 * s.lines + 0.5;
       break;
   }
-  y = hint(pen, s.hint, x, y, w);
+  // What ◉ means follows the hint, which says what ● means.
+  const after = s.kind === "checkList" ? s.legend : [];
+  y = hint(pen, [s.hint, ...after].filter((t) => t !== "").join(" "), x, y, w);
   return y - top;
 }
 
@@ -666,15 +668,27 @@ function drawHeader(
   let rule = y + 18.5;
   if (s.fields.length > 0) {
     // One cell per answer: its label small, then the answer; an open one gets a line to write on.
+    // Cells are as wide as they need and share what is left, so a short answer leaves room to a long one.
     const gap = 4;
-    const cw = (w - (s.fields.length - 1) * gap) / s.fields.length;
+    const room = w - (s.fields.length - 1) * gap;
+    const OPEN_LINE = 25;
+    const need = s.fields.map(
+      (f) =>
+        pen.width(f.label, S.fieldLabel) + 2 + (f.text === "" ? OPEN_LINE : pen.width(f.text, S.fieldValue)),
+    );
+    const total = need.reduce((a, b) => a + b, 0);
+    const widths = need.map((n) =>
+      total <= room ? n + (room - total) / s.fields.length : (room * n) / total,
+    );
+    let cx = x;
     s.fields.forEach((f, i) => {
-      const cx = x + i * (cw + gap);
+      const cw = widths[i]!;
       const label = pen.fit(f.label, S.fieldLabel, cw * 0.45);
       const lw = pen.width(f.label, label) + 2;
       pen.text(f.label, cx, y + 21, label);
       if (f.text === "") pen.line(cx + lw, y + 21.5, cx + cw, y + 21.5, 0.4, "#999");
       else pen.text(f.text, cx + lw, y + 21, pen.fit(f.text, S.fieldValue, cw - lw, 7));
+      cx += cw + gap;
     });
     rule = y + 23.5;
   }
@@ -808,8 +822,8 @@ function splitSection(s: SheetSection, n: number, m: Messages): [SheetSection, S
       ];
     case "checkList":
       return [
-        { ...head, kind: s.kind, items: s.items.slice(0, n) },
-        { ...tail, kind: s.kind, items: s.items.slice(n) },
+        { ...head, kind: s.kind, items: s.items.slice(0, n), legend: [] },
+        { ...tail, kind: s.kind, items: s.items.slice(n), legend: s.legend },
       ];
     case "featureTable":
       // The lead stays above the first rows, the legend under the last ones, like the hint.

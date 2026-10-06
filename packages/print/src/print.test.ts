@@ -296,8 +296,9 @@ describe("printed character (demo package)", () => {
           .map((s) => (s.id === "gear" && s.kind === "list" ? { ...s, blankLines: s.blankLines + 4 } : s))
           // The knacks as one plain table, so the first page is filled just so.
           .map((s) => (s.id === "knacks" ? { ...s, byRank: false, marks: undefined, lead: undefined } : s))
-          // Header answers, feature notes and groups are tested on their own; here they would only move the gear.
+          // Header answers, the double mark's legend, feature notes and groups are tested on their own; here they would only move the gear.
           .map((s) => (s.kind === "header" ? { ...s, fields: undefined } : s))
+          .map((s) => (s.kind === "checkList" ? { ...s, strongLegend: undefined } : s))
           .map((s) => (s.kind === "featureTable" ? { ...s, note: undefined, groupBy: undefined } : s)),
       },
     };
@@ -837,6 +838,7 @@ describe("printed character (demo package)", () => {
           note: "",
           total: { text: "", parts: "" },
         })),
+        legend: [],
       },
       {
         ...base,
@@ -1091,6 +1093,7 @@ describe("what a game master would otherwise write on the sheet by hand (demo pa
     expect(section(model, "header", "header").fields).toEqual([
       { label: "Herkunft", text: "Moorvolk" },
       { label: "Kindheit", text: "Fährkind" },
+      { label: "Wuchs", text: "zierlich" },
     ]);
     expect(extracted.pageTexts[0]).toMatch(/HERKUNFT\s+Moorvolk/u);
     expect(extracted.pageTexts[0]).toMatch(/KINDHEIT\s+Fährkind/u);
@@ -1107,6 +1110,56 @@ describe("what a game master would otherwise write on the sheet by hand (demo pa
     expect(fields).toEqual([
       { label: "Folk", text: "Moorfolk" },
       { label: "Upbringing", text: "" },
+      { label: "Build", text: "slight" },
+    ]);
+  });
+
+  it("gives a long header answer the room short ones leave, at full size", async () => {
+    const long = "Moorvolk aus den Nebelsümpfen";
+    const withFields = (fields: { choice: string }[] | undefined): ContentPackage => ({
+      ...pkg,
+      texts: { ...pkg.texts, de: { ...pkg.texts["de"]!, "folk.moorfolk.name": long } },
+      sheet: {
+        ...pkg.sheet,
+        sections: pkg.sheet.sections.map((s) => (s.kind === "header" ? { ...s, fields } : s)),
+      },
+    });
+    const widthOf = async (p: ContentPackage) => {
+      const { pdf } = await print("de", { length: "m" }, p);
+      return (await positions(pdf))[0]!.find((x) => x.str === long)!.w;
+    };
+    const alone = await widthOf(withFields([{ choice: "folk" }]));
+    const four = await widthOf(
+      withFields([{ choice: "folk" }, { choice: "upbringing" }, { choice: "calling" }, { choice: "name" }]),
+    );
+    expect(four).toBeCloseTo(alone, 1);
+  });
+
+  it("names the things of a kind the character has in the header, fixed or by another folk, a line for none", async () => {
+    const { extracted } = await print("de", { length: "m" });
+    expect(extracted.pageTexts[0]).toMatch(/WUCHS\s+zierlich/u);
+    const header = (d: typeof doc) =>
+      section(buildPrintModel(pkg, d, { language: "de" }), "header", "header");
+    const hill = applyChange(pkg, doc, { type: "answer", choice: "folk", answer: { pick: "folk.hillfolk" } });
+    if (!hill.ok) throw new Error(JSON.stringify(hill.error));
+    expect(header(hill.doc).fields[2]).toEqual({ label: "Wuchs", text: "stämmig" });
+    const none = applyChange(pkg, doc, { type: "answer", choice: "folk", answer: null });
+    if (!none.ok) throw new Error(JSON.stringify(none.error));
+    expect(header(none.doc).fields[2]).toEqual({ label: "Wuchs", text: "" });
+    // A label of its own instead of the kind's name.
+    const labelled = {
+      ...pkg,
+      sheet: {
+        ...pkg.sheet,
+        sections: pkg.sheet.sections.map((s) =>
+          s.kind === "header"
+            ? { ...s, fields: [{ things: { kind: "build" }, label: "kind.folk.name" }] }
+            : s,
+        ),
+      },
+    };
+    expect(section(buildPrintModel(labelled, doc, { language: "en" }), "header", "header").fields).toEqual([
+      { label: "Folk", text: "slight" },
     ]);
   });
 
@@ -1177,10 +1230,23 @@ describe("what a game master would otherwise write on the sheet by hand (demo pa
     expect(strong).toEqual(["Feilschen"]);
     expect(talents.items.find((i) => i.name === "Feilschen")).toMatchObject({ marked: true });
     expect(talents.items.find((i) => i.name === "Lauschen")).toMatchObject({ marked: true, strong: false });
-    expect(talents.hint).toContain("◉");
+    expect(talents.legend).toEqual(["◉ = mit Kniff: Übung doppelt."]);
+    expect(talents.hint).not.toContain("◉");
     // Practice counts twice in the number of a talent with flair.
     const haggling = talents.items.find((i) => i.name === "Feilschen")!;
     expect(haggling.total.text).toBe("+5");
+  });
+
+  it("explains the double mark only on a sheet that has one", async () => {
+    const { extracted } = await print("de", { length: "m" });
+    expect(extracted.pageTexts[0]).toContain("= mit Kniff: Übung doppelt.");
+    const plain = applyChange(pkg, doc, { type: "answer", choice: "upbringing", answer: null });
+    if (!plain.ok) throw new Error(JSON.stringify(plain.error));
+    const talents = section(buildPrintModel(pkg, plain.doc, { language: "de" }), "talents", "checkList");
+    expect(talents.items.some((i) => i.strong)).toBe(false);
+    expect(talents.legend).toEqual([]);
+    const { extracted: without } = await print("de", { length: "m" }, pkg, plain.doc);
+    expect(without.pageTexts[0]).not.toContain("Übung doppelt");
   });
 
   it("adds a wrapping column of weapon traits to the attack table, units converted", async () => {

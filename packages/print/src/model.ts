@@ -92,6 +92,8 @@ export type SheetSection = { id: string; span: number; title: string; hint: stri
        * `strong`: marked a second time (a thing of the section's `strong` is about it).
        */
       items: { name: string; marked: boolean; strong?: boolean; note: string; total: Figure }[];
+      /** What ◉ means (`strongLegend`), if a row is marked twice; else empty. */
+      legend: string[];
     }
   | {
       kind: "statTable";
@@ -391,10 +393,16 @@ export function buildPrintModel(
           name,
           summary: text("summary.line", lineVars),
           packageName,
-          fields: (s.fields ?? []).map((f) => ({
-            label: text(f.label ?? `choice.${f.choice}.title`),
-            text: answerText(f.choice),
-          })),
+          fields: (s.fields ?? []).map((f) =>
+            "choice" in f
+              ? { label: text(f.label ?? `choice.${f.choice}.title`), text: answerText(f.choice) }
+              : {
+                  label: text(f.label ?? `kind.${f.things.kind}.name`),
+                  text: heldOf(f.things)
+                    .map((t) => thingName(t.id))
+                    .join(", "),
+                },
+          ),
         };
       case "statBoxes":
         return {
@@ -440,24 +448,27 @@ export function buildPrintModel(
         const strong = new Set(
           s.strong === undefined ? [] : heldOf(s.strong).flatMap((t) => (t.about ? [t.about] : [])),
         );
+        const items = selectThings(pkg, s.things).map((t) => {
+          const note = s.note === undefined ? undefined : t.stats?.[s.note];
+          const total = s.total === undefined ? undefined : t.stats?.[s.total];
+          return {
+            name: thingName(t.id),
+            marked: held.has(t.id),
+            strong: held.has(t.id) && strong.has(t.id),
+            note: note === undefined ? "" : statText(note),
+            // A roll is added to: the number goes in with its sign ("+5").
+            total:
+              typeof total === "object" && "value" in total
+                ? figure(total.value, true)
+                : { text: "", parts: "" },
+          };
+        });
         return {
           ...base,
           kind: "checkList",
-          items: selectThings(pkg, s.things).map((t) => {
-            const note = s.note === undefined ? undefined : t.stats?.[s.note];
-            const total = s.total === undefined ? undefined : t.stats?.[s.total];
-            return {
-              name: thingName(t.id),
-              marked: held.has(t.id),
-              strong: held.has(t.id) && strong.has(t.id),
-              note: note === undefined ? "" : statText(note),
-              // A roll is added to: the number goes in with its sign ("+5").
-              total:
-                typeof total === "object" && "value" in total
-                  ? figure(total.value, true)
-                  : { text: "", parts: "" },
-            };
-          }),
+          items,
+          // Like the marks of a table: what ◉ means only where a row has it.
+          legend: s.strongLegend !== undefined && items.some((i) => i.strong) ? [text(s.strongLegend)] : [],
         };
       }
       case "statTable":

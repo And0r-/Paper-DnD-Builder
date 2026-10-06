@@ -129,7 +129,7 @@ describe("cross-file rules", () => {
     [
       "format version",
       (f) => (f.get("manifest.json").formatVersion = "0.3"),
-      "manifest.json formatVersion: package is written for format 0.3, this builder understands 0.13",
+      "manifest.json formatVersion: package is written for format 0.3, this builder understands 0.14",
     ],
     [
       "duplicate thing",
@@ -337,7 +337,7 @@ describe("cross-file rules", () => {
     [
       "mark from things that do not exist",
       (f) => (knacksSection(f).marks[0].from = { kind: "guild" }),
-      'sheet.json sections[8].marks[0].from.kind: unknown kind "guild"',
+      'sheet.json sections[8].marks[0].from.kind: unknown kind "guild" (known: folk, upbringing, calling, path, talent, trait, knack, item, …)',
     ],
     [
       "mark that says nothing about the rows",
@@ -856,6 +856,64 @@ describe("counts and what the sheet needs at the table (format 0.13)", () => {
       "unknown grouping",
       (f) => (section(f, "traits").groupBy = "kind"),
       'sheet.json sections[7].groupBy: Invalid input: expected "origin"',
+    ],
+  ])("%s", (_name, change, expected) => {
+    const r = mutate(change);
+    expect(r.ok).toBe(false);
+    expect(messages(r)).toContain(expected);
+  });
+});
+
+describe("header fields of things, the double mark explained only where it is (format 0.14)", () => {
+  /* eslint-disable @typescript-eslint/no-explicit-any -- tests poke into raw JSON */
+  const section = (f: RawFiles, id: string) => f.get("sheet.json").sections.find((s: any) => s.id === id);
+  const buildField = (f: RawFiles) => section(f, "header").fields[2];
+  /* eslint-enable @typescript-eslint/no-explicit-any */
+
+  it("accepts things selected by tags or ids when the field has a label", () => {
+    expect(
+      messages(
+        mutate(
+          (f) =>
+            (section(f, "header").fields[2] = {
+              things: { ids: ["build.slight"] },
+              label: "kind.build.name",
+            }),
+        ),
+      ),
+    ).toEqual([]);
+  });
+
+  it.each<[string, (f: RawFiles) => void, string]>([
+    [
+      "header field of a kind the package does not have",
+      (f) => (buildField(f).things = { kind: "size" }),
+      'sheet.json sections[0].fields[2].things.kind: unknown kind "size" (known: folk, upbringing, calling, path, talent, trait, knack, item, …)',
+    ],
+    [
+      "header field of things without a kind and without a label",
+      (f) => (buildField(f).things = { ids: ["build.slight", "build.sturdy"] }),
+      'sheet.json sections[0].fields[2]: needs a "label": without "things.kind" there is no kind name to print',
+    ],
+    [
+      "header field of things that selects nothing",
+      (f) => (buildField(f).things = { kind: "build", tags: ["bonus-talent"] }),
+      "sheet.json sections[0].fields[2].things: selects no things",
+    ],
+    [
+      "header field of things with a label without text",
+      (f) => (buildField(f).label = "sheet.header.build"),
+      'texts/de/ sheet.header.build: missing text (label of header field "build")',
+    ],
+    [
+      "legend of the double mark without text",
+      (f) => (section(f, "talents").strongLegend = "sheet.talents.twice"),
+      'texts/de/ sheet.talents.twice: missing text (legend of the double mark in sheet section "talents")',
+    ],
+    [
+      "legend of the double mark on a list without one",
+      (f) => delete section(f, "talents").strong,
+      'sheet.json sections[4].strongLegend: explains the double mark, but the section has no "strong"',
     ],
   ])("%s", (_name, change, expected) => {
     const r = mutate(change);
