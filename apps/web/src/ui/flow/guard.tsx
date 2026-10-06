@@ -24,10 +24,12 @@ interface Pending {
   change: DraftChange;
   words: GuardWords;
   items: Consequence[];
+  onKeep?: (() => void) | undefined;
 }
 
 export function useGuardedChange(): {
-  request(change: DraftChange, words: () => GuardWords): boolean;
+  /** `onKeep` runs when the player keeps things as they were in the dialog. */
+  request(change: DraftChange, words: () => GuardWords, onKeep?: () => void): boolean;
   dialog: ReactNode;
 } {
   const { t, tc } = useApp();
@@ -35,12 +37,12 @@ export function useGuardedChange(): {
   const [pending, setPending] = useState<Pending | null>(null);
 
   const request = useCallback(
-    (c: DraftChange, words: () => GuardWords) => {
+    (c: DraftChange, words: () => GuardWords, onKeep?: () => void) => {
       const next = applyChange(lp.pkg, doc, c);
       if (!next.ok) return false;
       const items = consequences(lp.pkg, doc, next.doc);
       if (items.length === 0) return change(c);
-      setPending({ change: c, words: words(), items });
+      setPending({ change: c, words: words(), items, onKeep });
       return true;
     },
     [lp, doc, change],
@@ -52,7 +54,10 @@ export function useGuardedChange(): {
       title={pending?.words.title ?? ""}
       cancelLabel={t("change.keep")}
       confirmLabel={t("change.confirm")}
-      onCancel={() => setPending(null)}
+      onCancel={() => {
+        pending?.onKeep?.();
+        setPending(null);
+      }}
       onConfirm={() => {
         if (pending) change(pending.change);
         setPending(null);

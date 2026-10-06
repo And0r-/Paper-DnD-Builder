@@ -11,7 +11,6 @@ test("new build: a typed level stands in the top bar before Next", async ({ page
   void foreign;
   await login(page, uniqueEmail("typed-level"));
   await page.getByRole("link", { name: m["characters.emptyAction"] }).click();
-  await page.getByRole("radio", { name: "Andere Stufe" }).check();
   const field = page.getByRole("spinbutton", { name: "Stufe" });
   const level = page.locator(".topbar__character");
   await expect(level).toContainText("Stufe 1");

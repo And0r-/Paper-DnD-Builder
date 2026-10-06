@@ -432,8 +432,8 @@ carries is a warning.
 ### 9.1 Level
 
 The player chooses the level first (the builder shows this screen; its texts
-are `level.name`, `level.intro`, `level.hint`, and `level.pick.<n>` for the
-levels shown as big cards; any other level is entered as a number). `max` may be raised later;
+are `level.name`, `level.intro` and `level.hint`; the level is one number
+field starting at `level.default`, and the hint is one sentence under it). `max` may be raised later;
 grants with `atLevel` above `max` are allowed and simply never apply until
 then. Tables by level (`byLevel`) have one entry per level, so raising
 `max` means adding entries to them.
@@ -808,7 +808,7 @@ Text keys follow from the keys of the things they belong to.
 | ------------------------------------------------------------------------ | ------------------------------------------------------------------- | ------------------------------------------------------- |
 | `package.name`, `package.short`                                          | yes                                                                 | name and description of the package                     |
 | `level.name`, `level.intro`, `level.hint`                                | yes                                                                 | the level screen (the word for "level" is package text) |
-| `level.pick.<n>`                                                         | no                                                                  | level n as a big card on the level screen (10.2.1)      |
+| `level.pick.<n>`                                                         | no                                                                  | not shown any more; older packages stay valid           |
 | `rank.name`, `rank.<n>.name`                                             | no                                                                  | headings of a long list grouped by rank (10.2.1)        |
 | `kind.<kind>.name`                                                       | yes                                                                 | name of a kind (card type line, headings)               |
 | `<thing>.name`                                                           | yes                                                                 | name, at most 30 characters                             |
@@ -843,10 +843,9 @@ Text keys follow from the keys of the things they belong to.
 
 #### 10.2.1 Long builds
 
-`level.pick.<n>` says what level n is good for ("For starting out."). Every
-level with such a text is a big card on the level screen; `level.default` is
-marked as recommended. Without any, only the default level is a card. Any
-other level is chosen as a number.
+The level screen is one number field, whatever the highest level. It starts
+at `level.default`. `level.pick.<n>` is no longer shown (the cards it filled
+were dropped after a player test); a package may still carry it.
 
 A list of 12 options or more gets a search, shows the recommended options
 first and, if its options have no `group` but different ranks, groups them

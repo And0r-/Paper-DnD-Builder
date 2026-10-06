@@ -1,14 +1,14 @@
 /**
- * Levels 1 to 20 on screen: the level screen (common levels as cards, any
- * other level by number), raising values with a limit, a refused change in
+ * Levels 1 to 20 on screen: the level screen (one number field), raising values with a limit, a refused change in
  * plain words, and the step list of a long build grouped by level.
  */
 import AxeBuilder from "@axe-core/playwright";
-import type { Page } from "@playwright/test";
+import { devices, type Page } from "@playwright/test";
 import m from "../src/i18n/messages/de.json" with { type: "json" };
+import en from "../src/i18n/messages/en.json" with { type: "json" };
 import { expect, expectOneLanguage, login, makeLeveled, shot, test, uniqueEmail } from "./helpers.ts";
 
-test("the level screen: common levels as cards, any other by number", async ({ page, foreign }) => {
+test("the level screen: one number field, starting at 1", async ({ page, foreign }) => {
   void foreign;
   await login(page, uniqueEmail("levels"));
   await page.getByRole("link", { name: m["characters.emptyAction"] }).click();
@@ -17,49 +17,95 @@ test("the level screen: common levels as cards, any other by number", async ({ p
   ).toBeVisible();
   const level = page.locator(".topbar__character");
 
-  // Level 1 is chosen and recommended, with why.
-  const one = page.getByRole("radio", { name: "Stufe 1" });
-  await expect(one).toBeChecked();
-  await expect(page.locator(".level-card").first()).toContainText(m["common.recommended"]);
-  await expect(page.locator(".level-card").first()).toContainText("Für den Anfang.");
-  // No wall of 20 buttons: three common levels and "another level".
-  await expect(page.getByRole("radio")).toHaveCount(4);
+  // One field named "Stufe", at 1; no cards, no range line, the one-sentence hint under it.
+  const field = page.getByRole("spinbutton", { name: "Stufe" });
+  await expect(field).toHaveValue("1");
+  await expect(field).toHaveAccessibleDescription(
+    "Wenn deine Spielleitung nichts anderes sagt, nimm Stufe 1.",
+  );
+  await expect(page.getByRole("radio")).toHaveCount(0);
+  await expect(page.getByText("Von 1 bis 20")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Stufe tiefer" })).toHaveAttribute("aria-disabled", "true");
   await expectOneLanguage(page, "de");
   await shot(page, "72-stufenwahl");
 
-  await page.getByRole("radio", { name: "Stufe 5" }).check();
-  await expect(level).toContainText("Stufe 5");
-
-  // Another level: the number field starts at the current level, steps and takes a typed number.
-  await page.getByRole("radio", { name: "Andere Stufe" }).check();
-  const field = page.getByRole("spinbutton", { name: "Stufe" });
-  await expect(field).toHaveValue("5");
+  // The buttons step, a typed number counts, Enter takes it.
   await page.getByRole("button", { name: "Stufe höher" }).click();
-  await expect(level).toContainText("Stufe 6");
+  await expect(level).toContainText("Stufe 2");
+  await expect(field).toHaveValue("2");
   await field.fill("20");
   await field.press("Enter");
   await expect(level).toContainText("Stufe 20");
   await expect(page.getByRole("button", { name: "Stufe höher" })).toHaveAttribute("aria-disabled", "true");
-  // Over the top is cut to the highest level.
+  // Over the top: the range is said only now, and leaving cuts it to the highest level.
   await field.fill("25");
+  await expect(page.getByText("Von 1 bis 20")).toBeVisible();
   await field.press("Tab");
   await expect(field).toHaveValue("20");
-  await page.getByRole("radio", { name: "Andere Stufe" }).scrollIntoViewIfNeeded();
-  await shot(page, "73-stufenwahl-andere");
+  await expect(page.getByText("Von 1 bis 20")).toHaveCount(0);
+  // Below 1 is cut to 1.
+  await field.fill("0");
+  await field.press("Tab");
+  await expect(field).toHaveValue("1");
+  await expect(level).toContainText("Stufe 1");
   const a11y = await new AxeBuilder({ page })
     .withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"])
     .analyze();
   expect(a11y.violations.map((v) => v.id)).toEqual([]);
 
-  // Keyboard: arrows move between the cards.
-  await page.getByRole("radio", { name: "Andere Stufe" }).focus();
+  // Keyboard: arrows in the field step the level.
+  await field.focus();
   await page.keyboard.press("ArrowUp");
-  await expect(page.getByRole("radio", { name: "Stufe 5" })).toBeChecked();
-  await expect(level).toContainText("Stufe 5");
-  await page.keyboard.press("ArrowUp");
-  await page.keyboard.press("ArrowUp");
-  await expect(one).toBeChecked();
-  await expect(level).toContainText("Stufe 1");
+  await field.press("Enter");
+  await expect(level).toContainText("Stufe 2");
+  await shot(page, "73-stufenwahl-andere");
+});
+
+test("lowering the level asks first, and says which choices drop out", async ({ page, foreign }) => {
+  void foreign;
+  await login(page, uniqueEmail("level-lower"));
+  const id = await makeLeveled(page, 5);
+  await page.goto(`/c/${id}/level`);
+  const field = page.getByRole("spinbutton", { name: "Stufe" });
+  await expect(field).toHaveValue("5");
+  const dialog = page.getByRole("dialog", { name: "Stufe ändern?" });
+  // The screen is drawn on the server first; a number typed before the page is live is lost.
+  await expect(async () => {
+    await field.fill("1");
+    await field.press("Enter");
+    await expect(dialog).toBeVisible({ timeout: 1000 });
+  }).toPass();
+  await expect(dialog).toContainText("Bei Stufe 1 fallen diese Wahlen weg:");
+  // Keeping it leaves level and field as they were.
+  await dialog.getByRole("button", { name: m["change.keep"] }).click();
+  await expect(page.locator(".topbar__character")).toContainText("Stufe 5");
+  await expect(field).toHaveValue("5");
+  await field.fill("1");
+  await field.press("Enter");
+  await page.getByRole("dialog").getByRole("button", { name: m["change.confirm"] }).click();
+  await expect(page.locator(".topbar__character")).toContainText("Stufe 1");
+});
+
+test.describe("in English, on a large screen", () => {
+  // The desktop device without its browser type: a group may not switch browsers.
+  const { defaultBrowserType: _, ...desktop } = devices["Desktop Chrome"];
+  test.use({ ...desktop, viewport: { width: 1366, height: 900 } });
+
+  test("the same one field", async ({ page, foreign }) => {
+    void foreign;
+    await login(page, uniqueEmail("levels-en"), "en");
+    await page.getByRole("link", { name: en["characters.emptyAction"] }).click();
+    await expect(
+      page.getByRole("heading", { level: 1, name: "What level is your character?" }),
+    ).toBeVisible();
+    const field = page.getByRole("spinbutton", { name: "Level" });
+    await expect(field).toHaveValue("1");
+    await expect(field).toHaveAccessibleDescription("Unless your game leader says otherwise, pick level 1.");
+    await expect(page.getByRole("radio")).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Higher level" })).toBeVisible();
+    await expectOneLanguage(page, "en");
+    await shot(page, "72-stufenwahl-desktop-en");
+  });
 });
 
 test("raising values: old value, points, new value, and why a row is full", async ({ page, foreign }) => {
