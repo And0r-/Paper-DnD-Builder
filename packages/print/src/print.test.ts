@@ -1442,6 +1442,16 @@ describe("what a game master would otherwise write on the sheet by hand (demo pa
     expect(inTable.some((p) => p.str === "1W6 +0, stumpf")).toBe(true);
   });
 
+  it("prints the text variant whose condition holds, filled with the same values (format 0.15)", () => {
+    // Lantern staff: "blunt" up to level 4, "blunt or bright" from level 5 on (demo package).
+    const harm = (d: DraftDocument, language: string) =>
+      section(buildPrintModel(pkg, d, { language }), "attacks", "statTable").rows[0]!.cells[1];
+    expect(harm(doc, "de")).toBe("1W6 +0, stumpf");
+    const five = demoCharacter(pkg, 5);
+    expect(harm(five, "de")).toMatch(/^1W6 [+-]\d+, stumpf oder hell$/u);
+    expect(harm(five, "en")).toMatch(/^1d6 [+-]\d+, blunt or bright$/u);
+  });
+
   it("prints a stat small under each name of a feature table", () => {
     const model = buildSheetModel(pkg, doc, { language: "de", units: { length: "m" } });
     const knacks = section(model, "knacks", "featureTable");

@@ -13,6 +13,7 @@ import {
   evaluateCondition,
   evaluateDraft,
   evaluationScope,
+  filledTextKey,
   effectiveUnits,
   explainValue,
   formatMeasure,
@@ -29,6 +30,7 @@ import {
 import {
   declaredChoiceId,
   type ContentPackage,
+  type FilledText,
   type Mark,
   type Section,
   type StatValue,
@@ -208,7 +210,7 @@ export function buildSheetModel(
       if (n <= 0) return null;
       return n <= MAX_USE_BOXES ? { boxes: n } : { count: n };
     }
-    if (typeof v === "object" && "text" in v) return { text: text(v.text) };
+    if (typeof v === "object" && "text" in v) return { text: text(filledTextKey(v, scope)) };
     return null;
   };
   /** Uses that are ticked or counted down by hand; a word ("always") is only read. */
@@ -303,9 +305,12 @@ export function buildSheetModel(
       at = up;
     }
   };
-  /** Text of a box or stat filled with the character's values. */
-  const filled = (v: { text: string; vars?: Record<string, string> | undefined }): string =>
-    text(v.text, Object.fromEntries(Object.entries(v.vars ?? {}).map(([n, id]) => [n, valueOf(id)])));
+  /** Text of a box or stat filled with the character's values; a variant may replace the text. */
+  const filled = (v: FilledText): string =>
+    text(
+      filledTextKey(v, scope),
+      Object.fromEntries(Object.entries(v.vars ?? {}).map(([n, id]) => [n, valueOf(id)])),
+    );
 
   const summary = summarize(pkg, doc, ev);
   const name = summary.name || messages.unnamed;
