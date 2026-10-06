@@ -498,6 +498,24 @@ export class Store {
     return rows.length > 0;
   }
 
+  /** The copy `accountId` opened last on this character; null for the original or nothing stored. */
+  async findSheetView(accountId: string, draftId: string): Promise<string | null> {
+    const rows = await this.db.query<{ copy_id: string | null }>(
+      "SELECT copy_id FROM sheet_views WHERE account_id = $1 AND draft_id = $2",
+      [accountId, draftId],
+    );
+    return rows[0]?.copy_id ?? null;
+  }
+
+  /** Remembers the version opened last; a copy must be one of this character's (checked by the caller). */
+  async putSheetView(accountId: string, draftId: string, copyId: string | null, now: Date): Promise<void> {
+    await this.db.query(
+      `INSERT INTO sheet_views (account_id, draft_id, copy_id, updated_at) VALUES ($1, $2, $3, $4)
+       ON CONFLICT (account_id, draft_id) DO UPDATE SET copy_id = $3, updated_at = $4`,
+      [accountId, draftId, copyId, now],
+    );
+  }
+
   // -------------------------------------------------------------- play state
 
   async findCharacterState(draftId: string): Promise<CharacterStateRow | undefined> {

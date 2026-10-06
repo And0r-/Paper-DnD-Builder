@@ -16,6 +16,9 @@
  * screen skips fields the shown sheet does not have and cuts ticks to what
  * a field holds; the state itself is never trimmed.
  *
+ * Per account, the version opened last (`opened`): the screen opens it
+ * again next time. Picking a version sets it, and so does making a copy.
+ *
  * The builder never reads either. Access is the character's (owner, game
  * master of the owner's campaign, an access key of either); someone else's
  * character answers 404 like everywhere. Every write names the version it
@@ -40,8 +43,12 @@ import { originalSheet } from "./print.ts";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
-/** Plenty to keep a few versions side by side; whoever wants more deletes an old one. */
-export const MAX_COPIES_PER_CHARACTER = 10;
+/**
+ * The screen offers no delete, so this is reached by changing the original
+ * again and again; at the limit the original cannot be changed any more,
+ * while every kept copy still can.
+ */
+export const MAX_COPIES_PER_CHARACTER = 50;
 /** A demo sheet is a few dozen KiB; this leaves room for a long list of own rows. */
 export const MAX_COPY_BYTES = 512 * 1024;
 /** A request that sends a whole copy: the model and a little around it. */
@@ -151,9 +158,15 @@ export const sheetCopyRoutes: Route[] = [
     method: "GET",
     path: "/api/drafts/:id/sheet-copies",
     handler: async (ctx) => {
-      const { row } = await loadDraft(ctx);
+      const { row, viewer } = await loadDraft(ctx);
       const copies = await ctx.app.store.listSheetCopies(row.id);
-      return json(200, { copies: copies.map(copyEntry), original: originalStamp(ctx.app, row) });
+      return json(200, {
+        copies: copies.map(copyEntry),
+        original: originalStamp(ctx.app, row),
+        /** The copy this account opened last; null for the original. */
+        opened: await ctx.app.store.findSheetView(viewer.id, row.id),
+        max: MAX_COPIES_PER_CHARACTER,
+      });
     },
   },
   {
@@ -210,6 +223,8 @@ export const sheetCopyRoutes: Route[] = [
         MAX_COPIES_PER_CHARACTER,
       );
       if (!made) throw new HttpError(409, "tooManyCopies", { max: MAX_COPIES_PER_CHARACTER });
+      // Whoever made it is looking at it now: it opens next time.
+      await ctx.app.store.putSheetView((await ctx.requireSession()).account.id, row.id, made.id, now);
       return json(201, copyView(made));
     },
   },
@@ -261,6 +276,23 @@ export const sheetCopyRoutes: Route[] = [
       const deleted = UUID.test(id) && (await ctx.app.store.deleteSheetCopy(row.id, id));
       if (!deleted) throw new HttpError(404, "copyNotFound");
       return json(204, null);
+    },
+  },
+  {
+    // Which version this account opens next time: a copy of this character, or null for the original.
+    method: "PUT",
+    path: "/api/drafts/:id/sheet-view",
+    handler: async (ctx) => {
+      const body = await readJson(ctx.req, z.strictObject({ copyId: z.string().nullable() }));
+      const { row, viewer } = await loadDraft(ctx);
+      if (body.copyId !== null) {
+        const copy = UUID.test(body.copyId)
+          ? await ctx.app.store.findSheetCopy(row.id, body.copyId)
+          : undefined;
+        if (!copy) throw new HttpError(404, "copyNotFound");
+      }
+      await ctx.app.store.putSheetView(viewer.id, row.id, body.copyId, ctx.app.now());
+      return json(200, { opened: body.copyId });
     },
   },
   {

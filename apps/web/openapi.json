@@ -2430,9 +2430,14 @@
                   "type": "object",
                   "properties": {
                     "copies": { "type": "array", "items": { "$ref": "#/components/schemas/SheetCopy" } },
-                    "original": { "$ref": "#/components/schemas/OriginalStamp" }
+                    "original": { "$ref": "#/components/schemas/OriginalStamp" },
+                    "opened": {
+                      "type": ["string", "null"],
+                      "description": "The copy this account opened last; null for the original."
+                    },
+                    "max": { "type": "integer", "description": "How many copies a character may have." }
                   },
-                  "required": ["copies", "original"],
+                  "required": ["copies", "original", "opened", "max"],
                   "additionalProperties": false
                 }
               }
@@ -2457,7 +2462,7 @@
         "operationId": "createSheetCopy",
         "summary": "Keep a copy of the sheet",
         "tags": ["Sheet copies"],
-        "description": "Copies the original as it is now, in the language and units of whoever asks, named \"Meine Fassung vom <date>\" in that language unless `name` is given. With `model`, the copy is that model instead: the original as the viewer loaded it with the first change already in, so the first change makes a copy in one request. Its `origin` must be the original as it is now (`level`, `changedAt`, `packageVersion`), else `409 originalChanged`. At most 10 copies per character.",
+        "description": "Copies the original as it is now, in the language and units of whoever asks, named \"Meine Fassung vom <date>\" in that language unless `name` is given. With `model`, the copy is that model instead: the original as the viewer loaded it with the first change already in, so the first change makes a copy in one request. Its `origin` must be the original as it is now (`level`, `changedAt`, `packageVersion`), else `409 originalChanged`. At most 50 copies per character; the new copy becomes the asker's opened version.",
         "parameters": [
           {
             "name": "id",
@@ -2747,6 +2752,67 @@
           "204": { "description": "Done. No body." },
           "401": { "$ref": "#/components/responses/Unauthorized" },
           "403": { "$ref": "#/components/responses/CrossSite" },
+          "404": {
+            "description": "`draftNotFound` (also someone else's character), `copyNotFound`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                  "properties": {
+                    "error": { "properties": { "code": { "enum": ["draftNotFound", "copyNotFound"] } } }
+                  }
+                }
+              }
+            }
+          },
+          "default": { "$ref": "#/components/responses/ServerError" }
+        }
+      }
+    },
+    "/api/drafts/{id}/sheet-view": {
+      "put": {
+        "operationId": "setSheetView",
+        "summary": "Which version of the sheet opens next time",
+        "tags": ["Sheet copies"],
+        "description": "Per account: a copy of this character, or `null` for the original. The online sheet opens it next time; making a copy sets it too.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Draft id (a UUID).",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": { "copyId": { "type": ["string", "null"] } },
+                "required": ["copyId"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Remembered.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": { "opened": { "type": ["string", "null"] } },
+                  "required": ["opened"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadBody" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
           "404": {
             "description": "`draftNotFound` (also someone else's character), `copyNotFound`",
             "content": {
