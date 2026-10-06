@@ -25,7 +25,7 @@ export const MAX_CAMPAIGNS_PER_ACCOUNT = 50;
 export const MAX_PLAYERS_PER_CAMPAIGN = 50;
 
 /** One line of plain text: it goes into mails, so no line breaks or other control characters. */
-const nameSchema = z
+export const nameSchema = z
   .string()
   .trim()
   .min(1)

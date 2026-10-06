@@ -22,6 +22,7 @@ import { campaignRoutes } from "./routes/campaigns.ts";
 import { draftRoutes } from "./routes/drafts.ts";
 import { packageRoutes } from "./routes/packages.ts";
 import { printRoutes } from "./routes/print.ts";
+import { sheetCopyRoutes } from "./routes/sheet-copies.ts";
 import { assertSameOrigin, errorResponse, HttpError, json } from "./http.ts";
 
 export interface Session {
@@ -57,6 +58,7 @@ export const ROUTES: Route[] = [
   ...packageRoutes,
   ...draftRoutes,
   ...printRoutes,
+  ...sheetCopyRoutes,
   ...campaignRoutes,
 ];
 

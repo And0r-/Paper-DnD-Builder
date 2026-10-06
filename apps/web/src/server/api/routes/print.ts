@@ -8,6 +8,7 @@ import { evaluateDraft, type Evaluation } from "@builder/core";
 import { renderPdf } from "@builder/print";
 import { buildSheetModel, sheetLanguages, type SheetModel } from "@builder/sheet";
 import { HttpError, json } from "../http.ts";
+import type { ReachableDraftRow } from "../../store.ts";
 import type { RequestContext, Route } from "../router.ts";
 import { loadDraft, packageOf } from "./drafts.ts";
 
@@ -29,9 +30,14 @@ function fileNames(name: string): string {
 /**
  * The sheet of a finished character, in the language and units of whoever
  * asks: a game master sees a player's character in their own. `beforeBuild`
- * runs once the request is known to be good (the PDF's rate limit).
+ * runs once the request is known to be good (the PDF's rate limit). The
+ * origin says when the character last changed, so a kept copy can tell
+ * whether this original moved on since.
  */
-async function sheetOf(ctx: RequestContext, beforeBuild?: (accountId: string) => void): Promise<SheetModel> {
+export async function originalSheet(
+  ctx: RequestContext,
+  beforeBuild?: (accountId: string) => void,
+): Promise<{ model: SheetModel; row: ReachableDraftRow }> {
   const { row, viewer: account } = await loadDraft(ctx);
   const pkg = packageOf(ctx.app, row);
   const ev: Evaluation = evaluateDraft(pkg, row.document);
@@ -42,12 +48,18 @@ async function sheetOf(ctx: RequestContext, beforeBuild?: (accountId: string) =>
     throw new HttpError(422, "languageNotSupported", { language: account.language, languages });
   }
   beforeBuild?.(account.id);
-  return buildSheetModel(
+  const model = buildSheetModel(
     pkg,
     row.document,
-    { language: account.language, units: account.units, createdAt: ctx.app.now() },
+    {
+      language: account.language,
+      units: account.units,
+      createdAt: ctx.app.now(),
+      changedAt: row.updated_at,
+    },
     ev,
   );
+  return { model, row };
 }
 
 export const printRoutes: Route[] = [
@@ -55,14 +67,14 @@ export const printRoutes: Route[] = [
     method: "GET",
     path: "/api/drafts/:id/sheet",
     handler: async (ctx) => {
-      return json(200, await sheetOf(ctx));
+      return json(200, (await originalSheet(ctx)).model);
     },
   },
   {
     method: "GET",
     path: "/api/drafts/:id/pdf",
     handler: async (ctx) => {
-      const model = await sheetOf(ctx, (accountId) => {
+      const { model } = await originalSheet(ctx, (accountId) => {
         const limit = ctx.app.limiter.take(`pdf:account:${accountId}`, PDF_LIMIT);
         if (!limit.ok) {
           throw new HttpError(429, "tooManyRequests", {}, { "Retry-After": String(limit.retryAfter) });

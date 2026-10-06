@@ -41,14 +41,17 @@ export function errorResponse(e: HttpError): Response {
 
 const MAX_BODY_BYTES = 64 * 1024;
 
-/** Reads a JSON body and checks its shape. Only `application/json` is accepted (a CSRF guard, too). */
-export async function readJson<T>(req: Request, schema: ZodType<T>): Promise<T> {
+/**
+ * Reads a JSON body and checks its shape. Only `application/json` is accepted (a CSRF guard, too).
+ * `maxBytes` raises the 64 KiB limit for the few routes that take a whole document.
+ */
+export async function readJson<T>(req: Request, schema: ZodType<T>, maxBytes = MAX_BODY_BYTES): Promise<T> {
   const type = req.headers.get("content-type") ?? "";
   if (!/^application\/json\b/i.test(type)) throw new HttpError(415, "jsonRequired");
   const length = Number(req.headers.get("content-length") ?? "0");
-  if (length > MAX_BODY_BYTES) throw new HttpError(413, "bodyTooLarge");
+  if (length > maxBytes) throw new HttpError(413, "bodyTooLarge", { max: maxBytes });
   const text = await req.text();
-  if (Buffer.byteLength(text) > MAX_BODY_BYTES) throw new HttpError(413, "bodyTooLarge");
+  if (Buffer.byteLength(text) > maxBytes) throw new HttpError(413, "bodyTooLarge", { max: maxBytes });
   let raw: unknown;
   try {
     raw = JSON.parse(text);

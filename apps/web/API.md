@@ -337,6 +337,7 @@ routes (they know the campaign exists); anyone else `404 campaignNotFound`.
 | `POST /api/campaigns/:id/players/:playerId/drafts`                                                   | `201`                  | `403`                  | `404`           |
 | `GET /api/drafts`                                                                                    | own only               | own only               | own only        |
 | `GET`, `PATCH /api/drafts/:id`, answers, pools, finish, level-up, sheet, pdf of a player's character | `200`                  | `200` (owner)          | `404`           |
+| sheet copies (all four) and play state of a player's character                                       | `200` / `201` / `204`  | the same (owner)       | `404`           |
 | `DELETE /api/drafts/:id` of a player's character                                                     | `403 ownerOnly`        | `204` (owner)          | `404`           |
 | any draft route on the game master's own character                                                   | `200` (owner)          | `404`                  | `404`           |
 
@@ -364,9 +365,12 @@ text in one language, every quantity in the account's units, sections in
 the package's order with their conditions decided. It says nothing about
 rules, only sections, words and numbers:
 
-- `origin`: `{ kind: "original", level, builtAt }` for a sheet made now;
-  `{ kind: "copy", name, createdAt, fromLevel }` is reserved for a copy a
-  player keeps.
+- `origin`: `{ kind: "original", level, builtAt, packageVersion,
+changedAt }` for a sheet made now (`changedAt`: when the character last
+  changed in the builder); `{ kind: "copy", name, createdAt, fromLevel,
+fromPackageVersion, fromChangedAt }` for a copy a player keeps (below).
+  If a copy's `from…` differ from the original's, the original changed
+  since the copy was made; no models need comparing.
 - `field`, `usesField`, `playedByField`: an id for every place a player
   writes or ticks on paper (pencil boxes, squares, circles, use boxes,
   notes, blank lines, the player's name), such as `sheet/primary/stamina`
@@ -379,6 +383,49 @@ rules, only sections, words and numbers:
 
 It is made on every request and never stored, like the PDF; it has no
 rate limit, it costs about as much as `GET /api/drafts/:id`.
+
+## Sheet copies and play state
+
+A **copy** is a sheet model a player keeps and changes freely, like a
+printed page: any number, text or row, checked for shape only, never for
+rules. It is made from the original as it is now and never follows it
+again: a level, other answers, a package update or another account
+language leave it exactly as it was. It stays in the language and units it
+was made in. The **play state** is what is written and rubbed out at the
+table (field id to a number, a text or `{ checks: n }`); one per character,
+the same for the original and every copy, so a level or a new copy keeps
+it. Both are kept apart from the draft; the builder never reads them.
+
+| Method & path                                    | Body                                                     | Result                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| ------------------------------------------------ | -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 🔒 `GET /api/drafts/:id/sheet-copies`            | —                                                        | `200 { copies: [SheetCopy], original: { level, changedAt, packageVersion, finished } }`, oldest first, without models. Also while the character is not finished.                                                                                                                                                                                                                                                                                                                      |
+| 🔒 `POST /api/drafts/:id/sheet-copies`           | `{ name?, model? }`                                      | `201 { copy, model }`: the original now, in the asker's language and units, named "Meine Fassung vom 4. Oktober 2026" (in the account's language) unless `name` is given. With `model`: the original as loaded with the first change in, so the first change makes a copy in one request; its `origin` must be the original now, else `409 originalChanged` (with `original`). `409 notFinished`, `409 tooManyCopies` (10), `413 copyTooLarge` (512 KiB), `422 languageNotSupported`. |
+| 🔒 `GET /api/drafts/:id/sheet-copies/:copyId`    | —                                                        | `200 { copy, model }`; `model.origin` is `{ kind: "copy", … }`. `404 copyNotFound`.                                                                                                                                                                                                                                                                                                                                                                                                   |
+| 🔒 `PUT /api/drafts/:id/sheet-copies/:copyId`    | `{ version, name?, model? }`                             | `200 { copy, model }`. A model that is not a `SheetModel` is `400 badRequest`; its `origin` is ignored. `409 versionConflict` (with `current`), `413 copyTooLarge`.                                                                                                                                                                                                                                                                                                                   |
+| 🔒 `DELETE /api/drafts/:id/sheet-copies/:copyId` | —                                                        | `204`. `404 copyNotFound`.                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| 🔒 `GET /api/drafts/:id/state`                   | —                                                        | `200 { state, version, updatedAt }`; `{}` at version `0` while nothing is stored.                                                                                                                                                                                                                                                                                                                                                                                                     |
+| 🔒 `PUT /api/drafts/:id/state`                   | `{ version, state }` or `{ version, clearChecks: true }` | `200` as `GET`. `state` replaces the whole state (at most 1000 fields, texts up to 2000 characters); `clearChecks` removes every `{ checks }` and keeps the rest (a rest: the builder does not know what one is, it only rubs out ticks). The first write names version `0`. `409 versionConflict` (with `current`).                                                                                                                                                                  |
+
+`SheetCopy` is `{ id, name, createdAt, updatedAt, fromLevel, fromChangedAt,
+fromPackageVersion, language, units, version }`.
+
+- **Access** is the character's: owner, game master of the owner's
+  campaign (also deleting a copy) and access keys of either. Someone
+  else's character is `404 draftNotFound`.
+- **Versions** as for drafts: a write names the version it was read at;
+  a stale one is `409 versionConflict` with the current state, and the
+  screen loads again.
+- **Limits**: ten copies per character, a model of at most 512 KiB
+  (`JSON` bytes); a body sending a model may be up to 516 KiB, other
+  bodies stay at 64 KiB.
+- **What the screen does, not the server**: fields of the state the shown
+  sheet does not have are skipped, ticks above what a field holds are cut.
+  The stored state is never trimmed.
+- An unfinished character keeps its copies and state, and they stay
+  readable; only a new copy waits for the character to be finished.
+  Deleting the character deletes both.
+
+Tests: [`sheet-copies.test.ts`](src/server/api/sheet-copies.test.ts).
 
 ## Server
 
@@ -403,15 +450,19 @@ rate limit, it costs about as much as `GET /api/drafts/:id`.
 | `404`  | `draftNotFound`        | No draft with this id that you may reach (someone else's looks the same).                          |
 | `404`  | `campaignNotFound`     | No campaign with this id that you lead or play in.                                                 |
 | `404`  | `playerNotFound`       | No such player in this campaign.                                                                   |
+| `404`  | `copyNotFound`         | No kept copy with this id on this character.                                                       |
 | `404`  | `keyNotFound`          | No access key with this id in this account.                                                        |
 | `404`  | `packageNotFound`      | No loaded package with this id.                                                                    |
 | `404`  | `languageNotFound`     | The package has no texts in this language.                                                         |
 | `405`  | `methodNotAllowed`     | The path exists, the method does not.                                                              |
-| `409`  | `versionConflict`      | The draft moved on; `current` holds its state now.                                                 |
+| `409`  | `versionConflict`      | The draft, copy or play state moved on; `current` holds it now.                                    |
 | `409`  | `notFinished`          | PDF or sheet of a draft, or raising a draft that is not in a raise; `open` lists the open choices. |
+| `409`  | `tooManyCopies`        | The character has 10 kept copies (`max`); delete one first.                                        |
+| `409`  | `originalChanged`      | A copy made with `model` from an original that changed since; `original` says how it is now.       |
 | `409`  | `alreadyPlayer`        | The address is already a player of this campaign.                                                  |
 | `409`  | `packageUnavailable`   | The draft's package is not loaded right now; `packageId` names it.                                 |
-| `413`  | `bodyTooLarge`         | Body over 64 KiB.                                                                                  |
+| `413`  | `bodyTooLarge`         | Body over 64 KiB (516 KiB for a body with a sheet copy; `max`).                                    |
+| `413`  | `copyTooLarge`         | A sheet copy's model over 512 KiB (`max`).                                                         |
 | `415`  | `jsonRequired`         | Body not `application/json`.                                                                       |
 | `422`  | `changeRejected`       | The rule core refused the change; `reason` is a `ChangeError` (below).                             |
 | `422`  | `incomplete`           | Finishing with open choices; `open` lists them.                                                    |

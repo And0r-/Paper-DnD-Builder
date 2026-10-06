@@ -23,31 +23,21 @@
     }
   ],
   "tags": [
+    { "name": "Login" },
+    { "name": "Account" },
+    { "name": "Access keys" },
+    { "name": "Packages" },
+    { "name": "Characters" },
+    { "name": "Print" },
     {
-      "name": "Login"
-    },
-    {
-      "name": "Account"
-    },
-    {
-      "name": "Access keys"
-    },
-    {
-      "name": "Packages"
-    },
-    {
-      "name": "Characters"
-    },
-    {
-      "name": "Print"
+      "name": "Sheet copies",
+      "description": "Copies of the sheet a player keeps and changes freely, and the play state. Kept apart from the character; the builder never reads them. Same access as the character: owner, game master of the owner's campaign, an access key of either; anyone else gets 404."
     },
     {
       "name": "Campaigns",
       "description": "Whoever makes a campaign leads it (game master) and adds players by mail address. The game master reaches every character of the players; a player sees only their own characters and the campaigns they are in. Anyone else gets 404."
     },
-    {
-      "name": "Server"
-    }
+    { "name": "Server" }
   ],
   "paths": {
     "/api/health": {
@@ -2002,7 +1992,7 @@
         "operationId": "sheet",
         "summary": "The character sheet as data",
         "tags": ["Print"],
-        "description": "Everything the sheet says, as one JSON model: texts in one language, quantities in the account's units, sections in the package's order with conditions decided, the places a player writes on (`field`, `usesField`, `playedByField`), for each value the values that change with it, and the full texts of the character's rows and cards. Language and units from the account settings, like the PDF; a game master sees a player's character in their own. Made on every request, never stored.",
+        "description": "Everything the sheet says, as one JSON model: texts in one language, quantities in the account's units, sections in the package's order with conditions decided, the places a player writes on (`field`, `usesField`, `playedByField`), for each value the values that change with it, and the full texts of the character's rows and cards. Language and units from the account settings, like the PDF; a game master sees a player's character in their own. Made on every request, never stored. `origin` says the character's level, when it last changed in the builder (`changedAt`) and the package version (`packageVersion`); a kept copy keeps the same of the original it was made from (`fromLevel`, `fromChangedAt`, `fromPackageVersion`), so the screen can say \"the original changed since\" without comparing models.",
         "parameters": [
           {
             "name": "id",
@@ -2254,6 +2244,485 @@
           "default": {
             "$ref": "#/components/responses/ServerError"
           }
+        }
+      }
+    },
+    "/api/drafts/{id}/sheet-copies": {
+      "get": {
+        "operationId": "listSheetCopies",
+        "summary": "The kept copies of a character's sheet",
+        "tags": ["Sheet copies"],
+        "description": "Oldest first, without models, and the original as it is now (`original`) to tell which copies it moved away from. Also while the character is not finished, and while its package is not loaded.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Draft id (a UUID).",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The copies and the original's stamp.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "copies": { "type": "array", "items": { "$ref": "#/components/schemas/SheetCopy" } },
+                    "original": { "$ref": "#/components/schemas/OriginalStamp" }
+                  },
+                  "required": ["copies", "original"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": {
+            "description": "`draftNotFound` (also someone else's character: it looks exactly like a missing one)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                  "properties": { "error": { "properties": { "code": { "enum": ["draftNotFound"] } } } }
+                }
+              }
+            }
+          },
+          "default": { "$ref": "#/components/responses/ServerError" }
+        }
+      },
+      "post": {
+        "operationId": "createSheetCopy",
+        "summary": "Keep a copy of the sheet",
+        "tags": ["Sheet copies"],
+        "description": "Copies the original as it is now, in the language and units of whoever asks, named \"Meine Fassung vom <date>\" in that language unless `name` is given. With `model`, the copy is that model instead: the original as the viewer loaded it with the first change already in, so the first change makes a copy in one request. Its `origin` must be the original as it is now (`level`, `changedAt`, `packageVersion`), else `409 originalChanged`. At most 10 copies per character.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Draft id (a UUID).",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 80,
+                    "description": "One line, no control characters."
+                  },
+                  "model": { "$ref": "#/components/schemas/SheetModel" }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The new copy.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/SheetCopyView" } } }
+          },
+          "400": { "$ref": "#/components/responses/BadBody" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/CrossSite" },
+          "404": {
+            "description": "`draftNotFound` (also someone else's character: it looks exactly like a missing one)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                  "properties": { "error": { "properties": { "code": { "enum": ["draftNotFound"] } } } }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`notFinished` (with `open`), `tooManyCopies` (`max`), `originalChanged` (`original`), `packageUnavailable`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "enum": ["notFinished", "tooManyCopies", "originalChanged", "packageUnavailable"]
+                        },
+                        "open": { "type": "array", "items": { "type": "string" } },
+                        "max": { "type": "integer" },
+                        "original": { "$ref": "#/components/schemas/OriginalStamp" },
+                        "packageId": { "type": "string" }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "`bodyTooLarge` (body over 516 KiB), `copyTooLarge` (model over 512 KiB, `max`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": { "enum": ["bodyTooLarge", "copyTooLarge"] },
+                        "max": { "type": "integer" }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "415": { "$ref": "#/components/responses/JsonRequired" },
+          "422": {
+            "description": "`languageNotSupported`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": { "enum": ["languageNotSupported"] },
+                        "language": { "type": "string" },
+                        "languages": { "type": "array", "items": { "type": "string" } }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": { "$ref": "#/components/responses/ServerError" }
+        }
+      }
+    },
+    "/api/drafts/{id}/sheet-copies/{copyId}": {
+      "get": {
+        "operationId": "sheetCopy",
+        "summary": "A kept copy with its model",
+        "tags": ["Sheet copies"],
+        "description": "Exactly as it was kept or last changed: a level, other answers, a package update or another account language leave it as it is.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Draft id (a UUID).",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "copyId",
+            "in": "path",
+            "required": true,
+            "description": "Copy id (a UUID).",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The copy.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/SheetCopyView" } } }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": {
+            "description": "`draftNotFound` (also someone else's character), `copyNotFound`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                  "properties": {
+                    "error": { "properties": { "code": { "enum": ["draftNotFound", "copyNotFound"] } } }
+                  }
+                }
+              }
+            }
+          },
+          "default": { "$ref": "#/components/responses/ServerError" }
+        }
+      },
+      "put": {
+        "operationId": "updateSheetCopy",
+        "summary": "Rename a copy or change its model",
+        "tags": ["Sheet copies"],
+        "description": "`name`, `model` or both, with the version it was read at. The model is checked for shape only (`SheetModel`); like on paper, anything may be written in and nothing follows from it. Its `origin` is ignored: a copy's origin always comes from the copy.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Draft id (a UUID).",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "copyId",
+            "in": "path",
+            "required": true,
+            "description": "Copy id (a UUID).",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "version": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "The copy version the change was made on."
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 80,
+                    "description": "One line, no control characters."
+                  },
+                  "model": { "$ref": "#/components/schemas/SheetModel" }
+                },
+                "required": ["version"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The changed copy.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/SheetCopyView" } } }
+          },
+          "400": { "$ref": "#/components/responses/BadBody" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/CrossSite" },
+          "404": {
+            "description": "`draftNotFound` (also someone else's character), `copyNotFound`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                  "properties": {
+                    "error": { "properties": { "code": { "enum": ["draftNotFound", "copyNotFound"] } } }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`versionConflict`; `current` holds the copy now",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": { "enum": ["versionConflict"] },
+                        "current": { "$ref": "#/components/schemas/SheetCopyView" }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "`bodyTooLarge` (body over 516 KiB), `copyTooLarge` (model over 512 KiB, `max`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": { "enum": ["bodyTooLarge", "copyTooLarge"] },
+                        "max": { "type": "integer" }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "415": { "$ref": "#/components/responses/JsonRequired" },
+          "default": { "$ref": "#/components/responses/ServerError" }
+        }
+      },
+      "delete": {
+        "operationId": "deleteSheetCopy",
+        "summary": "Delete a copy",
+        "tags": ["Sheet copies"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Draft id (a UUID).",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "copyId",
+            "in": "path",
+            "required": true,
+            "description": "Copy id (a UUID).",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "204": { "description": "Done. No body." },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/CrossSite" },
+          "404": {
+            "description": "`draftNotFound` (also someone else's character), `copyNotFound`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                  "properties": {
+                    "error": { "properties": { "code": { "enum": ["draftNotFound", "copyNotFound"] } } }
+                  }
+                }
+              }
+            }
+          },
+          "default": { "$ref": "#/components/responses/ServerError" }
+        }
+      }
+    },
+    "/api/drafts/{id}/state": {
+      "get": {
+        "operationId": "playState",
+        "summary": "The play state",
+        "tags": ["Sheet copies"],
+        "description": "What is written and rubbed out at the table, for the original and every copy alike. A field the shown sheet does not have is skipped by the screen; ticks over what a field holds are cut there. The state itself is never trimmed.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Draft id (a UUID).",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The play state; `version: 0` and `{}` while nothing is stored.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PlayStateView" } } }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": {
+            "description": "`draftNotFound` (also someone else's character: it looks exactly like a missing one)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                  "properties": { "error": { "properties": { "code": { "enum": ["draftNotFound"] } } } }
+                }
+              }
+            }
+          },
+          "default": { "$ref": "#/components/responses/ServerError" }
+        }
+      },
+      "put": {
+        "operationId": "putPlayState",
+        "summary": "Write the play state, or rub out every tick",
+        "tags": ["Sheet copies"],
+        "description": "The whole state at once (`state`), or `clearChecks: true` to remove every count of ticks and keep the rest (a rest; the builder does not know what a rest is). With the version it was read at; the first write names 0.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Draft id (a UUID).",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "version": { "type": "integer", "minimum": 0 },
+                      "state": { "$ref": "#/components/schemas/PlayState" }
+                    },
+                    "required": ["version", "state"],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "version": { "type": "integer", "minimum": 0 },
+                      "clearChecks": { "const": true }
+                    },
+                    "required": ["version", "clearChecks"],
+                    "additionalProperties": false
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The stored state.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PlayStateView" } } }
+          },
+          "400": { "$ref": "#/components/responses/BadBody" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/CrossSite" },
+          "404": {
+            "description": "`draftNotFound` (also someone else's character: it looks exactly like a missing one)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                  "properties": { "error": { "properties": { "code": { "enum": ["draftNotFound"] } } } }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`versionConflict`; `current` holds the state now",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": { "enum": ["versionConflict"] },
+                        "current": { "$ref": "#/components/schemas/PlayStateView" }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": { "$ref": "#/components/responses/BodyTooLarge" },
+          "415": { "$ref": "#/components/responses/JsonRequired" },
+          "default": { "$ref": "#/components/responses/ServerError" }
         }
       }
     },
@@ -3203,9 +3672,15 @@
                     "type": "string",
                     "format": "date-time",
                     "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                  },
+                  "packageVersion": { "type": "string" },
+                  "changedAt": {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
                   }
                 },
-                "required": ["kind", "level", "builtAt"],
+                "required": ["kind", "level", "builtAt", "packageVersion"],
                 "additionalProperties": false
               },
               {
@@ -3222,9 +3697,15 @@
                     "type": "integer",
                     "minimum": -9007199254740991,
                     "maximum": 9007199254740991
+                  },
+                  "fromPackageVersion": { "type": "string" },
+                  "fromChangedAt": {
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
                   }
                 },
-                "required": ["kind", "name", "createdAt", "fromLevel"],
+                "required": ["kind", "name", "createdAt", "fromLevel", "fromPackageVersion"],
                 "additionalProperties": false
               }
             ]
@@ -3730,7 +4211,11 @@
           "tooManyRequests",
           "unknownUnit",
           "versionConflict",
-          "wrongMailOrPassword"
+          "wrongMailOrPassword",
+          "copyNotFound",
+          "copyTooLarge",
+          "tooManyCopies",
+          "originalChanged"
         ]
       },
       "Error": {
@@ -4980,6 +5465,106 @@
         "required": ["campaign", "players"],
         "additionalProperties": false,
         "description": "A campaign; what it shows depends on your role in it."
+      },
+      "SheetCopy": {
+        "type": "object",
+        "description": "A kept copy of the sheet, without its model.",
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "updatedAt": { "type": "string", "format": "date-time" },
+          "fromLevel": { "type": "integer", "description": "Level of the original it was made from." },
+          "fromChangedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the character had last changed when the copy was made (the original's `origin.changedAt` then)."
+          },
+          "fromPackageVersion": {
+            "type": "string",
+            "description": "Package version of the original it was made from."
+          },
+          "language": {
+            "type": "string",
+            "description": "Language the copy is written in; it does not follow the account."
+          },
+          "units": {
+            "type": "object",
+            "additionalProperties": { "type": "string" },
+            "description": "Units the copy is written in."
+          },
+          "version": { "type": "integer", "minimum": 1 }
+        },
+        "required": [
+          "id",
+          "name",
+          "createdAt",
+          "updatedAt",
+          "fromLevel",
+          "fromChangedAt",
+          "fromPackageVersion",
+          "language",
+          "units",
+          "version"
+        ],
+        "additionalProperties": false
+      },
+      "SheetCopyView": {
+        "type": "object",
+        "description": "A copy with its model. The model's `origin` is `{ kind: \"copy\", name, createdAt, fromLevel, fromPackageVersion, fromChangedAt }`.",
+        "properties": {
+          "copy": { "$ref": "#/components/schemas/SheetCopy" },
+          "model": { "$ref": "#/components/schemas/SheetModel" }
+        },
+        "required": ["copy", "model"],
+        "additionalProperties": false
+      },
+      "OriginalStamp": {
+        "type": "object",
+        "description": "The original as it is now, without building it. Differs from a copy's `fromLevel`, `fromChangedAt` or `fromPackageVersion`: the original changed since the copy was made.",
+        "properties": {
+          "level": { "type": "integer" },
+          "changedAt": { "type": "string", "format": "date-time" },
+          "packageVersion": {
+            "type": ["string", "null"],
+            "description": "Null while the character's package is not loaded."
+          },
+          "finished": {
+            "type": "boolean",
+            "description": "False while the character has open choices; then there is no original sheet, the copies stay readable."
+          }
+        },
+        "required": ["level", "changedAt", "packageVersion", "finished"],
+        "additionalProperties": false
+      },
+      "PlayValue": {
+        "description": "A number, a text, or a count of ticks.",
+        "anyOf": [
+          { "type": "number" },
+          { "type": "string", "maxLength": 2000 },
+          {
+            "type": "object",
+            "properties": { "checks": { "type": "integer", "minimum": 0, "maximum": 1000 } },
+            "required": ["checks"],
+            "additionalProperties": false
+          }
+        ]
+      },
+      "PlayState": {
+        "type": "object",
+        "description": "The play state: field id of the sheet (`field`, `usesField`, `playedByField`) to its value. At most 1000 fields.",
+        "propertyNames": { "minLength": 1, "maxLength": 300 },
+        "additionalProperties": { "$ref": "#/components/schemas/PlayValue" }
+      },
+      "PlayStateView": {
+        "type": "object",
+        "properties": {
+          "state": { "$ref": "#/components/schemas/PlayState" },
+          "version": { "type": "integer", "minimum": 0, "description": "0 while nothing is stored yet." },
+          "updatedAt": { "type": ["string", "null"], "format": "date-time" }
+        },
+        "required": ["state", "version", "updatedAt"],
+        "additionalProperties": false
       }
     }
   }
