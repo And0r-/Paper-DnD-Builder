@@ -566,6 +566,10 @@
       },
       "recommend": [
         {
+          "when": "level >= 19",
+          "pick": ["boon.starlit-crown"]
+        },
+        {
           "pick": ["boon.raise"]
         }
       ],
@@ -579,6 +583,10 @@
         "kind": "boon"
       },
       "recommend": [
+        {
+          "when": "level >= 19",
+          "pick": ["boon.starlit-crown"]
+        },
         {
           "pick": ["boon.raise"]
         }
@@ -594,6 +602,10 @@
       },
       "recommend": [
         {
+          "when": "level >= 19",
+          "pick": ["boon.starlit-crown"]
+        },
+        {
           "pick": ["boon.raise"]
         }
       ],
@@ -607,6 +619,10 @@
         "kind": "boon"
       },
       "recommend": [
+        {
+          "when": "level >= 19",
+          "pick": ["boon.starlit-crown"]
+        },
         {
           "pick": ["boon.raise"]
         }

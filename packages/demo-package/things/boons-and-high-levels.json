@@ -40,6 +40,18 @@
     ]
   },
   {
+    "id": "boon.starlit-crown",
+    "kind": "boon",
+    "source": "mistland",
+    "requires": "level >= 19",
+    "grants": [
+      {
+        "value": "nerve",
+        "add": 2
+      }
+    ]
+  },
+  {
     "id": "boon.deep-practice",
     "kind": "boon",
     "source": "mistland",
