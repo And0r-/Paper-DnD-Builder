@@ -208,6 +208,31 @@
     "formula": "graceBonus"
   },
   {
+    "id": "knackBonus",
+    "source": "mistland",
+    "formula": "if(has('calling.lantern-bearer'), heartBonus, if(has('calling.river-runner'), graceBonus, witBonus))"
+  },
+  {
+    "id": "knackTarget",
+    "source": "mistland",
+    "formula": "8 + practice + knackBonus"
+  },
+  {
+    "id": "knackHit",
+    "source": "mistland",
+    "formula": "practice + knackBonus"
+  },
+  {
+    "id": "borrowedKnackTarget",
+    "source": "mistland",
+    "formula": "8 + practice + heartBonus"
+  },
+  {
+    "id": "borrowedKnackHit",
+    "source": "mistland",
+    "formula": "practice + heartBonus"
+  },
+  {
     "id": "knackRank",
     "source": "mistland",
     "byLevel": [1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 5, 5, 5, 5]

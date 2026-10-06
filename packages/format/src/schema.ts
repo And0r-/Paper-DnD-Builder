@@ -494,6 +494,20 @@ export const markSchema = z
   })
   .refine(...hasCondition);
 
+/** One line a card may carry: for a thing that matches the condition, the filled `text` under `label`. */
+export const cardOriginSchema = z
+  .strictObject({
+    ...markConditionShape,
+    not: z
+      .strictObject(markConditionShape)
+      .refine(...hasCondition)
+      .optional(),
+    /** Label over the line; default: the name of what brought the thing (as `groupBy: "origin"`). */
+    label: textKey.optional(),
+    text: filledText,
+  })
+  .refine(...hasCondition);
+
 export const sectionSchema = z.discriminatedUnion("kind", [
   z.strictObject({
     ...sectionBase,
@@ -620,6 +634,12 @@ export const sheetSchema = z.strictObject({
       fields: z.tuple([z.string(), z.string(), z.string(), z.string()]),
       /** Stat that gives the use boxes in the card footer, as in featureTable. */
       uses: statKey.optional(),
+      /**
+       * A line under the four stats that depends on where the character got
+       * the thing, e.g. the numbers it is used with. The first entry whose
+       * condition (as in a mark) the thing matches gives the line.
+       */
+      origins: z.array(cardOriginSchema).min(1).optional(),
     }),
   ),
 });
@@ -663,6 +683,7 @@ export type FixedStep = z.infer<typeof fixedStepSchema>;
 export type GatherStep = z.infer<typeof gatherStepSchema>;
 export type Section = z.infer<typeof sectionSchema>;
 export type Mark = z.infer<typeof markSchema>;
+export type CardOrigin = z.infer<typeof cardOriginSchema>;
 export type Sheet = z.infer<typeof sheetSchema>;
 export type GlossaryEntry = z.infer<typeof glossarySchema>[number];
 export type TextValue = z.infer<typeof textValueSchema>;
