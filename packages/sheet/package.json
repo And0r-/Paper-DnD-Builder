@@ -11,7 +11,8 @@
     "./printouts": "./src/printouts.ts",
     "./testing": "./src/testing.ts",
     "./designs": "./designs/geometry.ts",
-    "./designs/verbose": "./designs/verbose/index.ts"
+    "./designs/verbose": "./designs/verbose/index.ts",
+    "./designs/screens": "./designs/screens.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit -p ."
@@ -22,6 +23,13 @@
     "zod": "^4.6.5"
   },
   "devDependencies": {
-    "@builder/demo-package": "workspace:*"
+    "@builder/demo-package": "workspace:*",
+    "@types/react": "^19.3.0",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "@types/react-dom": "^19.3.0"
+  },
+  "peerDependencies": {
+    "react": "^19.3.0"
   }
 }
