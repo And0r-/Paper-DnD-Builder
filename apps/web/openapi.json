@@ -55,7 +55,7 @@
         "operationId": "health",
         "summary": "Liveness probe",
         "tags": ["Server"],
-        "description": "Answers as long as the process serves requests. Not part of the router; used by Docker.",
+        "description": "Answers as long as the process serves requests, also when no content package is loaded. Lists the loaded packages; `warnings` names rejected package folders, an empty package list or a failed start. Not part of the router; used by Docker.",
         "security": [],
         "responses": {
           "200": {
@@ -67,9 +67,26 @@
                   "properties": {
                     "status": {
                       "const": "ok"
+                    },
+                    "packages": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": { "type": "string" },
+                          "version": { "type": "string" },
+                          "formatVersion": { "type": "string" }
+                        },
+                        "required": ["id", "version", "formatVersion"],
+                        "additionalProperties": false
+                      }
+                    },
+                    "warnings": {
+                      "type": "array",
+                      "items": { "type": "string" }
                     }
                   },
-                  "required": ["status"],
+                  "required": ["status", "packages", "warnings"],
                   "additionalProperties": false
                 }
               }

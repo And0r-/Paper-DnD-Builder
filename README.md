@@ -79,7 +79,9 @@ docker compose up -d --build
 ```
 
 The web container applies pending migrations on start, then serves on
-`WEB_PORT` (default 3000). `GET /api/health` reports liveness. Each folder
+`WEB_PORT` (default 3000). `GET /api/health` reports liveness and lists the
+loaded packages (id, version, format version); with none loaded, its
+`warnings` say so. Each folder
 in `./packages-mount` with a `manifest.json` is one package (to try the
 builder, copy `packages/demo-package` there). Packages are validated on
 start; an invalid one is rejected with the validator's report in the log
