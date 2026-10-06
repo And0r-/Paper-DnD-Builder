@@ -206,7 +206,7 @@
     "sheet.scores.title": "Grundwerte",
     "sheet.scores.hint": "Die Zahl im Kreis zählst du zu passenden Würfen dazu.",
     "sheet.talents.title": "Talente",
-    "sheet.talents.hint": "● = geübt, ◉ = mit Kniff: Übung doppelt. Die Zahl im Kästchen zählst du zu deinem Wurf dazu.",
+    "sheet.talents.hint": "● = geübt. Die Zahl im Kästchen zählst du zu deinem Wurf dazu.",
     "sheet.traits.title": "Fähigkeiten",
     "sheet.traits.hint": "□ = einmal benutzt: ankreuzen. Nach einer Rast wegradieren.",
     "sheet.knacks.title": "Kniffe",
@@ -406,7 +406,6 @@
     "trait.root-lore.short": "Du weisst, welche Wurzeln man essen kann.",
     "trait.root-lore.explain.what": "Du gräbst dort, wo andere nur Erde sehen.",
     "trait.root-lore.explain.table": "Unterwegs findet ihr immer etwas zu essen.",
-
     "knack.spark-shower.name": "Funkenregen",
     "knack.spark-shower.short": "Ein Schwall heller Funken blendet deine Gegner.",
     "knack.spark-shower.goodIf": "Gut, wenn du Gegner aufhalten willst.",
@@ -631,6 +630,16 @@
     "stat.traits.name": "Eigenschaften",
     "stat-value.item.lantern-staff.traits": "Zweihändig, leuchtet {{length:10|short}} weit",
     "stat-value.item.boat-hook.traits": "Lang (trifft noch auf {{length:10|short}}), zieht Gegner heran",
-    "stat-value.item.sling.traits": "Braucht Steine"
+    "stat-value.item.sling.traits": "Braucht Steine",
+    "kind.build.name": "Wuchs",
+    "build.slight.name": "zierlich",
+    "build.slight.short": "Du bist klein und leicht.",
+    "build.slight.explain.what": "Dein Volk ist kleiner und leichter als die meisten.",
+    "build.slight.explain.table": "Du schlüpfst durch enge Spalten. Schwere Stangen sind dir zu lang.",
+    "build.sturdy.name": "stämmig",
+    "build.sturdy.short": "Du bist breit und fest gebaut.",
+    "build.sturdy.explain.what": "Dein Volk ist so groß wie die meisten und kräftig gebaut.",
+    "build.sturdy.explain.table": "Du trägst lange Stangen ohne Mühe. Enge Spalten sind dir zu schmal.",
+    "sheet.talents.strong": "◉ = mit Kniff: Übung doppelt."
   }
 }

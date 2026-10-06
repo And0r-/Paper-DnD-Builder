@@ -1,5 +1,5 @@
 {
-  "formatVersion": "0.13",
+  "formatVersion": "0.14",
   "id": "demo",
   "version": "0.12.0",
   "languages": ["de", "en"],
@@ -14,7 +14,8 @@
     "item",
     "flair",
     "handling",
-    "boon"
+    "boon",
+    "build"
   ],
   "sources": {
     "mistland": {
