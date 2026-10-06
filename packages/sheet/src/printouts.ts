@@ -73,11 +73,16 @@ export const DEFAULT_PRINT_CHOICE: PrintChoice = {
 
 /** A stored choice as far as it is still valid; the rest from the default. */
 export function printChoiceOf(stored: unknown): PrintChoice {
-  const parsed = printChoiceSchema.partial().safeParse(stored);
-  const choice = { ...DEFAULT_PRINT_CHOICE, ...(parsed.success ? parsed.data : {}) };
-  // A design that is no longer offered falls back to the default.
-  const design = SHEET_DESIGNS.some((d) => d.id === choice.design)
-    ? choice.design
-    : DEFAULT_PRINT_CHOICE.design;
-  return { ...choice, design, parts: inFileOrder(choice.parts) };
+  const raw = (typeof stored === "object" && stored !== null ? stored : {}) as Record<string, unknown>;
+  const field = <K extends keyof PrintChoice>(key: K): PrintChoice[K] => {
+    const parsed = printChoiceSchema.shape[key].safeParse(raw[key]);
+    return parsed.success ? (parsed.data as PrintChoice[K]) : DEFAULT_PRINT_CHOICE[key];
+  };
+  const design = field("design");
+  return {
+    parts: inFileOrder(field("parts")),
+    // A design that is no longer offered falls back to the default.
+    design: SHEET_DESIGNS.some((d) => d.id === design) ? design : DEFAULT_PRINT_CHOICE.design,
+    state: field("state"),
+  };
 }
