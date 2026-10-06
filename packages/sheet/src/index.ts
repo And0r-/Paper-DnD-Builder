@@ -41,4 +41,5 @@ export {
   type PrintPart,
   type SheetDesign,
 } from "./printouts.ts";
+export { type PlayState, type PlayValue } from "./play.ts";
 export { sheetModelSchema } from "./schema.ts";

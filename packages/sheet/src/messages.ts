@@ -19,6 +19,8 @@ export interface Messages {
   createdOn: (date: string) => string;
   /** Name of a copy of the sheet the player keeps, until they give it one. */
   copyName: (date: string) => string;
+  /** Footer of a kept copy: the level of the original it was made from. */
+  asOfLevel: (level: number) => string;
   cards: string;
   printHint: string;
   atTheTable: string;
@@ -47,6 +49,7 @@ export const MESSAGES: Readonly<Record<string, Messages>> = {
     page: (n, of) => `Seite ${n} von ${of}`,
     unitsUsed: (u) => `Einheiten: ${u.join(", ")}`,
     copyName: (d) => `Meine Fassung vom ${d}`,
+    asOfLevel: (n) => `Stand Stufe ${n}`,
     createdOn: (d) => `Erstellt am ${d}`,
     cards: "Karten",
     printHint: "In Originalgrösse (100 %) drucken. An den Linien ausschneiden.",
@@ -70,6 +73,7 @@ export const MESSAGES: Readonly<Record<string, Messages>> = {
     page: (n, of) => `Page ${n} of ${of}`,
     unitsUsed: (u) => `Units: ${u.join(", ")}`,
     copyName: (d) => `My version of ${d}`,
+    asOfLevel: (n) => `as of level ${n}`,
     createdOn: (d) => `Made on ${d}`,
     cards: "Cards",
     printHint: "Print at actual size (100%). Cut along the lines.",
