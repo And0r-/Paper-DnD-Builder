@@ -164,6 +164,22 @@ export async function expectOneLanguage(page: Page, lang: Lang): Promise<void> {
   expect(found, `${other} text on a ${lang} page (${page.url()})`).toEqual([]);
 }
 
+/**
+ * Waits until every finite animation on the page has ended. Run it before
+ * an axe check: a mark that fades in is caught half transparent otherwise,
+ * and axe reports its contrast (seen in CI on .menu-mark__count).
+ */
+export async function animationsDone(page: Page): Promise<void> {
+  await page.evaluate(() =>
+    Promise.all(
+      document
+        .getAnimations()
+        .filter((a) => a.effect?.getComputedTiming().endTime !== Infinity)
+        .map((a) => a.finished.catch(() => undefined)),
+    ),
+  );
+}
+
 export async function shot(page: Page, name: string): Promise<void> {
   await page.screenshot({ path: join(SHOTS, `${name}.png`), fullPage: true });
 }
