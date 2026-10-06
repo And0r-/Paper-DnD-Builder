@@ -107,9 +107,55 @@ export function explainValue(
     }
     const amount = evaluateParsed(e, scope);
     const refs = [...collectRefs(e).values];
+    const shares = valueShares(
+      e,
+      refs.filter((r) => r !== "level"),
+    );
+    if (shares) {
+      // What is left once the values are taken out: the owner's, or the level's.
+      const rest = refs.includes("level") && owner.kind !== "thing" ? levelSource : owner;
+      return [...shares.parts, { amount: shares.rest, source: rest }];
+    }
     // A thing's gift stays the thing's, even if it grows with the level.
     if (owner.kind === "thing" || refs.length === 0) return [{ amount, source: owner }];
     return [{ amount, source: { kind: "values", values: refs } }];
+  };
+
+  const levelSource: PartSource = { kind: "values", values: ["level"] };
+
+  /**
+   * Takes the values out of a term that is not a plain sum: a value's share
+   * is the term with it minus the term with it set to 0, and what is left
+   * with all of them at 0 is the rest. "(level - 1) * (6 + bonus)" gives the
+   * bonus (level - 1) * bonus and leaves (level - 1) * 6. Only if that is a
+   * fair split: each point of a value adds the same (in "floor((x - 10) / 2)"
+   * a 0 is no "without x"), and the shares do not hang on each other (in
+   * "trained * bonus" neither is the other's). Otherwise undefined, and the
+   * term stays whole; also if it uses no value but the level.
+   */
+  const valueShares = (
+    e: Expr,
+    names: readonly string[],
+  ): { parts: ValuePart[]; rest: number } | undefined => {
+    if (names.length === 0) return undefined;
+    const at = (set: ReadonlyMap<string, number>): number =>
+      evaluateParsed(e, { ...scope, value: (n) => set.get(n) ?? scope.value(n) });
+    try {
+      const whole = at(new Map());
+      const parts: ValuePart[] = [];
+      for (const name of names) {
+        const base = at(new Map([[name, 0]]));
+        const step = at(new Map([[name, 1]])) - base;
+        const even = [2, -1].every((n) => Math.abs(at(new Map([[name, n]])) - base - n * step) < EPSILON);
+        if (!even || Math.abs(whole - base - scope.value(name) * step) >= EPSILON) return undefined;
+        parts.push({ amount: whole - base, source: { kind: "values", values: [name] } });
+      }
+      const rest = at(new Map(names.map((n) => [n, 0])));
+      if (Math.abs(sum(parts) + rest - whole) >= EPSILON) return undefined;
+      return { parts, rest };
+    } catch {
+      return undefined;
+    }
   };
 
   const partsOf = (id: string, seen: Set<string>): ValuePart[] => {
