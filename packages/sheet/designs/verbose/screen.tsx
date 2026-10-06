@@ -164,9 +164,9 @@ function Header({ s, i, ui, playedBy }: Props<"header"> & { playedBy: string }) 
   return (
     <div className="vsheet__header">
       <div className="vsheet__who">
-        <p className="vsheet__name">
+        <h1 className="vsheet__name">
           <ui.Text path={at(i, "name")} value={s.name} label={s.name} />
-        </p>
+        </h1>
         <p className="vsheet__summary">
           <ui.Text path={at(i, "summary")} value={s.summary} label={s.name} />
         </p>

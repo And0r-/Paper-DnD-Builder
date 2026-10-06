@@ -101,7 +101,11 @@
 
 /* ------------------------------------------------- texts changed in place */
 
+/* At least 24 px to tap (WCAG 2.2, 2.5.8), also where the paper's type is small. */
 .sheet-text {
+  display: inline-block;
+  min-width: 24px;
+  min-height: 24px;
   border-radius: 2px;
   cursor: text;
 }
@@ -118,9 +122,7 @@
 
 /* Something to tap where a text is empty. */
 .sheet-text--empty {
-  display: inline-block;
   min-width: 3ch;
-  min-height: 1em;
   border-bottom: 1px dotted var(--color-border);
 }
 
@@ -281,8 +283,8 @@
   }
 
   .sheet-row-remove {
-    width: 6mm;
-    height: 6mm;
+    width: 24px;
+    height: 24px;
   }
 
   /* On paper they are not there: shown only where the pointer is. */

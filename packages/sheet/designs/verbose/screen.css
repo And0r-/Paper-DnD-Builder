@@ -20,6 +20,7 @@
 .vsheet ul,
 .vsheet dl,
 .vsheet dd,
+.vsheet h1,
 .vsheet h2 {
   margin: 0;
 }
@@ -440,7 +441,8 @@
 
 @media (min-width: 900px) {
   .vsheet {
-    --sheet-tick: var(--vs-square);
+    /* As on paper, but never below what a pointer can hit (24 px, WCAG 2.2). */
+    --sheet-tick: max(var(--vs-square), 24px);
     --sheet-touch: auto;
     --sheet-number: var(--vs-bigValue);
     font-size: var(--vs-body);

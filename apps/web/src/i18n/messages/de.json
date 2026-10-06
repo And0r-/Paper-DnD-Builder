@@ -442,7 +442,7 @@
   "sheet.group": "Bogen",
   "sheet.tools": "Werkzeuge des Bogens",
   "sheet.version": "Fassung",
-  "sheet.original": "Original (Builder)",
+  "sheet.original": "Original (vom Builder)",
   "sheet.copyName": "Meine Fassung vom {date}, {time}",
   "sheet.design": "Aussehen",
   "sheet.language": "Sprache",

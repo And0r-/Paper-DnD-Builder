@@ -39,3 +39,17 @@ than one mixed with another language.
 type sizes), with grid helpers in `@builder/sheet/designs`. The PDF
 painter in [`@builder/print`](../print) and the screen read the same
 file, so a box is the same size on paper and on screen.
+
+Next to it, `designs/<id>/screen.tsx` and `screen.css` draw the design on
+screen (React). A screen draws section kinds in the model's order and
+nothing else: every text goes through `ui.Text`, every place to write or
+tick through `ui.Field`, and rows through `ui.AddRow` / `ui.RemoveRow`
+(`designs/types.ts`). The app decides what they do, so a design does not
+know whether it shows the original or a kept copy.
+`@builder/sheet/designs/screens` maps the ids of `SHEET_DESIGNS` to their
+screens; only the browser imports it.
+
+`src/edit.ts` changes a model like paper (`withText`, `withRowAdded`,
+`withRowRemoved`; nothing follows from a change) and reads the play state
+against it (`playFields`, `shownState`: fields the shown sheet lacks are
+skipped, ticks cut to what a field holds).
