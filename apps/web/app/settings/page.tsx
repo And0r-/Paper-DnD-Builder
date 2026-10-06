@@ -116,7 +116,9 @@ function Settings({ account }: { account: Account }) {
           {!failed && !packages && <Loading count={1} />}
           {dimensions.map(({ dim, lp }) => {
             const d = lp.pkg.units.dimensions[dim]!;
-            const shown = effectiveUnits(lp.pkg.units, lp.lang, account.units)[dim];
+            // "" is "same as the language": nothing stored, the units change with the language.
+            const chosen = account.units[dim] ?? "";
+            const byLanguage = effectiveUnits(lp.pkg.units, lp.lang, {})[dim]!;
             const word = (u: string) => ptext(lp, `unit.${u}.long`) ?? u;
             const ctx = measureContext(lp, account.units);
             // An example from the package's own table, so the reader sees how numbers will look.
@@ -132,11 +134,14 @@ function Settings({ account }: { account: Account }) {
                       : list(d.units.map(word))
                   }
                   name={`unit-${dim}`}
-                  options={d.units.map((u) => ({ value: u, label: word(u) }))}
-                  value={shown}
+                  options={[
+                    { value: "", label: t("settings.unitByLanguage", { unit: word(byLanguage) }) },
+                    ...d.units.map((u) => ({ value: u, label: word(u) })),
+                  ]}
+                  value={chosen}
                   onChange={(u) => {
                     setError(undefined);
-                    app.setUnit(dim, u).catch(fail);
+                    app.setUnit(dim, u === "" ? null : u).catch(fail);
                   }}
                   help={t("settings.example", { example })}
                 />

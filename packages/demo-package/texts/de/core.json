@@ -612,6 +612,7 @@
     "value.restDice.name": "Rastwürfel",
     "value.restDice.explain": "Bei einer Rast würfelst du welche und bekommst so viel Ausdauer zurück.",
     "value.restDie.name": "Größe der Rastwürfel",
+    "value.restDie.amount": "W{{var:n}}",
     "value.closeCallsMade.name": "Knapp geschafft",
     "value.closeCallsMade.explain": "Bei 0 Ausdauer würfelst du jede Runde: Kreuze hier an, was klappt.",
     "value.closeCallsMissed.name": "Knapp verfehlt",

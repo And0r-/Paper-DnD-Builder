@@ -4,11 +4,9 @@
  * reader wants. Before login the language comes from a cookie or the
  * browser; after login the account setting wins.
  */
-import { effectiveUnits } from "@builder/core";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { isUiLanguage, translator, type Translator, type UiLanguage } from "../i18n/index.ts";
 import { api, ApiError, type Account } from "./api.ts";
-import { loadPackageStructure, loadPackageList } from "./packages.ts";
 
 /** Remembers the language chosen before login. Functional only; nothing else is stored. */
 export const LANGUAGE_COOKIE = "lang";
@@ -24,7 +22,8 @@ export interface AppState extends Translator {
   reloadAccount(): Promise<Account | null>;
   setAccount(account: Account | null): void;
   setLanguage(lang: UiLanguage): Promise<void>;
-  setUnit(dimension: string, unit: string): Promise<void>;
+  /** `null`: follow the language again. */
+  setUnit(dimension: string, unit: string | null): Promise<void>;
   logout(): Promise<void>;
 }
 
@@ -84,28 +83,16 @@ export function AppStateProvider({
         setGuestLanguage(next);
         return;
       }
-      // Units never follow a language change (plan 5.6): pin what the reader sees now.
-      const units: Record<string, string> = {};
-      try {
-        const list = await loadPackageList(lang);
-        for (const p of list) {
-          const structure = await loadPackageStructure(p.id);
-          Object.assign(units, effectiveUnits(structure.units, lang, account.units), account.units);
-        }
-      } catch {
-        // Without package data the units stay as they are stored.
-      }
-      const r = await api<{ account: Account }>("PATCH", "/api/account/settings", {
-        language: next,
-        ...(Object.keys(units).length > 0 ? { units } : {}),
-      });
+      // Only the language: units the reader never chose keep following it (plan 5.6),
+      // units they chose stay as they are.
+      const r = await api<{ account: Account }>("PATCH", "/api/account/settings", { language: next });
       setGuestLanguage(next);
       setAccount(r.account);
     },
-    [account, lang],
+    [account],
   );
 
-  const setUnit = useCallback(async (dimension: string, unit: string) => {
+  const setUnit = useCallback(async (dimension: string, unit: string | null) => {
     const r = await api<{ account: Account }>("PATCH", "/api/account/settings", {
       units: { [dimension]: unit },
     });
