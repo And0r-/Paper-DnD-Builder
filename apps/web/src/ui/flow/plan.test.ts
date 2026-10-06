@@ -38,4 +38,17 @@ describe("planDiff", () => {
     const asked = (head: FlowEntry) => head.key !== "folk";
     expect(planDiff(before, after, asked)).toMatchObject({ addedParts: [], removedParts: [] });
   });
+
+  it("names the parts a step lost or got when it came back under the same name (AND-138)", () => {
+    const before = flow(["class", 0, "Class"], ["order-1", 1, "Order"], ["sub-1", 1, "Branch"]);
+    const after = flow(["class", 0, "Class"], ["sub-2", 1, "Branch"], ["lore-2", 1, "Lore"]);
+    for (const e of [before[1]!, after[1]!]) e.sectionTitle = "Way";
+    expect(planDiff(before, after)).toEqual({
+      added: [],
+      removed: [],
+      addedParts: ["Lore"],
+      removedParts: ["Order"],
+    });
+    expect(planDiff(before, after, () => false)).toMatchObject({ addedParts: [], removedParts: [] });
+  });
 });

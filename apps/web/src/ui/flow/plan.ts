@@ -176,7 +176,7 @@ export function planDiff(
 ): { added: string[]; removed: string[]; addedParts: string[]; removedParts: string[] } {
   const gone = (from: FlowEntry[], to: FlowEntry[], side: "before" | "after") => {
     const keys = new Set(to.map((e) => e.key));
-    const steps: string[] = [];
+    const steps: { title: string; parts: string[]; asked: boolean }[] = [];
     const parts: string[] = [];
     for (const e of from) {
       if (keys.has(e.key)) continue;
@@ -184,13 +184,29 @@ export function planDiff(
       const section = from.filter((x) => x.section === e.section);
       if (section.some((x) => keys.has(x.key))) {
         if (asked(section[0]!, side)) parts.push(e.title);
-      } else if (e === section[0]) steps.push(e.sectionTitle ?? e.title);
+      } else if (e === section[0]) {
+        const title = e.sectionTitle ?? e.title;
+        steps.push({ title, parts: section.map((x) => x.title), asked: asked(e, side) });
+      }
     }
     return { steps, parts };
   };
   const added = gone(after, before, "after");
   const removed = gone(before, after, "before");
-  const [addedSteps, removedSteps] = withoutSame(added.steps, removed.steps);
+  const [addedSteps, removedSteps] = withoutSame(
+    added.steps.map((s) => s.title),
+    removed.steps.map((s) => s.title),
+  );
+  // A step that went and came under the same name stays; the parts it lost or got are named (AND-138).
+  const rest = [...added.steps];
+  for (const old of removed.steps) {
+    const i = rest.findIndex((s) => s.title === old.title);
+    if (i < 0) continue;
+    const [now] = rest.splice(i, 1);
+    const [came, went] = withoutSame(now!.parts, old.parts);
+    if (now!.asked) added.parts.push(...came);
+    if (old.asked) removed.parts.push(...went);
+  }
   const [addedParts, removedParts] = withoutSame(added.parts, removed.parts);
   return { added: addedSteps, removed: removedSteps, addedParts, removedParts };
 }
