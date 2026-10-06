@@ -69,6 +69,11 @@ export interface ChoiceState {
   textVariant?: string;
   /** Things that grant this choice (granted choices), in grant order. */
   grantedBy?: string[];
+  /**
+   * Problem `duplicate` because a grant gives a pick anyway (often a later
+   * step): each such pick with the thing that grants it.
+   */
+  givenBy?: Record<string, string>;
   /** Character level from which the choice is asked (the level of its step). */
   atLevel: number;
   /** Distribute choices with the method `raise`: what each target can still take. */
@@ -218,6 +223,14 @@ class Character {
   private memo = new Map<string, number>();
   private computing = new Set<string>();
 
+  /** Things offered so far in pick choices (not `owned` ones). */
+  readonly offered = new Set<string>();
+  /**
+   * Things a grant gave after a choice offered them, with the thing that
+   * granted them: that choice should not have offered them (see evaluateDraft).
+   */
+  readonly clashes = new Map<string, string>();
+
   private readonly pkg: ContentPackage;
   private readonly ix: Indexes;
   readonly level: number;
@@ -245,6 +258,8 @@ class Character {
     const thing = this.ix.things.get(id);
     // A key that vanished from a newer package version simply stops counting.
     if (!thing) return;
+    if (via.grantedBy !== undefined && !thing.repeatable && !this.ix.counted.has(id) && this.offered.has(id))
+      this.clashes.set(id, via.grantedBy);
     const held = this.held.get(id);
     // Given again: the counts add up (8 arrows and 20 arrows are 28 arrows), for
     // things the package counts at all; a skill from two sources is one skill.
@@ -439,6 +454,35 @@ function thingsIn(src: string | undefined): string[] {
  * same result. Throws {@link RuleError} only if the package itself is broken.
  */
 export function evaluateDraft(pkg: ContentPackage, doc: DraftDocument): Evaluation {
+  // Steps only look back, so a choice can offer a thing that a later step's
+  // grant gives anyway (a talent offered with the folk, then the upbringing
+  // grants it): picking it would silently give nothing. Such things are not
+  // offered in a second walk; a stored pick of one is a duplicate there and
+  // its step asks again. Walks repeat until the set of such things settles
+  // (a pick dropped can change what later steps grant); the bound only
+  // guards against a package where that never happens.
+  let givenLater = new Map<string, string>();
+  for (let walks = 1; ; walks++) {
+    const { ev, character } = walk(pkg, doc, givenLater);
+    const next = new Map(character.clashes);
+    for (const id of givenLater.keys()) {
+      const by = character.held.get(id)?.grantedBy;
+      if (by !== undefined) next.set(id, by);
+    }
+    if (walks === 4 || sameKeys(next, givenLater)) return ev;
+    givenLater = next;
+  }
+}
+
+function sameKeys(a: Map<string, string>, b: Map<string, string>): boolean {
+  return a.size === b.size && [...a.keys()].every((k) => b.has(k));
+}
+
+function walk(
+  pkg: ContentPackage,
+  doc: DraftDocument,
+  givenLater: ReadonlyMap<string, string>,
+): { ev: Evaluation; character: Character } {
   const ix = indexes(pkg);
   /** The declared choice of an id, also of a copy. */
   const choiceOf = (id: string) => ix.choices.get(declaredChoiceId(id));
@@ -507,7 +551,7 @@ export function evaluateDraft(pkg: ContentPackage, doc: DraftDocument): Evaluati
       const choice = choiceOf(choiceId);
       if (!choice) continue;
       const at = atLevelOf.get(choiceId) ?? step.atLevel;
-      const p = prepareChoice(pkg, choice, choiceId, step.id, at, doc, character, choices, refs);
+      const p = prepareChoice(pkg, choice, choiceId, step.id, at, doc, character, choices, refs, givenLater);
       const by = grantedByChoice.get(choiceId);
       if (by) p.state.grantedBy = by;
       choices[choiceId] = p.state;
@@ -596,7 +640,7 @@ export function evaluateDraft(pkg: ContentPackage, doc: DraftDocument): Evaluati
   const open = Object.values(choices)
     .filter((c) => !c.optional && !isSettled(c))
     .map((c) => c.id);
-  return {
+  const ev: Evaluation = {
     level: doc.level,
     steps,
     choices,
@@ -611,6 +655,7 @@ export function evaluateDraft(pkg: ContentPackage, doc: DraftDocument): Evaluati
     complete: open.length === 0,
     inactiveAnswers: Object.keys(doc.answers).filter((k) => !(k in choices)),
   };
+  return { ev, character };
 }
 
 function isSettled(c: ChoiceState): boolean {
@@ -627,6 +672,8 @@ interface Prepared {
   hasAnswer: boolean;
   /** Picks of the answer that count for the character (pick choices). */
   counted: string[];
+  /** Things not offered because a grant gives them anyway, with the thing that grants them. */
+  givenLater: Map<string, string>;
 }
 
 /** Choices whose picks mark things the character has instead of giving them (`options.owned`). */
@@ -713,6 +760,7 @@ function prepareChoice(
   character: Character,
   earlier: Record<string, ChoiceState>,
   refs: Set<string>,
+  givenLater: ReadonlyMap<string, string>,
 ): Prepared {
   const scope = character.scope;
   const state: ChoiceState = {
@@ -729,7 +777,7 @@ function prepareChoice(
   const hasAnswer = Object.hasOwn(doc.answers, id) && doc.answers[id] !== null;
   if (hasAnswer) state.answer = doc.answers[id];
   const ctx: ChoiceContext = {};
-  const prepared: Prepared = { id, choice, state, ctx, hasAnswer, counted: [] };
+  const prepared: Prepared = { id, choice, state, ctx, hasAnswer, counted: [], givenLater: new Map() };
 
   switch (choice.kind) {
     case "pickOne":
@@ -746,10 +794,17 @@ function prepareChoice(
             if (character.held.has(t.id) && !(t.repeatable && canTakeAgain(pkg, t, character, refs, atLevel)))
               return [];
             if (t.requires !== undefined && !evaluateCondition(t.requires, at)) return [];
+            // A grant gives it anyway (see evaluateDraft).
+            const by = givenLater.get(t.id);
+            if (by !== undefined && !t.repeatable) {
+              prepared.givenLater.set(t.id, by);
+              return [];
+            }
             return [t.id];
           });
       state.options = options;
       ctx.options = options;
+      if (!owned) for (const o of options) character.offered.add(o);
       if (choice.kind === "pickMany") {
         state.count = character.amount(choice.count);
         state.upTo = choice.upTo ?? false;
@@ -863,6 +918,20 @@ function answerChoice(
     judgeAnswer(choice, state.answer, p.ctx).problem !== "notOffered"
   )
     state.problem = "duplicate";
+  if (j.problem === "notOffered" && p.givenLater.size > 0) {
+    const answer = state.answer as { pick?: unknown; picks?: unknown };
+    const picks = Array.isArray(answer.picks) ? answer.picks : [answer.pick];
+    const givenBy = Object.fromEntries(
+      picks.flatMap((id) => {
+        const by = typeof id === "string" ? p.givenLater.get(id) : undefined;
+        return by !== undefined ? [[id, by]] : [];
+      }),
+    );
+    if (Object.keys(givenBy).length > 0) {
+      state.problem = "duplicate";
+      state.givenBy = givenBy;
+    }
+  }
   if (j.remaining !== undefined) state.remaining = j.remaining;
   else if (j.status !== "incomplete") delete state.remaining;
   p.counted = j.counted ?? [];

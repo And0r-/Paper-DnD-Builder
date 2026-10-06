@@ -537,3 +537,83 @@ describe("counts (format 0.13)", () => {
     expect(evaluateDraft(many, doc).values).toEqual(evaluateDraft(pkg, doc).values);
   });
 });
+
+describe("a pick that a later step grants anyway", () => {
+  // The coastfolk's flair is asked right after the folk; the bell tower
+  // upbringing (a later step) grants the flair "listening".
+  const coast: [string, unknown][] = [
+    ["folk", { pick: "folk.coastfolk" }],
+    ["coastfolk-flair", { pick: "flair.listening" }],
+  ];
+
+  it("marks the earlier pick as a duplicate and asks its step again", () => {
+    const doc = build(1, [...coast, ["upbringing", { pick: "upbringing.bell-tower" }]]);
+    const ev = evaluateDraft(pkg, doc);
+    expect(ev.choices["coastfolk-flair"]).toMatchObject({
+      status: "invalid",
+      problem: "duplicate",
+      givenBy: { "flair.listening": "upbringing.bell-tower" },
+      options: ["flair.haggling"],
+    });
+    expect(ev.steps.find((s) => s.id === "coastfolk-flair")?.status).toBe("needsAttention");
+    expect(ev.open).toContain("coastfolk-flair");
+    // The character has the flair once, from the upbringing.
+    expect(ev.things.filter((h) => h.id === "flair.listening")).toEqual([
+      expect.objectContaining({ grantedBy: "upbringing.bell-tower", step: "upbringing" }),
+    ]);
+  });
+
+  it("does not offer it when the later grant is known already, in either step order", () => {
+    const answers = { folk: { pick: "folk.coastfolk" }, upbringing: { pick: "upbringing.bell-tower" } };
+    expect(evaluateDraft(pkg, draft(1, answers)).choices["coastfolk-flair"]?.options).toEqual([
+      "flair.haggling",
+    ]);
+    const later = applyChange(pkg, draft(1, answers), {
+      type: "answer",
+      choice: "coastfolk-flair",
+      answer: { pick: "flair.listening" },
+    });
+    expect(later.ok ? "ok" : later.error).toEqual({ code: "answerDoesNotFit", problem: "notOffered" });
+    // Upbringing first: the flair is held already when the folk's step comes.
+    const swapped: ContentPackage = {
+      ...pkg,
+      flow: {
+        ...pkg.flow,
+        steps: pkg.flow.steps.map((s) =>
+          s.id === "folk"
+            ? pkg.flow.steps.find((u) => u.id === "upbringing")!
+            : s.id === "upbringing"
+              ? pkg.flow.steps.find((f) => f.id === "folk")!
+              : s,
+        ),
+      },
+    };
+    const ev = evaluateDraft(
+      swapped,
+      draft(1, { ...answers, "coastfolk-flair": { pick: "flair.listening" } }),
+    );
+    expect(ev.choices["coastfolk-flair"]).toMatchObject({ status: "invalid", options: ["flair.haggling"] });
+  });
+
+  it("keeps a pick the later step does not grant", () => {
+    const doc = build(1, [
+      ["folk", { pick: "folk.coastfolk" }],
+      ["coastfolk-flair", { pick: "flair.haggling" }],
+      ["upbringing", { pick: "upbringing.bell-tower" }],
+    ]);
+    const ev = evaluateDraft(pkg, doc);
+    expect(ev.choices["coastfolk-flair"]).toMatchObject({ status: "answered" });
+    expect(ev.choices["coastfolk-flair"]?.givenBy).toBeUndefined();
+  });
+
+  it("keeps the pick of a repeatable thing: it counts twice", () => {
+    const repeatable: ContentPackage = {
+      ...pkg,
+      things: pkg.things.map((t) => (t.id === "flair.listening" ? { ...t, repeatable: true } : t)),
+    };
+    const doc = build(1, [...coast, ["upbringing", { pick: "upbringing.bell-tower" }]]);
+    const ev = evaluateDraft(repeatable, doc);
+    expect(ev.choices["coastfolk-flair"]).toMatchObject({ status: "answered" });
+    expect(ev.choices["coastfolk-flair"]?.options).toContain("flair.listening");
+  });
+});
