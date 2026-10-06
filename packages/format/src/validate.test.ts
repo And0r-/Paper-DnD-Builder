@@ -129,7 +129,7 @@ describe("cross-file rules", () => {
     [
       "format version",
       (f) => (f.get("manifest.json").formatVersion = "0.3"),
-      "manifest.json formatVersion: package is written for format 0.3, this builder understands 0.15",
+      "manifest.json formatVersion: package is written for format 0.3, this builder understands 0.16",
     ],
     [
       "duplicate thing",
@@ -1083,6 +1083,61 @@ describe("text variants of a filled text (format 0.15)", () => {
       "an empty list of variants",
       (f) => (harm(f).variants = []),
       `${at}.variants: Too small: expected array to have >=1 items`,
+    ],
+  ])("%s", (_name, change, expected) => {
+    const r = mutate(change);
+    expect(r.ok).toBe(false);
+    expect(messages(r)).toContain(expected);
+  });
+});
+
+describe("card lines by origin (format 0.16)", () => {
+  const origins = (f: RawFiles) => f.get("sheet.json").cards.knack.origins;
+  const at = "sheet.json cards.knack.origins";
+
+  it("accepts the demo package's lines", () => {
+    expect(mutate(() => {}).ok).toBe(true);
+  });
+
+  it("accepts a package without them", () => {
+    expect(mutate((f) => delete f.get("sheet.json").cards.knack.origins).ok).toBe(true);
+  });
+
+  it.each<[string, (f: RawFiles) => void, string]>([
+    [
+      "a line that fills in an unknown value",
+      (f) => (origins(f)[1].text.vars.hit = "knackHt"),
+      `${at}[1].text.vars.hit: unknown value "knackHt"`,
+    ],
+    [
+      "a line text missing in one language",
+      (f) => delete f.get("texts/en/core.json").entries["card.knack.numbers"],
+      "texts/en/ card.knack.numbers: missing text (stat text)",
+    ],
+    [
+      "a label missing in one language",
+      (f) => delete f.get("texts/de/core.json").entries["card.knack.borrowed"],
+      'texts/de/ card.knack.borrowed: missing text (label of an origin line on "knack" cards)',
+    ],
+    [
+      "a condition on an unknown choice",
+      (f) => (origins(f)[0].pickedIn = ["borowed-knack"]),
+      `${at}[0].pickedIn[0]: unknown choice "borowed-knack"`,
+    ],
+    [
+      "a condition that selects no things",
+      (f) => (origins(f)[1].from = { kind: "calling", tags: ["nothing-has-this"] }),
+      `${at}[1].from: selects no things`,
+    ],
+    [
+      "two entries with the same condition, the second never printed",
+      (f) => origins(f).push({ ...structuredClone(origins(f)[1]), label: "card.knack.borrowed" }),
+      `${at}: two entries have the same condition; the second is never printed`,
+    ],
+    [
+      "an entry without a condition",
+      (f) => (origins(f)[0] = { text: origins(f)[0].text }),
+      `${at}[0]: a mark needs one of "tags", "how", "from", "pickedIn", "marked", "unmarked"`,
     ],
   ])("%s", (_name, change, expected) => {
     const r = mutate(change);

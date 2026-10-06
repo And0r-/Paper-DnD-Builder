@@ -147,6 +147,11 @@ describe("a level-20 lantern bearer, worked out by hand", () => {
       boatHookHarm: 0,
       slingHit: 6, // grace bonus 0 + practice 6
       slingHarm: 0,
+      knackBonus: 3, // a lantern bearer's knacks go by heart
+      knackTarget: 17, // 8 + practice 6 + 3
+      knackHit: 9, // practice 6 + 3
+      borrowedKnackTarget: 17, // borrowed knacks go by heart for everyone
+      borrowedKnackHit: 9,
       knackRank: 5,
       bloomWardUses: 3, // a herbalist's table; the value is there for everyone
       lanternSlots1: 3,

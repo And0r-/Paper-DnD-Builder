@@ -17,11 +17,13 @@ import {
   thingsFileSchema,
   unitsSchema,
   valuesSchema,
+  type CardOrigin,
   type FilledText,
   type Flow,
   type GatherStep,
   type GlossaryEntry,
   type Manifest,
+  type Mark,
   type OptionSource,
   type Sheet,
   type TextValue,
@@ -738,6 +740,30 @@ export function validatePackageFiles(files: PackageFiles): ValidationResult {
       err(at.file, `[${at.index}].stats.${key}`, problem);
     }
   };
+  /** The fields of a mark or a card origin (and of its `not`) name tags, things and choices that exist. */
+  const checkMarkCondition = (mark: Mark | CardOrigin, path: string) => {
+    for (const [m, mp] of [
+      [mark, path],
+      ...(mark.not ? [[mark.not, `${path}.not`] as const] : []),
+    ] as const) {
+      m.tags?.forEach((tag, k) => {
+        if (!allTags.has(tag)) err(S, `${mp}.tags[${k}]`, `no thing carries tag ${lit(tag)}`);
+      });
+      if (m.from !== undefined) checkOptionSource(S, `${mp}.from`, m.from);
+      m.pickedIn?.forEach((cid, k) => checkGivingPick(S, `${mp}.pickedIn[${k}]`, cid));
+      for (const field of ["marked", "unmarked"] as const)
+        m[field]?.forEach((cid, k) => {
+          const c = choiceById.get(cid);
+          if (!c) err(S, `${mp}.${field}[${k}]`, `unknown choice ${lit(cid)}`);
+          else if (!("options" in c && c.options.owned))
+            err(
+              S,
+              `${mp}.${field}[${k}]`,
+              `choice ${lit(cid)} marks nothing; name a choice with options.owned`,
+            );
+        });
+    }
+  };
   sheet.sections.forEach((s, i) => {
     const p = `sections[${i}]`;
     if (s.when !== undefined) checkExpr(S, `${p}.when`, s.when);
@@ -810,29 +836,7 @@ export function validatePackageFiles(files: PackageFiles): ValidationResult {
         if (s.uses !== undefined) checkStatRef(`${p}.uses`, s.uses, selected, "uses");
         if (s.byRank && !selected.some((t) => t.rank !== undefined))
           err(S, `${p}.byRank`, "none of the things selected here has a rank");
-        s.marks?.forEach((mark, j) => {
-          for (const [m, mp] of [
-            [mark, `${p}.marks[${j}]`],
-            ...(mark.not ? [[mark.not, `${p}.marks[${j}].not`] as const] : []),
-          ] as const) {
-            m.tags?.forEach((tag, k) => {
-              if (!allTags.has(tag)) err(S, `${mp}.tags[${k}]`, `no thing carries tag ${lit(tag)}`);
-            });
-            if (m.from !== undefined) checkOptionSource(S, `${mp}.from`, m.from);
-            m.pickedIn?.forEach((cid, k) => checkGivingPick(S, `${mp}.pickedIn[${k}]`, cid));
-            for (const field of ["marked", "unmarked"] as const)
-              m[field]?.forEach((cid, k) => {
-                const c = choiceById.get(cid);
-                if (!c) err(S, `${mp}.${field}[${k}]`, `unknown choice ${lit(cid)}`);
-                else if (!("options" in c && c.options.owned))
-                  err(
-                    S,
-                    `${mp}.${field}[${k}]`,
-                    `choice ${lit(cid)} marks nothing; name a choice with options.owned`,
-                  );
-              });
-          }
-        });
+        s.marks?.forEach((mark, j) => checkMarkCondition(mark, `${p}.marks[${j}]`));
         if (s.lead !== undefined) checkOptionSource(S, `${p}.lead.things`, s.lead.things);
         if (s.note !== undefined) checkStatRef(`${p}.note`, s.note, selected, "note");
         if (s.byRank && s.groupBy !== undefined)
@@ -862,6 +866,14 @@ export function validatePackageFiles(files: PackageFiles): ValidationResult {
   });
   for (const [kind, layout] of Object.entries(sheet.cards)) {
     if (!manifest.kinds.includes(kind)) err(S, `cards.${kind}`, `unknown kind ${lit(kind)}`);
+    layout.origins?.forEach((o, j) => {
+      checkMarkCondition(o, `cards.${kind}.origins[${j}]`);
+      checkFilledText(S, `cards.${kind}.origins[${j}].text`, o.text);
+    });
+    // The first entry that matches wins: a second one with the same condition would never be printed.
+    duplicates((layout.origins ?? []).map(({ label: _, text: __, ...cond }) => canonical(cond))).forEach(() =>
+      err(S, `cards.${kind}.origins`, "two entries have the same condition; the second is never printed"),
+    );
     layout.fields.forEach((f, j) => {
       if (!statKeys.has(f)) err(S, `cards.${kind}.fields[${j}]`, `no thing has a stat ${lit(f)}`);
     });
@@ -986,9 +998,11 @@ export function validatePackageFiles(files: PackageFiles): ValidationResult {
           need(sc.extraLabel, `label of ${lit(sc.extra ?? "")} in sheet section ${lit(s.id)}`);
     optional.add(`sheet.${s.id}.hint`);
   }
-  for (const kind of Object.keys(sheet.cards)) {
+  for (const [kind, layout] of Object.entries(sheet.cards)) {
     need(`card.${kind}.typeLine`, `type line of ${lit(kind)} cards`);
     optional.add(`card.${kind}.hint`);
+    for (const o of layout.origins ?? [])
+      if (o.label !== undefined) need(o.label, `label of an origin line on ${lit(kind)} cards`);
   }
 
   const texts: Record<string, Record<string, TextValue>> = {};
@@ -1181,6 +1195,20 @@ function duplicates<T>(list: readonly T[]): T[] {
   const dup = new Set<T>();
   for (const x of list) (seen.has(x) ? dup : seen).add(x);
   return [...dup];
+}
+
+/** The same JSON for the same data: keys sorted, lists of names sorted (their order says nothing). */
+function canonical(x: unknown): string {
+  if (Array.isArray(x)) {
+    const items = x.map(canonical);
+    return `[${(x.every((i) => typeof i === "string") ? items.sort() : items).join(",")}]`;
+  }
+  if (x !== null && typeof x === "object")
+    return `{${Object.keys(x)
+      .sort()
+      .map((k) => `${JSON.stringify(k)}:${canonical((x as Record<string, unknown>)[k])}`)
+      .join(",")}}`;
+  return JSON.stringify(x);
 }
 
 function known(set: Iterable<string> | Map<string, unknown> | Record<string, unknown>): string {
