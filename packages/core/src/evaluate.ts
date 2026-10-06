@@ -635,9 +635,10 @@ function marksOnly(choice: Choice): boolean {
 }
 
 /**
- * Options of a choice with `options.owned`: what the character has, whose
- * condition holds, and that no other copy of the same declared choice has
- * marked (a repeatable thing picked twice marks two different things).
+ * Options of a choice with `options.owned`: what the character has (picked
+ * in one of `ownedFrom`, if given), whose condition holds, and that no other
+ * copy of the same declared choice has marked (a repeatable thing picked
+ * twice marks two different things).
  */
 function ownedOptions(
   pkg: ContentPackage,
@@ -646,10 +647,14 @@ function ownedOptions(
   refs: Set<string>,
 ): string[] {
   if (choice.kind !== "pickOne" && choice.kind !== "pickMany") return [];
+  const from = choice.options.ownedFrom;
   return selectThings(pkg, choice.options).flatMap((t) => {
     for (const r of thingsIn(t.requires)) refs.add(r);
     refs.add(t.id);
-    if (!character.held.has(t.id)) return [];
+    const held = character.held.get(t.id);
+    if (!held) return [];
+    // `ownedFrom`: only what was picked in one of these choices, not what came another way.
+    if (from && !(held.pickedIn !== undefined && from.includes(declaredChoiceId(held.pickedIn)))) return [];
     if (character.marks.get(t.id)?.some((c) => declaredChoiceId(c) === choice.id)) return [];
     if (t.requires !== undefined && !evaluateCondition(t.requires, character.scope)) return [];
     return [t.id];

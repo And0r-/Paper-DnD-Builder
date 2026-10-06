@@ -396,6 +396,78 @@ describe("printed character (demo package)", () => {
     expect(plain.rows.every((r) => r.marks === "B")).toBe(true);
   });
 
+  it("marks what an owned choice marked and what it left in the book; owned only from the book (format 0.14)", async () => {
+    // Herbalist, level 6: four root knacks written in the herb book (knacks-root), a borrowed
+    // root knack (borrowed-knack), and Rooted Focus keeping three of the book's knacks at hand.
+    let herbalist = demoCharacter(pkg, 6, "Mira Fennwick", "calling.herbalist");
+    const book = ["knack.herb-scent", "knack.root-grip", "knack.moss-bed", "knack.thorn-ring"];
+    for (const [choice, answer] of [
+      ["knacks-root", { picks: book }],
+      ["borrowed-knack", { picks: ["knack.quiet-word"] }],
+      ["boon-4", { pick: "boon.rooted-focus" }],
+    ] as const) {
+      const r = applyChange(pkg, herbalist, { type: "answer", choice, answer });
+      if (!r.ok) throw new Error(JSON.stringify(r.error));
+      herbalist = r.doc;
+    }
+    // Only the book is offered: the borrowed knack has a root tag, but was not picked in knacks-root.
+    expect(evaluateDraft(pkg, herbalist).choices["rooted-focus"]!.options).toEqual(
+      expect.arrayContaining(book),
+    );
+    expect(evaluateDraft(pkg, herbalist).choices["rooted-focus"]!.options).toHaveLength(4);
+    const r = applyChange(pkg, herbalist, {
+      type: "answer",
+      choice: "rooted-focus",
+      answer: { picks: ["knack.herb-scent", "knack.root-grip", "knack.moss-bed"] },
+    });
+    if (!r.ok) throw new Error(JSON.stringify(r.error));
+    herbalist = r.doc;
+
+    const de = pkg.texts["de"]!;
+    const name = (id: string) => de[`${id}.name`] as string;
+    const { model, pdf, extracted } = await print("de", {}, pkg, herbalist);
+    const knacks = model.sections.find((s) => s.id === "knacks")!;
+    if (knacks.kind !== "featureTable") throw new Error("demo sheet changed");
+    const marksOf = (id: string) => knacks.rows.find((row) => row.name === name(id))?.marks;
+    // At hand: chosen from the calling. Only in the book: its own sign, never the calling's.
+    expect(marksOf("knack.herb-scent")).toBe("B");
+    expect(marksOf("knack.root-grip")).toBe("B R");
+    expect(marksOf("knack.moss-bed")).toBe("B");
+    expect(marksOf("knack.thorn-ring")).toBe("K R");
+    // The borrowed knack is not in the book: always at hand, as before.
+    expect(marksOf("knack.quiet-word")).toBe("B R");
+    expect(knacks.legend).toContain(`K = ${de["sheet.knacks.mark.book.legend"] as string}`);
+    const sheet = extracted.pageTexts.slice(0, pdf.sheetPages).join(" ").replace(/\s+/gu, " ");
+    expect(sheet).toContain(`K = ${de["sheet.knacks.mark.book.legend"] as string}`);
+
+    // Two marks with the same sign and legend are one: one sign on a row, one legend entry.
+    const split: ContentPackage = {
+      ...pkg,
+      sheet: {
+        ...pkg.sheet,
+        sections: pkg.sheet.sections.map((s) =>
+          s.kind === "featureTable" && s.id === "knacks"
+            ? {
+                ...s,
+                marks: [
+                  { ...s.marks![0]!, not: undefined, how: "picked", unmarked: ["rooted-focus"] },
+                  { text: s.marks![0]!.text, legend: s.marks![0]!.legend, marked: ["rooted-focus"] },
+                  { text: s.marks![0]!.text, legend: s.marks![0]!.legend, marked: ["rooted-focus"] },
+                ],
+              }
+            : s,
+        ),
+      },
+    };
+    const one = buildPrintModel(split, herbalist, { language: "de", createdAt }).sections.find(
+      (s) => s.id === "knacks",
+    )!;
+    if (one.kind !== "featureTable") throw new Error("demo sheet changed");
+    expect(one.rows.find((row) => row.name === name("knack.herb-scent"))!.marks).toBe("B");
+    expect(one.rows.find((row) => row.name === name("knack.thorn-ring"))!.marks).toBe("B");
+    expect(one.legend).toEqual(["B = aus deinem Beruf gewählt"]);
+  });
+
   it("prints a table without byRank, marks or lead as before: one plain list", async () => {
     const plainSheet: ContentPackage = {
       ...pkg,

@@ -48,7 +48,7 @@ describe("demo package", () => {
     expect(count("folk")).toBe(3);
     expect(count("upbringing")).toBe(2);
     expect(count("knack")).toBe(29);
-    expect(count("boon")).toBe(4);
+    expect(count("boon")).toBe(5);
     expect(p.flow.level).toEqual({ min: 1, max: 20, default: 1 });
     expect(p.manifest.languages).toEqual(["de", "en"]);
     expect(new Set(p.flow.choices.map((c) => c.kind))).toEqual(
@@ -346,7 +346,7 @@ describe("cross-file rules", () => {
           text: "sheet.knacks.mark.calling",
           legend: "sheet.knacks.mark.calling.legend",
         }),
-      'sheet.json sections[8].marks[0]: a mark needs "tags", "how" or "from"',
+      'sheet.json sections[8].marks[0]: a mark needs one of "tags", "how", "from", "pickedIn", "marked", "unmarked"',
     ],
     [
       "groups by rank without a word for rank",
@@ -861,5 +861,68 @@ describe("counts and what the sheet needs at the table (format 0.13)", () => {
     const r = mutate(change);
     expect(r.ok).toBe(false);
     expect(messages(r)).toContain(expected);
+  });
+});
+
+describe("marks by what an owned choice marked, owned only from some choices (format 0.14)", () => {
+  /* eslint-disable @typescript-eslint/no-explicit-any -- tests poke into raw JSON */
+  const choiceIndex = (id: string) =>
+    (demo as RawFiles).get("flow.json").choices.findIndex((c: any) => c.id === id);
+  const choice = (f: RawFiles, id: string) => f.get("flow.json").choices[choiceIndex(id)];
+  /* eslint-enable @typescript-eslint/no-explicit-any */
+  const book = 1; // the herb book mark: picked in knacks-root, not marked in rooted-focus
+
+  it.each<[string, (f: RawFiles) => void, () => string]>([
+    [
+      "marked by a choice that does not exist",
+      (f) => (knacksSection(f).marks[book].unmarked = ["rooted-fokus"]),
+      () => 'sheet.json sections[8].marks[1].unmarked[0]: unknown choice "rooted-fokus"',
+    ],
+    [
+      "marked by a choice that marks nothing",
+      (f) => (knacksSection(f).marks[book].marked = ["knacks-root"]),
+      () =>
+        'sheet.json sections[8].marks[1].marked[0]: choice "knacks-root" marks nothing; name a choice with options.owned',
+    ],
+    [
+      "picked in a choice that only marks",
+      (f) => (knacksSection(f).marks[0].not.pickedIn = ["lantern-mastery"]),
+      () =>
+        'sheet.json sections[8].marks[0].not.pickedIn[0]: choice "lantern-mastery" only marks what the character has (options.owned); it gives nothing',
+    ],
+    [
+      "picked in a choice that picks nothing",
+      (f) => (knacksSection(f).marks[book].pickedIn = ["scores"]),
+      () =>
+        'sheet.json sections[8].marks[1].pickedIn[0]: choice "scores" is distribute; name a pickOne or pickMany choice',
+    ],
+    [
+      "a not that says nothing",
+      (f) => (knacksSection(f).marks[0].not = {}),
+      () =>
+        'sheet.json sections[8].marks[0].not: a mark needs one of "tags", "how", "from", "pickedIn", "marked", "unmarked"',
+    ],
+    [
+      "ownedFrom without owned",
+      (f) => delete choice(f, "rooted-focus").options.owned,
+      () =>
+        `flow.json choices[${choiceIndex("rooted-focus")}].options.ownedFrom: "ownedFrom" narrows "owned": set "owned": true`,
+    ],
+    [
+      "ownedFrom an unknown choice",
+      (f) => (choice(f, "rooted-focus").options.ownedFrom = ["knacks-roots"]),
+      () =>
+        `flow.json choices[${choiceIndex("rooted-focus")}].options.ownedFrom[0]: unknown choice "knacks-roots"`,
+    ],
+    [
+      "ownedFrom a choice that only marks",
+      (f) => (choice(f, "rooted-focus").options.ownedFrom = ["lantern-mastery"]),
+      () =>
+        `flow.json choices[${choiceIndex("rooted-focus")}].options.ownedFrom[0]: choice "lantern-mastery" only marks what the character has (options.owned); it gives nothing`,
+    ],
+  ])("%s", (_name, change, expected) => {
+    const r = mutate(change);
+    expect(r.ok).toBe(false);
+    expect(messages(r)).toContain(expected());
   });
 });

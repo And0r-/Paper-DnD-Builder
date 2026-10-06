@@ -51,6 +51,17 @@
     ]
   },
   {
+    "id": "boon.rooted-focus",
+    "kind": "boon",
+    "source": "mistland",
+    "requires": "has('calling.herbalist')",
+    "grants": [
+      {
+        "choice": "rooted-focus"
+      }
+    ]
+  },
+  {
     "id": "trait.bright-beacon",
     "kind": "trait",
     "source": "mistland",

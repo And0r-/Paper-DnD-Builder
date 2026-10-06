@@ -771,6 +771,24 @@
         }
       ],
       "gather": "mastery"
+    },
+    {
+      "id": "rooted-focus",
+      "kind": "pickMany",
+      "source": "mistland",
+      "options": {
+        "kind": "knack",
+        "tags": ["root"],
+        "owned": true,
+        "ownedFrom": ["knacks-root"]
+      },
+      "count": 3,
+      "recommend": [
+        {
+          "pick": ["knack.herb-scent", "knack.root-grip", "knack.moss-bed"]
+        }
+      ],
+      "gather": "mastery"
     }
   ],
   "characterName": "name",

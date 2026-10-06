@@ -177,7 +177,17 @@
           "how": "picked",
           "from": {
             "kind": "calling"
+          },
+          "not": {
+            "pickedIn": ["knacks-root"],
+            "unmarked": ["rooted-focus"]
           }
+        },
+        {
+          "text": "sheet.knacks.mark.book",
+          "legend": "sheet.knacks.mark.book.legend",
+          "pickedIn": ["knacks-root"],
+          "unmarked": ["rooted-focus"]
         },
         {
           "text": "sheet.knacks.mark.path",
