@@ -4,6 +4,8 @@ import { beforeAll, describe, expect, it } from "vitest";
 import {
   applyChange,
   evaluateDraft,
+  evaluationScope,
+  filledTextKey,
   newDraft,
   summarize,
   type DraftChange,
@@ -615,5 +617,23 @@ describe("a pick that a later step grants anyway", () => {
     const ev = evaluateDraft(repeatable, doc);
     expect(ev.choices["coastfolk-flair"]).toMatchObject({ status: "answered" });
     expect(ev.choices["coastfolk-flair"]?.options).toContain("flair.listening");
+  });
+});
+
+describe("text variants (format 0.15)", () => {
+  const harm = () => {
+    const stat = pkg.things.find((t) => t.id === "item.lantern-staff")!.stats!.harm!;
+    if (typeof stat !== "object" || !("text" in stat)) throw new Error("demo package changed");
+    return stat;
+  };
+  const keyAt = (level: number) =>
+    filledTextKey(harm(), evaluationScope(pkg, evaluateDraft(pkg, draft(level))));
+
+  it("keeps the text while no variant holds", () => {
+    expect(keyAt(4)).toBe("stat-value.item.lantern-staff.harm");
+  });
+
+  it("takes the first variant whose condition holds", () => {
+    expect(keyAt(5)).toBe("stat-value.item.lantern-staff.harm.bright");
   });
 });

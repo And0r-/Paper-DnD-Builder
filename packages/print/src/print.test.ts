@@ -1442,6 +1442,16 @@ describe("what a game master would otherwise write on the sheet by hand (demo pa
     expect(inTable.some((p) => p.str === "1W6 +0, stumpf")).toBe(true);
   });
 
+  it("prints the text variant whose condition holds, filled with the same values (format 0.15)", () => {
+    // Lantern staff: "blunt" up to level 4, "blunt or bright" from level 5 on (demo package).
+    const harm = (d: DraftDocument, language: string) =>
+      section(buildSheetModel(pkg, d, { language }), "attacks", "statTable").rows[0]!.cells[1];
+    expect(harm(doc, "de")).toBe("1W6 +0, stumpf");
+    const five = demoCharacter(pkg, 5);
+    expect(harm(five, "de")).toMatch(/^1W6 [+-]\d+, stumpf oder hell$/u);
+    expect(harm(five, "en")).toMatch(/^1d6 [+-]\d+, blunt or bright$/u);
+  });
+
   it("prints a stat small under each name of a feature table", () => {
     const model = buildSheetModel(pkg, doc, { language: "de", units: { length: "m" } });
     const knacks = section(model, "knacks", "featureTable");
@@ -1495,8 +1505,8 @@ describe("the PDF made from the sheet model", () => {
   // or the demo package changes these: then check the sample PDFs and
   // update them.
   const before = {
-    de: { pages: 4, sha256: "7ed11acdfdc54207d53592d5c57a2f0a5c3ad3e08030f3ef864a3b400c7696bb" },
-    en: { pages: 4, sha256: "de1881a9a3d64e09bc57d5524dcbe8aec4109f15ded9180b10232a9646a98efc" },
+    de: { pages: 4, sha256: "693f60a090596a89e8e82be2940839fdbaca8c29ca095d36be80021da1c2264a" },
+    en: { pages: 4, sha256: "f8ca7b0d6b6677fdceffb8767031cd9944040a74565e0ef50637389a622b46d1" },
   };
 
   it("is unchanged for the level 20 demo character with cards", async () => {

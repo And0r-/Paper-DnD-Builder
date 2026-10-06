@@ -1,6 +1,6 @@
 # Content package format — specification
 
-Format version **0.14**. This document describes everything a content
+Format version **0.15**. This document describes everything a content
 package contains and every rule a valid package follows. After reading it
 you should be able to write your own package. The demo package in
 [`packages/demo-package`](../demo-package) uses every feature and is the
@@ -122,7 +122,7 @@ people who distribute packages.
 
 ```json
 {
-  "formatVersion": "0.14",
+  "formatVersion": "0.15",
   "id": "demo",
   "version": "0.1.0",
   "languages": ["de", "en"],
@@ -249,6 +249,26 @@ character's.
 with the text `"1d4 {{var:bonus|signed}}, blunt"`, printed "1d4 +2, blunt"
 for a character whose `slingHarm` is 2. The builder knows no rules: what
 is added to what is the package's formula for the value.
+
+**Text variants.** When the words themselves depend on the character, a
+`{text}` stat lists `variants`: `[{ "when": "<expression>", "text":
+"<key>" }]`, at least one. The first variant whose `when` holds for the
+character replaces `text`; `vars` fill it the same way. Without a match
+`text` is used. Two characters with the same thing can so read different
+lines, for example a harm that gets a second kind from level 5 on:
+
+```json
+"harm": {
+  "text": "stat-value.item.lantern-staff.harm",
+  "vars": { "bonus": "lanternStaffHarm" },
+  "variants": [{ "when": "level >= 5", "text": "stat-value.item.lantern-staff.harm.bright" }]
+}
+```
+
+with `"1d6 {{var:bonus|signed}}, blunt or bright"` as the variant. Every
+variant text exists in every language and uses only names from `vars`.
+The same goes for the `text` of a `statBoxes` box
+([13](#13-print-sheet-and-cards)), which has the shape of a `{text}` stat.
 
 ### Grants
 
@@ -1334,7 +1354,10 @@ well-formed does the second stage check the rules between files:
 - every expression parses and refers to existing values and things;
   formulas are not circular;
 - `{value}` stats and the `vars` of `{text}` stats name existing values; a
-  stat text with `vars` uses no other variable;
+  stat text with `vars` uses no other variable; the `when` of a text
+  variant is an expression like any other, its text exists in every
+  language, is not the stat's own `text` or another variant's, and uses
+  no variable its `vars` do not name;
 - option sources select at least one thing; recommendations are among the
   options; badges name options, at most one per thing, and their texts
   exist in every language; `about` names another existing thing; `held`
@@ -1413,6 +1436,7 @@ are removed (saved characters may lose picks). Keys are never renamed.
 | 0.12    | 2026-10-05 | Optional `badges` on `distribute` choices (a label on rows while `when` holds); optional row texts `choice.<id>.target.<target>` and `choice.<id>.variant.<variant>.target.<target>`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | Set `formatVersion` to `"0.12"`. Nothing else changes: the field and the texts are optional, so every valid 0.11 package is a valid 0.12 package.                                                                                                                                                                                                                                                                                                                                                                                                    |
 | 0.13    | 2026-10-06 | Optional `byRank`, `marks` and `lead` on `featureTable` sections: rows grouped by rank under `rank.<n>.name` or `rank.name` with an optional `sheet.<id>.rank.<n>.hint`, short signs with a legend by tags, picked or granted, and where a row came from, and a sentence `<thing>.<text>` above the rows. `count` on thing grants (how many; counted things add up, the sheet prints "8 × Arrow"). Sheet: `fields` on the header (answers under the summary line); box style `boxes` (squares to tick) and box `text` (filled text instead of the number); `extra` and `extraLabel` on scores; `strong` on `checkList` (marked twice, ◉); `wrap` on `statTable` columns; `note` and `groupBy: "origin"` on `featureTable`. Optional text `value.<id>.amount`: how the builder writes a value ("d{{var:n}}").                                                                                                                                                                                                                                                                                                             | Set `formatVersion` to `"0.13"`. Nothing else changes: every field is optional, and without `count` a thing is had once as before, so every valid 0.12 package is a valid 0.13 package.                                                                                                                                                                                                                                                                                                                                                              |
 | 0.14    | 2026-10-06 | Sheet: a header field may name `things` instead of a `choice` (the names of the selected things the character has, e.g. a size; label by default `kind.<kind>.name`). Optional `strongLegend` on `checkList` sections: what ◉ means, printed after the section hint only if a row is marked twice. Copies of a choice with `options.owned` (asked again by a repeatable thing) mark different things: a copy leaves out what another copy marked, its recommendation moves on to the first free thing, and a repeatable thing is no longer offered when its copy would have nothing left to mark. Header fields and `answers` rows print the answers of every copy of the named choice in one row; an `answers` row of a choice not asked is left out, a section without rows is not printed. `options.ownedFrom`: an `owned` choice offers only what was picked in these choices. Marks on `featureTable` rows: new fields `pickedIn`, `marked` and `unmarked` (picked in, marked or left unmarked by these choices) and `not` (rows that also match it get no sign); marks with the same sign and legend are one mark. | Set `formatVersion` to `"0.14"`. Nothing else has to change: both are optional, so every valid 0.13 package is a valid 0.14 package. To print the ◉ explanation only where it applies, move it from `sheet.<id>.hint` into a text of its own and name that in `strongLegend`. The new fields are optional. A package that let two copies mark the same thing loses that; put the steps that give the marked things before the step that offers the repeatable thing. A package with two marks of the same sign and legend now prints that sign once. |
+| 0.15    | 2026-10-07 | Optional `variants` on `{text}` stats and on the `text` of `statBoxes` boxes: `[{ "when": …, "text": … }]`; the first variant whose condition holds for the character replaces the text, `vars` fill it the same way. The sheet, the cards and the "learn more" panel show the variant.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | Set `formatVersion` to `"0.15"`. Nothing else has to change: `variants` is optional, so every valid 0.14 package is a valid 0.15 package.                                                                                                                                                                                                                                                                                                                                                                                                            |
 | 0.8     | 2026-10-04 | Gather steps (`gather`, optional `together`: `sections` or one shared `list`) in `flow.steps`, optional `gather` on choices, optional text `choice.<id>.from`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           | Set `formatVersion` to `"0.8"`. Nothing else changes: a package without gather steps builds the same steps as before, so every valid 0.7 package is a valid 0.8 package.                                                                                                                                                                                                                                                                                                                                                                             |
 
 ## 16. A minimal package
@@ -1424,7 +1448,7 @@ language. The validator accepts it as is.
 
 ```json
 {
-  "formatVersion": "0.14",
+  "formatVersion": "0.15",
   "id": "tiny",
   "version": "1.0.0",
   "languages": ["en"],

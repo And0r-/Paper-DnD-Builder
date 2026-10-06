@@ -3,7 +3,7 @@
  * The six kinds of questions (flow spec 3): pickOne, pickMany, distribute,
  * number, text, info. Every option explains itself where it is chosen.
  */
-import { explainValue, formatMeasure, type ChoiceState } from "@builder/core";
+import { evaluationScope, explainValue, filledTextKey, formatMeasure, type ChoiceState } from "@builder/core";
 import type { Choice, Thing } from "@builder/format/pure";
 import Link from "next/link";
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
@@ -44,6 +44,7 @@ function Stats({ lp, thing }: { lp: LoadedPackage; thing: Thing }) {
   const ctx = useMeasure(lp);
   const entries = Object.entries(thing.stats ?? {});
   if (entries.length === 0) return null;
+  const scope = evaluationScope(lp.pkg, ev);
   return (
     <dl className="stats">
       {entries.map(([key, v]) => {
@@ -54,11 +55,11 @@ function Stats({ lp, thing }: { lp: LoadedPackage; thing: Thing }) {
         // A stat that names a value shows the character's value (uses that grow with the level).
         else if ("value" in v)
           shown = formatValue(lp, ctx, v.value, v.value === "level" ? ev.level : (ev.values[v.value] ?? 0));
-        // `vars` fill the text with the character's values ("1d8 +3").
+        // `vars` fill the text with the character's values ("1d8 +3"); a variant may replace the text.
         else
           shown = plain(
             ctx,
-            ptext(lp, v.text),
+            ptext(lp, filledTextKey(v, scope)),
             Object.fromEntries(Object.entries(v.vars ?? {}).map(([n, id]) => [n, ev.values[id] ?? 0])),
           );
         return (
