@@ -1,14 +1,15 @@
 /**
  * The character sheet: as data (the model screen and PDF share) and printed
  * as one PDF with the parts asked for (sheet, cards, rules texts), in the
- * account's language and units. Only finished characters have a sheet: a
- * draft with open choices would print a sheet with holes the player cannot
- * explain.
+ * account's language and units, or a kept copy in its own. Only finished
+ * characters have an original sheet: a draft with open choices would print
+ * a sheet with holes the player cannot explain.
  */
 import { evaluateDraft, type Evaluation } from "@builder/core";
 import { renderPdf } from "@builder/print";
 import {
   buildSheetModel,
+  sheetModelSchema,
   DEFAULT_API_PARTS,
   DESIGN_IDS,
   inFileOrder,
@@ -16,6 +17,7 @@ import {
   PRINT_PARTS,
   SHEET_DESIGNS,
   sheetLanguages,
+  type PlayState,
   type PrintPart,
   type SheetModel,
 } from "@builder/sheet";
@@ -23,6 +25,7 @@ import { HttpError, json } from "../http.ts";
 import type { ReachableDraftRow } from "../../store.ts";
 import type { RequestContext, Route } from "../router.ts";
 import { loadDraft, packageOf } from "./drafts.ts";
+import { copyView, loadCopy } from "./sheet-copies.ts";
 
 /** Making a PDF takes a moment of CPU; this is plenty for printing and stops a loop from hogging the server. */
 const PDF_LIMIT = { max: 20, windowMs: 10 * 60_000 };
@@ -30,10 +33,16 @@ const PDF_LIMIT = { max: 20, windowMs: 10 * 60_000 };
 /**
  * What a PDF request asks for, checked before anything is loaded. Without
  * `parts` the PDF is the sheet and the cards, as before there were parts.
- * Designs and states that are planned but not drawn yet say so (`400`
- * with their own code), so a caller can tell them from a typo.
+ * Designs that are planned but not drawn yet say so (`400` with their own
+ * code), so a caller can tell them from a typo. `version` is `original` or
+ * the id of a kept copy.
  */
-function printRequest(url: URL): { parts: PrintPart[] | undefined; version: string } {
+function printRequest(url: URL): {
+  parts: PrintPart[] | undefined;
+  design: string;
+  version: string;
+  filled: boolean;
+} {
   const bad = (parameter: string, value: string): never => {
     throw new HttpError(400, "badQuery", { parameter, value });
   };
@@ -50,9 +59,13 @@ function printRequest(url: URL): { parts: PrintPart[] | undefined; version: stri
     throw new HttpError(400, "designNotAvailable", { design, designs: SHEET_DESIGNS.map((d) => d.id) });
   }
   const state = url.searchParams.get("state") ?? "empty";
-  if (state === "filled") throw new HttpError(400, "stateNotAvailable", { state });
-  if (state !== "empty") bad("state", state);
-  return { parts, version: url.searchParams.get("version") ?? "original" };
+  if (state !== "empty" && state !== "filled") bad("state", state);
+  return {
+    parts,
+    design,
+    version: url.searchParams.get("version") ?? "original",
+    filled: state === "filled",
+  };
 }
 
 /** An ASCII file name from the character's name; the exact name goes into `filename*`. */
@@ -80,27 +93,66 @@ export async function originalSheet(
   beforeBuild?: (accountId: string) => void,
 ): Promise<{ model: SheetModel; row: ReachableDraftRow }> {
   const { row, viewer: account } = await loadDraft(ctx);
+  beforeBuild?.(account.id);
+  return { model: buildOriginal(ctx, row, account), row };
+}
+
+/** The original sheet of a character the viewer reaches, in the given language and units. */
+function buildOriginal(
+  ctx: RequestContext,
+  row: ReachableDraftRow,
+  settings: { language: string; units: Record<string, string> },
+): SheetModel {
   const pkg = packageOf(ctx.app, row);
   const ev: Evaluation = evaluateDraft(pkg, row.document);
   if (!row.finished_at || !ev.complete) throw new HttpError(409, "notFinished", { open: ev.open });
 
   const languages = sheetLanguages(pkg);
-  if (!languages.includes(account.language)) {
-    throw new HttpError(422, "languageNotSupported", { language: account.language, languages });
+  if (!languages.includes(settings.language)) {
+    throw new HttpError(422, "languageNotSupported", { language: settings.language, languages });
   }
-  beforeBuild?.(account.id);
-  const model = buildSheetModel(
+  return buildSheetModel(
     pkg,
     row.document,
     {
-      language: account.language,
-      units: account.units,
+      language: settings.language,
+      units: settings.units,
       createdAt: ctx.app.now(),
       changedAt: row.updated_at,
     },
     ev,
   );
-  return { model, row };
+}
+
+/**
+ * What a PDF prints: the original, or a kept copy as the player left it, in
+ * the copy's language and units. A copy has the original's cards and rules
+ * texts (in the copy's language and units, so the file stays in one), and
+ * only when they are asked for: the sheet of a copy prints even when the
+ * character is no longer finished or its package is gone. A row the player
+ * wrote into a copy has no card and no rules text.
+ */
+async function printedSheet(
+  ctx: RequestContext,
+  version: string,
+  parts: readonly PrintPart[],
+  beforeBuild: (accountId: string) => void,
+): Promise<{ model: SheetModel; row: ReachableDraftRow }> {
+  if (version === "original") return originalSheet(ctx, beforeBuild);
+  const { row, viewer } = await loadDraft(ctx);
+  const copy = await loadCopy(ctx, row.id, version).catch((e: unknown) => {
+    if (e instanceof HttpError && e.code === "copyNotFound")
+      throw new HttpError(404, "versionNotFound", { version });
+    throw e;
+  });
+  // Stored models are checked on the way in; a shape older than this code is not printed half.
+  const parsed = sheetModelSchema.safeParse(copyView(copy).model);
+  if (!parsed.success) throw new HttpError(409, "copyUnreadable", { version });
+  beforeBuild(viewer.id);
+  const model = parsed.data;
+  if (!parts.includes("cards") && !parts.includes("texts")) return { model, row };
+  const original = buildOriginal(ctx, row, { language: copy.language, units: copy.units });
+  return { model: { ...model, cards: original.cards, rulesTexts: original.rulesTexts }, row };
 }
 
 export const printRoutes: Route[] = [
@@ -126,16 +178,17 @@ export const printRoutes: Route[] = [
     method: "GET",
     path: "/api/drafts/:id/pdf",
     handler: async (ctx) => {
-      const { parts, version } = printRequest(ctx.url);
-      const { model } = await originalSheet(ctx, (accountId) => {
-        // Only the original exists until copies of a sheet can be kept.
-        if (version !== "original") throw new HttpError(404, "versionNotFound", { version });
+      const { parts, design, version, filled } = printRequest(ctx.url);
+      const printed = parts ?? DEFAULT_API_PARTS;
+      const { model, row } = await printedSheet(ctx, version, printed, (accountId) => {
         const limit = ctx.app.limiter.take(`pdf:account:${accountId}`, PDF_LIMIT);
         if (!limit.ok) {
           throw new HttpError(429, "tooManyRequests", {}, { "Retry-After": String(limit.retryAfter) });
         }
       });
-      const pdf = await renderPdf(model, { parts: parts ?? DEFAULT_API_PARTS });
+      // The play state is one per character, for the original and every copy alike.
+      const play: PlayState = filled ? ((await ctx.app.store.findCharacterState(row.id))?.state ?? {}) : {};
+      const pdf = await renderPdf(model, { parts: printed, design, play });
       // Asked for parts, the file name says which: "Mira - Sheet.pdf".
       const m = MESSAGES[model.language]!;
       const words: Record<PrintPart, string> = { sheet: m.sheet, cards: m.cards, texts: m.rulesTexts };

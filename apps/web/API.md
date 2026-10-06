@@ -374,11 +374,20 @@ Query parameters of the PDF, all optional:
 - `design`: an id from `GET /api/sheet-designs`; default the first one
   (`verbose`). `classic` is planned and answers `400 designNotAvailable`
   until it is drawn. Cards and rules texts look the same in every design.
-- `version`: `original` (default), the sheet as the builder makes it now.
-  Kept copies of a sheet come later; any other id answers
-  `404 versionNotFound`.
-- `state`: `empty` (default), a sheet to write on. `filled` (the play
-  state written in) is planned and answers `400 stateNotAvailable`.
+- `version`: `original` (default), the sheet as the builder makes it now,
+  in the account's language and units; or the id of a kept copy
+  (`GET /api/drafts/:id/sheet-copies`), printed as kept, in the copy's
+  language and units, with its name and the level of the original it was
+  made from in the footer ("as of level 4"). A copy's cards and rules
+  texts are the original's (in the copy's language and units); a row the
+  player wrote into the copy has neither. A copy's sheet alone prints
+  even when the character is no longer finished; with cards or rules
+  texts it needs the finished original (`409 notFinished`). An id that is
+  not a copy of this character answers `404 versionNotFound`.
+- `state`: `empty` (default), a sheet to write on, or `filled`: the play
+  state (`GET /api/drafts/:id/state`) written into the fields of the sheet
+  and the cards. Ticks beyond what a field holds are cut; a field the
+  sheet does not have is skipped.
 - Any other value answers `400 badQuery` with `parameter` and `value`.
 
 The screen keeps the player's choice of parts and design on the account
@@ -469,7 +478,6 @@ Tests: [`sheet-copies.test.ts`](src/server/api/sheet-copies.test.ts).
 | `400`  | `badRequest`           | The body has the wrong shape; `issues` lists `{ path, message }`.                                  |
 | `400`  | `badQuery`             | A query parameter has a value the API does not know (`parameter`, `value`).                        |
 | `400`  | `designNotAvailable`   | A planned sheet design not drawn yet (`designs` lists those that are); `422` in the settings.      |
-| `400`  | `stateNotAvailable`    | The PDF cannot have the play state written in yet.                                                 |
 | `401`  | `notLoggedIn`          | No session cookie and no `Authorization` header.                                                   |
 | `401`  | `keyNotValid`          | The access key is unknown, withdrawn or not `Bearer cbk_...`.                                      |
 | `401`  | `wrongMailOrPassword`  | Login failed.                                                                                      |
@@ -485,12 +493,13 @@ Tests: [`sheet-copies.test.ts`](src/server/api/sheet-copies.test.ts).
 | `404`  | `keyNotFound`          | No access key with this id in this account.                                                        |
 | `404`  | `packageNotFound`      | No loaded package with this id.                                                                    |
 | `404`  | `languageNotFound`     | The package has no texts in this language.                                                         |
-| `404`  | `versionNotFound`      | No such copy of the sheet; only `original` for now.                                                |
+| `404`  | `versionNotFound`      | No such copy of the sheet: not `original` and not a kept copy of this character.                   |
 | `405`  | `methodNotAllowed`     | The path exists, the method does not.                                                              |
 | `409`  | `versionConflict`      | The draft, copy or play state moved on; `current` holds it now.                                    |
 | `409`  | `notFinished`          | PDF or sheet of a draft, or raising a draft that is not in a raise; `open` lists the open choices. |
 | `409`  | `tooManyCopies`        | The character has 10 kept copies (`max`); delete one first.                                        |
 | `409`  | `originalChanged`      | A copy made with `model` from an original that changed since; `original` says how it is now.       |
+| `409`  | `copyUnreadable`       | A kept copy stored in a shape this server no longer prints; `version` names it.                    |
 | `409`  | `alreadyPlayer`        | The address is already a player of this campaign.                                                  |
 | `409`  | `packageUnavailable`   | The draft's package is not loaded right now; `packageId` names it.                                 |
 | `413`  | `bodyTooLarge`         | Body over 64 KiB (516 KiB for a body with a sheet copy; `max`).                                    |

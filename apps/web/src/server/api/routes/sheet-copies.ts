@@ -70,7 +70,7 @@ function copyEntry(c: SheetCopyEntry) {
 }
 
 /** The copy with its model; the model's origin always says which copy it is. */
-function copyView(c: SheetCopyRow) {
+export function copyView(c: SheetCopyRow) {
   const model = {
     ...c.model,
     origin: {
@@ -104,8 +104,11 @@ function checkSize(model: unknown): void {
   if (modelSize(model) > MAX_COPY_BYTES) throw new HttpError(413, "copyTooLarge", { max: MAX_COPY_BYTES });
 }
 
-async function loadCopy(ctx: RequestContext, draftId: string): Promise<SheetCopyRow> {
-  const id = ctx.params["copyId"]!;
+export async function loadCopy(
+  ctx: RequestContext,
+  draftId: string,
+  id = ctx.params["copyId"]!,
+): Promise<SheetCopyRow> {
   const copy = UUID.test(id) ? await ctx.app.store.findSheetCopy(draftId, id) : undefined;
   if (!copy) throw new HttpError(404, "copyNotFound");
   return copy;

@@ -165,11 +165,11 @@ describe("the parts of a printout", () => {
     expect(await code("parts=")).toEqual([400, "badQuery"]);
     expect(await code("parts=sheet,poster")).toEqual([400, "badQuery"]);
     expect(await code("design=fancy")).toEqual([400, "badQuery"]);
-    // Planned: the classic design and the play state come with later parts of the sheet work.
+    // Planned: the classic design comes with a later part of the sheet work.
     expect(await code("design=classic")).toEqual([400, "designNotAvailable"]);
-    expect(await code("state=filled")).toEqual([400, "stateNotAvailable"]);
     expect(await code("state=half")).toEqual([400, "badQuery"]);
     expect(await code("version=0b0f0c3e-1d5a-4a8e-9f00-000000000000")).toEqual([404, "versionNotFound"]);
+    expect(await code("version=copy-1")).toEqual([404, "versionNotFound"]);
     // None of these used up the PDF limit.
     const account = (await server.db.query<{ id: string }>("SELECT id FROM accounts"))[0]!.id;
     expect(server.app.limiter.take(`pdf:account:${account}`, { max: 1, windowMs: 600_000 }).ok).toBe(true);
@@ -188,6 +188,121 @@ describe("the parts of a printout", () => {
         },
       ],
     });
+  });
+});
+
+describe("printing a kept copy and the play state", () => {
+  const bytes = async (res: Response) => Buffer.from(await res.arrayBuffer());
+
+  it("prints a copy as kept, in its own language and units, with the original's cards and rules texts", async () => {
+    const id = await character(true, 3);
+    const original = (await client.call("GET", `/api/drafts/${id}/sheet`)).json as SheetModel;
+    // The player's own row in a copy; it has no card and no rules text.
+    const own: SheetModel = {
+      ...original,
+      sections: original.sections.map((s) =>
+        s.kind === "featureTable" && s.id === "traits"
+          ? {
+              ...s,
+              rows: [
+                ...s.rows,
+                {
+                  id: "own-1",
+                  name: "Moorlicht",
+                  marks: "",
+                  text: "Leuchtet im Nebel.",
+                  uses: null,
+                  group: null,
+                },
+              ],
+            }
+          : s,
+      ),
+    };
+    const made = (await client.call("POST", `/api/drafts/${id}/sheet-copies`, { model: own })).json;
+    const copyId: string = made.copy.id;
+    // The account switches to English with feet; the copy stays German with meters.
+    await client.call("PATCH", "/api/account/settings", { language: "en", units: { length: "ft" } });
+
+    const sheet = await client.request("GET", `/api/drafts/${id}/pdf?parts=sheet&version=${copyId}`);
+    expect(sheet.status).toBe(200);
+    const kept = made.model as SheetModel;
+    const sheetBytes = await bytes(sheet);
+    expect(sheetBytes.equals(Buffer.from((await renderPdf(kept, { parts: ["sheet"] })).bytes))).toBe(true);
+    expect(sheetBytes.toString("latin1")).toContain("/Lang (de)");
+
+    // Cards and rules texts are the original's, in the copy's language and units.
+    const all = await client.request(
+      "GET",
+      `/api/drafts/${id}/pdf?parts=sheet,cards,texts&version=${copyId}`,
+    );
+    expect(all.status).toBe(200);
+    expect(all.headers.get("content-disposition")).toContain("Bogen%2C%20Karten%2C%20Regeltexte");
+    await client.call("PATCH", "/api/account/settings", { language: "de", units: { length: "m" } });
+    const now = (await client.call("GET", `/api/drafts/${id}/sheet`)).json as SheetModel;
+    const expected = await renderPdf(
+      { ...kept, cards: now.cards, rulesTexts: now.rulesTexts },
+      { parts: ["sheet", "cards", "texts"] },
+    );
+    expect((await bytes(all)).equals(Buffer.from(expected.bytes))).toBe(true);
+    expect(now.rulesTexts.flatMap((g) => g.entries.map((e) => e.id))).not.toContain("own-1");
+  });
+
+  it("prints a copy's sheet even when the character is no longer finished, but not its cards", async () => {
+    const id = await character(true, 3);
+    const made = (await client.call("POST", `/api/drafts/${id}/sheet-copies`, {})).json;
+    // Back to a draft: a level up leaves choices open.
+    const draft = (await client.call("GET", `/api/drafts/${id}`)).json;
+    const raised = await client.call("POST", `/api/drafts/${id}/level-up`, {
+      version: draft.draft.version,
+      level: 4,
+    });
+    expect(raised.status).toBe(200);
+    expect((await client.call("GET", `/api/drafts/${id}/pdf?parts=sheet`)).json.error.code).toBe(
+      "notFinished",
+    );
+    expect(
+      (await client.request("GET", `/api/drafts/${id}/pdf?parts=sheet&version=${made.copy.id}`)).status,
+    ).toBe(200);
+    const cards = await client.call("GET", `/api/drafts/${id}/pdf?parts=cards&version=${made.copy.id}`);
+    expect([cards.status, cards.json.error.code]).toEqual([409, "notFinished"]);
+  });
+
+  it("fills in the play state only when asked, for the original and a copy alike", async () => {
+    const id = await character(true, 3);
+    const model = (await client.call("GET", `/api/drafts/${id}/sheet`)).json as SheetModel;
+    const play = { "sheet/primary/stamina": 7, "sheet/notes/notes": "Zwei Münzen beim Fährmann" };
+    expect((await client.call("PUT", `/api/drafts/${id}/state`, { version: 0, state: play })).status).toBe(
+      200,
+    );
+
+    const empty = await bytes(await client.request("GET", `/api/drafts/${id}/pdf?parts=sheet`));
+    expect(empty.equals(Buffer.from((await renderPdf(model, { parts: ["sheet"] })).bytes))).toBe(true);
+    const filled = await client.request("GET", `/api/drafts/${id}/pdf?parts=sheet&state=filled`);
+    expect(filled.status).toBe(200);
+    const local = await renderPdf(model, { parts: ["sheet"], play });
+    expect((await bytes(filled)).equals(Buffer.from(local.bytes))).toBe(true);
+    expect(local.fields.find((f) => f.id === "sheet/primary/stamina")).toMatchObject({ text: "7" });
+
+    const made = (await client.call("POST", `/api/drafts/${id}/sheet-copies`, {})).json;
+    const copy = await client.request(
+      "GET",
+      `/api/drafts/${id}/pdf?parts=sheet&state=filled&version=${made.copy.id}`,
+    );
+    const kept = await renderPdf(made.model as SheetModel, { parts: ["sheet"], play });
+    expect((await bytes(copy)).equals(Buffer.from(kept.bytes))).toBe(true);
+  });
+
+  it("prints no copy of someone else's character", async () => {
+    const id = await character();
+    const made = (await client.call("POST", `/api/drafts/${id}/sheet-copies`, {})).json;
+    const other = new Client(server, "198.51.100.9");
+    await signIn(other, server, "someone-else@example.org");
+    const mine = await character();
+    expect((await other.call("GET", `/api/drafts/${id}/pdf?version=${made.copy.id}`)).status).toBe(404);
+    // A copy of one character is not a version of another.
+    const res = await client.call("GET", `/api/drafts/${mine}/pdf?version=${made.copy.id}`);
+    expect([res.status, res.json.error.code]).toEqual([404, "versionNotFound"]);
   });
 });
 
