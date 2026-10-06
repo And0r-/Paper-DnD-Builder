@@ -1187,6 +1187,55 @@ describe("printed character (demo package)", () => {
     expect((await extract(pdf)).minFontSize).toBeGreaterThanOrEqual(7 - 0.01);
   });
 
+  it("sets a long name in a table smaller rather than splitting it, and splits at a soft hyphen", async () => {
+    // At 9 pt each is wider than the name column; the old wrap left "…stellu-" over "ng".
+    const names = [
+      "Laternenwiederherstellung",
+      "Laternen­wiederherstellung",
+      "Laternenwiederherstellungsnebelzauberei",
+    ];
+    const model = buildPrintModel(pkg, doc, { language: "de", createdAt });
+    const sections = model.sections.map((s): SheetSection => {
+      if (s.kind !== "featureTable" || s.id !== "knacks") return s;
+      return { ...s, rows: s.rows.map((r, i) => (i < names.length ? { ...r, name: names[i]! } : r)) };
+    });
+    const pdf = await renderPdf({ ...model, sections });
+    const page = pdf.sheetLayout.findIndex((ps) => ps.some((p) => p.section.id === "knacks"));
+    const placed = pdf.sheetLayout[page]!.find((p) => p.section.id === "knacks")!;
+    const nameW = Math.min(36, placed.w * 0.36);
+    const task = getDocument({ data: pdf.bytes.slice(), verbosity: 0 });
+    const content = await (await (await task.promise).getPage(page + 1)).getTextContent();
+    const pieces = content.items
+      .filter((it) => "str" in it && /^Laternen|^\p{Ll}+$/u.test(it.str))
+      .map((it) => {
+        const t = it as { str: string; transform: number[]; width: number };
+        return {
+          str: t.str,
+          x: t.transform[4]! / PT,
+          w: t.width / PT,
+          size: Math.hypot(t.transform[0]!, t.transform[1]!),
+        };
+      })
+      .filter((p) => p.x < placed.x + nameW);
+    await task.destroy();
+    for (const p of pieces) expect(p.x + p.w).toBeLessThanOrEqual(placed.x + nameW);
+
+    // No compound joint: smaller, in one piece, not below 7 pt.
+    const whole = pieces.find((p) => p.str === names[0]);
+    expect(whole?.size).toBeLessThan(9);
+    expect(whole?.size).toBeGreaterThanOrEqual(7 - 0.01);
+    // A soft hyphen marks the joint: split there, at full size.
+    const at = pieces.findIndex((p) => p.str === "Laternen-");
+    expect(at).toBeGreaterThanOrEqual(0);
+    expect(pieces[at + 1]).toMatchObject({ str: "wiederherstellung", size: 9 });
+    // Too long even at 7 pt: split between letters, never fewer than three on either side.
+    const head = pieces.findIndex((p) => p.str.startsWith("Laternenw") && p.str !== names[0]);
+    const split = pieces.slice(head, head + 2).map((p) => p.str);
+    expect(split[0]).toMatch(/-$/u);
+    expect(split.join("").replace("-", "")).toBe(names[2]);
+    for (const p of split) expect(p.replace(/-$/u, "").length).toBeGreaterThanOrEqual(3);
+  });
+
   it("refuses a language without texts instead of mixing in another one", () => {
     expect(() => buildPrintModel(pkg, doc, { language: "fr" })).toThrow(PrintError);
   });
