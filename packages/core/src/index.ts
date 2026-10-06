@@ -28,6 +28,7 @@ export {
   byLevel,
   evaluateDraft,
   evaluationScope,
+  filledTextKey,
   fillRaise,
   selectThings,
   type ChoiceState,

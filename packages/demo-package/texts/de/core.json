@@ -597,6 +597,7 @@
     "sheet.attacks.title": "Angriffe",
     "sheet.attacks.hint": "Zum Treffen: 2W6 + diese Zahl. Schaden: diese Würfel.",
     "stat-value.item.lantern-staff.harm": "1W6 {{var:bonus|signed}}, stumpf",
+    "stat-value.item.lantern-staff.harm.bright": "1W6 {{var:bonus|signed}}, stumpf oder hell",
     "stat-value.item.boat-hook.harm": "1W4 {{var:bonus|signed}}, spitz",
     "stat-value.item.sling.harm": "1W4 {{var:bonus|signed}}, stumpf",
     "stat-value.item.sling.range": "{{length:30|short}} / {{length:120|short}}",

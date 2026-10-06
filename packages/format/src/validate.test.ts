@@ -97,7 +97,7 @@ describe("structure errors", () => {
       /flow\.json choices\[0\]\.kind: Invalid discriminator value\. Expected 'pickOne' \| 'pickMany'/,
     );
     expect(messages(r)).toContain(
-      'things/knacks.json [8].stats.reach: must be a number, true/false, {"amount": n, "unit": "u"}, {"text": "text.key", "vars"?: {…}} or {"value": "valueKey"}',
+      'things/knacks.json [8].stats.reach: must be a number, true/false, {"amount": n, "unit": "u"}, {"text": "text.key", "vars"?: {…}, "variants"?: […]} or {"value": "valueKey"}',
     );
     expect(messages(r)).toContain('manifest.json : Unrecognized key: "extra"');
   });
@@ -129,7 +129,7 @@ describe("cross-file rules", () => {
     [
       "format version",
       (f) => (f.get("manifest.json").formatVersion = "0.3"),
-      "manifest.json formatVersion: package is written for format 0.3, this builder understands 0.14",
+      "manifest.json formatVersion: package is written for format 0.3, this builder understands 0.15",
     ],
     [
       "duplicate thing",
@@ -1035,5 +1035,58 @@ describe("marks by what an owned choice marked, owned only from some choices (fo
     const r = mutate(change);
     expect(r.ok).toBe(false);
     expect(messages(r)).toContain(expected());
+  });
+});
+
+describe("text variants of a filled text (format 0.15)", () => {
+  const harm = (f: RawFiles) => thing(f, "items", "item.lantern-staff").stats.harm;
+  const at = "things/items.json [0].stats.harm";
+
+  it("accepts the demo package's variant", () => {
+    expect(mutate(() => {}).ok).toBe(true);
+  });
+
+  it.each<[string, (f: RawFiles) => void, string]>([
+    [
+      "a condition on an unknown value",
+      (f) => (harm(f).variants[0].when = "levle >= 5"),
+      `${at}.variants[0].when: expression "levle >= 5" uses unknown value "levle"`,
+    ],
+    [
+      "a condition on a thing that does not exist",
+      (f) => (harm(f).variants[0].when = "has('path.lightwardn')"),
+      `${at}.variants[0].when: expression "has('path.lightwardn')" asks has("path.lightwardn") but there is no such thing`,
+    ],
+    [
+      "a variant text missing in one language",
+      (f) => delete f.get("texts/en/core.json").entries["stat-value.item.lantern-staff.harm.bright"],
+      "texts/en/ stat-value.item.lantern-staff.harm.bright: missing text (stat text)",
+    ],
+    [
+      "a variant text with a variable the stat does not supply",
+      (f) =>
+        (f.get("texts/de/core.json").entries["stat-value.item.lantern-staff.harm.bright"] =
+          "1W6 {{var:glow|signed}}"),
+      'texts/de/core.json entries.stat-value.item.lantern-staff.harm.bright: uses {{var:glow}}, but no stat with this text supplies "glow"',
+    ],
+    [
+      "a variant without vars that uses a variable",
+      (f) => delete harm(f).vars,
+      'texts/de/core.json entries.stat-value.item.lantern-staff.harm.bright: uses {{var:bonus}}, but no stat with this text supplies "bonus"',
+    ],
+    [
+      "a variant that names the same text",
+      (f) => (harm(f).variants[0].text = "stat-value.item.lantern-staff.harm"),
+      `${at}.variants: text "stat-value.item.lantern-staff.harm" is named twice`,
+    ],
+    [
+      "an empty list of variants",
+      (f) => (harm(f).variants = []),
+      `${at}.variants: Too small: expected array to have >=1 items`,
+    ],
+  ])("%s", (_name, change, expected) => {
+    const r = mutate(change);
+    expect(r.ok).toBe(false);
+    expect(messages(r)).toContain(expected);
   });
 });

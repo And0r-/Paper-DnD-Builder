@@ -601,6 +601,7 @@
     "sheet.attacks.title": "Attacks",
     "sheet.attacks.hint": "To hit: 2d6 + this number. Harm: these dice.",
     "stat-value.item.lantern-staff.harm": "1d6 {{var:bonus|signed}}, blunt",
+    "stat-value.item.lantern-staff.harm.bright": "1d6 {{var:bonus|signed}}, blunt or bright",
     "stat-value.item.boat-hook.harm": "1d4 {{var:bonus|signed}}, pointed",
     "stat-value.item.sling.harm": "1d4 {{var:bonus|signed}}, blunt",
     "stat-value.item.sling.range": "{{length:30|short}} / {{length:120|short}}",
