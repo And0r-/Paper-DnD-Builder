@@ -368,6 +368,29 @@ describe("one list for the gathered choices", () => {
     expect(moved.answers["folk-talent"]).toEqual({ picks: ["talent.tracking"] });
   });
 
+  // Finding 54 for a single pick: when the list takes the package's
+  // recommendation away, the first option left is recommended instead.
+  it("recommends the first option left to a single pick whose recommendation another choice holds", () => {
+    const pkg = variant({ together: "list" });
+    const folk = pkg.flow.choices.find((c) => c.id === "folk-talent")!;
+    Object.assign(folk, { kind: "pickOne" });
+    delete (folk as { count?: unknown }).count;
+    const doc = build(pkg, [
+      ...LANTERN_HILLFOLK,
+      ["talents-lantern-bearer", { picks: ["talent.mending", "talent.climbing"] }],
+    ]);
+    const ev = evaluateDraft(pkg, doc);
+    const single = ev.choices["folk-talent"]!;
+    expect(single.options).not.toContain("talent.mending");
+    expect(single.recommended).toEqual([single.options![0]]);
+    const done = applyOk(pkg, doc, {
+      type: "answer",
+      choice: "folk-talent",
+      answer: { pick: single.options![0] },
+    });
+    expect(evaluateDraft(pkg, done).steps.find((s) => s.id === "talents")!.status).toBe("done");
+  });
+
   it("recommends a full list without doubles, so choose for me finishes the step", () => {
     const pkg = variant({ together: "list" });
     const doc = build(pkg, LANTERN_HILLFOLK);
