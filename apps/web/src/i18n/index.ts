@@ -13,6 +13,14 @@ export type UiLanguage = (typeof UI_LANGUAGES)[number];
 export const DEFAULT_LANGUAGE: UiLanguage = "de";
 
 /**
+ * Remembers the language chosen before login. Functional only; nothing
+ * else is stored. Lives here, not in a client module: the server reads it
+ * for the first paint, and a value imported from a "use client" file is
+ * only a reference on the server, never the string.
+ */
+export const LANGUAGE_COOKIE = "lang";
+
+/**
  * Each language named in itself. The only place where a word of another
  * language may appear on screen: whoever switched by mistake must find
  * their own language again. Shown with a matching `lang` attribute.

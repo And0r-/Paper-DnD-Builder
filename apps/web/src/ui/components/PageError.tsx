@@ -45,7 +45,7 @@ export function useReloadOnChunkError(error: unknown): void {
 export function documentLanguage(): UiLanguage {
   const rendered = document.documentElement.lang;
   if (isUiLanguage(rendered)) return rendered;
-  // The cookie is LANGUAGE_COOKIE from app-state.tsx, not imported to keep this screen light.
+  // The cookie is LANGUAGE_COOKIE from i18n/index.ts, not imported to keep this screen light.
   const chosen = /(?:^|;\s*)lang=([^;]*)/.exec(document.cookie)?.[1];
   if (isUiLanguage(chosen)) return chosen;
   return pickLanguage(navigator.languages.join(","));
