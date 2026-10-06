@@ -581,6 +581,21 @@ listed in `ids` (if given) and carry every tag in `tags` (if given). From
 these, the builder offers those whose `requires` is true and that the
 character does not already have from somewhere else.
 
+**The level a pick sees.** A `pickOne`, and a `pickMany` whose `count` is
+a number, is a pick made once, at the level of its step (the higher of
+the granter's level and the grant's `atLevel`, see
+[What a character has](#what-a-character-has)). Its `requires` and the
+`when` of its `recommend` see `level` and the values at that level, so a
+character built at level 20 is not offered a thing with
+`"requires": "level >= 19"` on its level-4 step, and the step does not
+recommend it. `has()` and `count()` see what the character has by the
+time the step is asked, as the options do: a thing it gets at a later
+level is not offered or recommended a second time. A `pickMany` whose
+`count` is an expression or a table by level is the character's list at
+its level (for example knacks that grow with the level): it sees the
+character at its level. `count` and `textVariants` always see the
+character at its level.
+
 **Picking among what the character has** (`"owned": true` in `options`).
 Some choices pick from what the character already has, for example "two
 of your knacks become your favourites". With `owned`, the builder offers

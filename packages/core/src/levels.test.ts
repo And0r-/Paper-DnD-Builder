@@ -600,6 +600,56 @@ describe("a raise sees the character at its own level", () => {
   });
 });
 
+describe("a pick sees the level of its step", () => {
+  // The starlit crown needs level 19. Boons 4 to 16 list it for level 19 first.
+  const CROWN = "boon.starlit-crown";
+  const EARLY = ["boon-4", "boon-8", "boon-12", "boon-16"];
+  let doc: DraftDocument;
+  let ev: Evaluation;
+  beforeAll(() => {
+    doc = chooseForMe(20, "calling.herbalist");
+    ev = evaluateDraft(pkg, doc);
+  });
+
+  it("offers a thing that needs level 19 only on the level-19 step, also at level 20", () => {
+    for (const id of EARLY) {
+      expect(ev.choices[id]!.atLevel, id).toBeLessThan(19);
+      expect(ev.choices[id]!.options, id).not.toContain(CROWN);
+    }
+    expect(ev.choices["boon-19"]!.options).toContain(CROWN);
+  });
+
+  it("recommends by the level of the step, not of the character", () => {
+    for (const id of EARLY) expect(ev.choices[id]!.recommended, id).toEqual(["boon.raise"]);
+  });
+
+  it("does not take a pick of the higher level on an earlier step", () => {
+    const early = { ...doc, answers: { ...doc.answers, "boon-4": { pick: CROWN } } };
+    expect(evaluateDraft(pkg, early).choices["boon-4"]!.status).toBe("invalid");
+    const late = evaluateDraft(pkg, { ...doc, answers: { ...doc.answers, "boon-19": { pick: CROWN } } });
+    expect(late.choices["boon-19"]!.status).toBe("answered");
+    expect(late.values["nerve"]).toBe(ev.values["nerve"]! + 2);
+  });
+
+  it("offers the same on a raise from 1 to 20 in one go", () => {
+    const r = levelUp(pkg, chooseForMe(1, "calling.herbalist"), 20);
+    if (!r.ok) throw new Error(JSON.stringify(r.error));
+    const raised = evaluateDraft(pkg, r.doc);
+    for (const id of [...EARLY, "boon-19"]) {
+      expect(raised.choices[id]!.options, id).toEqual(ev.choices[id]!.options);
+      expect(raised.choices[id]!.recommended, id).toEqual(ev.choices[id]!.recommended);
+    }
+  });
+
+  it("keeps a list that grows with the level at the character's level", () => {
+    // Knacks are granted at level 1, their count is a table by level: the
+    // list is the one of the level-20 character, rank 2 knacks included.
+    const lantern = evaluateDraft(pkg, chooseForMe(20, "calling.lantern-bearer"));
+    expect(lantern.choices["knacks-lantern"]!.atLevel).toBe(1);
+    expect(lantern.choices["knacks-lantern"]!.options).toContain("knack.light-bridge");
+  });
+});
+
 describe("picking among what the character has", () => {
   let doc: DraftDocument;
   let ev: Evaluation;

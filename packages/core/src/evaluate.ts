@@ -635,6 +635,24 @@ function marksOnly(choice: Choice): boolean {
 }
 
 /**
+ * What a pick choice's `requires` and `recommend` see (SPEC 9.3). A pick
+ * with a fixed count is made once, at the level of its step (a boon at
+ * level 4): `level` and the values are those of that level, so a thing that
+ * needs a higher level is not offered even if the character is built at
+ * that level. `has()` and `count()` still see what the character has by the
+ * time the step is asked, like the options do: a thing it gets at a later
+ * level is neither offered nor recommended a second time. A pick whose
+ * count is an expression or a table by level is the character's list at
+ * its level (knacks that grow with the level): it sees the character at
+ * its level.
+ */
+function pickScope(choice: Choice, character: Character, atLevel: number): ExprScope {
+  const once = choice.kind === "pickOne" || (choice.kind === "pickMany" && typeof choice.count === "number");
+  if (!once || atLevel >= character.level) return character.scope;
+  return { ...character.scope, value: character.scopeAt(atLevel).value };
+}
+
+/**
  * Options of a choice with `options.owned`: what the character has (picked
  * in one of `ownedFrom`, if given), whose condition holds, and that no other
  * copy of the same declared choice has marked (a repeatable thing picked
@@ -645,6 +663,7 @@ function ownedOptions(
   choice: Choice,
   character: Character,
   refs: Set<string>,
+  scope: ExprScope,
 ): string[] {
   if (choice.kind !== "pickOne" && choice.kind !== "pickMany") return [];
   const from = choice.options.ownedFrom;
@@ -656,7 +675,7 @@ function ownedOptions(
     // `ownedFrom`: only what was picked in one of these choices, not what came another way.
     if (from && !(held.pickedIn !== undefined && from.includes(declaredChoiceId(held.pickedIn)))) return [];
     if (character.marks.get(t.id)?.some((c) => declaredChoiceId(c) === choice.id)) return [];
-    if (t.requires !== undefined && !evaluateCondition(t.requires, character.scope)) return [];
+    if (t.requires !== undefined && !evaluateCondition(t.requires, scope)) return [];
     return [t.id];
   });
 }
@@ -664,14 +683,23 @@ function ownedOptions(
 /**
  * A repeatable thing the character has is offered again only if every
  * choice with `options.owned` it grants up to the level still has something
- * to mark; otherwise its copy could never be answered.
+ * to mark; otherwise its copy could never be answered. A copy picked at
+ * `atLevel` is asked at that level or the grant's, whichever is higher.
  */
-function canTakeAgain(pkg: ContentPackage, thing: Thing, character: Character, refs: Set<string>): boolean {
+function canTakeAgain(
+  pkg: ContentPackage,
+  thing: Thing,
+  character: Character,
+  refs: Set<string>,
+  atLevel: number,
+): boolean {
   const choices = indexes(pkg).choices;
   return (thing.grants ?? []).every((g) => {
     if (g.choice === undefined || (g.atLevel ?? 1) > character.level) return true;
     const choice = choices.get(g.choice);
-    return !choice || !marksOnly(choice) || ownedOptions(pkg, choice, character, refs).length > 0;
+    if (!choice || !marksOnly(choice)) return true;
+    const scope = pickScope(choice, character, Math.max(atLevel, g.atLevel ?? 1));
+    return ownedOptions(pkg, choice, character, refs, scope).length > 0;
   });
 }
 
@@ -710,13 +738,14 @@ function prepareChoice(
       // with `owned` the other way round: only what the character has by now, and not
       // what another copy of the same choice marked already.
       const owned = choice.options.owned ?? false;
+      const at = pickScope(choice, character, atLevel);
       const options = owned
-        ? ownedOptions(pkg, choice, character, refs)
+        ? ownedOptions(pkg, choice, character, refs, at)
         : selectThings(pkg, choice.options).flatMap((t) => {
             for (const r of thingsIn(t.requires)) refs.add(r);
-            if (character.held.has(t.id) && !(t.repeatable && canTakeAgain(pkg, t, character, refs)))
+            if (character.held.has(t.id) && !(t.repeatable && canTakeAgain(pkg, t, character, refs, atLevel)))
               return [];
-            if (t.requires !== undefined && !evaluateCondition(t.requires, scope)) return [];
+            if (t.requires !== undefined && !evaluateCondition(t.requires, at)) return [];
             return [t.id];
           });
       state.options = options;
@@ -727,7 +756,7 @@ function prepareChoice(
         ctx.count = state.count;
         state.remaining = state.count;
       }
-      const rec = choice.recommend?.find((r) => r.when === undefined || evaluateCondition(r.when, scope));
+      const rec = choice.recommend?.find((r) => r.when === undefined || evaluateCondition(r.when, at));
       let recommended = rec?.pick.filter((p) => options.includes(p));
       // A count that grows with the level would need a recommendation per
       // count: the package's picks come first, the options fill up the rest.
