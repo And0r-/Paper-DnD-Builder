@@ -95,12 +95,30 @@ export function stepChange(
     const inSection = prev && now.get(prev.key)!.sectionKey === section ? prev.key : undefined;
     gone.push({ key: e.key, title: e.title, whole: false, section, after: inSection });
   }
-  const left = gone.filter((g) => !takeSameTitle(g, after, was, added));
+  // Sections of `after` that stand for a step that went under the same name.
+  const paired = new Set<number>();
+  const left: GoneEntry[] = [];
+  for (const g of gone) {
+    const twin = sameTitle(g, after, was, added);
+    if (!twin) {
+      left.push(g);
+      continue;
+    }
+    if (!g.whole) {
+      added.delete(twin.key);
+      continue;
+    }
+    // The step stays to the player; what it asks is told part by part, by name (AND-138).
+    paired.add(twin.section);
+    const old = before.filter((x) => x.section === was.get(g.key)!.section);
+    const fresh = after.filter((x) => x.section === twin.section);
+    left.push(...partsBetween(old, fresh, added));
+  }
   // Parts of a step the player has not answered come and go with the suggestion: not marked.
   for (const key of added) {
     const e = now.get(key)!;
     const head = after.find((x) => x.section === e.section)!;
-    if (was.has(head.key) && !asked(head, "after")) added.delete(key);
+    if ((was.has(head.key) || paired.has(e.section)) && !asked(head, "after")) added.delete(key);
   }
   const shown = left.filter((g) => {
     if (g.whole) return true;
@@ -116,31 +134,54 @@ export function stepChange(
  * player, the same step: neither is shown as gone or new (AND-100). The
  * package may give it another key (each choice its own), the name stays.
  * A whole step pairs with a whole step that came; a part with a part that
- * came in the same step. True, and the one that came is taken out of
- * `added`, when `g` found its pair.
+ * came in the same step. Returns the entry that came for `g` (for a whole
+ * step, its first entry), if it has one.
  */
-function takeSameTitle(
+function sameTitle(
   g: GoneEntry,
   after: readonly FlowEntry[],
   was: ReadonlyMap<string, FlowEntry>,
-  added: Set<string>,
-): boolean {
+  added: ReadonlySet<string>,
+): FlowEntry | undefined {
   const fresh = (e: FlowEntry) => added.has(e.key) && !was.has(e.key);
   if (!g.whole) {
-    const twin = after.find(
-      (e) => fresh(e) && e.part > 1 && e.sectionKey === g.section && e.title === g.title,
-    );
-    if (twin) added.delete(twin.key);
-    return twin !== undefined;
+    return after.find((e) => fresh(e) && e.part > 1 && e.sectionKey === g.section && e.title === g.title);
   }
-  const twin = after.find(
+  return after.find(
     (e) =>
       e.part === 1 &&
       fresh(e) &&
       (e.sectionTitle ?? e.title) === g.title &&
       after.filter((x) => x.section === e.section).every((x) => !was.has(x.key)),
   );
-  if (!twin) return false;
-  for (const e of after) if (e.section === twin.section) added.delete(e.key);
-  return true;
+}
+
+/**
+ * The parts of a step that went (`old`) and came back under the same name
+ * (`fresh`), told apart by name: a part whose name both have is the same
+ * part and is taken out of `added`; a part only `old` has went, and stays
+ * in the step at the place it had. A group "Your way" of two parts that
+ * comes back with one has lost the other (AND-138).
+ */
+function partsBetween(
+  old: readonly FlowEntry[],
+  fresh: readonly FlowEntry[],
+  added: Set<string>,
+): GoneEntry[] {
+  const left = [...fresh];
+  const section = fresh[0]!.sectionKey;
+  const out: GoneEntry[] = [];
+  // The part that came for the last old part that stays, to stand behind.
+  let prev: string | undefined;
+  for (const e of old) {
+    const i = left.findIndex((x) => x.title === e.title);
+    if (i >= 0) {
+      prev = left[i]!.key;
+      added.delete(prev);
+      left.splice(i, 1);
+      continue;
+    }
+    out.push({ key: e.key, title: e.title, whole: false, section, after: prev });
+  }
+  return out;
 }

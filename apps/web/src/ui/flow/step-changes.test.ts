@@ -96,4 +96,56 @@ describe("stepChange", () => {
       stepChange(flow(["a", 0], ["b", 1], ["b-x", 1]), flow(["a", 0], ["b", 1], ["b-y", 1]), none),
     ).toBeNull();
   });
+
+  it("marks every step a first answer brought, also when the planned count stays (AND-138)", () => {
+    // The list compares the steps as they stand; "Step x of y" compares the
+    // planned flow (plan.ts) and keeps its number when the answer takes as
+    // many steps as the suggestion would have.
+    const before = flow(["level", 0], ["class", 1], ["scores", 2]);
+    const after = withGroup(
+      flow(
+        ["level", 0],
+        ["class", 1],
+        ["order", 2, 1, "Order"],
+        ["branch", 2, 1, "Branch"],
+        ["scores", 3],
+        ["spells", 4],
+      ),
+      "order",
+      "Way",
+    );
+    const c = stepChange(before, after, answeredParts({ before: {}, after: { "class.0": 1 } }))!;
+    expect([...c.added]).toEqual(["order", "branch", "spells"]);
+    expect(c.gone).toEqual([]);
+  });
+
+  it("shows a part as gone when its group comes back under the same name without it (AND-138)", () => {
+    // Group "Way" of two parts gives way to a group "Way" of one: the group
+    // stays, the part that is missing went and stands red inside it.
+    const before = withGroup(
+      flow(["class", 0], ["order-1", 1, 1, "Order"], ["branch-1", 1, 1, "Branch"], ["scores", 2]),
+      "order-1",
+      "Way",
+    );
+    const after = withGroup(
+      flow(["class", 0], ["branch-2", 1, 1, "Branch"], ["scores", 2], ["lore", 3]),
+      "branch-2",
+      "Way",
+    );
+    const asked = answeredParts({ before: { "class.0": 1 }, after: { "class.0": 2 } });
+    const c = stepChange(before, after, asked)!;
+    expect([...c.added]).toEqual(["lore"]);
+    expect(c.gone).toEqual([
+      { key: "order-1", title: "Order", whole: false, section: "branch-2", after: undefined },
+    ]);
+    // Parts are told by name: what both groups have is neither gone nor new.
+    const back = stepChange(after, before, asked)!;
+    expect([...back.added]).toEqual(["order-1"]);
+    expect(back.gone.map((g) => g.key)).toEqual(["lore"]);
+  });
 });
+
+/** The entries with `key` leading its section under the group's own name `title`. */
+function withGroup(entries: FlowEntry[], key: string, title: string): FlowEntry[] {
+  return entries.map((e) => (e.key === key ? { ...e, sectionTitle: title } : e));
+}
