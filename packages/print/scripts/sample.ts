@@ -2,7 +2,9 @@
  * Writes sample PDFs of a demo character: German with meters, English with
  * feet, German with an over-long (invented) rules text on the first card,
  * to show continuation cards, and German with an over-long section, label
- * and card field (all invented), to show that nothing is cut off. Usage:
+ * and card field (all invented), to show that nothing is cut off; and the
+ * sheet alone of the level 20 character in the verbose design, as a kept
+ * copy with the play state filled in (German) and empty (English). Usage:
  * node packages/print/scripts/sample.ts <outDir>
  */
 import type { ContentPackage } from "@builder/format";
@@ -10,6 +12,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { buildSheetModel, type SheetModel } from "@builder/sheet";
 import { demoCharacter, loadDemoPackage } from "@builder/sheet/testing";
+import type { PlayState } from "@builder/sheet";
 import { renderPdf } from "../src/index.ts";
 
 const out = process.argv[2] ?? ".";
@@ -81,3 +84,47 @@ const file = "demo-character-de-over-long.pdf";
 const pdf = await renderPdf(overLong);
 await writeFile(path.join(out, file), pdf.bytes);
 console.log(`${file}: ${pdf.pages} pages (${pdf.sheetPages} sheet, ${pdf.cardPages} cards)`);
+
+// The sheet alone, as a kept copy, filled with a play state and empty.
+const level20 = demoCharacter(pkg, 20);
+for (const [language, units, name, play, file] of [
+  [
+    "de",
+    { length: "m", weight: "kg" },
+    "Meine Fassung vom 6. Oktober 2026",
+    {
+      "sheet/header/playedBy": "Sam",
+      "sheet/primary/stamina": 61,
+      "sheet/primary/luck": { checks: 2 },
+      "sheet/recovery/restDice": { checks: 25 },
+      "sheet/knacks/knack.glow-thread/uses": { checks: 1 },
+      "sheet/lantern-slots/lanternSlots1": { checks: 3 },
+      "sheet/gear/lines": "Ersatzdocht\nKarte vom Moor",
+      "sheet/notes/notes": "Dem Fährmann zwei Münzen schuldig. Den Glöckner nach dem Turm fragen.",
+    },
+    "demo-character-de-copy-filled.pdf",
+  ],
+  [
+    "en",
+    { length: "ft", weight: "lb" },
+    "My version of 6 October 2026",
+    {},
+    "demo-character-en-copy-empty.pdf",
+  ],
+] as const) {
+  const original = buildSheetModel(pkg, level20, { language, units, createdAt });
+  if (original.origin.kind !== "original") throw new Error("not an original");
+  const copy: SheetModel = {
+    ...original,
+    origin: {
+      kind: "copy",
+      name,
+      createdAt: "2026-10-06T14:20:00.000Z",
+      fromLevel: original.origin.level,
+      fromPackageVersion: original.origin.packageVersion,
+    },
+  };
+  const pdf = await renderPdf(copy, { parts: ["sheet"], design: "verbose", play: play as PlayState });
+  await writeFile(path.join(out, file), pdf.bytes);
+  console.log(`${file}: ${pdf.pages} pages`);
+}

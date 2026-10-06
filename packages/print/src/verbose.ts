@@ -169,9 +169,10 @@ function drawSection(c: Grid, s: Laid, x: number, top: number, w: number): numbe
           const noteLh = pen.lineHeight(note.style, 1.15);
           note.lines.forEach((l, j) => pen.text(l, cx + cw - 9.5, cy + j * noteLh, note.style, "right"));
           pen.rect(cx + cw - 7.5, cy - 4.2, 7, 5.5, { width: 0.5, radius: 0.8 });
-          pen.field(item.field, cx + cw - 7.5, cy - 4.2, 7, 5.5);
           // An empty box is filled in by hand; filled, the play state says what.
-          const total = item.total.text === "" ? pen.written(item.field) : item.total.text;
+          const byHand = item.total.text === "" ? pen.written(item.field) : "";
+          pen.field(item.field, cx + cw - 7.5, cy - 4.2, 7, 5.5, { text: byHand });
+          const total = item.total.text === "" ? byHand : item.total.text;
           pen.text(total, cx + cw - 4, cy, pen.fit(total, st.boxValue, 6.4), "center");
           const partsTop = cy + (name.lines.length - 1) * lh + 0.9;
           parts.forEach((l, j) => pen.text(l, cx + 5.5, partsTop + (j + 0.8) * partsLh, st.hint));
@@ -220,7 +221,8 @@ function drawSection(c: Grid, s: Laid, x: number, top: number, w: number): numbe
         pen.line(x, y + 6, x + w, y + 6, 0.3, "#BBB");
         y += 6;
       }
-      if (s.blankLines > 0) pen.field(s.field, x, y, w, s.blankLines * g.writingLine);
+      if (s.blankLines > 0)
+        pen.field(s.field, x, y, w, s.blankLines * g.writingLine, { text: s.written?.join("\n") ?? "" });
       for (let i = 0; i < s.blankLines; i++) {
         const line = s.written?.[i];
         if (line) pen.text(line, x + 1, y + 4.3, pen.fit(line, st.written, w - 2));
@@ -255,7 +257,7 @@ function drawSection(c: Grid, s: Laid, x: number, top: number, w: number): numbe
     }
     case "notes": {
       const lh = g.writingLine;
-      if (s.lines > 0) pen.field(s.field, x, y, w, s.lines * lh);
+      if (s.lines > 0) pen.field(s.field, x, y, w, s.lines * lh, { text: s.written?.join("\n") ?? "" });
       for (let i = 0; i < s.lines; i++) {
         const line = s.written?.[i];
         if (line) pen.text(line, x + 1, y + lh * i + 4.3, pen.fit(line, st.written, w - 2));
@@ -351,8 +353,8 @@ function drawHeader(
   pen.text(s.packageName, x + w, y + 4, pen.fit(s.packageName, st.meta, side), "right");
   pen.text(pen.messages.playedBy, x + w - side, y + 11.5, st.meta);
   pen.line(x + w - side, y + 15, x + w, y + 15, 0.4, "#777");
-  pen.field(s.playedByField, x + w - side, y + 12, side, 3);
   const player = pen.written(s.playedByField);
+  pen.field(s.playedByField, x + w - side, y + 12, side, 3, { text: player });
   if (player !== "") pen.text(player, x + w - side, y + 14.4, pen.fit(player, st.written, side, g.type.min));
   let rule = y + 18.5;
   if (s.fields.length > 0) {
@@ -422,11 +424,11 @@ function drawStatBoxes(c: Grid, boxes: StatBox[], x: number, y: number, w: numbe
       const fx = bx + 5;
       const fw = bw - 10;
       pen.rect(fx, top + 8, fw, 11, { stroke: "#777", width: 0.4, radius: 1 });
-      pen.field(b.field, fx, top + 8, fw, 11);
-      const what = pen.label(pen.messages.pencil, { size: 7, color: "#555" }, fw - 2);
-      what.lines.forEach((l, j) => pen.text(l, fx + 1, top + 10.6 + j * 2.6, what.style));
       // Filled in: under the words, as if written in pencil.
       const now = pen.written(b.field);
+      pen.field(b.field, fx, top + 8, fw, 11, { text: now });
+      const what = pen.label(pen.messages.pencil, { size: 7, color: "#555" }, fw - 2);
+      what.lines.forEach((l, j) => pen.text(l, fx + 1, top + 10.6 + j * 2.6, what.style));
       if (now !== "") pen.text(now, mid, top + 17.8, pen.fit(now, st.pencil, fw - 2, g.type.min), "center");
     } else if (b.style === "boxes") {
       // With a text ("5 × d10") the squares go under it, like circles; alone, they take its place.
@@ -436,7 +438,9 @@ function drawStatBoxes(c: Grid, boxes: StatBox[], x: number, y: number, w: numbe
       const first = b.text !== "" ? top + 16.2 : top + 12.5 - ((rows - 1) * (SQUARE + SQUARE_GAP)) / 2;
       const ticked = pen.checks(b.field, b.squares);
       const widest = Math.min(perRow, b.squares) * (SQUARE + SQUARE_GAP) - SQUARE_GAP;
-      pen.field(b.field, mid - widest / 2, first, widest, rows * (SQUARE + SQUARE_GAP) - SQUARE_GAP);
+      pen.field(b.field, mid - widest / 2, first, widest, rows * (SQUARE + SQUARE_GAP) - SQUARE_GAP, {
+        ticks: ticked,
+      });
       for (let r = 0; r < rows; r++) {
         const inRow = Math.min(perRow, b.squares - r * perRow);
         const left = mid - (inRow * SQUARE + (inRow - 1) * SQUARE_GAP) / 2;
@@ -454,7 +458,7 @@ function drawStatBoxes(c: Grid, boxes: StatBox[], x: number, y: number, w: numbe
       const r = Math.min(1.9, step * 0.38);
       const ticked = pen.checks(b.field, b.circles);
       const span = (b.circles - 1) * step + 2 * r;
-      pen.field(b.field, mid - span / 2, top + 17.9 - r, Math.max(0, span), 2 * r);
+      pen.field(b.field, mid - span / 2, top + 17.9 - r, Math.max(0, span), 2 * r, { ticks: ticked });
       for (let i = 0; i < b.circles; i++) {
         const cx = mid + (i - (b.circles - 1) / 2) * step;
         pen.circle(cx, top + 17.9, r, { width: 0.6 });

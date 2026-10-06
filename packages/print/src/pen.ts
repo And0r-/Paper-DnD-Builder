@@ -56,7 +56,10 @@ const MISSING_GLYPHS = new RegExp(`[${Object.keys(STAND_INS).join("")}]`, "gu");
 /** Spaces a line may break at: any white space but the non-breaking ones. */
 const BREAKS = /[^\S\u00A0\u202F\u2007]+/u;
 
-/** A place where the player writes or ticks, as drawn: its field id, page (from 1) and box in mm. */
+/**
+ * A place where the player writes or ticks, as drawn: its field id, page
+ * (from 1) and box in mm, and what the play state put in it.
+ */
 export interface DrawnField {
   id: string;
   page: number;
@@ -64,6 +67,10 @@ export interface DrawnField {
   y: number;
   w: number;
   h: number;
+  /** Text or number written in. */
+  text?: string;
+  /** Marks ticked, at most as many as the field has. */
+  ticks?: number;
 }
 
 /**
@@ -104,10 +111,19 @@ export class Pen {
     this.fonts = fonts;
   }
 
-  /** Notes where a field is drawn (not while measuring). */
-  field(id: string | undefined, x: number, y: number, w: number, h: number): void {
+  /** Notes where a field is drawn (not while measuring), and what was filled in. */
+  field(
+    id: string | undefined,
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+    filled: { text?: string; ticks?: number } = {},
+  ): void {
     if (this.dry || id === undefined) return;
-    this.fields.push({ id, page: this.page, x, y, w, h });
+    const text = filled.text ? { text: filled.text } : {};
+    const ticks = filled.ticks ? { ticks: filled.ticks } : {};
+    this.fields.push({ id, page: this.page, x, y, w, h, ...text, ...ticks });
   }
 
   /** What the play state has to write into a field: its text or number, "" for nothing (or ticks). */
@@ -442,14 +458,14 @@ export function drawUses(pen: Pen, uses: Uses, right: number, y: number, s: Text
   const top = y - USE_BOX + 0.4;
   if ("count" in uses) {
     pen.rect(right - USE_FIELD, top, USE_FIELD, USE_BOX, { width: 0.5 });
-    pen.field(field, right - USE_FIELD, top, USE_FIELD, USE_BOX);
     const left = pen.written(field);
+    pen.field(field, right - USE_FIELD, top, USE_FIELD, USE_BOX, { text: left });
     if (left !== "") pen.text(left, right - USE_FIELD / 2, y, pen.fit(left, s, USE_FIELD - 1), "center");
     return pen.text(String(uses.count), right - USE_FIELD - USE_BOX_GAP, y, s, "right");
   }
   const width = usesWidth(pen, uses, s);
-  pen.field(field, right - width, top, width, USE_BOX);
   const ticked = pen.checks(field, uses.boxes);
+  pen.field(field, right - width, top, width, USE_BOX, { ticks: ticked });
   for (let i = 0; i < uses.boxes; i++) {
     const left = right - USE_BOX - i * (USE_BOX + USE_BOX_GAP);
     pen.rect(left, top, USE_BOX, USE_BOX, { width: 0.5 });
