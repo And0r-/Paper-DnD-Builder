@@ -700,6 +700,29 @@
       ]
     },
     {
+      "id": "deep-practice",
+      "kind": "pickOne",
+      "source": "mistland",
+      "options": {
+        "ids": [
+          "trait.steady-flame",
+          "trait.bright-beacon",
+          "trait.quick-feet",
+          "trait.current-sense",
+          "trait.flood-stride",
+          "trait.green-thumb",
+          "trait.deep-roots",
+          "trait.bloom-ward"
+        ],
+        "owned": true
+      },
+      "recommend": [
+        {
+          "pick": ["trait.steady-flame"]
+        }
+      ]
+    },
+    {
       "id": "lantern-vow",
       "kind": "pickOne",
       "source": "mistland",

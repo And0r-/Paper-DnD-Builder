@@ -40,6 +40,17 @@
     ]
   },
   {
+    "id": "boon.deep-practice",
+    "kind": "boon",
+    "source": "mistland",
+    "repeatable": true,
+    "grants": [
+      {
+        "choice": "deep-practice"
+      }
+    ]
+  },
+  {
     "id": "trait.bright-beacon",
     "kind": "trait",
     "source": "mistland",

@@ -17,6 +17,7 @@ import {
   renderText,
   selectThings,
   summarize,
+  type ChoiceState,
   type DraftDocument,
   type Evaluation,
   type HeldThing,
@@ -557,7 +558,10 @@ export function buildPrintModel(
         return {
           ...base,
           kind: "answers",
-          rows: s.choices.map((c) => ({ label: text(`choice.${c}.title`), text: answerText(c) })),
+          // A choice the character was never asked, not even as a copy, has no row.
+          rows: s.choices
+            .filter((c) => asked(c).length > 0)
+            .map((c) => ({ label: text(`choice.${c}.title`), text: answerText(c) })),
         };
       case "helpBox":
         return { ...base, kind: "helpBox", paragraphs: paragraphs(`sheet.${s.id}.text`) };
@@ -566,10 +570,22 @@ export function buildPrintModel(
     }
   };
 
-  /** A choice's answer as words: the text, the number (with unit), or the name of what was picked. */
+  /** The choice as asked: itself, or every copy a repeatable thing asked, in step order. */
+  function asked(choiceId: string): ChoiceState[] {
+    return Object.values(ev.choices).filter((c) => c.id === choiceId || c.copyOf === choiceId);
+  }
+
+  /** A choice's answers as words, those of all its copies in one line ("Warm Glow, Glow Thread"). */
   function answerText(choiceId: string): string {
-    const state = ev.choices[choiceId];
-    if (!state || state.status !== "answered") return "";
+    return asked(choiceId)
+      .map((c) => oneAnswer(c, choiceId))
+      .filter((t) => t !== "")
+      .join(", ");
+  }
+
+  /** One answer as words: the text, the number (with unit), or the name of what was picked. */
+  function oneAnswer(state: ChoiceState, choiceId: string): string {
+    if (state.status !== "answered") return "";
     const a = state.answer as Record<string, unknown>;
     if (typeof a["text"] === "string") return a["text"].trim();
     if (typeof a["pick"] === "string") return thingName(a["pick"]);
@@ -625,7 +641,9 @@ export function buildPrintModel(
     sections: pkg.sheet.sections
       .filter(shown)
       .map(section)
-      .filter((s) => s.kind !== "statBoxes" || s.boxes.length > 0),
+      .filter(
+        (s) => (s.kind !== "statBoxes" || s.boxes.length > 0) && (s.kind !== "answers" || s.rows.length > 0),
+      ),
     cards,
   };
 }

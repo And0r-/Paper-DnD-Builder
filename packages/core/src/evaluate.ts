@@ -634,6 +634,42 @@ function marksOnly(choice: Choice): boolean {
   return (choice.kind === "pickOne" || choice.kind === "pickMany") && choice.options.owned === true;
 }
 
+/**
+ * Options of a choice with `options.owned`: what the character has, whose
+ * condition holds, and that no other copy of the same declared choice has
+ * marked (a repeatable thing picked twice marks two different things).
+ */
+function ownedOptions(
+  pkg: ContentPackage,
+  choice: Choice,
+  character: Character,
+  refs: Set<string>,
+): string[] {
+  if (choice.kind !== "pickOne" && choice.kind !== "pickMany") return [];
+  return selectThings(pkg, choice.options).flatMap((t) => {
+    for (const r of thingsIn(t.requires)) refs.add(r);
+    refs.add(t.id);
+    if (!character.held.has(t.id)) return [];
+    if (character.marks.get(t.id)?.some((c) => declaredChoiceId(c) === choice.id)) return [];
+    if (t.requires !== undefined && !evaluateCondition(t.requires, character.scope)) return [];
+    return [t.id];
+  });
+}
+
+/**
+ * A repeatable thing the character has is offered again only if every
+ * choice with `options.owned` it grants up to the level still has something
+ * to mark; otherwise its copy could never be answered.
+ */
+function canTakeAgain(pkg: ContentPackage, thing: Thing, character: Character, refs: Set<string>): boolean {
+  const choices = indexes(pkg).choices;
+  return (thing.grants ?? []).every((g) => {
+    if (g.choice === undefined || (g.atLevel ?? 1) > character.level) return true;
+    const choice = choices.get(g.choice);
+    return !choice || !marksOnly(choice) || ownedOptions(pkg, choice, character, refs).length > 0;
+  });
+}
+
 function prepareChoice(
   pkg: ContentPackage,
   choice: Choice,
@@ -666,18 +702,18 @@ function prepareChoice(
     case "pickOne":
     case "pickMany": {
       // Offered: matches the source, its condition holds, and the character does not have it yet;
-      // with `owned` the other way round: only what the character has by now.
+      // with `owned` the other way round: only what the character has by now, and not
+      // what another copy of the same choice marked already.
       const owned = choice.options.owned ?? false;
-      const options: string[] = [];
-      for (const t of selectThings(pkg, choice.options)) {
-        for (const r of thingsIn(t.requires)) refs.add(r);
-        if (owned) {
-          refs.add(t.id);
-          if (!character.held.has(t.id)) continue;
-        } else if (character.held.has(t.id) && !t.repeatable) continue;
-        if (t.requires !== undefined && !evaluateCondition(t.requires, scope)) continue;
-        options.push(t.id);
-      }
+      const options = owned
+        ? ownedOptions(pkg, choice, character, refs)
+        : selectThings(pkg, choice.options).flatMap((t) => {
+            for (const r of thingsIn(t.requires)) refs.add(r);
+            if (character.held.has(t.id) && !(t.repeatable && canTakeAgain(pkg, t, character, refs)))
+              return [];
+            if (t.requires !== undefined && !evaluateCondition(t.requires, scope)) return [];
+            return [t.id];
+          });
       state.options = options;
       ctx.options = options;
       if (choice.kind === "pickMany") {
@@ -692,6 +728,9 @@ function prepareChoice(
       // count: the package's picks come first, the options fill up the rest.
       if (recommended && state.count !== undefined)
         recommended = [...new Set([...recommended, ...options])].slice(0, state.count);
+      // A copy of an `owned` choice may have lost the package's pick to an
+      // earlier copy: the first thing still free takes its place.
+      else if (owned && recommended?.length === 0 && options.length > 0) recommended = [options[0]!];
       if (choice.held) {
         // Options about something the character already has are the better
         // pick; the package's own recommendation fills the remaining places.

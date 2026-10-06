@@ -127,7 +127,9 @@ granted by a repeatable thing is asked once per pick of that thing, under
 the id `<choice>@<where the thing was picked>`, for example
 `boon-raise@boon-8`. It is answered like any choice
 (`PUT /api/drafts/:id/answers/boon-raise%40boon-8`); its rules and texts are
-those of the declared choice (`copyOf` in the evaluation).
+those of the declared choice (`copyOf` in the evaluation). Copies of a choice
+with `options.owned` (format 0.14) do not offer what another copy marked,
+and the repeatable thing is not offered again once nothing is left to mark.
 
 ### Fields of `evaluation` for levels (format 0.9)
 

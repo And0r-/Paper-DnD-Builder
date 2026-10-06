@@ -657,3 +657,58 @@ describe("picking among what the character has", () => {
     expect(ev2.open).toContain("lantern-mastery");
   });
 });
+
+describe("a repeatable thing that marks what the character has", () => {
+  let doc: DraftDocument;
+  let ev: Evaluation;
+  /** Takes Deep Practice at a boon step and answers its copy with "choose for me". */
+  const practise = (d: DraftDocument, boon: string) =>
+    answerOpen(apply(d, { type: "answer", choice: boon, answer: { pick: "boon.deep-practice" } }));
+  beforeAll(() => {
+    doc = practise(practise(chooseForMe(12, "calling.lantern-bearer"), "boon-4"), "boon-8");
+    ev = evaluateDraft(pkg, doc);
+  });
+  /** The traits the lantern bearer's calling gives, in package order: the options of a first copy. */
+  const held = () => ["trait.bright-beacon", "trait.steady-flame"];
+
+  it("leaves out what an earlier copy of the same choice marked, also from choose for me", () => {
+    expect(ev.choices["deep-practice@boon-4"]).toMatchObject({
+      copyOf: "deep-practice",
+      options: held(),
+      recommended: ["trait.steady-flame"],
+      answer: { pick: "trait.steady-flame" },
+    });
+    // The package recommends the steady flame; it is taken, so the trait still free is recommended.
+    expect(ev.choices["deep-practice@boon-8"]).toMatchObject({
+      options: ["trait.bright-beacon"],
+      recommended: ["trait.bright-beacon"],
+      answer: { pick: "trait.bright-beacon" },
+    });
+    expect(ev.marks).toMatchObject({
+      "trait.steady-flame": ["deep-practice@boon-4"],
+      "trait.bright-beacon": ["deep-practice@boon-8"],
+    });
+  });
+
+  it("is not offered again once its copy would have nothing left to mark", () => {
+    expect(ev.choices["boon-8"]!.options).toContain("boon.deep-practice");
+    expect(ev.choices["boon-12"]!.options).not.toContain("boon.deep-practice");
+    expect(ev.choices["boon-12"]!.options).toContain("boon.raise");
+    expect(ev.complete).toBe(true);
+  });
+
+  it("refuses the same pick in a later copy, and offers the boon again when an earlier copy is gone", () => {
+    const r = applyChange(pkg, doc, {
+      type: "answer",
+      choice: "deep-practice@boon-8",
+      answer: { pick: "trait.steady-flame" },
+    });
+    expect(r.ok ? "ok" : r.error).toEqual({ code: "answerDoesNotFit", problem: "notOffered" });
+    const back = evaluateDraft(
+      pkg,
+      apply(doc, { type: "answer", choice: "boon-4", answer: { pick: "boon.raise" } }),
+    );
+    expect(back.choices["deep-practice@boon-8"]!.options).toEqual(held());
+    expect(back.choices["boon-12"]!.options).toContain("boon.deep-practice");
+  });
+});

@@ -554,6 +554,45 @@ describe("printed character (demo package)", () => {
     for (const n of names) expect(extracted.text).toContain(n);
   });
 
+  it("prints the answers of every copy of a choice in one row, and no row for a choice never asked", async () => {
+    // Deep Practice (repeatable, options.owned) at levels 4 and 8: two copies of `deep-practice`.
+    let practised = demoCharacter(pkg, 12, "Mira Fennwick", "calling.lantern-bearer");
+    for (const [choice, pick] of [
+      ["boon-4", "boon.deep-practice"],
+      ["boon-8", "boon.deep-practice"],
+      ["deep-practice@boon-4", "trait.steady-flame"],
+      ["deep-practice@boon-8", "trait.bright-beacon"],
+    ] as const) {
+      const r = applyChange(pkg, practised, { type: "answer", choice, answer: { pick } });
+      if (!r.ok) throw new Error(JSON.stringify(r.error));
+      practised = r.doc;
+    }
+    const de = pkg.texts["de"]!;
+    const { model, extracted } = await print("de", {}, pkg, practised);
+    expect(model.sections.find((s) => s.id === "practice")).toMatchObject({
+      kind: "answers",
+      rows: [
+        {
+          label: de["choice.deep-practice.title"],
+          text: `${de["trait.steady-flame.name"]}, ${de["trait.bright-beacon.name"]}`,
+        },
+      ],
+    });
+    expect(extracted.text).toContain(`${de["trait.steady-flame.name"]}, ${de["trait.bright-beacon.name"]}`);
+
+    // Without its `when`, the section of a character who never took the boon has no row, and is left out.
+    const always = {
+      ...pkg,
+      sheet: {
+        ...pkg.sheet,
+        sections: pkg.sheet.sections.map((s) => (s.id === "practice" ? { ...s, when: undefined } : s)),
+      },
+    };
+    const plain = buildPrintModel(always, demoCharacter(pkg, 12), { language: "de", units: {}, createdAt });
+    expect(plain.sections.map((s) => s.id)).not.toContain("practice");
+    expect(plain.sections.map((s) => s.id)).toContain("about");
+  });
+
   it("leaves out sections and boxes whose `when` is false; the rest moves up", async () => {
     const title = pkg.texts["de"]!["sheet.path.title"] as string;
     const pathShort = pkg.texts["de"]!["path.lightwarden.short"] as string;
@@ -570,7 +609,7 @@ describe("printed character (demo package)", () => {
     const low = await print("de", {}, pkg, level2);
     const ids = pkg.sheet.sections
       .map((s) => s.id)
-      .filter((id) => id !== "path" && id !== "lantern-slots-high" && id !== "mastery");
+      .filter((id) => !["path", "lantern-slots-high", "mastery", "practice"].includes(id));
     expect(low.model.sections.map((s) => s.id)).toEqual(ids);
     expect(low.pdf.sheetLayout.flat().map((p) => p.section.id)).toEqual(ids);
     expect(low.extracted.pageTexts.slice(0, low.pdf.sheetPages).join("\n")).not.toContain(title);

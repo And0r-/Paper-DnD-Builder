@@ -48,7 +48,7 @@ describe("demo package", () => {
     expect(count("folk")).toBe(3);
     expect(count("upbringing")).toBe(2);
     expect(count("knack")).toBe(29);
-    expect(count("boon")).toBe(3);
+    expect(count("boon")).toBe(4);
     expect(p.flow.level).toEqual({ min: 1, max: 20, default: 1 });
     expect(p.manifest.languages).toEqual(["de", "en"]);
     expect(new Set(p.flow.choices.map((c) => c.kind))).toEqual(
@@ -129,7 +129,7 @@ describe("cross-file rules", () => {
     [
       "format version",
       (f) => (f.get("manifest.json").formatVersion = "0.3"),
-      "manifest.json formatVersion: package is written for format 0.3, this builder understands 0.13",
+      "manifest.json formatVersion: package is written for format 0.3, this builder understands 0.14",
     ],
     [
       "duplicate thing",

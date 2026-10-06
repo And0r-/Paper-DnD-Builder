@@ -122,7 +122,7 @@ people who distribute packages.
 
 ```json
 {
-  "formatVersion": "0.13",
+  "formatVersion": "0.14",
   "id": "demo",
   "version": "0.1.0",
   "languages": ["de", "en"],
@@ -299,6 +299,18 @@ Picked in `boon-4` and `boon-8`, it asks `boon-raise@boon-4` and
 declared choice (`choice.boon-raise.*`); its answer is stored under the
 copy's id, so changing the pick in `boon-4` leaves the answer of
 `boon-raise@boon-8` alone. The declared choice itself is never asked.
+
+**Copies that mark** (a granted choice with `options.owned`). Copies of
+the same declared choice mark different things: a copy does not offer what
+another copy of that choice has marked by then (in step order), and its
+recommendation moves on to the first thing still free when the package's
+pick is taken. A repeatable thing the character has is offered again only
+while each such choice it grants still has something to mark, judged by
+what the character has when the repeatable thing is offered; otherwise its
+copy could never be answered. So ask the things to be marked in steps
+before the step that offers the repeatable thing. An `answers` section that
+names the declared choice prints the answers of all copies in one row
+([13](#13-print-sheet-and-cards)).
 
 ### What a character has
 
@@ -1009,7 +1021,7 @@ kinds:
 | `statTable`    | the selected things the character has, one row each: name, then one column per stat                                                                                                           | `things`, `columns[]: { stat, signed?, wrap? }`                      |
 | `featureTable` | the selected things the character has: name, `note` stat under it, `short`, use boxes from the `uses` stat; grouped by rank (`byRank`) or by origin (`groupBy`), marked, with a lead sentence | `things`, `uses?`, `note?`, `byRank?`, `groupBy?`, `marks?`, `lead?` |
 | `list`         | the selected things the character has ("3 × Rope" for counted things), plus blank lines                                                                                                       | `things`, `blankLines`                                               |
-| `answers`      | answers to text and number choices, and the picks of choices with `owned` options                                                                                                             | `choices[]`                                                          |
+| `answers`      | answers to text and number choices, and the picks of choices with `owned` options; all copies of a choice in one row, no row for a choice not asked                                           | `choices[]`                                                          |
 | `helpBox`      | the text `sheet.<id>.text`                                                                                                                                                                    | —                                                                    |
 | `notes`        | blank lines                                                                                                                                                                                   | `lines`                                                              |
 
@@ -1041,7 +1053,12 @@ fit even then; keep labels to one word of about 15 letters.
 **Header answers** (`fields`, on the `header` section, 1 to 4). Each names
 a choice; its answer is printed small under the summary line, after its
 label: the text key `label`, or else the choice's title
-(`choice.<id>.title`). An unanswered choice gets a line to write on. Use it
+(`choice.<id>.title`). An unanswered choice gets a line to write on. A
+choice asked as copies (see "Repeatable things") prints the answers of
+all copies, in step order, separated by commas; so does its row in an
+`answers` section. An `answers` section leaves out the row of a choice
+the character was not asked at all, not even as a copy, and is not
+printed without any row. Use it
 for what a game master asks first and the summary line does not say, for
 example `[{ "choice": "folk" }, { "choice": "upbringing" }]`.
 
@@ -1306,6 +1323,7 @@ are removed (saved characters may lose picks). Keys are never renamed.
 | 0.11    | 2026-10-05 | `total` on `checkList` sections: the character's value in each box, with where it comes from. Section kind `statTable`: the things the character has, one column per stat. `{text}` stats may fill in values (`vars`); placeholder `{{var:name\|signed}}` writes a number with its sign.                                                                                                                                                                                                                                                                                                                                                                                                                                   | Set `formatVersion` to `"0.11"`. Nothing else changes: every field is optional and the placeholder is new, so every valid 0.10 package is a valid 0.11 package.                                                                                                                                                                                                                   |
 | 0.12    | 2026-10-05 | Optional `badges` on `distribute` choices (a label on rows while `when` holds); optional row texts `choice.<id>.target.<target>` and `choice.<id>.variant.<variant>.target.<target>`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      | Set `formatVersion` to `"0.12"`. Nothing else changes: the field and the texts are optional, so every valid 0.11 package is a valid 0.12 package.                                                                                                                                                                                                                                 |
 | 0.13    | 2026-10-06 | Optional `byRank`, `marks` and `lead` on `featureTable` sections: rows grouped by rank under `rank.<n>.name` or `rank.name` with an optional `sheet.<id>.rank.<n>.hint`, short signs with a legend by tags, picked or granted, and where a row came from, and a sentence `<thing>.<text>` above the rows. `count` on thing grants (how many; counted things add up, the sheet prints "8 × Arrow"). Sheet: `fields` on the header (answers under the summary line); box style `boxes` (squares to tick) and box `text` (filled text instead of the number); `extra` and `extraLabel` on scores; `strong` on `checkList` (marked twice, ◉); `wrap` on `statTable` columns; `note` and `groupBy: "origin"` on `featureTable`. | Set `formatVersion` to `"0.13"`. Nothing else changes: every field is optional, and without `count` a thing is had once as before, so every valid 0.12 package is a valid 0.13 package.                                                                                                                                                                                           |
+| 0.14    | 2026-10-06 | Copies of a choice with `options.owned` (asked again by a repeatable thing) mark different things: a copy leaves out what another copy marked, its recommendation moves on to the first free thing, and a repeatable thing is no longer offered when its copy would have nothing left to mark. Header fields and `answers` rows print the answers of every copy of the named choice in one row; an `answers` row of a choice not asked is left out, a section without rows is not printed.                                                                                                                                                                                                                                 | Set `formatVersion` to `"0.14"`. No field changes. A package that let two copies mark the same thing loses that; put the steps that give the marked things before the step that offers the repeatable thing.                                                                                                                                                                      |
 | 0.8     | 2026-10-04 | Gather steps (`gather`, optional `together`: `sections` or one shared `list`) in `flow.steps`, optional `gather` on choices, optional text `choice.<id>.from`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | Set `formatVersion` to `"0.8"`. Nothing else changes: a package without gather steps builds the same steps as before, so every valid 0.7 package is a valid 0.8 package.                                                                                                                                                                                                          |
 
 ## 16. A minimal package
@@ -1317,7 +1335,7 @@ language. The validator accepts it as is.
 
 ```json
 {
-  "formatVersion": "0.13",
+  "formatVersion": "0.14",
   "id": "tiny",
   "version": "1.0.0",
   "languages": ["en"],

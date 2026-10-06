@@ -284,6 +284,13 @@
       "choices": ["lantern-mastery"]
     },
     {
+      "id": "practice",
+      "kind": "answers",
+      "span": 4,
+      "when": "has('boon.deep-practice')",
+      "choices": ["deep-practice"]
+    },
+    {
       "id": "gear",
       "kind": "list",
       "span": 6,
