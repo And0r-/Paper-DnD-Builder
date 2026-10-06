@@ -27,4 +27,18 @@ export {
   type StatBox,
   type Uses,
 } from "./model.ts";
+export {
+  DEFAULT_API_PARTS,
+  DEFAULT_PRINT_CHOICE,
+  DESIGN_IDS,
+  inFileOrder,
+  PRINT_PARTS,
+  PRINT_STATES,
+  printChoiceOf,
+  printChoiceSchema,
+  SHEET_DESIGNS,
+  type PrintChoice,
+  type PrintPart,
+  type SheetDesign,
+} from "./printouts.ts";
 export { sheetModelSchema } from "./schema.ts";

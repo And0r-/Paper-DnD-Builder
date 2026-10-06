@@ -11,10 +11,14 @@
 import { fileURLToPath } from "node:url";
 import PDFDocument from "pdfkit";
 import {
+  DEFAULT_API_PARTS,
+  inFileOrder,
   MESSAGES,
   type Card,
+  type PrintPart,
   type Messages,
   type RowGroup,
+  type RulesGroup,
   type SheetModel,
   type SheetSection,
   type StatBox,
@@ -1220,6 +1224,121 @@ function cropMarks(pen: Pen, count: number): void {
   }
 }
 
+// ------------------------------------------------------------------ rules texts
+
+// Rules texts to read up on: two columns of running text, no cut lines.
+const TEXT_COLUMN_GAP = 6;
+const TEXT_COLUMN_W = (CONTENT_W - TEXT_COLUMN_GAP) / 2;
+const TEXTS_FIRST_TOP = MARGIN + 16;
+const TEXTS_LATER_TOP = MARGIN + 10;
+
+const T = {
+  title: { font: "bold", size: 16 },
+  entryName: { font: "bold", size: 9.5 },
+  kind: { size: 7, caps: true, color: "#333", spacing: 0.06 },
+  rules: { size: 8.5 },
+  explain: { size: 8, color: "#333" },
+} satisfies Record<string, TextStyle>;
+const TEXT_LEAD = 1.3;
+
+/**
+ * One line or gap of the running text. `keep`: goes into the same column as
+ * the row after it, so a heading or a name never ends a column alone.
+ */
+interface FlowRow {
+  h: number;
+  keep?: boolean;
+  /** Room between blocks; dropped at the top of a column. */
+  gap?: boolean;
+  draw?: (pen: Pen, x: number, top: number) => void;
+}
+
+function textRows(pen: Pen, text: string, s: TextStyle): FlowRow[] {
+  const h = pen.lineHeight(s, TEXT_LEAD);
+  return pen
+    .wrap(text, s, TEXT_COLUMN_W)
+    .map((line) => ({ h, draw: (p: Pen, x: number, top: number) => p.lines([line], x, top, s, TEXT_LEAD) }));
+}
+
+/** The rules texts as rows: a heading per origin, then name, kind and paragraphs of each thing. */
+function rulesRows(pen: Pen, groups: RulesGroup[]): FlowRow[] {
+  const rows: FlowRow[] = [];
+  for (const g of groups) {
+    rows.push({ h: 4, gap: true });
+    if (g.title !== "")
+      rows.push({
+        h: TITLE_H + 2,
+        keep: true,
+        draw: (p, x, top) => sectionTitle(p, g.title, x, top, TEXT_COLUMN_W),
+      });
+    for (const e of g.entries) {
+      rows.push({ h: 2.5, gap: true });
+      rows.push(...textRows(pen, e.name, T.entryName).map((r) => ({ ...r, keep: true })));
+      if (e.kindName !== "")
+        rows.push(...textRows(pen, e.kindName, T.kind).map((r) => ({ ...r, keep: true })));
+      rows.push({ h: 0.8, gap: true, keep: true });
+      e.rules.forEach((para, i) => {
+        if (i > 0) rows.push({ h: 1.2, gap: true });
+        rows.push(...textRows(pen, para, T.rules));
+      });
+      for (const para of e.explain) {
+        rows.push({ h: 1.2, gap: true });
+        rows.push(...textRows(pen, para, T.explain));
+      }
+    }
+  }
+  return rows;
+}
+
+interface FlowPlaced {
+  row: FlowRow;
+  x: number;
+  y: number;
+}
+
+/** Fills the rows into two columns per page, top to bottom, left to right. */
+function flowRows(rows: FlowRow[], bottom: number): FlowPlaced[][] {
+  const pages: FlowPlaced[][] = [[]];
+  let col = 0;
+  const top = () => (pages.length === 1 ? TEXTS_FIRST_TOP : TEXTS_LATER_TOP);
+  let y = top();
+  const next = () => {
+    col += 1;
+    if (col === 2) {
+      col = 0;
+      pages.push([]);
+    }
+    y = top();
+  };
+  rows.forEach((row, i) => {
+    if (row.gap) {
+      if (y > top()) y += row.h;
+      return;
+    }
+    // The row and every row it keeps with must fit, unless the column is empty anyway.
+    let need = row.h;
+    for (let j = i; rows[j]?.keep && j + 1 < rows.length; j++) need += rows[j + 1]!.h;
+    if (y + need > bottom && y > top()) next();
+    pages.at(-1)!.push({ row, x: MARGIN + col * (TEXT_COLUMN_W + TEXT_COLUMN_GAP), y });
+    y += row.h;
+  });
+  return pages;
+}
+
+/** The footer of a sheet or rules texts page: a line, who and which page, and the date. */
+function pageFooter(pen: Pen, model: SheetModel, page: number, total: number): void {
+  pen.line(MARGIN, FOOTER_LINE_Y, MARGIN + CONTENT_W, FOOTER_LINE_Y, 0.3, "#999");
+  const footer = [model.name, model.levelLabel, model.unitsLine, pen.messages.page(page, total)].join(" · ");
+  pen.text(footer, MARGIN, PAGE_H - MARGIN, pen.fit(footer, S.footer, CONTENT_W - 40));
+  pen.text(model.createdOn, MARGIN + CONTENT_W, PAGE_H - MARGIN, S.footer, "right");
+}
+
+/** The head of every page after the first: the character's name and level over a line. */
+function continuationHead(pen: Pen, model: SheetModel): void {
+  pen.text(`${model.name} · ${model.levelLabel}`, MARGIN, MARGIN + 4, S.fieldName);
+  pen.line(MARGIN, MARGIN + 6, MARGIN + CONTENT_W, MARGIN + 6, 0.6);
+}
+
 // ------------------------------------------------------------------ document
 
 export interface RenderedPdf {
@@ -1227,14 +1346,25 @@ export interface RenderedPdf {
   pages: number;
   sheetPages: number;
   cardPages: number;
+  textPages: number;
   /** Where each sheet section ended up, per sheet page, in mm. */
   sheetLayout: Placed[][];
 }
 
-/** The character sheet followed by the cards, as one A4 PDF. */
-export async function renderPdf(model: SheetModel): Promise<RenderedPdf> {
+export interface RenderOptions {
+  /**
+   * The parts to print; they always follow each other as sheet, cards, rules
+   * texts, whatever the order given. Without: the sheet and the cards.
+   */
+  parts?: readonly PrintPart[];
+}
+
+/** The printout of a sheet model as one A4 PDF: the sheet, the cards and the rules texts, as asked. */
+export async function renderPdf(model: SheetModel, options: RenderOptions = {}): Promise<RenderedPdf> {
   const m = MESSAGES[model.language];
   if (!m) throw new Error(`no page words in "${model.language}"`);
+  const parts = new Set(inFileOrder(options.parts ?? DEFAULT_API_PARTS));
+  if (parts.size === 0) throw new Error("nothing to print");
   // The PDF is dated like the sheet: the original when it was made, a copy when it was kept.
   const createdAt = new Date(
     model.origin.kind === "original" ? model.origin.builtAt : model.origin.createdAt,
@@ -1271,34 +1401,39 @@ export async function renderPdf(model: SheetModel): Promise<RenderedPdf> {
 
   const pen = new Pen(doc, model.language, m, fonts);
 
-  // The source and license line is wrapped, never cut; on the sheet it needs
-  // room above the footer if the sheet's last page is the document's last.
+  const cards = parts.has("cards") ? model.cards : [];
+  const texts = parts.has("texts");
+  // The source and license line is wrapped, never cut; on the sheet and the
+  // rules texts it needs room above the footer on the document's last page.
   const attributionLh = pen.lineHeight(S.footer, 1.2);
   const sheetAttribution = pen.wrap(model.attribution, S.footer, CONTENT_W).filter((l) => l !== "");
   const cardAttribution = pen.wrap(model.attribution, S.footer, PAGE_W - 2 * GRID_X).filter((l) => l !== "");
-  const reserve =
-    model.cards.length === 0 && sheetAttribution.length > 0 ? sheetAttribution.length * attributionLh + 2 : 0;
+  const attributionRoom = sheetAttribution.length > 0 ? sheetAttribution.length * attributionLh + 2 : 0;
+  const sheetIsLast = cards.length === 0 && !texts;
+  const reserve = sheetIsLast ? attributionRoom : 0;
   // Only the last page gives up that room, and which page is last shows
   // after placing: the pages before it keep their full height (a page 1
   // that holds its boxes without cards must hold them with cards too).
-  const full = placeSections(pen, model.sections, () => CONTENT_BOTTOM);
-  const lastFull = full.length - 1;
-  const sheetPages =
-    reserve === 0
-      ? full
-      : placeSections(pen, model.sections, (page) => CONTENT_BOTTOM - (page >= lastFull ? reserve : 0));
-  const faces = model.cards.flatMap((c) => cardFaces(pen, c, m));
+  let sheetPages: Placed[][] = [];
+  if (parts.has("sheet")) {
+    const full = placeSections(pen, model.sections, () => CONTENT_BOTTOM);
+    const lastFull = full.length - 1;
+    sheetPages =
+      reserve === 0
+        ? full
+        : placeSections(pen, model.sections, (page) => CONTENT_BOTTOM - (page >= lastFull ? reserve : 0));
+  }
+  const faces = cards.flatMap((c) => cardFaces(pen, c, m));
   const cardPages = Math.ceil(faces.length / CARDS_PER_PAGE);
-  const total = sheetPages.length + cardPages;
+  // Rules texts come last: every one of their pages keeps the source line's room, few lines.
+  const textFlow = texts ? flowRows(rulesRows(pen, model.rulesTexts), CONTENT_BOTTOM - attributionRoom) : [];
+  const total = sheetPages.length + cardPages + textFlow.length;
   const isLast = (page: number) => page === total;
 
   sheetPages.forEach((placed, i) => {
     const page = i + 1;
     doc.addPage({ size: "A4", margin: 0 });
-    if (i > 0) {
-      pen.text(`${model.name} · ${model.levelLabel}`, MARGIN, MARGIN + 4, S.fieldName);
-      pen.line(MARGIN, MARGIN + 6, MARGIN + CONTENT_W, MARGIN + 6, 0.6);
-    }
+    if (i > 0) continuationHead(pen, model);
     for (const p of placed) drawSection(pen, p.section, p.x, p.y, p.w);
     if (isLast(page))
       pen.lines(
@@ -1308,10 +1443,7 @@ export async function renderPdf(model: SheetModel): Promise<RenderedPdf> {
         S.footer,
         1.2,
       );
-    pen.line(MARGIN, FOOTER_LINE_Y, MARGIN + CONTENT_W, FOOTER_LINE_Y, 0.3, "#999");
-    const footer = [model.name, model.levelLabel, model.unitsLine, m.page(page, total)].join(" · ");
-    pen.text(footer, MARGIN, PAGE_H - MARGIN, pen.fit(footer, S.footer, CONTENT_W - 40));
-    pen.text(model.createdOn, MARGIN + CONTENT_W, PAGE_H - MARGIN, S.footer, "right");
+    pageFooter(pen, model, page, total);
   });
 
   for (let p = 0; p < cardPages; p++) {
@@ -1335,6 +1467,29 @@ export async function renderPdf(model: SheetModel): Promise<RenderedPdf> {
       );
   }
 
+  textFlow.forEach((placed, i) => {
+    const page = sheetPages.length + cardPages + i + 1;
+    doc.addPage({ size: "A4", margin: 0 });
+    if (i === 0) {
+      pen.text(m.rulesTextsTitle, MARGIN, MARGIN + 6, pen.fit(m.rulesTextsTitle, T.title, CONTENT_W, 10));
+      const who = `${model.name} · ${model.levelLabel}`;
+      pen.text(who, MARGIN, MARGIN + 11, pen.fit(who, S.meta, CONTENT_W));
+      pen.line(MARGIN, MARGIN + 13, MARGIN + CONTENT_W, MARGIN + 13, 0.6);
+      if (model.rulesTexts.length === 0)
+        pen.paragraph(m.noRulesTexts, MARGIN, TEXTS_FIRST_TOP, CONTENT_W, T.rules);
+    } else continuationHead(pen, model);
+    for (const p of placed) p.row.draw?.(pen, p.x, p.y);
+    if (isLast(page))
+      pen.lines(
+        sheetAttribution,
+        MARGIN,
+        FOOTER_LINE_Y - 1.5 - sheetAttribution.length * attributionLh,
+        S.footer,
+        1.2,
+      );
+    pageFooter(pen, model, page, total);
+  });
+
   doc.end();
   await done;
   return {
@@ -1342,6 +1497,7 @@ export async function renderPdf(model: SheetModel): Promise<RenderedPdf> {
     pages: total,
     sheetPages: sheetPages.length,
     cardPages,
+    textPages: textFlow.length,
     sheetLayout: sheetPages,
   };
 }

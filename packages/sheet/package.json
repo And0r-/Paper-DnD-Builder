@@ -8,6 +8,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./cards": "./src/cards.ts",
+    "./printouts": "./src/printouts.ts",
     "./testing": "./src/testing.ts"
   },
   "scripts": {

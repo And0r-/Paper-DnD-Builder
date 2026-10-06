@@ -1518,3 +1518,108 @@ describe("the PDF made from the sheet model", () => {
     }
   });
 });
+
+describe("the parts of a printout: sheet, cards, rules texts", () => {
+  const level20 = () => demoCharacter(pkg, 20);
+  /** Words of four letters or more, lower case: what text extraction keeps whatever the line breaks. */
+  const wordsOf = (t: string) => [...words([t])];
+
+  it("prints the sheet alone without a card, and the cards alone without the sheet", async () => {
+    const model = buildSheetModel(pkg, level20(), { language: "de", createdAt });
+    expect(model.cards.length).toBeGreaterThan(0);
+    const sheet = await renderPdf(model, { parts: ["sheet"] });
+    expect([sheet.cardPages, sheet.textPages]).toEqual([0, 0]);
+    const sheetText = await extract(sheet);
+    expect(sheetText.pages).toBe(sheet.sheetPages);
+    expect(sheetText.text).toContain(`Seite 1 von ${sheet.sheetPages}`);
+    expect(sheetText.text).not.toContain(MESSAGES["de"]!.printHint);
+    expect(sheetText.text).not.toContain(MESSAGES["de"]!.rulesText.toLocaleUpperCase("de"));
+    // No rules text of a card is on the sheet.
+    for (const c of model.cards)
+      for (const r of c.rules) expect(sheetText.text).not.toContain(r.slice(0, 30));
+    // The sheet alone is laid out like a sheet without cards: the source line on its last page.
+    const noCards = await renderPdf({ ...model, cards: [] });
+    expect(Buffer.from(sheet.bytes).equals(Buffer.from(noCards.bytes))).toBe(true);
+
+    const cards = await renderPdf(model, { parts: ["cards"] });
+    expect([cards.sheetPages, cards.textPages]).toEqual([0, 0]);
+    expect(cards.cardPages).toBe(Math.ceil(model.cards.length / 9));
+    const cardText = await extract(cards);
+    expect(cardText.pageTexts[0]).toContain(`Karten · Mira Fennwick · Seite 1 von ${cards.cardPages}`);
+    expect(cardText.pageTexts.at(-1)).toContain("Lizenz: GNU AGPL 3.0");
+  });
+
+  it("prints the full rules texts of every feature and card, under the name of what brought them", async () => {
+    const model = buildSheetModel(pkg, level20(), { language: "de", createdAt });
+    const pdf = await renderPdf(model, { parts: ["texts"] });
+    expect([pdf.sheetPages, pdf.cardPages]).toEqual([0, 0]);
+    const { text, pageTexts, pages, minFontSize } = await extract(pdf);
+    expect(pages).toBe(pdf.textPages);
+    expect(pageTexts[0]).toContain("Regeltexte zum Nachlesen");
+    expect(pageTexts.at(-1)).toContain("Lizenz: GNU AGPL 3.0");
+    expect(text).toContain(`Seite 1 von ${pages}`);
+    expect(minFontSize).toBeGreaterThanOrEqual(6.99);
+    // Everything on a card and in a feature table is here, in full.
+    const onSheet = model.sections.flatMap((s) => (s.kind === "featureTable" ? s.rows.map((r) => r.id) : []));
+    const ids = new Set(model.rulesTexts.flatMap((g) => g.entries.map((e) => e.id)));
+    for (const id of [...onSheet, ...model.cards.map((c) => c.id)]) expect(ids.has(id), id).toBe(true);
+    const printed = new Set(wordsOf(text));
+    for (const g of model.rulesTexts) {
+      expect(text).toContain(g.title.toLocaleUpperCase("de"));
+      for (const e of g.entries) {
+        expect(text).toContain(e.name);
+        expect(e.rules.length + e.explain.length, e.id).toBeGreaterThan(0);
+        for (const w of wordsOf([...e.rules, ...e.explain].join(" ")))
+          expect(printed.has(w), `${e.id}: ${w}`).toBe(true);
+      }
+    }
+    // No cut lines and no cards: nothing but the running text.
+    expect(text).not.toContain(MESSAGES["de"]!.printHint);
+  });
+
+  it("puts the parts in file order, whatever the order asked, and counts the pages through", async () => {
+    const model = buildSheetModel(pkg, level20(), { language: "en", createdAt });
+    const all = await renderPdf(model, { parts: ["texts", "cards", "sheet", "texts"] });
+    expect(all.pages).toBe(all.sheetPages + all.cardPages + all.textPages);
+    const { pageTexts } = await extract(all);
+    expect(pageTexts[0]).toContain(`Page 1 of ${all.pages}`);
+    expect(pageTexts[all.sheetPages]).toContain("Cards · Mira Fennwick");
+    expect(pageTexts[all.sheetPages + all.cardPages]).toContain("Rules texts to read up on");
+    // The source line once, on the last page.
+    expect(pageTexts.filter((t) => t.includes("License: GNU AGPL 3.0"))).toHaveLength(1);
+    expect(pageTexts.at(-1)).toContain("License: GNU AGPL 3.0");
+    // Without parts: the sheet and the cards, as before there were parts.
+    const plain = await renderPdf(model);
+    const both = await renderPdf(model, { parts: ["cards", "sheet"] });
+    expect(Buffer.from(plain.bytes).equals(Buffer.from(both.bytes))).toBe(true);
+    expect(plain.textPages).toBe(0);
+  });
+
+  it("prints the rules texts in one language only, both ways", async () => {
+    for (const [language, other] of [
+      ["de", "en"],
+      ["en", "de"],
+    ] as const) {
+      const model = buildSheetModel(pkg, level20(), { language, createdAt });
+      const { text } = await extract(await renderPdf(model, { parts: ["texts"] }));
+      const foreign = foreignWords(language, other);
+      expect(
+        wordsOf(text).filter((w) => foreign.has(w)),
+        language,
+      ).toEqual([]);
+    }
+  });
+
+  it("says so when a character has no rules text, and stays a self-contained PDF/A", async () => {
+    const model = buildSheetModel(pkg, doc, { language: "en", createdAt });
+    const pdf = await renderPdf({ ...model, rulesTexts: [] }, { parts: ["texts"] });
+    expect(pdf.pages).toBe(1);
+    expect((await extract(pdf)).text).toContain(MESSAGES["en"]!.noRulesTexts);
+    const raw = Buffer.from(pdf.bytes).toString("latin1");
+    expect(raw).toContain("/FontFile2");
+    expect(raw).toContain("pdfaid:part");
+    for (const bad of ["/URI", "/JavaScript", "/AcroForm", "/Annots", "/Helvetica"])
+      expect(raw).not.toContain(bad);
+    await expect(renderPdf(model, { parts: [] })).rejects.toThrow();
+  });
+});
