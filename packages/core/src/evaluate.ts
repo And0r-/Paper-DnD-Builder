@@ -132,8 +132,18 @@ export interface StepState {
 export interface PoolState {
   /** Every option of every choice, without things the character had before the step; in choice order, then option order. */
   options: string[];
-  /** The choices, in step order: how many each takes and which picks count for it. */
-  choices: { choice: string; count: number; upTo: boolean; picks: string[]; remaining: number }[];
+  /**
+   * The choices, in step order: how many each takes, what it offers (also
+   * what another choice of the list holds now) and which picks count for it.
+   */
+  choices: {
+    choice: string;
+    count: number;
+    upTo: boolean;
+    options: string[];
+    picks: string[];
+    remaining: number;
+  }[];
   /** All picks, in choice order. */
   picks: string[];
   /** Sum of the counts, and how many of them are still open. */
@@ -565,6 +575,7 @@ function walk(
       const taken = new Set<string>();
       for (const p of prepared) answerChoice(p, character, step.id, granted, taken);
       pool = poolFor(pkg, prepared, before);
+      leaveToOthers(prepared);
     }
 
     const dependsOn = new Set<string>();
@@ -1002,6 +1013,7 @@ function poolFor(pkg: ContentPackage, prepared: Prepared[], before: HeldThing[])
     choice: p.id,
     count: slots[i]!.count,
     upTo: p.state.upTo ?? false,
+    options: p.state.options!,
     picks: p.counted,
     remaining: slots[i]!.count - p.counted.length,
   }));
@@ -1025,6 +1037,31 @@ function poolFor(pkg: ContentPackage, prepared: Prepared[], before: HeldThing[])
     held: before.filter((h) => kinds.has(h.kind)),
     recommended: fillPicks(slots, [...recommended, ...options]),
   };
+}
+
+/**
+ * On a list step a thing counts for one choice only (see applyChange): a
+ * choice neither offers nor recommends what another choice of the list
+ * holds, whichever comes first. The list itself (`pool.choices[].options`)
+ * keeps the full offer, so picks can still move between the choices.
+ */
+function leaveToOthers(prepared: Prepared[]): void {
+  for (const p of prepared) {
+    const { state } = p;
+    if (!state.options) continue;
+    const others = new Set(prepared.filter((o) => o !== p).flatMap((o) => o.counted));
+    if (others.size === 0) continue;
+    const free = (id: string) => !others.has(id) || p.counted.includes(id);
+    state.options = state.options.filter(free);
+    if (Array.isArray(state.recommended)) {
+      // A pick count is filled up from what is left, as without the list.
+      let rec = state.recommended.filter(free);
+      if (state.count !== undefined) rec = [...new Set([...rec, ...state.options])].slice(0, state.count);
+      if (rec.length > 0) state.recommended = rec;
+      else delete state.recommended;
+    }
+    if (state.badges) for (const id of Object.keys(state.badges)) if (!free(id)) delete state.badges[id];
+  }
 }
 
 function infoFor(

@@ -70,6 +70,16 @@ const LANTERN_HILLFOLK: [string, unknown][] = [
   ["folk", { pick: "folk.hillfolk" }],
 ];
 
+/** What the folk talent offers on the list step: every talent the character does not have yet, in package order. */
+const FOLK_TALENTS = [
+  "talent.climbing",
+  "talent.tracking",
+  "talent.mending",
+  "talent.listening",
+  "talent.legends",
+  "talent.sneaking",
+];
+
 const pool = (step: string, picks: string[]): DraftChange => ({ type: "pool", step, picks });
 
 describe("gather steps", () => {
@@ -177,9 +187,9 @@ describe("one list for the gathered choices", () => {
     const ev = evaluateDraft(pkg, doc);
     const step = ev.steps.find((s) => s.id === "talents")!;
     expect(step.gather).toEqual({ group: "talents", together: "list" });
-    // Both choices offer climbing; the picks count for the first, yet the
-    // second still lists them: options are worked out as before the step.
-    expect(ev.choices["folk-talent"]!.options).toContain("talent.climbing");
+    // Both choices offer climbing; the picks count for the first, so the
+    // second no longer lists them. The list keeps each choice's full offer.
+    expect(ev.choices["folk-talent"]!.options).not.toContain("talent.climbing");
     expect(step.pool).toEqual({
       options: [
         "talent.climbing",
@@ -194,10 +204,18 @@ describe("one list for the gathered choices", () => {
           choice: "talents-lantern-bearer",
           count: 2,
           upTo: false,
+          options: ["talent.climbing", "talent.mending", "talent.legends"],
           picks: ["talent.climbing", "talent.mending"],
           remaining: 0,
         },
-        { choice: "folk-talent", count: 1, upTo: false, picks: [], remaining: 1 },
+        {
+          choice: "folk-talent",
+          count: 1,
+          upTo: false,
+          options: FOLK_TALENTS,
+          picks: [],
+          remaining: 1,
+        },
       ],
       picks: ["talent.climbing", "talent.mending"],
       count: 3,
@@ -310,6 +328,44 @@ describe("one list for the gathered choices", () => {
     });
     expect(ev.choices["folk-talent"]).toMatchObject({ status: "invalid", problem: "duplicate" });
     expect(ev.steps.find((s) => s.id === "talents")!.status).toBe("needsAttention");
+  });
+
+  // Finding 54: one list asks for 3 talents of the calling and 1 of the folk.
+  // Someone answering choice by choice (the API) picks the folk's first; the
+  // calling's choice, asked before it, must then neither offer nor recommend
+  // that talent, because setting it is refused.
+  it("does not offer or recommend what a later choice of the list holds", () => {
+    const pkg = variant({ together: "list" });
+    const doc = build(pkg, [...LANTERN_HILLFOLK, ["folk-talent", { picks: ["talent.mending"] }]]);
+    const ev = evaluateDraft(pkg, doc);
+    const calling = ev.choices["talents-lantern-bearer"]!;
+    expect(calling.options).toEqual(["talent.climbing", "talent.legends"]);
+    // The package recommends mending here; the rest of the list takes its place.
+    expect(calling.recommended).toEqual(["talent.climbing", "talent.legends"]);
+    // The folk's own pick stays offered to it.
+    expect(ev.choices["folk-talent"]!.options).toContain("talent.mending");
+    expect(
+      applyChange(pkg, doc, {
+        type: "answer",
+        choice: "talents-lantern-bearer",
+        answer: { picks: ["talent.mending", "talent.climbing"] },
+      }),
+    ).toEqual({ ok: false, error: { code: "answerDoesNotFit", problem: "notOffered" } });
+    // What the evaluation recommends, the setter takes, and the step is done.
+    const done = applyOk(pkg, doc, {
+      type: "answer",
+      choice: "talents-lantern-bearer",
+      answer: { picks: calling.recommended },
+    });
+    expect(evaluateDraft(pkg, done).steps.find((s) => s.id === "talents")!.status).toBe("done");
+    // The list still lets the picks move: mending can go to the calling.
+    const moved = applyOk(
+      pkg,
+      doc,
+      pool("talents", ["talent.mending", "talent.climbing", "talent.tracking"]),
+    );
+    expect(moved.answers["talents-lantern-bearer"]).toEqual({ picks: ["talent.mending", "talent.climbing"] });
+    expect(moved.answers["folk-talent"]).toEqual({ picks: ["talent.tracking"] });
   });
 
   it("recommends a full list without doubles, so choose for me finishes the step", () => {
