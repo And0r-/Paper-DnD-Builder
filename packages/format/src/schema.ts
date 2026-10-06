@@ -239,10 +239,19 @@ export const optionSourceSchema = z.strictObject(optionSourceShape).refine(...se
 /**
  * Options of a pick choice. With `owned`, only things the character already
  * has are offered, and a pick marks the thing instead of giving it again.
+ * `ownedFrom` narrows that to things picked in one of these choices.
  */
 export const choiceOptionsSchema = z
-  .strictObject({ ...optionSourceShape, owned: z.boolean().optional() })
-  .refine(...selectsSomething);
+  .strictObject({
+    ...optionSourceShape,
+    owned: z.boolean().optional(),
+    ownedFrom: z.array(id).min(1).optional(),
+  })
+  .refine(...selectsSomething)
+  .refine((o) => o.ownedFrom === undefined || o.owned === true, {
+    message: '"ownedFrom" narrows "owned": set "owned": true',
+    path: ["ownedFrom"],
+  });
 
 const choiceBase = {
   id,
@@ -440,24 +449,42 @@ const sectionBase = {
 const statKey = z.string().regex(VALUE_ID_PATTERN, "stat keys are camelCase");
 
 /**
- * A sign on rows of a `featureTable`. `tags`: the thing carries them all.
- * `how`: it was picked in a choice or granted by another thing. `from`: the
- * thing behind it (the thing that granted it, or that granted the choice it
- * was picked in) is one of these.
+ * What a row's thing must match for a mark. `tags`: the thing carries them
+ * all. `how`: it was picked in a choice or granted by another thing. `from`:
+ * the thing behind it (the thing that granted it, or that granted the choice
+ * it was picked in) is one of these. `pickedIn`: it was picked in one of these
+ * choices. `marked`: one of these choices with `options.owned` marked it.
+ * `unmarked`: at least one of these was asked, and none marked it.
  */
+const markConditionShape = {
+  tags: z.array(id).min(1).optional(),
+  how: z.enum(["picked", "granted"]).optional(),
+  from: optionSourceSchema.optional(),
+  pickedIn: z.array(id).min(1).optional(),
+  marked: z.array(id).min(1).optional(),
+  unmarked: z.array(id).min(1).optional(),
+};
+const conditionFields = Object.keys(markConditionShape) as (keyof typeof markConditionShape)[];
+const hasCondition = [
+  (m: Partial<Record<keyof typeof markConditionShape, unknown>>) =>
+    conditionFields.some((k) => m[k] !== undefined),
+  { message: `a mark needs one of ${conditionFields.map((k) => `"${k}"`).join(", ")}` },
+] as const;
+
+/** A sign on rows of a `featureTable`; `not`: rows that also match this get no sign. */
 export const markSchema = z
   .strictObject({
     /** The sign, a letter or two. */
     text: textKey,
     /** What the sign means, in the legend under the table. */
     legend: textKey,
-    tags: z.array(id).min(1).optional(),
-    how: z.enum(["picked", "granted"]).optional(),
-    from: optionSourceSchema.optional(),
+    ...markConditionShape,
+    not: z
+      .strictObject(markConditionShape)
+      .refine(...hasCondition)
+      .optional(),
   })
-  .refine((m) => m.tags !== undefined || m.how !== undefined || m.from !== undefined, {
-    message: 'a mark needs "tags", "how" or "from"',
-  });
+  .refine(...hasCondition);
 
 export const sectionSchema = z.discriminatedUnion("kind", [
   z.strictObject({

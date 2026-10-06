@@ -213,6 +213,8 @@
     "sheet.knacks.hint": "□ = einmal benutzt: ankreuzen. Nach einer Rast wegradieren.",
     "sheet.knacks.mark.calling": "B",
     "sheet.knacks.mark.calling.legend": "aus deinem Beruf gewählt",
+    "sheet.knacks.mark.book": "K",
+    "sheet.knacks.mark.book.legend": "nur im Kräuterbuch, nicht bereit; nach einer Nachtruhe hineintauschen",
     "sheet.knacks.mark.path": "W",
     "sheet.knacks.mark.path.legend": "von deinem Weg, immer bereit",
     "sheet.knacks.mark.steady": "R",

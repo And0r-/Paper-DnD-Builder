@@ -183,7 +183,17 @@
           "how": "picked",
           "from": {
             "kind": "calling"
+          },
+          "not": {
+            "pickedIn": ["knacks-root"],
+            "unmarked": ["rooted-focus"]
           }
+        },
+        {
+          "text": "sheet.knacks.mark.book",
+          "legend": "sheet.knacks.mark.book.legend",
+          "pickedIn": ["knacks-root"],
+          "unmarked": ["rooted-focus"]
         },
         {
           "text": "sheet.knacks.mark.path",
@@ -288,6 +298,13 @@
       "span": 4,
       "when": "has('calling.lantern-bearer') and level >= 18",
       "choices": ["lantern-mastery"]
+    },
+    {
+      "id": "practice",
+      "kind": "answers",
+      "span": 4,
+      "when": "has('boon.deep-practice')",
+      "choices": ["deep-practice"]
     },
     {
       "id": "gear",

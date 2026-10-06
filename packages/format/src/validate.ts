@@ -207,6 +207,20 @@ export function validatePackageFiles(files: PackageFiles): ValidationResult {
     thingById.set(thing.id, thing);
   }
 
+  /** A choice that gives what is picked in it: a pick choice without `options.owned`. */
+  const checkGivingPick = (file: string, path: string, cid: string) => {
+    const c = choiceById.get(cid);
+    if (!c) err(file, path, `unknown choice ${lit(cid)}`);
+    else if (c.kind !== "pickOne" && c.kind !== "pickMany")
+      err(file, path, `choice ${lit(cid)} is ${c.kind}; name a pickOne or pickMany choice`);
+    else if (c.options.owned)
+      err(
+        file,
+        path,
+        `choice ${lit(cid)} only marks what the character has (options.owned); it gives nothing`,
+      );
+  };
+
   const checkExpr = (file: string, path: string, src: string) => {
     let ast;
     try {
@@ -499,6 +513,7 @@ export function validatePackageFiles(files: PackageFiles): ValidationResult {
         });
         if (c.held && !options.some((o) => o.about !== undefined))
           err(F, `${p}.held`, 'none of this choice\'s options is "about" another thing');
+        c.options.ownedFrom?.forEach((cid, k) => checkGivingPick(F, `${p}.options.ownedFrom[${k}]`, cid));
         break;
       }
       case "distribute": {
@@ -791,11 +806,28 @@ export function validatePackageFiles(files: PackageFiles): ValidationResult {
         if (s.uses !== undefined) checkStatRef(`${p}.uses`, s.uses, selected, "uses");
         if (s.byRank && !selected.some((t) => t.rank !== undefined))
           err(S, `${p}.byRank`, "none of the things selected here has a rank");
-        s.marks?.forEach((m, j) => {
-          m.tags?.forEach((tag, k) => {
-            if (!allTags.has(tag)) err(S, `${p}.marks[${j}].tags[${k}]`, `no thing carries tag ${lit(tag)}`);
-          });
-          if (m.from !== undefined) checkOptionSource(S, `${p}.marks[${j}].from`, m.from);
+        s.marks?.forEach((mark, j) => {
+          for (const [m, mp] of [
+            [mark, `${p}.marks[${j}]`],
+            ...(mark.not ? [[mark.not, `${p}.marks[${j}].not`] as const] : []),
+          ] as const) {
+            m.tags?.forEach((tag, k) => {
+              if (!allTags.has(tag)) err(S, `${mp}.tags[${k}]`, `no thing carries tag ${lit(tag)}`);
+            });
+            if (m.from !== undefined) checkOptionSource(S, `${mp}.from`, m.from);
+            m.pickedIn?.forEach((cid, k) => checkGivingPick(S, `${mp}.pickedIn[${k}]`, cid));
+            for (const field of ["marked", "unmarked"] as const)
+              m[field]?.forEach((cid, k) => {
+                const c = choiceById.get(cid);
+                if (!c) err(S, `${mp}.${field}[${k}]`, `unknown choice ${lit(cid)}`);
+                else if (!("options" in c && c.options.owned))
+                  err(
+                    S,
+                    `${mp}.${field}[${k}]`,
+                    `choice ${lit(cid)} marks nothing; name a choice with options.owned`,
+                  );
+              });
+          }
         });
         if (s.lead !== undefined) checkOptionSource(S, `${p}.lead.things`, s.lead.things);
         if (s.note !== undefined) checkStatRef(`${p}.note`, s.note, selected, "note");

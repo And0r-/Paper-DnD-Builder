@@ -1,7 +1,7 @@
 {
   "formatVersion": "0.14",
   "id": "demo",
-  "version": "0.12.0",
+  "version": "0.13.0",
   "languages": ["de", "en"],
   "kinds": [
     "folk",
@@ -20,14 +20,14 @@
   "sources": {
     "mistland": {
       "title": "Mistland demo world, invented for the character builder repository",
-      "version": "0.12.0",
-      "retrieved": "2026-10-04",
+      "version": "0.13.0",
+      "retrieved": "2026-10-06",
       "license": "agpl"
     },
     "mistland-community": {
       "title": "Example of a community addition to the Mistland demo world",
-      "version": "0.12.0",
-      "retrieved": "2026-10-04",
+      "version": "0.13.0",
+      "retrieved": "2026-10-06",
       "license": "cc0"
     }
   },

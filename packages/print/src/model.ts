@@ -17,13 +17,21 @@ import {
   renderText,
   selectThings,
   summarize,
+  type ChoiceState,
   type DraftDocument,
   type Evaluation,
   type HeldThing,
   type MeasureContext,
   type PartSource,
 } from "@builder/core";
-import type { ContentPackage, Section, StatValue, Thing } from "@builder/format/pure";
+import {
+  declaredChoiceId,
+  type ContentPackage,
+  type Mark,
+  type Section,
+  type StatValue,
+  type Thing,
+} from "@builder/format/pure";
 import { isCard } from "./cards.ts";
 import { MESSAGES, type Messages } from "./messages.ts";
 
@@ -336,6 +344,27 @@ export function buildPrintModel(
       : h.pickedIn !== undefined
         ? (ev.choices[h.pickedIn]?.grantedBy ?? [])
         : [];
+  /** Declared ids of the choices (with `options.owned`) that marked a thing. */
+  const markedIn = (id: string): string[] => (ev.marks[id] ?? []).map(declaredChoiceId);
+  /** Whether a row's thing matches every field of a mark (or of its `not`). */
+  const markCondition = (m: Omit<Mark, "text" | "legend" | "not">) => {
+    const from = m.from === undefined ? undefined : new Set(selectThings(pkg, m.from).map((t) => t.id));
+    // `unmarked` says something only once one of its choices was asked: before that nothing is left out.
+    const askedAny = m.unmarked?.some((c) => asked(c).length > 0) ?? false;
+    return (t: Thing): boolean => {
+      const h = heldById.get(t.id)!;
+      const marked = markedIn(t.id);
+      return (
+        (m.tags ?? []).every((tag) => t.tags?.includes(tag)) &&
+        (m.how === undefined || (m.how === "picked" ? h.pickedIn : h.grantedBy) !== undefined) &&
+        (from === undefined || origins(h).some((o) => from.has(o))) &&
+        (m.pickedIn === undefined ||
+          (h.pickedIn !== undefined && m.pickedIn.includes(declaredChoiceId(h.pickedIn)))) &&
+        (m.marked === undefined || m.marked.some((c) => marked.includes(c))) &&
+        (m.unmarked === undefined || (askedAny && !m.unmarked.some((c) => marked.includes(c))))
+      );
+    };
+  };
   const collator = new Intl.Collator(language);
   /** "8 × Rope"; just the name for one. */
   const counted = (id: string): string => {
@@ -488,17 +517,18 @@ export function buildPrintModel(
           })),
         };
       case "featureTable": {
-        const marks = s.marks ?? [];
-        const markOn = marks.map((m) => {
-          const from = m.from === undefined ? undefined : new Set(selectThings(pkg, m.from).map((t) => t.id));
-          return (t: Thing): boolean => {
-            const h = heldById.get(t.id)!;
-            return (
-              (m.tags ?? []).every((tag) => t.tags?.includes(tag)) &&
-              (m.how === undefined || (m.how === "picked" ? h.pickedIn : h.grantedBy) !== undefined) &&
-              (from === undefined || origins(h).some((o) => from.has(o)))
-            );
-          };
+        // Marks with the same sign and legend are one mark: one sign on a row, one legend entry.
+        const signs: { text: string; legend: string }[] = [];
+        const signOf = (s.marks ?? []).map((m) => {
+          const i = signs.findIndex((x) => x.text === m.text && x.legend === m.legend);
+          if (i >= 0) return i;
+          signs.push({ text: m.text, legend: m.legend });
+          return signs.length - 1;
+        });
+        const markOn = (s.marks ?? []).map((m) => {
+          const matches = markCondition(m);
+          const not = m.not === undefined ? undefined : markCondition(m.not);
+          return (t: Thing): boolean => matches(t) && !not?.(t);
         });
         let held = heldOf(s.things);
         if (s.byRank) {
@@ -516,14 +546,16 @@ export function buildPrintModel(
         }
         const used = new Set<number>();
         const rows = held.map((t): FeatureRow => {
-          const on = markOn.flatMap((matches, i) => (matches(t) ? [i] : []));
+          const on = [...new Set(markOn.flatMap((matches, i) => (matches(t) ? [signOf[i]!] : [])))].sort(
+            (a, b) => a - b,
+          );
           on.forEach((i) => used.add(i));
           const rank = s.byRank ? t.rank : undefined;
           const from = originOf.get(t.id);
           const note = s.note === undefined ? undefined : t.stats?.[s.note];
           return {
             name: thingName(t.id),
-            marks: on.map((i) => text(marks[i]!.text)).join(" "),
+            marks: on.map((i) => text(signs[i]!.text)).join(" "),
             note: note === undefined ? "" : statText(note),
             text: text(`${t.id}.short`),
             uses: uses(t, s.uses),
@@ -539,7 +571,7 @@ export function buildPrintModel(
                     },
           };
         });
-        const legend = marks.flatMap((m, i) => (used.has(i) ? [`${text(m.text)} = ${text(m.legend)}`] : []));
+        const legend = signs.flatMap((m, i) => (used.has(i) ? [`${text(m.text)} = ${text(m.legend)}`] : []));
         const lead =
           s.lead === undefined
             ? []
@@ -568,7 +600,10 @@ export function buildPrintModel(
         return {
           ...base,
           kind: "answers",
-          rows: s.choices.map((c) => ({ label: text(`choice.${c}.title`), text: answerText(c) })),
+          // A choice the character was never asked, not even as a copy, has no row.
+          rows: s.choices
+            .filter((c) => asked(c).length > 0)
+            .map((c) => ({ label: text(`choice.${c}.title`), text: answerText(c) })),
         };
       case "helpBox":
         return { ...base, kind: "helpBox", paragraphs: paragraphs(`sheet.${s.id}.text`) };
@@ -577,10 +612,22 @@ export function buildPrintModel(
     }
   };
 
-  /** A choice's answer as words: the text, the number (with unit), or the name of what was picked. */
+  /** The choice as asked: itself, or every copy a repeatable thing asked, in step order. */
+  function asked(choiceId: string): ChoiceState[] {
+    return Object.values(ev.choices).filter((c) => c.id === choiceId || c.copyOf === choiceId);
+  }
+
+  /** A choice's answers as words, those of all its copies in one line ("Warm Glow, Glow Thread"). */
   function answerText(choiceId: string): string {
-    const state = ev.choices[choiceId];
-    if (!state || state.status !== "answered") return "";
+    return asked(choiceId)
+      .map((c) => oneAnswer(c, choiceId))
+      .filter((t) => t !== "")
+      .join(", ");
+  }
+
+  /** One answer as words: the text, the number (with unit), or the name of what was picked. */
+  function oneAnswer(state: ChoiceState, choiceId: string): string {
+    if (state.status !== "answered") return "";
     const a = state.answer as Record<string, unknown>;
     if (typeof a["text"] === "string") return a["text"].trim();
     if (typeof a["pick"] === "string") return thingName(a["pick"]);
@@ -636,7 +683,9 @@ export function buildPrintModel(
     sections: pkg.sheet.sections
       .filter(shown)
       .map(section)
-      .filter((s) => s.kind !== "statBoxes" || s.boxes.length > 0),
+      .filter(
+        (s) => (s.kind !== "statBoxes" || s.boxes.length > 0) && (s.kind !== "answers" || s.rows.length > 0),
+      ),
     cards,
   };
 }

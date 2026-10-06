@@ -217,6 +217,8 @@
     "sheet.knacks.hint": "□ = used once: tick it. Erase after a rest.",
     "sheet.knacks.mark.calling": "C",
     "sheet.knacks.mark.calling.legend": "chosen from your calling",
+    "sheet.knacks.mark.book": "H",
+    "sheet.knacks.mark.book.legend": "only in your herb book, not at hand; swap it in after a night's rest",
     "sheet.knacks.mark.path": "P",
     "sheet.knacks.mark.path.legend": "from your path, always ready",
     "sheet.knacks.mark.steady": "S",
