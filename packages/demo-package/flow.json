@@ -558,6 +558,14 @@
       "gather": "talents"
     },
     {
+      "id": "coastfolk-flair",
+      "kind": "pickOne",
+      "source": "mistland",
+      "options": {
+        "kind": "flair"
+      }
+    },
+    {
       "id": "boon-4",
       "kind": "pickOne",
       "source": "mistland",
