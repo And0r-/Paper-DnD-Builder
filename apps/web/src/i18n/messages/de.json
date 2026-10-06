@@ -162,6 +162,7 @@
   "pool.blocked": "Dafür ist keine Wahl mehr frei.",
   "pool.blockedFrom": "Dafür ist keine Wahl mehr frei. Das gibt es nur {where}, und dort ist schon alles gewählt.",
   "option.youGet": "Das bekommst du dazu",
+  "option.count": "{count} × {name}",
   "option.youChoose": "Du wählst später: {title}",
   "option.rulesShow": "Regeltext anzeigen",
   "option.rulesHide": "Regeltext verbergen",

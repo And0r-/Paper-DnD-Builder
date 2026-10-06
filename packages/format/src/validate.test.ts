@@ -250,44 +250,44 @@ describe("cross-file rules", () => {
     [
       "use boxes from a stat the selected things lack",
       (f) => (f.get("sheet.json").sections.find((s: { id: string }) => s.id === "knacks").uses = "weight"),
-      'sheet.json sections[7].uses: none of the things selected here has a stat "weight"',
+      'sheet.json sections[8].uses: none of the things selected here has a stat "weight"',
     ],
     [
       "use boxes from a quantity",
       (f) => (thing(f, "talents-and-traits", "trait.stone-steady").stats.uses = { amount: 5, unit: "ft" }),
-      'things/talents-and-traits.json [9].stats.uses: sections[6].uses draws use boxes from this stat; it must be a whole number ≥ 0, {"text": …} or {"value": …}',
+      'things/talents-and-traits.json [9].stats.uses: sections[7].uses draws use boxes from this stat; it must be a whole number ≥ 0, {"text": …} or {"value": …}',
     ],
     [
       "use boxes from a fraction",
       (f) => (thing(f, "knacks", "knack.spark-shower").stats.uses = 1.5),
-      'things/knacks.json [0].stats.uses: sections[7].uses draws use boxes from this stat; it must be a whole number ≥ 0, {"text": …} or {"value": …}',
+      'things/knacks.json [0].stats.uses: sections[8].uses draws use boxes from this stat; it must be a whole number ≥ 0, {"text": …} or {"value": …}',
     ],
     [
       "check list note from true/false",
       (f) => (thing(f, "talents-and-traits", "talent.climbing").stats.score = true),
-      "things/talents-and-traits.json [0].stats.score: sections[3].note prints this stat next to the name; it cannot be true/false",
+      "things/talents-and-traits.json [0].stats.score: sections[4].note prints this stat next to the name; it cannot be true/false",
     ],
     [
       "check list note from a stat nobody has",
       (f) => (f.get("sheet.json").sections.find((s: { id: string }) => s.id === "talents").note = "basis"),
-      'sheet.json sections[3].note: no thing has a stat "basis"',
+      'sheet.json sections[4].note: no thing has a stat "basis"',
     ],
     [
       "check list total from a text",
       (f) => (thing(f, "talents-and-traits", "talent.climbing").stats.roll = { text: "value.might.name" }),
-      'things/talents-and-traits.json [0].stats.roll: sections[3].total prints the character\'s value in the box; this stat must be {"value": …}',
+      'things/talents-and-traits.json [0].stats.roll: sections[4].total prints the character\'s value in the box; this stat must be {"value": …}',
     ],
     [
       "table column from a stat nobody has",
       (f) =>
         (f.get("sheet.json").sections.find((s: { id: string }) => s.id === "attacks").columns[2].stat =
           "colour"),
-      'sheet.json sections[4].columns[2].stat: no thing has a stat "colour"',
+      'sheet.json sections[5].columns[2].stat: no thing has a stat "colour"',
     ],
     [
       "table column from true/false",
       (f) => (thing(f, "items", "item.sling").stats.range = true),
-      "things/items.json [10].stats.range: sections[4].columns[2].stat prints this stat in a table column; it cannot be true/false",
+      "things/items.json [10].stats.range: sections[5].columns[2].stat prints this stat in a table column; it cannot be true/false",
     ],
     [
       "stat text filled from an unknown value",
@@ -302,12 +302,12 @@ describe("cross-file rules", () => {
     [
       "section condition on an unknown value",
       (f) => (f.get("sheet.json").sections.find((s: { id: string }) => s.id === "path").when = "glow > 0"),
-      'sheet.json sections[10].when: expression "glow > 0" uses unknown value "glow"',
+      'sheet.json sections[11].when: expression "glow > 0" uses unknown value "glow"',
     ],
     [
       "section condition that does not parse",
       (f) => (f.get("sheet.json").sections.find((s: { id: string }) => s.id === "path").when = "level >="),
-      'sheet.json sections[10].when: cannot read expression "level >=": unexpected end of expression (at character 9)',
+      'sheet.json sections[11].when: cannot read expression "level >=": unexpected end of expression (at character 9)',
     ],
     [
       "box condition on an unknown thing",
@@ -332,12 +332,12 @@ describe("cross-file rules", () => {
     [
       "mark on a tag no thing carries",
       (f) => (knacksSection(f).marks[2].tags = ["shaky"]),
-      'sheet.json sections[7].marks[2].tags[0]: no thing carries tag "shaky"',
+      'sheet.json sections[8].marks[2].tags[0]: no thing carries tag "shaky"',
     ],
     [
       "mark from things that do not exist",
       (f) => (knacksSection(f).marks[0].from = { kind: "guild" }),
-      'sheet.json sections[7].marks[0].from.kind: unknown kind "guild"',
+      'sheet.json sections[8].marks[0].from.kind: unknown kind "guild"',
     ],
     [
       "mark that says nothing about the rows",
@@ -346,7 +346,7 @@ describe("cross-file rules", () => {
           text: "sheet.knacks.mark.calling",
           legend: "sheet.knacks.mark.calling.legend",
         }),
-      'sheet.json sections[7].marks[0]: a mark needs "tags", "how" or "from"',
+      'sheet.json sections[8].marks[0]: a mark needs "tags", "how" or "from"',
     ],
     [
       "groups by rank without a word for rank",
@@ -356,12 +356,12 @@ describe("cross-file rules", () => {
     [
       "groups by rank, but nothing has a rank",
       (f) => (f.get("sheet.json").sections.find((s: { id: string }) => s.id === "traits").byRank = true),
-      "sheet.json sections[6].byRank: none of the things selected here has a rank",
+      "sheet.json sections[7].byRank: none of the things selected here has a rank",
     ],
     [
       "lead on things that do not exist",
       (f) => (knacksSection(f).lead.things = { tags: ["guild"] }),
-      'sheet.json sections[7].lead.things.tags[0]: no thing carries tag "guild"',
+      'sheet.json sections[8].lead.things.tags[0]: no thing carries tag "guild"',
     ],
     [
       "language without unit defaults",
@@ -764,5 +764,102 @@ describe("uses by value and picks among what the character has (format 0.10)", (
     const r = mutate(change);
     expect(r.ok).toBe(false);
     expect(messages(r)).toContain(expected());
+  });
+});
+
+describe("counts and what the sheet needs at the table (format 0.13)", () => {
+  /* eslint-disable @typescript-eslint/no-explicit-any -- tests poke into raw JSON */
+  const provisions = (f: RawFiles) =>
+    thing(f, "callings-and-paths", "calling.lantern-bearer").grants.find(
+      (g: any) => g.thing === "item.provisions",
+    );
+  const section = (f: RawFiles, id: string) => f.get("sheet.json").sections.find((s: any) => s.id === id);
+  /* eslint-enable @typescript-eslint/no-explicit-any */
+
+  it("accepts a whole count of 1 or more on a thing grant", () => {
+    expect(messages(mutate((f) => (provisions(f).count = 1)))).toEqual([]);
+    expect(messages(mutate((f) => (provisions(f).count = 20)))).toEqual([]);
+  });
+
+  it.each<[string, (f: RawFiles) => void, string]>([
+    [
+      "count 0",
+      (f) => (provisions(f).count = 0),
+      "things/callings-and-paths.json [0].grants[4].count: Too small: expected number to be >=1",
+    ],
+    [
+      "count as a fraction",
+      (f) => (provisions(f).count = 1.5),
+      "things/callings-and-paths.json [0].grants[4].count: Invalid input: expected int, received number",
+    ],
+    [
+      "count on a value grant",
+      (f) => (thing(f, "callings-and-paths", "calling.lantern-bearer").grants[0].count = 2),
+      'things/callings-and-paths.json [0].grants[0].count: "count" only goes with "thing"',
+    ],
+    [
+      "header answer of an unknown choice",
+      (f) => (section(f, "header").fields[0].choice = "homeland"),
+      'sheet.json sections[0].fields[0].choice: unknown choice "homeland"',
+    ],
+    [
+      "header label without text",
+      (f) => (section(f, "header").fields[0].label = "sheet.header.folk"),
+      'texts/de/ sheet.header.folk: missing text (label of header field "folk")',
+    ],
+    [
+      "box text on a pencil box",
+      (f) => (section(f, "primary").boxes[0].text = { text: "sheet.recovery.rest-dice" }),
+      "sheet.json sections[1].boxes[0].text: a pencil box has no text, only a field",
+    ],
+    [
+      "box text from an unknown value",
+      (f) => (section(f, "recovery").boxes[0].text.vars.die = "restDieSize"),
+      'sheet.json sections[2].boxes[0].text.vars.die: unknown value "restDieSize"',
+    ],
+    [
+      "box text with a variable the box does not fill",
+      (f) => (texts(f, "de")["sheet.recovery.rest-dice"] = "{{var:count}} × W{{var:sides}}"),
+      'texts/de/core.json entries.sheet.recovery.rest-dice: uses {{var:sides}}, but no stat with this text supplies "sides"',
+    ],
+    [
+      "unknown box style",
+      (f) => (section(f, "recovery").boxes[1].style = "ticks"),
+      'sheet.json sections[2].boxes[1].style: Invalid option: expected one of "number"|"pencil"|"circles"|"boxes"',
+    ],
+    [
+      "further number of an unknown value",
+      (f) => (section(f, "scores").scores[0].extra = "mightStand"),
+      'sheet.json sections[3].scores[0].extra: unknown value "mightStand"',
+    ],
+    [
+      "label of a further number that is not there",
+      (f) => delete section(f, "scores").scores[0].extra,
+      'sheet.json sections[3].scores[0].extraLabel: "extraLabel" only goes with "extra"',
+    ],
+    [
+      "strong marks that are about nothing in the list",
+      (f) => (section(f, "talents").strong = { kind: "handling" }),
+      "sheet.json sections[4].strong: none of these things is `about` a thing listed in this section",
+    ],
+    [
+      "feature note from a stat nobody has",
+      (f) => (section(f, "knacks").note = "colour"),
+      'sheet.json sections[8].note: no thing has a stat "colour"',
+    ],
+    [
+      "grouped by rank and by origin",
+      (f) => (section(f, "knacks").groupBy = "origin"),
+      'sheet.json sections[8].groupBy: rows are grouped one way: "byRank" or "groupBy", not both',
+    ],
+    [
+      "unknown grouping",
+      (f) => (section(f, "traits").groupBy = "kind"),
+      'sheet.json sections[7].groupBy: Invalid input: expected "origin"',
+    ],
+  ])("%s", (_name, change, expected) => {
+    const r = mutate(change);
+    expect(r.ok).toBe(false);
+    expect(messages(r)).toContain(expected);
   });
 });

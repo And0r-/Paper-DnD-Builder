@@ -90,6 +90,8 @@ export interface InfoContent {
   /** Thing picked there, or null if nothing is picked yet. */
   thing: string | null;
   things: string[];
+  /** How many of a thing in `things`, where the grant gives more than one. */
+  counts: Record<string, number>;
   values: { value: string; add: number }[];
   choices: string[];
 }
@@ -151,6 +153,8 @@ export interface HeldThing {
   step: string;
   /** Character level from which the character has it. */
   atLevel: number;
+  /** How many of it, if more than one: the `count` of every grant that gives it, added up. */
+  count?: number;
 }
 
 export interface Evaluation {
@@ -180,6 +184,8 @@ interface Indexes {
   things: Map<string, Thing>;
   choices: Map<string, Choice>;
   values: Map<string, ContentPackage["values"][number]>;
+  /** Things some grant gives with a `count`: only these are counted. */
+  counted: Set<string>;
 }
 
 const indexCache = new WeakMap<ContentPackage, Indexes>();
@@ -191,6 +197,9 @@ function indexes(pkg: ContentPackage): Indexes {
       things: new Map(pkg.things.map((t) => [t.id, t])),
       choices: new Map(pkg.flow.choices.map((c) => [c.id, c])),
       values: new Map(pkg.values.map((v) => [v.id, v])),
+      counted: new Set(
+        pkg.things.flatMap((t) => (t.grants ?? []).flatMap((g) => (g.count !== undefined ? [g.thing!] : []))),
+      ),
     };
     indexCache.set(pkg, ix);
   }
@@ -231,22 +240,29 @@ class Character {
     step: string,
     atLevel: number,
     choices: Grant[],
+    count = 1,
   ): void {
     const thing = this.ix.things.get(id);
     // A key that vanished from a newer package version simply stops counting.
     if (!thing) return;
-    const again = this.held.has(id);
+    const held = this.held.get(id);
+    // Given again: the counts add up (8 arrows and 20 arrows are 28 arrows), for
+    // things the package counts at all; a skill from two sources is one skill.
+    if (held && via.grantedBy !== undefined && this.ix.counted.has(id))
+      this.held.set(id, { ...held, count: (held.count ?? 1) + count });
     // A thing counts once; only a repeatable one asks its choices again, once per pick.
-    if (again && !thing.repeatable) return;
-    if (!again) {
-      this.held.set(id, { id, kind: thing.kind, ...via, step, atLevel });
+    if (held && !thing.repeatable) return;
+    if (!held) {
+      this.held.set(id, { id, kind: thing.kind, ...via, step, atLevel, ...(count > 1 ? { count } : {}) });
       this.memo.clear();
     }
+    const again = held !== undefined;
     const copy = thing.repeatable ? (via.pickedIn ?? via.grantedBy) : undefined;
     for (const g of thing.grants ?? []) {
       if ((g.atLevel ?? 1) > this.level) continue;
       const from = Math.max(atLevel, g.atLevel ?? 1);
-      if (g.thing !== undefined && !again) this.give(g.thing, { grantedBy: id }, step, from, choices);
+      if (g.thing !== undefined && !again)
+        this.give(g.thing, { grantedBy: id }, step, from, choices, g.count ?? 1);
       else if (g.choice !== undefined)
         choices.push({
           choice: copy ? `${g.choice}${COPY_SEPARATOR}${copy}` : g.choice,
@@ -880,11 +896,22 @@ function infoFor(
   const pick =
     source?.status === "answered" ? (source.answer as { pick?: unknown } | undefined)?.pick : undefined;
   const thing = typeof pick === "string" ? pkg.things.find((t) => t.id === pick) : undefined;
-  const content: InfoContent = { of, thing: thing?.id ?? null, things: [], values: [], choices: [] };
+  const content: InfoContent = {
+    of,
+    thing: thing?.id ?? null,
+    things: [],
+    counts: {},
+    values: [],
+    choices: [],
+  };
   for (const g of thing?.grants ?? []) {
     if ((g.atLevel ?? 1) > level) continue;
-    if (g.thing !== undefined) content.things.push(g.thing);
-    else if (g.choice !== undefined) content.choices.push(g.choice);
+    if (g.thing !== undefined) {
+      const had = content.things.includes(g.thing);
+      if (!had) content.things.push(g.thing);
+      const n = (had ? (content.counts[g.thing] ?? 1) : 0) + (g.count ?? 1);
+      if (n > 1 && indexes(pkg).counted.has(g.thing)) content.counts[g.thing] = n;
+    } else if (g.choice !== undefined) content.choices.push(g.choice);
     else if (g.value !== undefined) {
       const add = character.amount(g.add!);
       const existing = content.values.find((v) => v.value === g.value);

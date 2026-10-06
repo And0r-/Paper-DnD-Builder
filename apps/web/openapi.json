@@ -3857,6 +3857,11 @@
           },
           "atLevel": {
             "type": "integer"
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 2,
+            "description": "How many of it, if more than one: the counts of every grant that gives it, added up."
           }
         },
         "required": ["id", "kind", "step", "atLevel"],
@@ -4028,6 +4033,14 @@
               "type": "string"
             }
           },
+          "counts": {
+            "type": "object",
+            "description": "How many of a thing in `things`, where the grant gives more than one.",
+            "additionalProperties": {
+              "type": "integer",
+              "minimum": 2
+            }
+          },
           "values": {
             "type": "array",
             "items": {
@@ -4051,7 +4064,7 @@
             }
           }
         },
-        "required": ["of", "thing", "things", "values", "choices"],
+        "required": ["of", "thing", "things", "counts", "values", "choices"],
         "additionalProperties": false
       },
       "Problem": {

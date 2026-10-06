@@ -3,7 +3,15 @@
     {
       "id": "header",
       "kind": "header",
-      "span": 12
+      "span": 12,
+      "fields": [
+        {
+          "choice": "folk"
+        },
+        {
+          "choice": "upbringing"
+        }
+      ]
     },
     {
       "id": "primary",
@@ -38,25 +46,59 @@
       ]
     },
     {
+      "id": "recovery",
+      "kind": "statBoxes",
+      "span": 12,
+      "boxes": [
+        {
+          "value": "restDice",
+          "style": "boxes",
+          "text": {
+            "text": "sheet.recovery.rest-dice",
+            "vars": {
+              "count": "restDice",
+              "die": "restDie"
+            }
+          }
+        },
+        {
+          "value": "closeCallsMade",
+          "style": "boxes"
+        },
+        {
+          "value": "closeCallsMissed",
+          "style": "boxes"
+        }
+      ]
+    },
+    {
       "id": "scores",
       "kind": "scoreColumn",
       "span": 4,
       "scores": [
         {
           "value": "might",
-          "derived": "mightBonus"
+          "derived": "mightBonus",
+          "extra": "mightHold",
+          "extraLabel": "sheet.scores.hold"
         },
         {
           "value": "grace",
-          "derived": "graceBonus"
+          "derived": "graceBonus",
+          "extra": "graceHold",
+          "extraLabel": "sheet.scores.hold"
         },
         {
           "value": "wit",
-          "derived": "witBonus"
+          "derived": "witBonus",
+          "extra": "witHold",
+          "extraLabel": "sheet.scores.hold"
         },
         {
           "value": "heart",
-          "derived": "heartBonus"
+          "derived": "heartBonus",
+          "extra": "heartHold",
+          "extraLabel": "sheet.scores.hold"
         }
       ]
     },
@@ -68,7 +110,10 @@
         "kind": "talent"
       },
       "note": "score",
-      "total": "roll"
+      "total": "roll",
+      "strong": {
+        "kind": "flair"
+      }
     },
     {
       "id": "attacks",
@@ -87,6 +132,10 @@
         },
         {
           "stat": "range"
+        },
+        {
+          "stat": "traits",
+          "wrap": true
         }
       ]
     },
@@ -109,7 +158,8 @@
       "things": {
         "kind": "trait"
       },
-      "uses": "uses"
+      "uses": "uses",
+      "groupBy": "origin"
     },
     {
       "id": "knacks",
@@ -145,7 +195,8 @@
           "kind": "calling"
         },
         "text": "knacks.change"
-      }
+      },
+      "note": "reach"
     },
     {
       "id": "lantern-slots",

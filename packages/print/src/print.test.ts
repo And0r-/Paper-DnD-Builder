@@ -104,8 +104,15 @@ function words(values: Iterable<TextValue | string>): Set<string> {
 
 function messageWords(language: string): Set<string> {
   const m = MESSAGES[language]!;
-  const { startValue, page, unitsUsed, createdOn, ...plain } = m;
-  return words([...Object.values(plain), startValue(""), page(1, 2), unitsUsed([]), createdOn("")]);
+  const { startValue, page, unitsUsed, createdOn, count, ...plain } = m;
+  return words([
+    ...Object.values(plain),
+    startValue(""),
+    page(1, 2),
+    unitsUsed([]),
+    createdOn(""),
+    count("2", ""),
+  ]);
 }
 
 /** Words that only the other language uses: none of them may appear in a document. */
@@ -139,8 +146,8 @@ describe("printed character (demo package)", () => {
     expect(pdf.cardPages).toBe(Math.ceil(cardThings.length / 9));
     expect(extracted.pages).toBe(pdf.pages);
     expect(extracted.pages).toBe(pdf.sheetPages + pdf.cardPages);
-    expect(pdf.sheetPages).toBe(2);
-    expect(extracted.pages).toBe(3);
+    expect(pdf.sheetPages).toBe(3);
+    expect(extracted.pages).toBe(4);
 
     const t = extracted.text;
     expect(t).toContain("Mira Fennwick");
@@ -148,8 +155,8 @@ describe("printed character (demo package)", () => {
     for (const c of model.cards) expect(t).toContain(c.name);
     expect(t).toContain("7,5 m"); // pace: 25 ft by the package's table, not 7,62 m
     expect(t).toContain("Einheiten: Meter, Kilogramm");
-    expect(t).toContain("Seite 1 von 3");
-    expect(extracted.pageTexts[2]).toContain("In Originalgrösse (100 %) drucken.");
+    expect(t).toContain("Seite 1 von 4");
+    expect(extracted.pageTexts[3]).toContain("In Originalgrösse (100 %) drucken.");
     // License line on the last page.
     expect(extracted.pageTexts.at(-1)).toContain("Lizenz: GNU AGPL 3.0");
 
@@ -272,6 +279,7 @@ describe("printed character (demo package)", () => {
     // Without the half-width boxes after the gear, and a few more blank gear lines to fill
     // the first page, only the notes move on.
     const lower = new Set([
+      "recovery",
       "rolls",
       "lantern-slots",
       "lantern-slots-high",
@@ -287,7 +295,10 @@ describe("printed character (demo package)", () => {
           .filter((s) => !lower.has(s.id))
           .map((s) => (s.id === "gear" && s.kind === "list" ? { ...s, blankLines: s.blankLines + 4 } : s))
           // The knacks as one plain table, so the first page is filled just so.
-          .map((s) => (s.id === "knacks" ? { ...s, byRank: false, marks: undefined, lead: undefined } : s)),
+          .map((s) => (s.id === "knacks" ? { ...s, byRank: false, marks: undefined, lead: undefined } : s))
+          // Header answers, feature notes and groups are tested on their own; here they would only move the gear.
+          .map((s) => (s.kind === "header" ? { ...s, fields: undefined } : s))
+          .map((s) => (s.kind === "featureTable" ? { ...s, note: undefined, groupBy: undefined } : s)),
       },
     };
     const { pdf } = await print("de", {}, early, level1);
@@ -456,15 +467,18 @@ describe("printed character (demo package)", () => {
     const de = attacks("de", { length: "m" });
     expect(de.s.title).toBe("Angriffe");
     expect(de.s.hint).toBe("Zum Treffen: 2W6 + diese Zahl. Schaden: diese Würfel.");
-    expect(de.s.columns).toEqual(["Treffer", "Schaden", "Reichweite"]);
+    expect(de.s.columns).toEqual(["Treffer", "Schaden", "Reichweite", "Eigenschaften"]);
     expect(de.s.rows).toEqual([
-      { name: "Bootshaken", cells: ["+4", "1W4 +2, spitz", "—"] },
-      { name: "Schleuder", cells: ["+4", "1W4 +2, stumpf", "9 m / 36 m"] },
+      {
+        name: "Bootshaken",
+        cells: ["+4", "1W4 +2, spitz", "—", "Lang (trifft noch auf 3 m), zieht Gegner heran"],
+      },
+      { name: "Schleuder", cells: ["+4", "1W4 +2, stumpf", "9 m / 36 m", "Braucht Steine"] },
     ]);
     const en = attacks("en", { length: "ft" });
     expect(en.s.rows.map((row) => row.cells)).toEqual([
-      ["+4", "1d4 +2, pointed", "—"],
-      ["+4", "1d4 +2, blunt", "30 ft / 120 ft"],
+      ["+4", "1d4 +2, pointed", "—", "Long (still hits at 10 ft), pulls foes close"],
+      ["+4", "1d4 +2, blunt", "30 ft / 120 ft", "Needs stones"],
     ]);
 
     // Talents: the total is in the box, trained or not; where it comes from is under the name.
@@ -986,10 +1000,11 @@ describe("printed character (demo package)", () => {
     const page = (await positions(pdf))[0]!;
     const primary = pdf.sheetLayout[0]!.find((p) => p.section.id === "primary")!;
     const scores = pdf.sheetLayout[0]!.find((p) => p.section.id === "scores")!;
+    const recovery = pdf.sheetLayout[0]!.find((p) => p.section.id === "recovery")!;
     const boxes = primary.section.kind === "statBoxes" ? primary.section.boxes.length : 0;
     const boxW = (primary.w - 4 * (boxes - 1)) / boxes;
-    // Only the boxes of the first row: other box sections lie below the scores.
-    const inPrimary = (p: { y: number }) => p.y < scores.y;
+    // Only the boxes of the first row: other box sections lie below it.
+    const inPrimary = (p: { y: number }) => p.y < recovery.y;
     for (const item of page.filter((p) => /^NEBEL|STUFE$/u.test(p.str) && inPrimary(p))) {
       const box = Math.floor((item.x - primary.x) / (boxW + 4));
       const left = primary.x + box * (boxW + 4);
@@ -1061,6 +1076,163 @@ describe("printed character (demo package)", () => {
 
   it("refuses a language without texts instead of mixing in another one", () => {
     expect(() => buildPrintModel(pkg, doc, { language: "fr" })).toThrow(PrintError);
+  });
+});
+
+describe("what a game master would otherwise write on the sheet by hand (demo package)", () => {
+  const section = <K extends SheetSection["kind"]>(model: PrintModel, id: string, kind: K) => {
+    const s = model.sections.find((x) => x.id === id);
+    if (s?.kind !== kind) throw new Error(`demo sheet changed: ${id}`);
+    return s as Extract<SheetSection, { kind: K }>;
+  };
+
+  it("names the answers of the header's choices under the summary line, a line for an open one", async () => {
+    const { model, extracted, pdf } = await print("de", { length: "m" });
+    expect(section(model, "header", "header").fields).toEqual([
+      { label: "Herkunft", text: "Moorvolk" },
+      { label: "Kindheit", text: "Fährkind" },
+    ]);
+    expect(extracted.pageTexts[0]).toMatch(/HERKUNFT\s+Moorvolk/u);
+    expect(extracted.pageTexts[0]).toMatch(/KINDHEIT\s+Fährkind/u);
+    // Under the name and summary, above the first box row.
+    const page = (await positions(pdf))[0]!;
+    const folk = page.find((p) => p.str === "Moorvolk")!;
+    const summary = page.find((p) => p.str.startsWith("Laternenträgerin"))!;
+    expect(folk.y).toBeGreaterThan(summary.y);
+    expect(folk.y).toBeLessThan(pdf.sheetLayout[0]!.find((p) => p.section.id === "primary")!.y);
+
+    const open = applyChange(pkg, doc, { type: "answer", choice: "upbringing", answer: null });
+    if (!open.ok) throw new Error(JSON.stringify(open.error));
+    const fields = section(buildPrintModel(pkg, open.doc, { language: "en" }), "header", "header").fields;
+    expect(fields).toEqual([
+      { label: "Folk", text: "Moorfolk" },
+      { label: "Upbringing", text: "" },
+    ]);
+  });
+
+  it("groups features under the name of what brought them: the calling, the folk", () => {
+    const model = buildPrintModel(pkg, doc, { language: "de" });
+    const rows = section(model, "traits", "featureTable").rows;
+    expect([...new Set(rows.map((r) => r.group?.title))]).toEqual(["Laternenträgerin", "Moorvolk"]);
+    // A thing picked in a choice its calling grants still counts for the calling.
+    const ev = evaluateDraft(pkg, doc);
+    const path = ev.things.find((h) => h.id === "path.lightwarden")!;
+    expect(path.pickedIn).toBe("path");
+    const heading = rows.findIndex((r) => r.group?.title === "Moorvolk");
+    expect(rows.slice(heading).map((r) => r.name)).toEqual(["Nebelblick"]);
+    expect(rows.slice(0, heading).map((r) => r.name)).toContain("Schützendes Leuchten");
+  });
+
+  it("prints rest dice as text and squares to tick, as many as the level, in more rows when many", async () => {
+    const boxes = (d: DraftDocument) =>
+      section(buildPrintModel(pkg, d, { language: "de" }), "recovery", "statBoxes").boxes;
+    const [dice, made, missed] = boxes(doc);
+    expect(dice).toMatchObject({ label: "Rastwürfel", style: "boxes", text: "3 × W8", squares: 3 });
+    // Close calls: three squares each, no number (the squares say how many).
+    expect(made).toMatchObject({ label: "Knapp geschafft", text: "", squares: 3 });
+    expect(missed).toMatchObject({ label: "Knapp verfehlt", text: "", squares: 3 });
+    expect(boxes(raisedCharacter(pkg, doc, 20))[0]).toMatchObject({ text: "20 × W8", squares: 20 });
+
+    const { pdf, extracted } = await print("de", { length: "m" });
+    expect(extracted.pageTexts[0]).toContain("3 × W8");
+    expect(extracted.pageTexts[0]).toContain("RASTWÜRFEL");
+    // Twenty squares do not fit a row of a third of the page: the box grows a row, all boxes with it.
+    const high = await renderPdf(buildPrintModel(pkg, raisedCharacter(pkg, doc, 20), { language: "de" }));
+    const height = (r: RenderedPdf) => {
+      const at = r.sheetLayout[0]!.findIndex((p) => p.section.id === "recovery");
+      return r.sheetLayout[0]![at + 1]!.y - r.sheetLayout[0]![at]!.y;
+    };
+    expect(height(high)).toBeCloseTo(height(pdf) + 4.6, 1);
+    // More than a sheet can hold as squares: the number instead.
+    const many = {
+      ...pkg,
+      values: pkg.values.map((v) => (v.id === "restDice" ? { ...v, formula: "level * 9" } : v)),
+    };
+    const [tooMany] = section(buildPrintModel(many, doc, { language: "de" }), "recovery", "statBoxes").boxes;
+    expect(tooMany).toMatchObject({ text: "27 × W8", squares: 0 });
+  });
+
+  it("prints a score's further number small beside it, with its own label", async () => {
+    const { model, extracted, pdf } = await print("de", { length: "m" });
+    const scores = section(model, "scores", "scoreColumn").scores;
+    expect(scores.map((s) => s.extra)).toEqual([
+      { label: "Standhalten", value: "+0" },
+      { label: "Standhalten", value: "+0" },
+      { label: "Standhalten", value: "+3" },
+      { label: "Standhalten", value: "+3" },
+    ]);
+    expect(extracted.pageTexts[0]).toContain("Standhalten");
+    // Between the score and its circle: inside the box, left of the circle.
+    const placed = pdf.sheetLayout[0]!.find((p) => p.section.id === "scores")!;
+    for (const p of (await positions(pdf))[0]!.filter((x) => x.str === "Standhalten")) {
+      expect(p.x).toBeGreaterThan(placed.x + 8);
+      expect(p.x + p.w).toBeLessThan(placed.x + placed.w - 17);
+    }
+  });
+
+  it("marks a talent the character has a flair for a second time, and says so in the legend", () => {
+    const model = buildPrintModel(pkg, doc, { language: "de" });
+    const talents = section(model, "talents", "checkList");
+    const strong = talents.items.filter((i) => i.strong).map((i) => i.name);
+    expect(strong).toEqual(["Feilschen"]);
+    expect(talents.items.find((i) => i.name === "Feilschen")).toMatchObject({ marked: true });
+    expect(talents.items.find((i) => i.name === "Lauschen")).toMatchObject({ marked: true, strong: false });
+    expect(talents.hint).toContain("◉");
+    // Practice counts twice in the number of a talent with flair.
+    const haggling = talents.items.find((i) => i.name === "Feilschen")!;
+    expect(haggling.total.text).toBe("+5");
+  });
+
+  it("adds a wrapping column of weapon traits to the attack table, units converted", async () => {
+    const { model, pdf } = await print("de", { length: "m" });
+    const attacks = section(model, "attacks", "statTable");
+    expect(attacks.columns.at(-1)).toBe("Eigenschaften");
+    expect(attacks.wrap).toEqual([false, false, false, true]);
+    expect(attacks.rows[0]!.cells.at(-1)).toBe("Zweihändig, leuchtet 3 m weit");
+    const placed = pdf.sheetLayout[0]!.find((p) => p.section.id === "attacks")!;
+    const page = (await positions(pdf))[0]!;
+    const inTable = page.filter((p) => p.y > placed.y && p.y < placed.y + 25 && p.x >= placed.x - 0.1);
+    // The trait text wraps inside the table: nothing runs over its right edge.
+    expect(inTable.some((p) => p.str.startsWith("Zweihändig"))).toBe(true);
+    for (const p of inTable) expect(p.x + p.w).toBeLessThanOrEqual(placed.x + placed.w + 0.1);
+    // The numbers keep to one line each.
+    expect(inTable.some((p) => p.str === "1W6 +0, stumpf")).toBe(true);
+  });
+
+  it("prints a stat small under each name of a feature table", () => {
+    const model = buildPrintModel(pkg, doc, { language: "de", units: { length: "m" } });
+    const knacks = section(model, "knacks", "featureTable");
+    expect(knacks.rows.every((r) => r.note !== "")).toBe(true);
+    expect(knacks.rows.find((r) => r.name === "Laternenruf")?.note).toBe("30 m");
+  });
+
+  it("keeps the source line's room off every page but the last, so page 1 holds as much without cards", async () => {
+    const model = buildPrintModel(pkg, doc, { language: "de", createdAt });
+    const withCards = await renderPdf(model);
+    const without = await renderPdf({ ...model, cards: [] });
+    expect(without.sheetPages).toBe(withCards.sheetPages);
+    expect(without.sheetPages).toBeGreaterThan(1);
+    const ids = (r: RenderedPdf, page: number) => r.sheetLayout[page]!.map((p) => [p.section.id, p.y]);
+    expect(ids(without, 0)).toEqual(ids(withCards, 0));
+    // The last sheet page carries the source line and ends above it.
+    const last = (await extract(without)).pageTexts[without.sheetPages - 1]!;
+    expect(last).toContain(model.attribution.slice(0, 20));
+    const lowest = Math.max(...without.sheetLayout.at(-1)!.map((p) => p.y));
+    expect(lowest).toBeLessThan(297 - 12 - 4 - 3);
+  });
+
+  it("prints how many of a thing the character has, counts of all grants added up", async () => {
+    const ev = evaluateDraft(pkg, doc);
+    // 3 from the lantern bearer, 2 from the ferry child.
+    expect(ev.things.find((h) => h.id === "item.provisions")?.count).toBe(5);
+    expect(ev.things.find((h) => h.id === "item.rope")?.count).toBeUndefined();
+    const { model, extracted } = await print("de", { length: "m" });
+    const gear = section(model, "gear", "list");
+    expect(gear.items).toContain("5 × Proviant");
+    expect(gear.items).toContain("Seil");
+    expect(extracted.text).toContain("5 × Proviant");
+    const en = buildPrintModel(pkg, doc, { language: "en" });
+    expect(section(en, "gear", "list").items).toContain("5 × Provisions");
   });
 });
 

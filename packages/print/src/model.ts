@@ -37,13 +37,18 @@ export interface PrintSettings {
 
 export interface StatBox {
   label: string;
-  style: "number" | "pencil" | "circles";
-  /** The big number, with unit if it has one ("9 m"). */
+  style: "number" | "pencil" | "circles" | "boxes";
+  /** The big number, with unit if it has one ("9 m"), or the box's own text ("5 × d10"); "" for none. */
   text: string;
   /** Circles to tick (`circles`). */
   circles: number;
+  /** Squares to tick (`boxes`). */
+  squares: number;
   hint: string;
 }
+
+/** Most squares a `boxes` box draws; a larger value is printed as a number instead. */
+export const MAX_SQUARES = 24;
 
 /** A number on paper and, small under it, where it comes from ("Grace +2 · Practice +2"); "" if nothing to say. */
 export interface Figure {
@@ -60,18 +65,41 @@ export type Uses = { boxes: number } | { count: number } | { text: string } | nu
 export const MAX_USE_BOXES = 12;
 
 export type SheetSection = { id: string; span: number; title: string; hint: string } & (
-  | { kind: "header"; name: string; summary: string; packageName: string }
+  | {
+      kind: "header";
+      name: string;
+      summary: string;
+      packageName: string;
+      /** Answers under the summary line ("Folk: Fenfolk"); empty text for an open choice. */
+      fields: { label: string; text: string }[];
+    }
   | { kind: "statBoxes"; boxes: StatBox[] }
   | {
       kind: "scoreColumn";
-      scores: { label: string; value: string; derivedLabel: string; derived: string | null }[];
+      scores: {
+        label: string;
+        value: string;
+        derivedLabel: string;
+        derived: string | null;
+        /** A further number made with the score, small beside it. */
+        extra?: { label: string; value: string } | null;
+      }[];
     }
   | {
       kind: "checkList";
-      /** `total`: the number in the box; empty text for a box to fill in by hand. */
-      items: { name: string; marked: boolean; note: string; total: Figure }[];
+      /**
+       * `total`: the number in the box; empty text for a box to fill in by hand.
+       * `strong`: marked a second time (a thing of the section's `strong` is about it).
+       */
+      items: { name: string; marked: boolean; strong?: boolean; note: string; total: Figure }[];
     }
-  | { kind: "statTable"; columns: string[]; rows: { name: string; cells: string[] }[] }
+  | {
+      kind: "statTable";
+      columns: string[];
+      /** Per column: text that takes the room left and wraps. */
+      wrap?: boolean[];
+      rows: { name: string; cells: string[] }[];
+    }
   | {
       kind: "featureTable";
       /** Sentences above the rows (`lead`). */
@@ -97,6 +125,8 @@ export interface FeatureRow {
   name: string;
   /** The row's mark signs, in the package's order, joined by spaces; "" for none. */
   marks: string;
+  /** The `note` stat, small under the name; "" for none. */
+  note?: string;
   text: string;
   uses: Uses;
   group: RowGroup | null;
@@ -241,11 +271,7 @@ export function buildPrintModel(
     if (typeof v === "number") return numberFormat.format(v);
     if (typeof v === "boolean") return v ? messages.yes : messages.no;
     // `vars` fill the text with the character's values ("1d8 +3").
-    if ("text" in v)
-      return (
-        text(v.text, Object.fromEntries(Object.entries(v.vars ?? {}).map(([n, id]) => [n, valueOf(id)]))) ||
-        "—"
-      );
+    if ("text" in v) return filled(v) || "—";
     if ("value" in v) return valueText(v.value);
     return formatMeasure(measure, v, "short");
   };
@@ -309,6 +335,30 @@ export function buildPrintModel(
         ? (ev.choices[h.pickedIn]?.grantedBy ?? [])
         : [];
   const collator = new Intl.Collator(language);
+  /** "8 × Rope"; just the name for one. */
+  const counted = (id: string): string => {
+    const n = heldById.get(id)?.count ?? 1;
+    return n > 1 ? messages.count(numberFormat.format(n), thingName(id)) : thingName(id);
+  };
+  /**
+   * What brought a thing to the character: followed up through the things
+   * that granted it and the things that granted the choice it was picked in,
+   * to a thing picked in one of the package's own steps (or to itself).
+   */
+  const origin = (id: string): string => {
+    const seen = new Set<string>();
+    let at = id;
+    for (;;) {
+      seen.add(at);
+      const h = heldById.get(at);
+      const up = h === undefined ? undefined : origins(h)[0];
+      if (up === undefined || seen.has(up) || !heldById.has(up)) return at;
+      at = up;
+    }
+  };
+  /** Text of a box or stat filled with the character's values. */
+  const filled = (v: { text: string; vars?: Record<string, string> | undefined }): string =>
+    text(v.text, Object.fromEntries(Object.entries(v.vars ?? {}).map(([n, id]) => [n, valueOf(id)])));
 
   const summary = summarize(pkg, doc, ev);
   const name = summary.name || messages.unnamed;
@@ -341,18 +391,33 @@ export function buildPrintModel(
           name,
           summary: text("summary.line", lineVars),
           packageName,
+          fields: (s.fields ?? []).map((f) => ({
+            label: text(f.label ?? `choice.${f.choice}.title`),
+            text: answerText(f.choice),
+          })),
         };
       case "statBoxes":
         return {
           ...base,
           kind: "statBoxes",
-          boxes: s.boxes.filter(shown).map((b) => ({
-            label: b.label !== undefined ? text(b.label) : valueLabel(b.value),
-            style: b.style,
-            text: valueText(b.value),
-            circles: b.style === "circles" ? Math.max(0, Math.min(12, Math.round(valueOf(b.value)))) : 0,
-            hint: b.style === "pencil" ? messages.startValue(valueText(b.value)) : valueHint(b.value),
-          })),
+          boxes: s.boxes.filter(shown).map((b) => {
+            const n = Math.max(0, Math.round(valueOf(b.value)));
+            const squares = b.style === "boxes" && n <= MAX_SQUARES ? n : 0;
+            return {
+              label: b.label !== undefined ? text(b.label) : valueLabel(b.value),
+              style: b.style,
+              // Squares say how many on their own; too many to draw, the number says it.
+              text:
+                b.text !== undefined
+                  ? filled(b.text)
+                  : b.style === "boxes" && squares === n
+                    ? ""
+                    : valueText(b.value),
+              circles: b.style === "circles" ? Math.min(12, n) : 0,
+              squares,
+              hint: b.style === "pencil" ? messages.startValue(valueText(b.value)) : valueHint(b.value),
+            };
+          }),
         };
       case "scoreColumn":
         return {
@@ -363,9 +428,18 @@ export function buildPrintModel(
             value: valueText(sc.value),
             derivedLabel: sc.derived ? valueLabel(sc.derived) : "",
             derived: sc.derived ? signed.format(valueOf(sc.derived)) : null,
+            extra: sc.extra
+              ? {
+                  label: sc.extraLabel !== undefined ? text(sc.extraLabel) : valueLabel(sc.extra),
+                  value: signed.format(valueOf(sc.extra)),
+                }
+              : null,
           })),
         };
-      case "checkList":
+      case "checkList": {
+        const strong = new Set(
+          s.strong === undefined ? [] : heldOf(s.strong).flatMap((t) => (t.about ? [t.about] : [])),
+        );
         return {
           ...base,
           kind: "checkList",
@@ -375,6 +449,7 @@ export function buildPrintModel(
             return {
               name: thingName(t.id),
               marked: held.has(t.id),
+              strong: held.has(t.id) && strong.has(t.id),
               note: note === undefined ? "" : statText(note),
               // A roll is added to: the number goes in with its sign ("+5").
               total:
@@ -384,11 +459,13 @@ export function buildPrintModel(
             };
           }),
         };
+      }
       case "statTable":
         return {
           ...base,
           kind: "statTable",
           columns: s.columns.map((c) => text(`stat.${c.stat}.name`)),
+          wrap: s.columns.map((c) => c.wrap === true),
           rows: heldOf(s.things).map((t) => ({
             name: thingName(t.id),
             // Numbers only: a table row is one line, so a few weapons still fit beside other boxes.
@@ -420,24 +497,35 @@ export function buildPrintModel(
             .sort((a, b) => a.rank! - b.rank! || collator.compare(thingName(a.id), thingName(b.id)));
           held = [...ranked, ...held.filter((t) => t.rank === undefined)];
         }
+        // groupBy origin: groups in the order their first row came; inside a group, the order stays.
+        const originOf = new Map(s.groupBy === "origin" ? held.map((t) => [t.id, origin(t.id)]) : []);
+        if (s.groupBy === "origin") {
+          const order = [...new Set(held.map((t) => originOf.get(t.id)!))];
+          held = order.flatMap((o) => held.filter((t) => originOf.get(t.id) === o));
+        }
         const used = new Set<number>();
         const rows = held.map((t): FeatureRow => {
           const on = markOn.flatMap((matches, i) => (matches(t) ? [i] : []));
           on.forEach((i) => used.add(i));
           const rank = s.byRank ? t.rank : undefined;
+          const from = originOf.get(t.id);
+          const note = s.note === undefined ? undefined : t.stats?.[s.note];
           return {
             name: thingName(t.id),
             marks: on.map((i) => text(marks[i]!.text)).join(" "),
+            note: note === undefined ? "" : statText(note),
             text: text(`${t.id}.short`),
             uses: uses(t, s.uses),
             group:
-              rank === undefined
-                ? null
-                : {
-                    key: `rank-${rank}`,
-                    title: text(`rank.${rank}.name`) || `${text("rank.name")} ${numberFormat.format(rank)}`,
-                    hint: text(`sheet.${s.id}.rank.${rank}.hint`),
-                  },
+              from !== undefined
+                ? { key: `origin-${from}`, title: thingName(from), hint: "" }
+                : rank === undefined
+                  ? null
+                  : {
+                      key: `rank-${rank}`,
+                      title: text(`rank.${rank}.name`) || `${text("rank.name")} ${numberFormat.format(rank)}`,
+                      hint: text(`sheet.${s.id}.rank.${rank}.hint`),
+                    },
           };
         });
         const legend = marks.flatMap((m, i) => (used.has(i) ? [`${text(m.text)} = ${text(m.legend)}`] : []));
@@ -462,7 +550,7 @@ export function buildPrintModel(
         return {
           ...base,
           kind: "list",
-          items: heldOf(s.things).map((t) => thingName(t.id)),
+          items: heldOf(s.things).map((t) => counted(t.id)),
           blankLines: s.blankLines,
         };
       case "answers":

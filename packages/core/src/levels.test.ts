@@ -135,7 +135,7 @@ describe("a level-20 lantern bearer, worked out by hand", () => {
       practice: 6, // floor(19 / 4) + 2
       sneakRoll: 0, // grace bonus 0, sneaking not trained
       climbingRoll: 6, // might bonus 0 + practice 6 (trained)
-      hagglingRoll: 9, // heart bonus 3 + 6
+      hagglingRoll: 15, // heart bonus 3 + 6, twice with the ferry child's flair
       trackingRoll: 3, // wit bonus 3, not trained
       mendingRoll: 9,
       listeningRoll: 9,
@@ -158,6 +158,10 @@ describe("a level-20 lantern bearer, worked out by hand", () => {
       lanternSlots7: 1,
       lanternSlots8: 1,
       lanternSlots9: 2,
+      ...{ mightHold: 0, graceHold: 0, witHold: 9, heartHold: 9 }, // bonus, + practice for wit and heart
+      restDice: 20, // one per level
+      restDie: 8, // lantern bearer
+      ...{ closeCallsMade: 3, closeCallsMissed: 3 },
       age: 20,
     });
   });

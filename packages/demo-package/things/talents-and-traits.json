@@ -175,5 +175,17 @@
     "id": "trait.spore-friend",
     "kind": "trait",
     "source": "mistland"
+  },
+  {
+    "id": "flair.haggling",
+    "kind": "flair",
+    "source": "mistland",
+    "about": "talent.haggling"
+  },
+  {
+    "id": "flair.listening",
+    "kind": "flair",
+    "source": "mistland",
+    "about": "talent.listening"
   }
 ]

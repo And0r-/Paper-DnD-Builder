@@ -88,7 +88,14 @@ function Grants({ lp, thing, level }: { lp: LoadedPackage; thing: Thing; level: 
   }
   for (const [i, g] of (thing.grants ?? []).entries()) {
     if ((g.atLevel ?? 1) > level) continue;
-    if (g.thing) items.push(<li key={i}>{thingName(lp, g.thing)}</li>);
+    if (g.thing)
+      items.push(
+        <li key={i}>
+          {(g.count ?? 1) > 1
+            ? t("option.count", { count: g.count!, name: thingName(lp, g.thing) })
+            : thingName(lp, g.thing)}
+        </li>,
+      );
     else if (g.choice)
       items.push(
         <li key={i}>
@@ -1177,7 +1184,11 @@ export function InfoChoice({ state }: { state: ChoiceState }) {
   const word = levelWord(lp);
   const thingCard = (th: Thing) => (
     <li className="gift" key={th.id}>
-      <p className="gift__name">{thingName(lp, th.id)}</p>
+      <p className="gift__name">
+        {info.counts[th.id] !== undefined
+          ? t("option.count", { count: info.counts[th.id]!, name: thingName(lp, th.id) })
+          : thingName(lp, th.id)}
+      </p>
       <p className="gift__text">
         <RichText lp={lp} text={ptext(lp, `${th.id}.short`)} />
       </p>

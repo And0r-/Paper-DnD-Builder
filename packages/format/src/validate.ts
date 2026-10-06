@@ -717,10 +717,27 @@ export function validatePackageFiles(files: PackageFiles): ValidationResult {
     const p = `sections[${i}]`;
     if (s.when !== undefined) checkExpr(S, `${p}.when`, s.when);
     switch (s.kind) {
+      case "header":
+        s.fields?.forEach((f, j) => {
+          if (!choiceById.has(f.choice))
+            err(S, `${p}.fields[${j}].choice`, `unknown choice ${lit(f.choice)}`);
+        });
+        break;
       case "statBoxes":
         s.boxes.forEach((b, j) => {
           if (!isValueRef(b.value)) err(S, `${p}.boxes[${j}].value`, `unknown value ${lit(b.value)}`);
           if (b.when !== undefined) checkExpr(S, `${p}.boxes[${j}].when`, b.when);
+          if (b.text !== undefined) {
+            if (b.style === "pencil")
+              err(S, `${p}.boxes[${j}].text`, "a pencil box has no text, only a field");
+            statTextKeys.add(b.text.text);
+            for (const [name, v] of Object.entries(b.text.vars ?? {})) {
+              if (!isValueRef(v)) err(S, `${p}.boxes[${j}].text.vars.${name}`, `unknown value ${lit(v)}`);
+              let names = statTextVars.get(b.text.text);
+              if (!names) statTextVars.set(b.text.text, (names = new Set()));
+              names.add(name);
+            }
+          }
         });
         break;
       case "scoreColumn":
@@ -729,12 +746,24 @@ export function validatePackageFiles(files: PackageFiles): ValidationResult {
           if (sc.derived !== undefined && !valueIds.has(sc.derived)) {
             err(S, `${p}.scores[${j}].derived`, `unknown value ${lit(sc.derived)}`);
           }
+          if (sc.extra !== undefined && !valueIds.has(sc.extra)) {
+            err(S, `${p}.scores[${j}].extra`, `unknown value ${lit(sc.extra)}`);
+          }
+          if (sc.extraLabel !== undefined && sc.extra === undefined) {
+            err(S, `${p}.scores[${j}].extraLabel`, '"extraLabel" only goes with "extra"');
+          }
         });
         break;
       case "checkList": {
         const selected = checkOptionSource(S, `${p}.things`, s.things);
         if (s.note !== undefined) checkStatRef(`${p}.note`, s.note, selected, "note");
         if (s.total !== undefined) checkStatRef(`${p}.total`, s.total, selected, "total");
+        if (s.strong !== undefined) {
+          const ids = new Set(selected.map((t) => t.id));
+          const strong = checkOptionSource(S, `${p}.strong`, s.strong);
+          if (strong.length > 0 && !strong.some((t) => t.about !== undefined && ids.has(t.about)))
+            err(S, `${p}.strong`, "none of these things is `about` a thing listed in this section");
+        }
         break;
       }
       case "statTable": {
@@ -757,6 +786,9 @@ export function validatePackageFiles(files: PackageFiles): ValidationResult {
           if (m.from !== undefined) checkOptionSource(S, `${p}.marks[${j}].from`, m.from);
         });
         if (s.lead !== undefined) checkOptionSource(S, `${p}.lead.things`, s.lead.things);
+        if (s.note !== undefined) checkStatRef(`${p}.note`, s.note, selected, "note");
+        if (s.byRank && s.groupBy !== undefined)
+          err(S, `${p}.groupBy`, 'rows are grouped one way: "byRank" or "groupBy", not both');
         break;
       }
       case "list":
@@ -890,6 +922,13 @@ export function validatePackageFiles(files: PackageFiles): ValidationResult {
       if (s.lead !== undefined)
         for (const t of resolveOptions(s.lead.things)) optional.add(`${t.id}.${s.lead.text}`);
     }
+    if (s.kind === "header")
+      for (const f of s.fields ?? [])
+        if (f.label !== undefined) need(f.label, `label of header field ${lit(f.choice)}`);
+    if (s.kind === "scoreColumn")
+      for (const sc of s.scores)
+        if (sc.extraLabel !== undefined)
+          need(sc.extraLabel, `label of ${lit(sc.extra ?? "")} in sheet section ${lit(s.id)}`);
     optional.add(`sheet.${s.id}.hint`);
   }
   for (const kind of Object.keys(sheet.cards)) {

@@ -144,6 +144,8 @@ export const grantSchema = z
   .strictObject({
     /** Give the character this thing. */
     thing: id.optional(),
+    /** How many of the thing (with "thing"), e.g. 8 arrows. Default 1. Counts of the same thing add up. */
+    count: z.number().int().min(1).optional(),
     /** Ask the player this choice (inserted as a step). */
     choice: id.optional(),
     /** Add to this value ... */
@@ -164,18 +166,23 @@ export const grantSchema = z
     if (g.value === undefined && g.add !== undefined) {
       ctx.addIssue({ code: "custom", message: '"add" only goes with "value"', path: ["add"] });
     }
+    if (g.thing === undefined && g.count !== undefined) {
+      ctx.addIssue({ code: "custom", message: '"count" only goes with "thing"', path: ["count"] });
+    }
   });
+
+/** A text filled with character values: `{{var:<name>}}` takes the value with this id. */
+const filledText = z.strictObject({
+  text: textKey,
+  vars: z.record(z.string().regex(VALUE_ID_PATTERN), z.string().min(1)).optional(),
+});
 
 export const statValueSchema = z.union(
   [
     z.number(),
     z.boolean(),
     quantitySchema,
-    z.strictObject({
-      text: textKey,
-      /** Character values filled into the text: `{{var:<name>}}` takes the value with this id. */
-      vars: z.record(z.string().regex(VALUE_ID_PATTERN), z.string().min(1)).optional(),
-    }),
+    filledText,
     /** The character's value with this key, e.g. uses that grow with the level. */
     z.strictObject({ value: z.string().min(1) }),
   ],
@@ -453,7 +460,16 @@ export const markSchema = z
   });
 
 export const sectionSchema = z.discriminatedUnion("kind", [
-  z.strictObject({ ...sectionBase, kind: z.literal("header") }),
+  z.strictObject({
+    ...sectionBase,
+    kind: z.literal("header"),
+    /** Answers printed small under the summary line, each with a label (default: the choice's title). */
+    fields: z
+      .array(z.strictObject({ choice: id, label: textKey.optional() }))
+      .min(1)
+      .max(4)
+      .optional(),
+  }),
   z.strictObject({
     ...sectionBase,
     kind: z.literal("statBoxes"),
@@ -461,9 +477,12 @@ export const sectionSchema = z.discriminatedUnion("kind", [
       .array(
         z.strictObject({
           value: z.string(),
-          style: z.enum(["number", "pencil", "circles"]),
+          /** `boxes`: as many squares to tick as the value, no number (`text` may say what they are). */
+          style: z.enum(["number", "pencil", "circles", "boxes"]),
           /** Text key printed as the box label instead of `value.<value>.name`, e.g. a shorter word. */
           label: textKey.optional(),
+          /** Printed large instead of the number, filled with character values, e.g. "5 × d10". */
+          text: filledText.optional(),
           /** Box is printed only while this expression is true; the other boxes close up. */
           when: expr.optional(),
         }),
@@ -474,7 +493,18 @@ export const sectionSchema = z.discriminatedUnion("kind", [
   z.strictObject({
     ...sectionBase,
     kind: z.literal("scoreColumn"),
-    scores: z.array(z.strictObject({ value: valueId, derived: valueId.optional() })).min(1),
+    scores: z
+      .array(
+        z.strictObject({
+          value: valueId,
+          derived: valueId.optional(),
+          /** A further number made with this score, printed small with its sign next to it. */
+          extra: valueId.optional(),
+          /** Label of `extra` (text key); default `value.<extra>.name`. */
+          extraLabel: textKey.optional(),
+        }),
+      )
+      .min(1),
   }),
   z.strictObject({
     ...sectionBase,
@@ -484,6 +514,11 @@ export const sectionSchema = z.discriminatedUnion("kind", [
     note: statKey.optional(),
     /** Stat naming a value ({"value": …}) printed in the box, with where it comes from. */
     total: statKey.optional(),
+    /**
+     * Held things selected here mark the thing they are `about` a second time
+     * (printed ◉ instead of ●), e.g. a talent the character is especially good at.
+     */
+    strong: optionSourceSchema.optional(),
   }),
   z.strictObject({
     ...sectionBase,
@@ -500,14 +535,21 @@ export const sectionSchema = z.discriminatedUnion("kind", [
     marks: z.array(markSchema).min(1).optional(),
     /** A sentence above the rows per held thing selected by `things`: the text `<thing>.<text>`, if it exists. */
     lead: z.strictObject({ things: optionSourceSchema, text: textKey }).optional(),
+    /** Stat printed small under the name, as in a checkList. */
+    note: statKey.optional(),
+    /** `origin`: rows grouped under the name of what brought them, e.g. a calling or a folk. */
+    groupBy: z.literal("origin").optional(),
   }),
   z.strictObject({
     ...sectionBase,
     kind: z.literal("statTable"),
     things: optionSourceSchema,
-    /** One column per stat, after the name. `signed`: numbers with their sign ("+5"). */
+    /**
+     * One column per stat, after the name. `signed`: numbers with their sign ("+5").
+     * `wrap`: a text column that takes the room left and wraps, e.g. a list of properties.
+     */
     columns: z
-      .array(z.strictObject({ stat: statKey, signed: z.boolean().optional() }))
+      .array(z.strictObject({ stat: statKey, signed: z.boolean().optional(), wrap: z.boolean().optional() }))
       .min(1)
       .max(4),
   }),

@@ -15,6 +15,7 @@ export function Origins({ headingLevel = 2 }: { headingLevel?: 2 | 3 }) {
   const { lp, ev } = useDraft();
   const id = useId();
   const groups = originGroups(lp, ev, { t, list });
+  const held = new Map(ev.things.map((h) => [h.id, h]));
   if (groups.length === 0) return null;
   const Heading = `h${headingLevel}` as const;
   return (
@@ -32,7 +33,16 @@ export function Origins({ headingLevel = 2 }: { headingLevel?: 2 | 3 }) {
             <p className="origins__things">
               {listNodes(
                 t,
-                g.things.map((id) => <ThingName key={id} lp={lp} id={id} />),
+                g.things.map((id) => {
+                  const name = <ThingName key={id} lp={lp} id={id} />;
+                  // "3 × Rope": how many, where the package gives more than one.
+                  const n = held.get(id)?.count;
+                  return n === undefined ? (
+                    name
+                  ) : (
+                    <span key={id}>{fillNodes((m) => t("option.count", { ...m, count: n }), { name })}</span>
+                  );
+                }),
               )}
             </p>
           </li>

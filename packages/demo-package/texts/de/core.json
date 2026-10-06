@@ -9,7 +9,6 @@
     "rank.name": "Rang",
     "summary.line": "{{var:calling}} · Stufe {{var:level}}",
     "sheet.attribution": "Nebelland ist eine erfundene Demo-Welt. Lizenz: GNU AGPL 3.0. Fischernetz: Beitrag der Gemeinschaft, CC0.",
-
     "kind.folk.name": "Herkunft",
     "kind.upbringing.name": "Kindheit",
     "kind.calling.name": "Beruf",
@@ -19,10 +18,8 @@
     "kind.knack.name": "Kniff",
     "kind.item.name": "Ausrüstung",
     "kind.handling.name": "Handgriff",
-
     "group.helping.name": "Zum Helfen",
     "group.daring.name": "Für mutige Momente",
-
     "choice.folk.title": "Herkunft",
     "choice.folk.question": "Woher kommt dein Charakter?",
     "choice.folk.intro": "Deine Herkunft ist das Volk, bei dem du aufgewachsen bist. Sie bestimmt, wie schnell du bist und was du von Geburt an kannst.",
@@ -117,7 +114,6 @@
     "choice.looks.title": "Aussehen",
     "choice.looks.question": "Wie sieht dein Charakter aus?",
     "choice.looks.intro": "Ein oder zwei Sätze reichen. Das kannst du auch weglassen.",
-
     "step.character.title": "Dein Charakter",
     "step.character.question": "Wer ist dein Charakter?",
     "step.character.intro": "Stell dir zuerst grob vor, wen du spielen willst. Die Zahlen kommen später. Bei jeder Wahl kannst du dann fragen: Was passt zu meinem Charakter?",
@@ -130,7 +126,6 @@
     "step.looks.title": "Aussehen",
     "step.looks.question": "Wie stellst du dir deinen Charakter vor?",
     "step.looks.intro": "Zum Schluss gibst du deinem Charakter ein Gesicht. Das ändert keine Werte.",
-
     "names.suggestions": [
       "Mira",
       "Tobin",
@@ -143,7 +138,6 @@
       "Joss",
       "Talia"
     ],
-
     "value.might.name": "Kraft",
     "value.might.explain": "Wie stark du bist. Hilft beim Tragen, Heben und Schieben.",
     "value.grace.name": "Geschick",
@@ -177,7 +171,6 @@
     "value.carry.name": "Traglast",
     "value.carry.explain": "So viel kannst du tragen, ohne langsamer zu werden.",
     "value.age.name": "Alter",
-
     "stat.reach.name": "Reichweite",
     "stat.duration.name": "Dauer",
     "stat.uses.name": "Pro Rast",
@@ -194,7 +187,6 @@
     "stat-value.herbs": "Kräuter",
     "stat-value.nothing": "nichts",
     "stat-value.always": "immer",
-
     "unit.ft.short": "Fuss",
     "unit.ft.long": "Fuss",
     "unit.m.short": "m",
@@ -203,17 +195,14 @@
     "unit.lb.long": "Pfund",
     "unit.kg.short": "kg",
     "unit.kg.long": "Kilogramm",
-
     "card.knack.typeLine": "{{var:kind}} · Rang {{var:rank}}",
     "card.knack.hint": "Ein Kästchen pro Nutzung ankreuzen. Nach einer Rast sind alle wieder frei.",
-
     "sheet.primary.title": "Am Tisch",
-
     "sheet.primary.nerve": "Mut",
     "sheet.scores.title": "Grundwerte",
     "sheet.scores.hint": "Die Zahl im Kreis zählst du zu passenden Würfen dazu.",
     "sheet.talents.title": "Talente",
-    "sheet.talents.hint": "● = geübt. Die Zahl im Kästchen zählst du zu deinem Wurf dazu.",
+    "sheet.talents.hint": "● = geübt, ◉ = mit Kniff: Übung doppelt. Die Zahl im Kästchen zählst du zu deinem Wurf dazu.",
     "sheet.traits.title": "Fähigkeiten",
     "sheet.traits.hint": "□ = einmal benutzt: ankreuzen. Nach einer Rast wegradieren.",
     "sheet.knacks.title": "Kniffe",
@@ -231,7 +220,6 @@
     "sheet.how-to-play.text": "1. Sag, was dein Charakter tun will. 2. Die Spielleitung sagt, ob du würfeln musst. 3. Würfle und zähl die passende Zahl dazu. 4. Die Spielleitung erzählt, was passiert.",
     "sheet.about.title": "Über mich",
     "sheet.notes.title": "Notizen",
-
     "glossary.stamina.name": "Ausdauer",
     "glossary.stamina.short": "Wie viel du noch aushältst, bevor du aufgeben musst.",
     "glossary.stamina.explain.what": "Ausdauer ist eine Zahl auf deinem Bogen. Jeder Treffer zieht etwas davon ab.",
@@ -276,7 +264,6 @@
     "glossary.game-leader.short": "Die Person, die das Spiel leitet und die Welt beschreibt.",
     "glossary.game-leader.explain.what": "Eine Person am Tisch spielt keinen eigenen Charakter. Sie erzählt die Geschichte und spielt alle anderen Figuren.",
     "glossary.game-leader.explain.table": "Sie sagt dir, wann du würfeln musst. Frag sie, wenn du nicht weiterweisst.",
-
     "folk.moorfolk.name": "Moorvolk",
     "folk.moorfolk.short": "Du kennst jeden Weg durch Nebel und Schlamm.",
     "folk.moorfolk.goodIf": "Gut, wenn du dich gern leise und sicher bewegst.",
@@ -295,7 +282,6 @@
     "folk.coastfolk.explain.what": "Das Küstenvolk lebt von Fischfang und Handel. Es schwimmt, seit es laufen kann.",
     "folk.coastfolk.explain.table": "Du kannst schwimmen und lange die Luft anhalten. Dein Tempo ist {{length:30}}. Du lernst 1 [[glossary:talent|Talent]]: Klettern, Lauschen oder Wetterkunde.",
     "folk.coastfolk.explain.example": "Beispiel: Ein Schlüssel fällt in den Hafen. Du tauchst hinterher und holst ihn.",
-
     "upbringing.ferry-child.name": "Fährkind",
     "upbringing.ferry-child.short": "Du bist auf einer Fähre gross geworden, zwischen Wind und Händlern.",
     "upbringing.ferry-child.goodIf": "Gut, wenn du gern mit Leuten redest.",
@@ -306,7 +292,6 @@
     "upbringing.bell-tower.goodIf": "Gut, wenn du gern Rätsel löst.",
     "upbringing.bell-tower.explain.what": "Du hast dem Glöckner geholfen und nachts alte Geschichten gelesen. Du hörst jedes leise Geräusch.",
     "upbringing.bell-tower.explain.table": "Du bekommst die Talente Sagenkunde und Lauschen. Dazu eine kleine Glocke. Nach den Grundwerten gibst du noch +2 und +1 auf Kraft, Klugheit oder Herz.",
-
     "calling.lantern-bearer.name": "Laternenträgerin",
     "calling.lantern-bearer.short": "Du bringst Licht ins Dunkel und hältst die Gruppe zusammen.",
     "calling.lantern-bearer.knacks.change": "Nach jeder langen Rast kannst du einen Kniff gegen einen anderen aus deinem Beruf tauschen.",
@@ -326,7 +311,6 @@
     "calling.herbalist.explain.what": "Ein Beruf für Leute, die sammeln, mischen und heilen. Du trägst eine Kräutertasche und lässt Pflanzen für dich arbeiten.",
     "calling.herbalist.explain.table": "Am Tisch hast du oft die passende Idee. Deine Kniffe halten Gegner fest oder helfen beim Heilen.",
     "calling.herbalist.explain.example": "Beispiel: Ein Bär greift an. Du lässt Wurzeln aus dem Boden wachsen. Sie halten ihn fest.",
-
     "path.lightwarden.name": "Lichtwächterin",
     "path.lightwarden.short": "Dein Licht schützt alle, die nah bei dir stehen.",
     "path.lightwarden.goodIf": "Gut, wenn du deine Gruppe beschützen willst.",
@@ -342,7 +326,6 @@
     "path.mushroom-whisperer.goodIf": "Gut, wenn du Geheimnisse aufdecken willst.",
     "path.mushroom-whisperer.explain.what": "Du hast mit den Pilzen tief im Wald Freundschaft geschlossen.",
     "path.mushroom-whisperer.explain.table": "Sporen schaden dir nicht. Du lernst den Kniff Sporenschleier.",
-
     "talent.climbing.name": "Klettern",
     "talent.climbing.short": "Du kommst an Mauern, Bäumen und Felsen hoch.",
     "talent.climbing.explain.what": "Du weisst, wo du Halt findest.",
@@ -375,7 +358,6 @@
     "talent.weather-sense.short": "Du weisst, wann Regen, Sturm oder Nebel kommt.",
     "talent.weather-sense.explain.what": "Du liest Wolken, Wind und Vögel.",
     "talent.weather-sense.explain.table": "Willst du das Wetter vorhersagen, zählst du 2 zu deinem Wurf dazu.",
-
     "trait.mist-sight.name": "Nebelblick",
     "trait.mist-sight.short": "Nebel und Dämmerung stören dich nicht.",
     "trait.mist-sight.explain.what": "Deine Augen sind an den Nebel gewöhnt.",
@@ -412,7 +394,6 @@
     "trait.spore-friend.short": "Sporen und Pilzgift schaden dir nicht.",
     "trait.spore-friend.explain.what": "Die Pilze halten dich für einen der ihren.",
     "trait.spore-friend.explain.table": "Sporenwolken und giftige Pilze können dir nichts tun.",
-
     "knack.spark-shower.name": "Funkenregen",
     "knack.spark-shower.short": "Ein Schwall heller Funken blendet deine Gegner.",
     "knack.spark-shower.goodIf": "Gut, wenn du Gegner aufhalten willst.",
@@ -514,7 +495,6 @@
     "knack.spore-veil.short": "Eine Wolke aus Sporen versteckt deine Gruppe.",
     "knack.spore-veil.explain.what": "Du öffnest einen Pilz. Eine dichte Wolke breitet sich {{length:15}} weit aus.",
     "knack.spore-veil.explain.table": "Für 1 Minute sieht niemand durch die Wolke. Ihr könnt euch darin verstecken.",
-
     "item.lantern-staff.name": "Laternenstab",
     "item.lantern-staff.short": "Ein Stab mit einer Laterne an der Spitze.",
     "item.lantern-staff.explain.what": "Er ist Wanderstock und Lichtquelle zugleich.",
@@ -536,7 +516,7 @@
     "item.small-bell.explain.what": "Sie klingt hell und weit.",
     "item.small-bell.explain.table": "Läutest du sie, hört deine Gruppe dich auch im Nebel.",
     "item.provisions.name": "Proviant",
-    "item.provisions.short": "Essen und Wasser für 5 Tage.",
+    "item.provisions.short": "Essen und Wasser für einen Tag.",
     "item.provisions.explain.what": "Brot, Käse, Dörrobst und eine Flasche.",
     "item.provisions.explain.table": "Streiche einen Tag ab, wenn ihr unterwegs übernachtet.",
     "item.travel-cloak.name": "Reisemantel",
@@ -592,7 +572,6 @@
     "handling.trail-boots.short": "In deinen Wanderstiefeln rutschst du nicht aus.",
     "handling.trail-boots.explain.what": "Du kennst jeden Tritt auf nassem Stein und Moos.",
     "handling.trail-boots.explain.table": "Auf glattem Boden fällst du nicht hin.",
-
     "stat.roll.name": "Wurf",
     "stat.hit.name": "Treffer",
     "stat.harm.name": "Schaden",
@@ -607,6 +586,37 @@
     "item.sling.short": "Ein Lederband, mit dem du Steine wirfst.",
     "item.sling.goodIf": "Gut, wenn du lieber aus der Ferne triffst.",
     "item.sling.explain.what": "Ein Riemen aus Leder und ein Beutel mit runden Flusskieseln.",
-    "item.sling.explain.table": "Du triffst Dinge, die weit weg sind."
+    "item.sling.explain.table": "Du triffst Dinge, die weit weg sind.",
+    "value.mightHold.name": "Standhalten mit Kraft",
+    "value.graceHold.name": "Standhalten mit Anmut",
+    "value.witHold.name": "Standhalten mit Witz",
+    "value.heartHold.name": "Standhalten mit Herz",
+    "value.mightHold.explain": "Diese Zahl zählst du dazu, wenn du mit Kraft gegen etwas standhältst.",
+    "value.graceHold.explain": "Diese Zahl zählst du dazu, wenn du mit Anmut gegen etwas standhältst.",
+    "value.witHold.explain": "Diese Zahl zählst du dazu, wenn du mit Witz gegen etwas standhältst.",
+    "value.heartHold.explain": "Diese Zahl zählst du dazu, wenn du mit Herz gegen etwas standhältst.",
+    "sheet.scores.hold": "Standhalten",
+    "value.restDice.name": "Rastwürfel",
+    "value.restDice.explain": "Bei einer Rast würfelst du welche und bekommst so viel Ausdauer zurück.",
+    "value.restDie.name": "Größe der Rastwürfel",
+    "value.closeCallsMade.name": "Knapp geschafft",
+    "value.closeCallsMade.explain": "Bei 0 Ausdauer würfelst du jede Runde: Kreuze hier an, was klappt.",
+    "value.closeCallsMissed.name": "Knapp verfehlt",
+    "value.closeCallsMissed.explain": "Kreuze hier an, was danebengeht. Sind alle drei voll, ist es vorbei.",
+    "sheet.recovery.title": "Rast und Not",
+    "sheet.recovery.rest-dice": "{{var:count}} × W{{var:die}}",
+    "kind.flair.name": "Kniff",
+    "flair.haggling.name": "Gewiefte Händlerin",
+    "flair.haggling.short": "Beim Feilschen zählst du deine Übung doppelt.",
+    "flair.haggling.explain.what": "Auf der Fähre hast du jeden Tag gehandelt.",
+    "flair.haggling.explain.table": "Beim Feilschen zählst du deine Übung zweimal dazu.",
+    "flair.listening.name": "Feines Gehör",
+    "flair.listening.short": "Beim Lauschen zählst du deine Übung doppelt.",
+    "flair.listening.explain.what": "Im Glockenturm hörst du jeden Ton.",
+    "flair.listening.explain.table": "Beim Lauschen zählst du deine Übung zweimal dazu.",
+    "stat.traits.name": "Eigenschaften",
+    "stat-value.item.lantern-staff.traits": "Zweihändig, leuchtet {{length:10|short}} weit",
+    "stat-value.item.boat-hook.traits": "Lang (trifft noch auf {{length:10|short}}), zieht Gegner heran",
+    "stat-value.item.sling.traits": "Braucht Steine"
   }
 }

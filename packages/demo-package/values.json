@@ -150,7 +150,7 @@
   {
     "id": "hagglingRoll",
     "source": "mistland",
-    "formula": "heartBonus + if(has('talent.haggling'), practice, 0)"
+    "formula": "heartBonus + if(has('talent.haggling'), practice, 0) + if(has('flair.haggling'), practice, 0)"
   },
   {
     "id": "trackingRoll",
@@ -165,7 +165,7 @@
   {
     "id": "listeningRoll",
     "source": "mistland",
-    "formula": "witBonus + if(has('talent.listening'), practice, 0)"
+    "formula": "witBonus + if(has('talent.listening'), practice, 0) + if(has('flair.listening'), practice, 0)"
   },
   {
     "id": "legendsRoll",
@@ -261,6 +261,46 @@
     "id": "lanternSlots9",
     "source": "mistland",
     "default": 0
+  },
+  {
+    "id": "mightHold",
+    "source": "mistland",
+    "formula": "mightBonus"
+  },
+  {
+    "id": "graceHold",
+    "source": "mistland",
+    "formula": "graceBonus"
+  },
+  {
+    "id": "witHold",
+    "source": "mistland",
+    "formula": "witBonus + practice"
+  },
+  {
+    "id": "heartHold",
+    "source": "mistland",
+    "formula": "heartBonus + practice"
+  },
+  {
+    "id": "restDice",
+    "source": "mistland",
+    "formula": "level"
+  },
+  {
+    "id": "restDie",
+    "source": "mistland",
+    "formula": "if(has('calling.river-runner'), 10, if(has('calling.lantern-bearer'), 8, 6))"
+  },
+  {
+    "id": "closeCallsMade",
+    "source": "mistland",
+    "default": 3
+  },
+  {
+    "id": "closeCallsMissed",
+    "source": "mistland",
+    "default": 3
   },
   {
     "id": "age",
