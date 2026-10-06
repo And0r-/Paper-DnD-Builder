@@ -8,7 +8,10 @@ import { Ajv2020, type ValidateFunction } from "ajv/dist/2020.js";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
+import { DEMO_PACKAGE_DIR } from "@builder/demo-package";
 import { GET as health } from "../../../app/api/health/route.ts";
+import { healthReport } from "../health.ts";
+import { loadPackages } from "../packages/loader.ts";
 import { Client, passwordFromMail, signIn, startTestServer, type TestServer } from "../testing.ts";
 import { ROUTES } from "./router.ts";
 
@@ -239,12 +242,11 @@ describe("openapi.json", () => {
   });
 
   it("describes the health check", async () => {
-    const body = await health().json();
-    expect(
-      validator(
-        `${pointer("paths", "/api/health", "get", "responses", "200")}/content/application~1json/schema`,
-      )(body),
-    ).toBe(true);
+    const valid = validator(
+      `${pointer("paths", "/api/health", "get", "responses", "200")}/content/application~1json/schema`,
+    );
+    expect(valid(await (await health()).json())).toBe(true);
+    expect(valid(healthReport(await loadPackages(DEMO_PACKAGE_DIR, { info() {}, error() {} })))).toBe(true);
   });
 });
 

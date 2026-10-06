@@ -357,9 +357,9 @@ link. The PDF is made on every request and never stored.
 
 ## Server
 
-| Method & path     | Result                                                                          |
-| ----------------- | ------------------------------------------------------------------------------- |
-| `GET /api/health` | `{ "status": "ok" }` while the process serves requests. Public; used by Docker. |
+| Method & path     | Result                                                                                                                                                                                                                                                         |
+| ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /api/health` | `{ "status": "ok", "packages": [{ "id", "version", "formatVersion" }], "warnings": [] }` while the process serves requests, also without packages. `warnings` names rejected package folders, an empty package list or a failed start. Public; used by Docker. |
 
 ## Error codes
 
