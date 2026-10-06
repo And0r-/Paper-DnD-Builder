@@ -1,8 +1,9 @@
 /**
- * Level headings in the step list. The steps of a group stand in the order
- * the package grants them, so a choice of the first level can follow one
- * that comes at a higher level; the headings and the span still say the
- * level each one comes at.
+ * Level headings in the step list. The steps of a section stand from the
+ * lowest level to the highest (model.ts, byLevel), but the step that opens
+ * a section stays first, so what it brought can come at a lower level than
+ * the step before it; the headings and the span still say the level each
+ * one comes at.
  */
 
 /**

@@ -126,12 +126,44 @@ export function buildFlow(
     sectionKey: OVERVIEW_KEY,
     atLevel: lp.pkg.flow.level.min,
   });
-  for (const e of entries) {
-    const same = entries.filter((x) => x.section === e.section);
+  const sorted = byLevel(entries);
+  for (const e of sorted) {
+    const same = sorted.filter((x) => x.section === e.section);
     e.part = same.indexOf(e) + 1;
     e.parts = same.length;
   }
-  return entries;
+  return sorted;
+}
+
+/**
+ * The steps of a section from the lowest level they come at to the highest,
+ * so the list reads the way its span does ("Level 1 to 3"); steps of the
+ * same level keep the package's order. A gathered group sorts all its steps
+ * and the first one then leads it, with the group's name; any other section
+ * keeps the step that opens it first and sorts what that step brought along.
+ */
+export function byLevel(entries: FlowEntry[]): FlowEntry[] {
+  const out: FlowEntry[] = [];
+  for (let i = 0; i < entries.length;) {
+    let j = i;
+    while (j < entries.length && entries[j]!.section === entries[i]!.section) j++;
+    const section = entries.slice(i, j);
+    const head = section[0]!;
+    const title = head.sectionTitle;
+    const sorted =
+      title !== undefined
+        ? section.toSorted((a, b) => a.atLevel - b.atLevel)
+        : [head, ...section.slice(1).toSorted((a, b) => a.atLevel - b.atLevel)];
+    const lead = sorted[0]!;
+    for (const e of sorted) {
+      e.sectionKey = lead.key;
+      if (e !== lead) delete e.sectionTitle;
+    }
+    if (title !== undefined) lead.sectionTitle = title;
+    out.push(...sorted);
+    i = j;
+  }
+  return out;
 }
 
 /**

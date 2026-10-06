@@ -160,6 +160,32 @@ export function OptionDetails({ lp, thing, level }: { lp: LoadedPackage; thing: 
 
 // ---------------------------------------------------------------- options
 
+/**
+ * A card picked while part of it is under the Back / Next bar (or the top
+ * bar) comes fully into view, so the player sees what they chose. The page's
+ * scroll padding keeps it clear of both bars; a card taller than the room
+ * between them shows from its top.
+ */
+function bringIntoView(card: HTMLElement) {
+  const html = document.documentElement;
+  const style = getComputedStyle(html);
+  const top = parseFloat(style.scrollPaddingTop) || 0;
+  const bottom = parseFloat(style.scrollPaddingBottom) || 0;
+  const r = card.getBoundingClientRect();
+  if (r.top >= top && r.bottom <= window.innerHeight - bottom) return;
+  const fits = r.height <= window.innerHeight - top - bottom;
+  const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  card.scrollIntoView({ block: fits ? "nearest" : "start", behavior: still ? "auto" : "smooth" });
+}
+
+/** True when a point lies on the Back / Next bar, which lets taps through to the cards under it. */
+function underFooter(x: number, y: number): boolean {
+  const footer = document.querySelector(".step-footer__dock");
+  const bar = footer && getComputedStyle(footer).position !== "fixed" ? footer.parentElement : footer;
+  const r = bar?.getBoundingClientRect();
+  return r !== undefined && x >= r.left && x <= r.right && y >= r.top && y <= r.bottom;
+}
+
 export function OptionCard({
   lp,
   thing,
@@ -189,6 +215,7 @@ export function OptionCard({
   const explain = useExplain();
   const id = useId();
   const input = useRef<HTMLInputElement>(null);
+  const card = useRef<HTMLDivElement>(null);
   const goodIf = ptext(lp, `${thing.id}.goodIf`);
   const badgeText = badge ? ptext(lp, badge) : undefined;
   const details = <OptionDetails lp={lp} thing={thing} level={level} />;
@@ -201,6 +228,7 @@ export function OptionCard({
     );
   return (
     <div
+      ref={card}
       className={`option${checked ? " option--checked" : ""}${blocked ? " option--blocked" : ""}`}
       onClick={(e) => {
         // The whole card picks the option, except its own buttons and links.
@@ -208,7 +236,10 @@ export function OptionCard({
         input.current?.click();
       }}
       onFocus={showExplain}
-      onMouseEnter={showExplain}
+      onMouseEnter={(e) => {
+        // A pointer on the Back / Next bar is not on the card under it.
+        if (!underFooter(e.clientX, e.clientY)) showExplain();
+      }}
       data-option={thing.id}
     >
       <div className="option__head">
@@ -221,7 +252,9 @@ export function OptionCard({
           value={thing.id}
           checked={checked}
           onChange={() => {
-            if (!blocked) onToggle();
+            if (blocked) return;
+            onToggle();
+            if (!checked && card.current) bringIntoView(card.current);
           }}
           aria-disabled={blocked ? true : undefined}
           aria-describedby={blocked ? `${id}-blocked ${id}-short` : `${id}-short`}

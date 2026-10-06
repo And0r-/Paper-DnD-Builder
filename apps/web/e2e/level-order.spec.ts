@@ -1,9 +1,9 @@
 /**
  * Findings of the first rules check (AND-108):
  *
- * - A step of the first level that a group lists after one of a higher
- *   level never stands under "From level 3"; the group's span reads from
- *   the lower level to the higher one.
+ * - A step of the first level never stands under "From level 3"; the
+ *   group's span reads from the lower level to the higher one (since AND-119
+ *   the group lists it first).
  * - The overview names no thing twice in one "from" line.
  * - The last card of a long list is not under the Back / Next bar: tapping
  *   what is in view picks it.
@@ -141,14 +141,14 @@ for (const lang of ["de", "en"] as const) {
         await expect(group).toContainText(
           new RegExp(`${levelWord} 1 ${lang === "de" ? "bis" : "to"} 3`, "i"),
         );
-        // The level-3 part stands under "From level 3", the level-1 part after it under "Level 1".
+        // The level-1 part comes first with no heading, the level-3 part after it under "From level 3" (AND-119).
         const path = list.getByRole("link", { name: new RegExp(`^${w.path}`) });
         const craft = list.getByRole("link", { name: new RegExp(`^${w.herbCraft}`) });
         await expect(craft).toBeVisible();
         expect(await headingOf(path)).toMatch(
           new RegExp(`^${lang === "de" ? "Ab Stufe" : "From level"} 3$`, "i"),
         );
-        expect((await headingOf(craft)).toLowerCase()).toBe(`${levelWord} 1`.toLowerCase());
+        expect(await headingOf(craft)).toBe("");
         await shot(page, "schrittliste");
 
         // On the level-1 part itself: its heading names no level.
