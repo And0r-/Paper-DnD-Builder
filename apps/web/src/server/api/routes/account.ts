@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { printChoiceOf, printChoiceSchema, SHEET_DESIGNS } from "@builder/sheet/printouts";
 import { z } from "zod";
 import { accessKeyHash, accessKeyHint, MAX_KEYS_PER_ACCOUNT, newAccessKey } from "../../auth/access-keys.ts";
 import { publicAccount, renewPassword, UI_LANGUAGES } from "../../auth/accounts.ts";
@@ -15,6 +16,8 @@ const settingsSchema = z.strictObject({
   language: z.enum(UI_LANGUAGES).optional(),
   /** Unit per dimension; `null` goes back to the language's default. */
   units: z.record(z.string().max(50), z.string().max(20).nullable()).optional(),
+  /** What the download dialog starts from next time; fields left out stay as they are. */
+  print: printChoiceSchema.partial().optional(),
 });
 
 export const accountRoutes: Route[] = [
@@ -45,10 +48,15 @@ export const accountRoutes: Route[] = [
         if (!offered) throw new HttpError(422, "unknownUnit", { dimension, unit });
         units[dimension] = unit;
       }
+      const design = body.print?.design;
+      if (design !== undefined && !SHEET_DESIGNS.some((d) => d.id === design)) {
+        throw new HttpError(422, "designNotAvailable", { design });
+      }
       const updated = await ctx.app.store.updateSettings(
         account.id,
         body.language ?? account.language,
         units,
+        { ...printChoiceOf(account.print_choice), ...body.print },
       );
       return json(200, { account: publicAccount(updated) });
     },

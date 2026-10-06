@@ -23,12 +23,24 @@
     }
   ],
   "tags": [
-    { "name": "Login" },
-    { "name": "Account" },
-    { "name": "Access keys" },
-    { "name": "Packages" },
-    { "name": "Characters" },
-    { "name": "Print" },
+    {
+      "name": "Login"
+    },
+    {
+      "name": "Account"
+    },
+    {
+      "name": "Access keys"
+    },
+    {
+      "name": "Packages"
+    },
+    {
+      "name": "Characters"
+    },
+    {
+      "name": "Print"
+    },
     {
       "name": "Sheet copies",
       "description": "Copies of the sheet a player keeps and changes freely, and the play state. Kept apart from the character; the builder never reads them. Same access as the character: owner, game master of the owner's campaign, an access key of either; anyone else gets 404."
@@ -37,7 +49,9 @@
       "name": "Campaigns",
       "description": "Whoever makes a campaign leads it (game master) and adds players by mail address. The game master reaches every character of the players; a player sees only their own characters and the campaigns they are in. Anyone else gets 404."
     },
-    { "name": "Server" }
+    {
+      "name": "Server"
+    }
   ],
   "paths": {
     "/api/health": {
@@ -63,9 +77,15 @@
                       "items": {
                         "type": "object",
                         "properties": {
-                          "id": { "type": "string" },
-                          "version": { "type": "string" },
-                          "formatVersion": { "type": "string" }
+                          "id": {
+                            "type": "string"
+                          },
+                          "version": {
+                            "type": "string"
+                          },
+                          "formatVersion": {
+                            "type": "string"
+                          }
                         },
                         "required": ["id", "version", "formatVersion"],
                         "additionalProperties": false
@@ -73,7 +93,9 @@
                     },
                     "warnings": {
                       "type": "array",
-                      "items": { "type": "string" }
+                      "items": {
+                        "type": "string"
+                      }
                     }
                   },
                   "required": ["status", "packages", "warnings"],
@@ -436,9 +458,9 @@
     "/api/account/settings": {
       "patch": {
         "operationId": "updateSettings",
-        "summary": "Change language or units",
+        "summary": "Change language, units or the print choice",
         "tags": ["Account"],
-        "description": "`units` maps a dimension to a unit; `null` follows the language's default again.",
+        "description": "`units` maps a dimension to a unit; `null` follows the language's default again. `print` keeps what the download dialog offers next time; fields left out stay as they are.",
         "requestBody": {
           "required": true,
           "content": {
@@ -461,6 +483,28 @@
                         }
                       ]
                     }
+                  },
+                  "print": {
+                    "type": "object",
+                    "properties": {
+                      "parts": {
+                        "type": "array",
+                        "items": {
+                          "enum": ["sheet", "cards", "texts"]
+                        },
+                        "minItems": 1,
+                        "maxItems": 3,
+                        "uniqueItems": true,
+                        "description": "In file order."
+                      },
+                      "design": {
+                        "enum": ["classic", "verbose"]
+                      },
+                      "state": {
+                        "enum": ["empty", "filled"]
+                      }
+                    },
+                    "additionalProperties": false
                   }
                 },
                 "required": [],
@@ -503,7 +547,7 @@
             "$ref": "#/components/responses/JsonRequired"
           },
           "422": {
-            "description": "`unknownUnit`",
+            "description": "`unknownUnit`, `designNotAvailable` (a planned design that is not drawn yet)",
             "content": {
               "application/json": {
                 "schema": {
@@ -512,12 +556,15 @@
                     "error": {
                       "properties": {
                         "code": {
-                          "enum": ["unknownUnit"]
+                          "enum": ["unknownUnit", "designNotAvailable"]
                         },
                         "dimension": {
                           "type": "string"
                         },
                         "unit": {
+                          "type": "string"
+                        },
+                        "design": {
                           "type": "string"
                         }
                       }
@@ -2099,12 +2146,70 @@
         }
       }
     },
+    "/api/sheet-designs": {
+      "get": {
+        "operationId": "sheetDesigns",
+        "summary": "Designs a sheet can be printed in",
+        "tags": ["Print"],
+        "description": "The designs the server draws, with a name and one line about each in every screen language, for a choice before printing. `default` is the one used when none is asked for. Cards and rules texts look the same in every design.",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "The designs.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "designs": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "object",
+                            "additionalProperties": {
+                              "type": "string"
+                            },
+                            "description": "Per screen language."
+                          },
+                          "description": {
+                            "type": "object",
+                            "additionalProperties": {
+                              "type": "string"
+                            },
+                            "description": "Per screen language."
+                          }
+                        },
+                        "required": ["id", "name", "description"],
+                        "additionalProperties": false
+                      }
+                    },
+                    "default": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["designs", "default"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
     "/api/drafts/{id}/pdf": {
       "get": {
         "operationId": "pdf",
         "summary": "The printed character",
         "tags": ["Print"],
-        "description": "A4 PDF: sheet, then cards; language and units from the account settings. Made on every request, never stored. A game master prints a player's character in the game master's language and units.",
+        "description": "A4 PDF/A with the parts asked for, always in the order sheet, cards, rules texts; one page count through the file. Without `parts`: the sheet, then the cards, exactly as before parts existed. Language and units from the account settings. Made on every request, never stored. A game master prints a player's character in the game master's language and units.",
         "parameters": [
           {
             "name": "id",
@@ -2114,6 +2219,45 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "parts",
+            "in": "query",
+            "required": false,
+            "description": "Comma-separated, one or more of `sheet` (the character sheet), `cards` (one card per thing marked as a card, with cut lines), `texts` (the full rules texts of every feature and card, two columns, under the name of what brought them). Default: `sheet,cards`.",
+            "schema": {
+              "type": "string",
+              "examples": ["sheet", "sheet,cards,texts"]
+            }
+          },
+          {
+            "name": "design",
+            "in": "query",
+            "required": false,
+            "description": "How the sheet looks; ids from `GET /api/sheet-designs`. Default: the first design there (`verbose`). `classic` is planned and answers `400 designNotAvailable` until it is drawn.",
+            "schema": {
+              "enum": ["classic", "verbose"]
+            }
+          },
+          {
+            "name": "version",
+            "in": "query",
+            "required": false,
+            "description": "Which sheet: `original` (made from the character as it is now). Printing a kept copy comes later; any other value answers `404 versionNotFound`.",
+            "schema": {
+              "type": "string",
+              "default": "original"
+            }
+          },
+          {
+            "name": "state",
+            "in": "query",
+            "required": false,
+            "description": "`empty`: a sheet to write on. `filled` (the play state written in) is planned and answers `400 stateNotAvailable` until it is printed.",
+            "schema": {
+              "enum": ["empty", "filled"],
+              "default": "empty"
+            }
           }
         ],
         "responses": {
@@ -2121,7 +2265,7 @@
             "description": "The PDF.",
             "headers": {
               "Content-Disposition": {
-                "description": "`attachment` with the character's name.",
+                "description": "`attachment` with the character's name; with `parts`, the parts' names after it (\"Mira - Sheet, Cards.pdf\").",
                 "schema": {
                   "type": "string"
                 }
@@ -2136,11 +2280,8 @@
               }
             }
           },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "404": {
-            "description": "`draftNotFound` (also someone else's character: it looks exactly like a missing one)",
+          "400": {
+            "description": "`badQuery` (a parameter with a value the API does not know; `parameter` and `value` name it), `designNotAvailable` (a planned design not drawn yet; `designs` lists those that are), `stateNotAvailable` (the play state is not printed yet)",
             "content": {
               "application/json": {
                 "schema": {
@@ -2149,7 +2290,50 @@
                     "error": {
                       "properties": {
                         "code": {
-                          "enum": ["draftNotFound"]
+                          "enum": ["badQuery", "designNotAvailable", "stateNotAvailable"]
+                        },
+                        "parameter": {
+                          "type": "string"
+                        },
+                        "value": {
+                          "type": "string"
+                        },
+                        "design": {
+                          "type": "string"
+                        },
+                        "designs": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "state": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "description": "`draftNotFound` (also someone else's character: it looks exactly like a missing one), `versionNotFound` (no such version of the sheet to print)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "enum": ["draftNotFound", "versionNotFound"]
+                        },
+                        "version": {
+                          "type": "string"
                         }
                       }
                     }
@@ -2259,7 +2443,9 @@
             "in": "path",
             "required": true,
             "description": "Draft id (a UUID).",
-            "schema": { "type": "string" }
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -2270,8 +2456,15 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "copies": { "type": "array", "items": { "$ref": "#/components/schemas/SheetCopy" } },
-                    "original": { "$ref": "#/components/schemas/OriginalStamp" }
+                    "copies": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/SheetCopy"
+                      }
+                    },
+                    "original": {
+                      "$ref": "#/components/schemas/OriginalStamp"
+                    }
                   },
                   "required": ["copies", "original"],
                   "additionalProperties": false
@@ -2279,19 +2472,31 @@
               }
             }
           },
-          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
           "404": {
             "description": "`draftNotFound` (also someone else's character: it looks exactly like a missing one)",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Error",
-                  "properties": { "error": { "properties": { "code": { "enum": ["draftNotFound"] } } } }
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "enum": ["draftNotFound"]
+                        }
+                      }
+                    }
+                  }
                 }
               }
             }
           },
-          "default": { "$ref": "#/components/responses/ServerError" }
+          "default": {
+            "$ref": "#/components/responses/ServerError"
+          }
         }
       },
       "post": {
@@ -2305,7 +2510,9 @@
             "in": "path",
             "required": true,
             "description": "Draft id (a UUID).",
-            "schema": { "type": "string" }
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -2321,7 +2528,9 @@
                     "maxLength": 80,
                     "description": "One line, no control characters."
                   },
-                  "model": { "$ref": "#/components/schemas/SheetModel" }
+                  "model": {
+                    "$ref": "#/components/schemas/SheetModel"
+                  }
                 },
                 "additionalProperties": false
               }
@@ -2331,18 +2540,38 @@
         "responses": {
           "201": {
             "description": "The new copy.",
-            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/SheetCopyView" } } }
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SheetCopyView"
+                }
+              }
+            }
           },
-          "400": { "$ref": "#/components/responses/BadBody" },
-          "401": { "$ref": "#/components/responses/Unauthorized" },
-          "403": { "$ref": "#/components/responses/CrossSite" },
+          "400": {
+            "$ref": "#/components/responses/BadBody"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/CrossSite"
+          },
           "404": {
             "description": "`draftNotFound` (also someone else's character: it looks exactly like a missing one)",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Error",
-                  "properties": { "error": { "properties": { "code": { "enum": ["draftNotFound"] } } } }
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "enum": ["draftNotFound"]
+                        }
+                      }
+                    }
+                  }
                 }
               }
             }
@@ -2359,10 +2588,21 @@
                         "code": {
                           "enum": ["notFinished", "tooManyCopies", "originalChanged", "packageUnavailable"]
                         },
-                        "open": { "type": "array", "items": { "type": "string" } },
-                        "max": { "type": "integer" },
-                        "original": { "$ref": "#/components/schemas/OriginalStamp" },
-                        "packageId": { "type": "string" }
+                        "open": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "max": {
+                          "type": "integer"
+                        },
+                        "original": {
+                          "$ref": "#/components/schemas/OriginalStamp"
+                        },
+                        "packageId": {
+                          "type": "string"
+                        }
                       }
                     }
                   }
@@ -2379,8 +2619,12 @@
                   "properties": {
                     "error": {
                       "properties": {
-                        "code": { "enum": ["bodyTooLarge", "copyTooLarge"] },
-                        "max": { "type": "integer" }
+                        "code": {
+                          "enum": ["bodyTooLarge", "copyTooLarge"]
+                        },
+                        "max": {
+                          "type": "integer"
+                        }
                       }
                     }
                   }
@@ -2388,7 +2632,9 @@
               }
             }
           },
-          "415": { "$ref": "#/components/responses/JsonRequired" },
+          "415": {
+            "$ref": "#/components/responses/JsonRequired"
+          },
           "422": {
             "description": "`languageNotSupported`",
             "content": {
@@ -2398,9 +2644,18 @@
                   "properties": {
                     "error": {
                       "properties": {
-                        "code": { "enum": ["languageNotSupported"] },
-                        "language": { "type": "string" },
-                        "languages": { "type": "array", "items": { "type": "string" } }
+                        "code": {
+                          "enum": ["languageNotSupported"]
+                        },
+                        "language": {
+                          "type": "string"
+                        },
+                        "languages": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
                       }
                     }
                   }
@@ -2408,7 +2663,9 @@
               }
             }
           },
-          "default": { "$ref": "#/components/responses/ServerError" }
+          "default": {
+            "$ref": "#/components/responses/ServerError"
+          }
         }
       }
     },
@@ -2424,22 +2681,34 @@
             "in": "path",
             "required": true,
             "description": "Draft id (a UUID).",
-            "schema": { "type": "string" }
+            "schema": {
+              "type": "string"
+            }
           },
           {
             "name": "copyId",
             "in": "path",
             "required": true,
             "description": "Copy id (a UUID).",
-            "schema": { "type": "string" }
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
           "200": {
             "description": "The copy.",
-            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/SheetCopyView" } } }
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SheetCopyView"
+                }
+              }
+            }
           },
-          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
           "404": {
             "description": "`draftNotFound` (also someone else's character), `copyNotFound`",
             "content": {
@@ -2447,13 +2716,21 @@
                 "schema": {
                   "$ref": "#/components/schemas/Error",
                   "properties": {
-                    "error": { "properties": { "code": { "enum": ["draftNotFound", "copyNotFound"] } } }
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "enum": ["draftNotFound", "copyNotFound"]
+                        }
+                      }
+                    }
                   }
                 }
               }
             }
           },
-          "default": { "$ref": "#/components/responses/ServerError" }
+          "default": {
+            "$ref": "#/components/responses/ServerError"
+          }
         }
       },
       "put": {
@@ -2467,14 +2744,18 @@
             "in": "path",
             "required": true,
             "description": "Draft id (a UUID).",
-            "schema": { "type": "string" }
+            "schema": {
+              "type": "string"
+            }
           },
           {
             "name": "copyId",
             "in": "path",
             "required": true,
             "description": "Copy id (a UUID).",
-            "schema": { "type": "string" }
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -2495,7 +2776,9 @@
                     "maxLength": 80,
                     "description": "One line, no control characters."
                   },
-                  "model": { "$ref": "#/components/schemas/SheetModel" }
+                  "model": {
+                    "$ref": "#/components/schemas/SheetModel"
+                  }
                 },
                 "required": ["version"],
                 "additionalProperties": false
@@ -2506,11 +2789,23 @@
         "responses": {
           "200": {
             "description": "The changed copy.",
-            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/SheetCopyView" } } }
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SheetCopyView"
+                }
+              }
+            }
           },
-          "400": { "$ref": "#/components/responses/BadBody" },
-          "401": { "$ref": "#/components/responses/Unauthorized" },
-          "403": { "$ref": "#/components/responses/CrossSite" },
+          "400": {
+            "$ref": "#/components/responses/BadBody"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/CrossSite"
+          },
           "404": {
             "description": "`draftNotFound` (also someone else's character), `copyNotFound`",
             "content": {
@@ -2518,7 +2813,13 @@
                 "schema": {
                   "$ref": "#/components/schemas/Error",
                   "properties": {
-                    "error": { "properties": { "code": { "enum": ["draftNotFound", "copyNotFound"] } } }
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "enum": ["draftNotFound", "copyNotFound"]
+                        }
+                      }
+                    }
                   }
                 }
               }
@@ -2533,8 +2834,12 @@
                   "properties": {
                     "error": {
                       "properties": {
-                        "code": { "enum": ["versionConflict"] },
-                        "current": { "$ref": "#/components/schemas/SheetCopyView" }
+                        "code": {
+                          "enum": ["versionConflict"]
+                        },
+                        "current": {
+                          "$ref": "#/components/schemas/SheetCopyView"
+                        }
                       }
                     }
                   }
@@ -2551,8 +2856,12 @@
                   "properties": {
                     "error": {
                       "properties": {
-                        "code": { "enum": ["bodyTooLarge", "copyTooLarge"] },
-                        "max": { "type": "integer" }
+                        "code": {
+                          "enum": ["bodyTooLarge", "copyTooLarge"]
+                        },
+                        "max": {
+                          "type": "integer"
+                        }
                       }
                     }
                   }
@@ -2560,8 +2869,12 @@
               }
             }
           },
-          "415": { "$ref": "#/components/responses/JsonRequired" },
-          "default": { "$ref": "#/components/responses/ServerError" }
+          "415": {
+            "$ref": "#/components/responses/JsonRequired"
+          },
+          "default": {
+            "$ref": "#/components/responses/ServerError"
+          }
         }
       },
       "delete": {
@@ -2574,20 +2887,30 @@
             "in": "path",
             "required": true,
             "description": "Draft id (a UUID).",
-            "schema": { "type": "string" }
+            "schema": {
+              "type": "string"
+            }
           },
           {
             "name": "copyId",
             "in": "path",
             "required": true,
             "description": "Copy id (a UUID).",
-            "schema": { "type": "string" }
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
-          "204": { "description": "Done. No body." },
-          "401": { "$ref": "#/components/responses/Unauthorized" },
-          "403": { "$ref": "#/components/responses/CrossSite" },
+          "204": {
+            "description": "Done. No body."
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/CrossSite"
+          },
           "404": {
             "description": "`draftNotFound` (also someone else's character), `copyNotFound`",
             "content": {
@@ -2595,13 +2918,21 @@
                 "schema": {
                   "$ref": "#/components/schemas/Error",
                   "properties": {
-                    "error": { "properties": { "code": { "enum": ["draftNotFound", "copyNotFound"] } } }
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "enum": ["draftNotFound", "copyNotFound"]
+                        }
+                      }
+                    }
                   }
                 }
               }
             }
           },
-          "default": { "$ref": "#/components/responses/ServerError" }
+          "default": {
+            "$ref": "#/components/responses/ServerError"
+          }
         }
       }
     },
@@ -2617,27 +2948,47 @@
             "in": "path",
             "required": true,
             "description": "Draft id (a UUID).",
-            "schema": { "type": "string" }
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
           "200": {
             "description": "The play state; `version: 0` and `{}` while nothing is stored.",
-            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PlayStateView" } } }
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlayStateView"
+                }
+              }
+            }
           },
-          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
           "404": {
             "description": "`draftNotFound` (also someone else's character: it looks exactly like a missing one)",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Error",
-                  "properties": { "error": { "properties": { "code": { "enum": ["draftNotFound"] } } } }
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "enum": ["draftNotFound"]
+                        }
+                      }
+                    }
+                  }
                 }
               }
             }
           },
-          "default": { "$ref": "#/components/responses/ServerError" }
+          "default": {
+            "$ref": "#/components/responses/ServerError"
+          }
         }
       },
       "put": {
@@ -2651,7 +3002,9 @@
             "in": "path",
             "required": true,
             "description": "Draft id (a UUID).",
-            "schema": { "type": "string" }
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -2663,8 +3016,13 @@
                   {
                     "type": "object",
                     "properties": {
-                      "version": { "type": "integer", "minimum": 0 },
-                      "state": { "$ref": "#/components/schemas/PlayState" }
+                      "version": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "state": {
+                        "$ref": "#/components/schemas/PlayState"
+                      }
                     },
                     "required": ["version", "state"],
                     "additionalProperties": false
@@ -2672,8 +3030,13 @@
                   {
                     "type": "object",
                     "properties": {
-                      "version": { "type": "integer", "minimum": 0 },
-                      "clearChecks": { "const": true }
+                      "version": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "clearChecks": {
+                        "const": true
+                      }
                     },
                     "required": ["version", "clearChecks"],
                     "additionalProperties": false
@@ -2686,18 +3049,38 @@
         "responses": {
           "200": {
             "description": "The stored state.",
-            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PlayStateView" } } }
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlayStateView"
+                }
+              }
+            }
           },
-          "400": { "$ref": "#/components/responses/BadBody" },
-          "401": { "$ref": "#/components/responses/Unauthorized" },
-          "403": { "$ref": "#/components/responses/CrossSite" },
+          "400": {
+            "$ref": "#/components/responses/BadBody"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/CrossSite"
+          },
           "404": {
             "description": "`draftNotFound` (also someone else's character: it looks exactly like a missing one)",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Error",
-                  "properties": { "error": { "properties": { "code": { "enum": ["draftNotFound"] } } } }
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "enum": ["draftNotFound"]
+                        }
+                      }
+                    }
+                  }
                 }
               }
             }
@@ -2711,8 +3094,12 @@
                   "properties": {
                     "error": {
                       "properties": {
-                        "code": { "enum": ["versionConflict"] },
-                        "current": { "$ref": "#/components/schemas/PlayStateView" }
+                        "code": {
+                          "enum": ["versionConflict"]
+                        },
+                        "current": {
+                          "$ref": "#/components/schemas/PlayStateView"
+                        }
                       }
                     }
                   }
@@ -2720,9 +3107,15 @@
               }
             }
           },
-          "413": { "$ref": "#/components/responses/BodyTooLarge" },
-          "415": { "$ref": "#/components/responses/JsonRequired" },
-          "default": { "$ref": "#/components/responses/ServerError" }
+          "413": {
+            "$ref": "#/components/responses/BodyTooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/JsonRequired"
+          },
+          "default": {
+            "$ref": "#/components/responses/ServerError"
+          }
         }
       }
     },
@@ -3659,21 +4052,35 @@
       "SheetModel": {
         "type": "object",
         "properties": {
-          "version": { "type": "number", "const": 1 },
-          "language": { "type": "string" },
+          "version": {
+            "type": "number",
+            "const": 1
+          },
+          "language": {
+            "type": "string"
+          },
           "origin": {
             "oneOf": [
               {
                 "type": "object",
                 "properties": {
-                  "kind": { "type": "string", "const": "original" },
-                  "level": { "type": "integer", "minimum": -9007199254740991, "maximum": 9007199254740991 },
+                  "kind": {
+                    "type": "string",
+                    "const": "original"
+                  },
+                  "level": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
                   "builtAt": {
                     "type": "string",
                     "format": "date-time",
                     "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
                   },
-                  "packageVersion": { "type": "string" },
+                  "packageVersion": {
+                    "type": "string"
+                  },
                   "changedAt": {
                     "type": "string",
                     "format": "date-time",
@@ -3686,8 +4093,13 @@
               {
                 "type": "object",
                 "properties": {
-                  "kind": { "type": "string", "const": "copy" },
-                  "name": { "type": "string" },
+                  "kind": {
+                    "type": "string",
+                    "const": "copy"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
                   "createdAt": {
                     "type": "string",
                     "format": "date-time",
@@ -3698,7 +4110,9 @@
                     "minimum": -9007199254740991,
                     "maximum": 9007199254740991
                   },
-                  "fromPackageVersion": { "type": "string" },
+                  "fromPackageVersion": {
+                    "type": "string"
+                  },
                   "fromChangedAt": {
                     "type": "string",
                     "format": "date-time",
@@ -3710,19 +4124,41 @@
               }
             ]
           },
-          "packageId": { "type": "string" },
-          "name": { "type": "string" },
-          "level": { "type": "integer", "minimum": -9007199254740991, "maximum": 9007199254740991 },
-          "levelLabel": { "type": "string" },
-          "packageName": { "type": "string" },
+          "packageId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "level": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "levelLabel": {
+            "type": "string"
+          },
+          "packageName": {
+            "type": "string"
+          },
           "units": {
             "type": "object",
-            "propertyNames": { "type": "string" },
-            "additionalProperties": { "type": "string" }
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {
+              "type": "string"
+            }
           },
-          "unitsLine": { "type": "string" },
-          "attribution": { "type": "string" },
-          "createdOn": { "type": "string" },
+          "unitsLine": {
+            "type": "string"
+          },
+          "attribution": {
+            "type": "string"
+          },
+          "createdOn": {
+            "type": "string"
+          },
           "sections": {
             "type": "array",
             "items": {
@@ -3730,24 +4166,53 @@
                 {
                   "type": "object",
                   "properties": {
-                    "id": { "type": "string" },
-                    "span": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
-                    "title": { "type": "string" },
-                    "hint": { "type": "string" },
-                    "kind": { "type": "string", "const": "header" },
-                    "name": { "type": "string" },
-                    "summary": { "type": "string" },
-                    "packageName": { "type": "string" },
+                    "id": {
+                      "type": "string"
+                    },
+                    "span": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 9007199254740991
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "hint": {
+                      "type": "string"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "const": "header"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "summary": {
+                      "type": "string"
+                    },
+                    "packageName": {
+                      "type": "string"
+                    },
                     "fields": {
                       "type": "array",
                       "items": {
                         "type": "object",
-                        "properties": { "label": { "type": "string" }, "text": { "type": "string" } },
+                        "properties": {
+                          "label": {
+                            "type": "string"
+                          },
+                          "text": {
+                            "type": "string"
+                          }
+                        },
                         "required": ["label", "text"],
                         "additionalProperties": false
                       }
                     },
-                    "playedByField": { "type": "string", "minLength": 1 }
+                    "playedByField": {
+                      "type": "string",
+                      "minLength": 1
+                    }
                   },
                   "required": [
                     "id",
@@ -3765,24 +4230,59 @@
                 {
                   "type": "object",
                   "properties": {
-                    "id": { "type": "string" },
-                    "span": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
-                    "title": { "type": "string" },
-                    "hint": { "type": "string" },
-                    "kind": { "type": "string", "const": "statBoxes" },
+                    "id": {
+                      "type": "string"
+                    },
+                    "span": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 9007199254740991
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "hint": {
+                      "type": "string"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "const": "statBoxes"
+                    },
                     "boxes": {
                       "type": "array",
                       "items": {
                         "type": "object",
                         "properties": {
-                          "valueId": { "type": "string" },
-                          "label": { "type": "string" },
-                          "style": { "type": "string", "enum": ["number", "pencil", "circles", "boxes"] },
-                          "text": { "type": "string" },
-                          "circles": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
-                          "squares": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
-                          "hint": { "type": "string" },
-                          "field": { "type": "string", "minLength": 1 }
+                          "valueId": {
+                            "type": "string"
+                          },
+                          "label": {
+                            "type": "string"
+                          },
+                          "style": {
+                            "type": "string",
+                            "enum": ["number", "pencil", "circles", "boxes"]
+                          },
+                          "text": {
+                            "type": "string"
+                          },
+                          "circles": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "squares": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "hint": {
+                            "type": "string"
+                          },
+                          "field": {
+                            "type": "string",
+                            "minLength": 1
+                          }
                         },
                         "required": ["valueId", "label", "style", "text", "circles", "squares", "hint"],
                         "additionalProperties": false
@@ -3795,34 +4295,65 @@
                 {
                   "type": "object",
                   "properties": {
-                    "id": { "type": "string" },
-                    "span": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
-                    "title": { "type": "string" },
-                    "hint": { "type": "string" },
-                    "kind": { "type": "string", "const": "scoreColumn" },
+                    "id": {
+                      "type": "string"
+                    },
+                    "span": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 9007199254740991
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "hint": {
+                      "type": "string"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "const": "scoreColumn"
+                    },
                     "scores": {
                       "type": "array",
                       "items": {
                         "type": "object",
                         "properties": {
-                          "valueId": { "type": "string" },
-                          "label": { "type": "string" },
-                          "value": { "type": "string" },
-                          "derivedId": { "type": "string" },
-                          "derivedLabel": { "type": "string" },
-                          "derived": { "type": ["string", "null"] },
+                          "valueId": {
+                            "type": "string"
+                          },
+                          "label": {
+                            "type": "string"
+                          },
+                          "value": {
+                            "type": "string"
+                          },
+                          "derivedId": {
+                            "type": "string"
+                          },
+                          "derivedLabel": {
+                            "type": "string"
+                          },
+                          "derived": {
+                            "type": ["string", "null"]
+                          },
                           "extra": {
                             "anyOf": [
                               {
                                 "type": "object",
                                 "properties": {
-                                  "label": { "type": "string" },
-                                  "value": { "type": "string" }
+                                  "label": {
+                                    "type": "string"
+                                  },
+                                  "value": {
+                                    "type": "string"
+                                  }
                                 },
                                 "required": ["label", "value"],
                                 "additionalProperties": false
                               },
-                              { "type": "null" }
+                              {
+                                "type": "null"
+                              }
                             ]
                           }
                         },
@@ -3837,34 +4368,72 @@
                 {
                   "type": "object",
                   "properties": {
-                    "id": { "type": "string" },
-                    "span": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
-                    "title": { "type": "string" },
-                    "hint": { "type": "string" },
-                    "kind": { "type": "string", "const": "checkList" },
+                    "id": {
+                      "type": "string"
+                    },
+                    "span": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 9007199254740991
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "hint": {
+                      "type": "string"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "const": "checkList"
+                    },
                     "items": {
                       "type": "array",
                       "items": {
                         "type": "object",
                         "properties": {
-                          "id": { "type": "string" },
-                          "name": { "type": "string" },
-                          "marked": { "type": "boolean" },
-                          "strong": { "type": "boolean" },
-                          "note": { "type": "string" },
+                          "id": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "marked": {
+                            "type": "boolean"
+                          },
+                          "strong": {
+                            "type": "boolean"
+                          },
+                          "note": {
+                            "type": "string"
+                          },
                           "total": {
                             "type": "object",
-                            "properties": { "text": { "type": "string" }, "parts": { "type": "string" } },
+                            "properties": {
+                              "text": {
+                                "type": "string"
+                              },
+                              "parts": {
+                                "type": "string"
+                              }
+                            },
                             "required": ["text", "parts"],
                             "additionalProperties": false
                           },
-                          "field": { "type": "string", "minLength": 1 }
+                          "field": {
+                            "type": "string",
+                            "minLength": 1
+                          }
                         },
                         "required": ["id", "name", "marked", "note", "total"],
                         "additionalProperties": false
                       }
                     },
-                    "legend": { "type": "array", "items": { "type": "string" } }
+                    "legend": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
                   },
                   "required": ["id", "span", "title", "hint", "kind", "items", "legend"],
                   "additionalProperties": false
@@ -3872,20 +4441,50 @@
                 {
                   "type": "object",
                   "properties": {
-                    "id": { "type": "string" },
-                    "span": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
-                    "title": { "type": "string" },
-                    "hint": { "type": "string" },
-                    "kind": { "type": "string", "const": "statTable" },
-                    "columns": { "type": "array", "items": { "type": "string" } },
-                    "wrap": { "type": "array", "items": { "type": "boolean" } },
+                    "id": {
+                      "type": "string"
+                    },
+                    "span": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 9007199254740991
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "hint": {
+                      "type": "string"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "const": "statTable"
+                    },
+                    "columns": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "wrap": {
+                      "type": "array",
+                      "items": {
+                        "type": "boolean"
+                      }
+                    },
                     "rows": {
                       "type": "array",
                       "items": {
                         "type": "object",
                         "properties": {
-                          "name": { "type": "string" },
-                          "cells": { "type": "array", "items": { "type": "string" } }
+                          "name": {
+                            "type": "string"
+                          },
+                          "cells": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          }
                         },
                         "required": ["name", "cells"],
                         "additionalProperties": false
@@ -3898,22 +4497,50 @@
                 {
                   "type": "object",
                   "properties": {
-                    "id": { "type": "string" },
-                    "span": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
-                    "title": { "type": "string" },
-                    "hint": { "type": "string" },
-                    "kind": { "type": "string", "const": "featureTable" },
-                    "lead": { "type": "array", "items": { "type": "string" } },
+                    "id": {
+                      "type": "string"
+                    },
+                    "span": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 9007199254740991
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "hint": {
+                      "type": "string"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "const": "featureTable"
+                    },
+                    "lead": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
                     "rows": {
                       "type": "array",
                       "items": {
                         "type": "object",
                         "properties": {
-                          "id": { "type": "string" },
-                          "name": { "type": "string" },
-                          "marks": { "type": "string" },
-                          "note": { "type": "string" },
-                          "text": { "type": "string" },
+                          "id": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "marks": {
+                            "type": "string"
+                          },
+                          "note": {
+                            "type": "string"
+                          },
+                          "text": {
+                            "type": "string"
+                          },
                           "uses": {
                             "anyOf": [
                               {
@@ -3944,29 +4571,46 @@
                                   },
                                   {
                                     "type": "object",
-                                    "properties": { "text": { "type": "string" } },
+                                    "properties": {
+                                      "text": {
+                                        "type": "string"
+                                      }
+                                    },
                                     "required": ["text"],
                                     "additionalProperties": false
                                   }
                                 ]
                               },
-                              { "type": "null" }
+                              {
+                                "type": "null"
+                              }
                             ]
                           },
-                          "usesField": { "type": "string", "minLength": 1 },
+                          "usesField": {
+                            "type": "string",
+                            "minLength": 1
+                          },
                           "group": {
                             "anyOf": [
                               {
                                 "type": "object",
                                 "properties": {
-                                  "key": { "type": "string" },
-                                  "title": { "type": "string" },
-                                  "hint": { "type": "string" }
+                                  "key": {
+                                    "type": "string"
+                                  },
+                                  "title": {
+                                    "type": "string"
+                                  },
+                                  "hint": {
+                                    "type": "string"
+                                  }
                                 },
                                 "required": ["key", "title", "hint"],
                                 "additionalProperties": false
                               },
-                              { "type": "null" }
+                              {
+                                "type": "null"
+                              }
                             ]
                           }
                         },
@@ -3974,7 +4618,12 @@
                         "additionalProperties": false
                       }
                     },
-                    "legend": { "type": "array", "items": { "type": "string" } }
+                    "legend": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
                   },
                   "required": ["id", "span", "title", "hint", "kind", "lead", "rows", "legend"],
                   "additionalProperties": false
@@ -3982,14 +4631,39 @@
                 {
                   "type": "object",
                   "properties": {
-                    "id": { "type": "string" },
-                    "span": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
-                    "title": { "type": "string" },
-                    "hint": { "type": "string" },
-                    "kind": { "type": "string", "const": "list" },
-                    "items": { "type": "array", "items": { "type": "string" } },
-                    "blankLines": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
-                    "field": { "type": "string", "minLength": 1 }
+                    "id": {
+                      "type": "string"
+                    },
+                    "span": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 9007199254740991
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "hint": {
+                      "type": "string"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "const": "list"
+                    },
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "blankLines": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "field": {
+                      "type": "string",
+                      "minLength": 1
+                    }
                   },
                   "required": ["id", "span", "title", "hint", "kind", "items", "blankLines"],
                   "additionalProperties": false
@@ -3997,16 +4671,36 @@
                 {
                   "type": "object",
                   "properties": {
-                    "id": { "type": "string" },
-                    "span": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
-                    "title": { "type": "string" },
-                    "hint": { "type": "string" },
-                    "kind": { "type": "string", "const": "answers" },
+                    "id": {
+                      "type": "string"
+                    },
+                    "span": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 9007199254740991
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "hint": {
+                      "type": "string"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "const": "answers"
+                    },
                     "rows": {
                       "type": "array",
                       "items": {
                         "type": "object",
-                        "properties": { "label": { "type": "string" }, "text": { "type": "string" } },
+                        "properties": {
+                          "label": {
+                            "type": "string"
+                          },
+                          "text": {
+                            "type": "string"
+                          }
+                        },
                         "required": ["label", "text"],
                         "additionalProperties": false
                       }
@@ -4018,12 +4712,30 @@
                 {
                   "type": "object",
                   "properties": {
-                    "id": { "type": "string" },
-                    "span": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
-                    "title": { "type": "string" },
-                    "hint": { "type": "string" },
-                    "kind": { "type": "string", "const": "helpBox" },
-                    "paragraphs": { "type": "array", "items": { "type": "string" } }
+                    "id": {
+                      "type": "string"
+                    },
+                    "span": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 9007199254740991
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "hint": {
+                      "type": "string"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "const": "helpBox"
+                    },
+                    "paragraphs": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
                   },
                   "required": ["id", "span", "title", "hint", "kind", "paragraphs"],
                   "additionalProperties": false
@@ -4031,13 +4743,33 @@
                 {
                   "type": "object",
                   "properties": {
-                    "id": { "type": "string" },
-                    "span": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
-                    "title": { "type": "string" },
-                    "hint": { "type": "string" },
-                    "kind": { "type": "string", "const": "notes" },
-                    "lines": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
-                    "field": { "type": "string", "minLength": 1 }
+                    "id": {
+                      "type": "string"
+                    },
+                    "span": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 9007199254740991
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "hint": {
+                      "type": "string"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "const": "notes"
+                    },
+                    "lines": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "field": {
+                      "type": "string",
+                      "minLength": 1
+                    }
                   },
                   "required": ["id", "span", "title", "hint", "kind", "lines"],
                   "additionalProperties": false
@@ -4050,20 +4782,40 @@
             "items": {
               "type": "object",
               "properties": {
-                "id": { "type": "string" },
-                "typeLine": { "type": "string" },
-                "name": { "type": "string" },
+                "id": {
+                  "type": "string"
+                },
+                "typeLine": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
                 "fields": {
                   "type": "array",
                   "items": {
                     "type": "object",
-                    "properties": { "label": { "type": "string" }, "value": { "type": "string" } },
+                    "properties": {
+                      "label": {
+                        "type": "string"
+                      },
+                      "value": {
+                        "type": "string"
+                      }
+                    },
                     "required": ["label", "value"],
                     "additionalProperties": false
                   }
                 },
-                "table": { "type": "string" },
-                "rules": { "type": "array", "items": { "type": "string" } },
+                "table": {
+                  "type": "string"
+                },
+                "rules": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
                 "uses": {
                   "anyOf": [
                     {
@@ -4071,7 +4823,11 @@
                         {
                           "type": "object",
                           "properties": {
-                            "boxes": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 }
+                            "boxes": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 9007199254740991
+                            }
                           },
                           "required": ["boxes"],
                           "additionalProperties": false
@@ -4079,24 +4835,39 @@
                         {
                           "type": "object",
                           "properties": {
-                            "count": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 }
+                            "count": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 9007199254740991
+                            }
                           },
                           "required": ["count"],
                           "additionalProperties": false
                         },
                         {
                           "type": "object",
-                          "properties": { "text": { "type": "string" } },
+                          "properties": {
+                            "text": {
+                              "type": "string"
+                            }
+                          },
                           "required": ["text"],
                           "additionalProperties": false
                         }
                       ]
                     },
-                    { "type": "null" }
+                    {
+                      "type": "null"
+                    }
                   ]
                 },
-                "usesField": { "type": "string", "minLength": 1 },
-                "hint": { "type": "string" }
+                "usesField": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "hint": {
+                  "type": "string"
+                }
               },
               "required": ["id", "typeLine", "name", "fields", "table", "rules", "uses", "hint"],
               "additionalProperties": false
@@ -4107,14 +4878,27 @@
             "items": {
               "type": "object",
               "properties": {
-                "id": { "type": "string" },
-                "label": { "type": "string" },
-                "text": { "type": "string" },
+                "id": {
+                  "type": "string"
+                },
+                "label": {
+                  "type": "string"
+                },
+                "text": {
+                  "type": "string"
+                },
                 "dependents": {
                   "type": "array",
                   "items": {
                     "type": "object",
-                    "properties": { "id": { "type": "string" }, "label": { "type": "string" } },
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "label": {
+                        "type": "string"
+                      }
+                    },
                     "required": ["id", "label"],
                     "additionalProperties": false
                   }
@@ -4129,18 +4913,38 @@
             "items": {
               "type": "object",
               "properties": {
-                "origin": { "type": "string" },
-                "title": { "type": "string" },
+                "origin": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                },
                 "entries": {
                   "type": "array",
                   "items": {
                     "type": "object",
                     "properties": {
-                      "id": { "type": "string" },
-                      "name": { "type": "string" },
-                      "kindName": { "type": "string" },
-                      "rules": { "type": "array", "items": { "type": "string" } },
-                      "explain": { "type": "array", "items": { "type": "string" } }
+                      "id": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "kindName": {
+                        "type": "string"
+                      },
+                      "rules": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "explain": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      }
                     },
                     "required": ["id", "name", "kindName", "rules", "explain"],
                     "additionalProperties": false
@@ -4173,16 +4977,20 @@
         "additionalProperties": false
       },
       "ErrorCode": {
-        "description": "Every error code the API answers with. Stable and English; screens word them in the player's language.\n\n- `badJson`: 400. The body is not JSON.\n- `badRequest`: 400. The body has the wrong shape; `issues` lists `{ path, message }`.\n- `notLoggedIn`: 401. No session cookie and no `Authorization` header.\n- `keyNotValid`: 401. The `Authorization` header holds no valid access key (unknown, withdrawn, or not `Bearer <key>`).\n- `wrongMailOrPassword`: 401. Login failed.\n- `crossSite`: 403. A change sent from another site (`Origin` or `Sec-Fetch-Site`).\n- `keyCannotMakeKeys`: 403. Access keys are made on the settings screen only, never with a key.\n- `notFound`: 404. No such API path.\n- `draftNotFound`: 404. No draft with this id in this account.\n- `keyNotFound`: 404. No access key with this id in this account.\n- `packageNotFound`: 404. No loaded package with this id.\n- `languageNotFound`: 404. The package has no texts in this language.\n- `methodNotAllowed`: 405. The path exists, the method does not.\n- `versionConflict`: 409. The draft moved on; `current` holds its state now.\n- `notFinished`: 409. The character is not finished (PDF) or not finished and not in a raise (level-up); `open` lists the open choices.\n- `packageUnavailable`: 409. The draft's package is not loaded right now; `packageId` names it.\n- `bodyTooLarge`: 413. The body is larger than 64 KiB.\n- `jsonRequired`: 415. The body is not `application/json`.\n- `changeRejected`: 422. The rule core refused the change; `reason` says why (see `ChangeError`).\n- `incomplete`: 422. Finishing with open choices; `open` lists them.\n- `languageNotSupported`: 422. The account's language cannot be printed with this package; `languages` lists those that can.\n- `tooManyKeys`: 422. The account has the most access keys allowed (`max`).\n- `unknownUnit`: 422. No loaded package offers this unit for this dimension.\n- `tooManyAttempts`: 429. Too many logins or password mails; `retryAfter` seconds, also in `Retry-After`.\n- `tooManyRequests`: 429. Too many PDFs; see `Retry-After`.\n- `internal`: 500. A bug in the builder.\n- `packageRuleError`: 500. The package's rules could not be worked out (a bug in the package); `message` says where.\n- `mailFailed`: 502. The mail server refused the password mail; nothing was changed.\n- `mailNotConfigured`: 503. The server has no mail set up; nobody can get a password.",
+        "description": "Every error code the API answers with. Stable and English; screens word them in the player's language.\n\n- `badJson`: 400. The body is not JSON.\n- `badRequest`: 400. The body has the wrong shape; `issues` lists `{ path, message }`.\n- `badQuery`: 400. A query parameter has a value the API does not know; `parameter` and `value` name it.\n- `designNotAvailable`: 400 (PDF) or 422 (settings). A planned sheet design that is not drawn yet; `designs` lists those that are.\n- `stateNotAvailable`: 400. The PDF cannot have the play state written in yet.\n- `notLoggedIn`: 401. No session cookie and no `Authorization` header.\n- `keyNotValid`: 401. The `Authorization` header holds no valid access key (unknown, withdrawn, or not `Bearer <key>`).\n- `wrongMailOrPassword`: 401. Login failed.\n- `crossSite`: 403. A change sent from another site (`Origin` or `Sec-Fetch-Site`).\n- `keyCannotMakeKeys`: 403. Access keys are made on the settings screen only, never with a key.\n- `notFound`: 404. No such API path.\n- `draftNotFound`: 404. No draft with this id in this account.\n- `keyNotFound`: 404. No access key with this id in this account.\n- `packageNotFound`: 404. No loaded package with this id.\n- `languageNotFound`: 404. The package has no texts in this language.\n- `versionNotFound`: 404. No such version of the sheet to print; only `original` for now.\n- `methodNotAllowed`: 405. The path exists, the method does not.\n- `versionConflict`: 409. The draft moved on; `current` holds its state now.\n- `notFinished`: 409. The character is not finished (PDF) or not finished and not in a raise (level-up); `open` lists the open choices.\n- `packageUnavailable`: 409. The draft's package is not loaded right now; `packageId` names it.\n- `bodyTooLarge`: 413. The body is larger than 64 KiB.\n- `jsonRequired`: 415. The body is not `application/json`.\n- `changeRejected`: 422. The rule core refused the change; `reason` says why (see `ChangeError`).\n- `incomplete`: 422. Finishing with open choices; `open` lists them.\n- `languageNotSupported`: 422. The account's language cannot be printed with this package; `languages` lists those that can.\n- `tooManyKeys`: 422. The account has the most access keys allowed (`max`).\n- `unknownUnit`: 422. No loaded package offers this unit for this dimension.\n- `tooManyAttempts`: 429. Too many logins or password mails; `retryAfter` seconds, also in `Retry-After`.\n- `tooManyRequests`: 429. Too many PDFs; see `Retry-After`.\n- `internal`: 500. A bug in the builder.\n- `packageRuleError`: 500. The package's rules could not be worked out (a bug in the package); `message` says where.\n- `mailFailed`: 502. The mail server refused the password mail; nothing was changed.\n- `mailNotConfigured`: 503. The server has no mail set up; nobody can get a password.",
         "enum": [
           "alreadyPlayer",
           "badJson",
+          "badQuery",
           "badRequest",
           "bodyTooLarge",
           "campaignNotFound",
           "cannotAddYourself",
           "changeRejected",
+          "copyNotFound",
+          "copyTooLarge",
           "crossSite",
+          "designNotAvailable",
           "draftNotFound",
           "gameMasterOnly",
           "incomplete",
@@ -4199,23 +5007,23 @@
           "notFinished",
           "notFound",
           "notLoggedIn",
+          "originalChanged",
           "ownerOnly",
           "packageNotFound",
           "packageRuleError",
           "packageUnavailable",
           "playerNotFound",
+          "stateNotAvailable",
           "tooManyAttempts",
           "tooManyCampaigns",
+          "tooManyCopies",
           "tooManyKeys",
           "tooManyPlayers",
           "tooManyRequests",
           "unknownUnit",
           "versionConflict",
-          "wrongMailOrPassword",
-          "copyNotFound",
-          "copyTooLarge",
-          "tooManyCopies",
-          "originalChanged"
+          "versionNotFound",
+          "wrongMailOrPassword"
         ]
       },
       "Error": {
@@ -4263,12 +5071,15 @@
             },
             "description": "Chosen unit per dimension; a missing dimension follows the language."
           },
+          "print": {
+            "$ref": "#/components/schemas/PrintChoice"
+          },
           "createdAt": {
             "type": "string",
             "format": "date-time"
           }
         },
-        "required": ["email", "language", "units", "createdAt"],
+        "required": ["email", "language", "units", "print", "createdAt"],
         "additionalProperties": false
       },
       "AccessKey": {
@@ -5477,11 +6288,24 @@
         "type": "object",
         "description": "A kept copy of the sheet, without its model.",
         "properties": {
-          "id": { "type": "string" },
-          "name": { "type": "string" },
-          "createdAt": { "type": "string", "format": "date-time" },
-          "updatedAt": { "type": "string", "format": "date-time" },
-          "fromLevel": { "type": "integer", "description": "Level of the original it was made from." },
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "fromLevel": {
+            "type": "integer",
+            "description": "Level of the original it was made from."
+          },
           "fromChangedAt": {
             "type": "string",
             "format": "date-time",
@@ -5497,10 +6321,15 @@
           },
           "units": {
             "type": "object",
-            "additionalProperties": { "type": "string" },
+            "additionalProperties": {
+              "type": "string"
+            },
             "description": "Units the copy is written in."
           },
-          "version": { "type": "integer", "minimum": 1 }
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          }
         },
         "required": [
           "id",
@@ -5520,8 +6349,12 @@
         "type": "object",
         "description": "A copy with its model. The model's `origin` is `{ kind: \"copy\", name, createdAt, fromLevel, fromPackageVersion, fromChangedAt }`.",
         "properties": {
-          "copy": { "$ref": "#/components/schemas/SheetCopy" },
-          "model": { "$ref": "#/components/schemas/SheetModel" }
+          "copy": {
+            "$ref": "#/components/schemas/SheetCopy"
+          },
+          "model": {
+            "$ref": "#/components/schemas/SheetModel"
+          }
         },
         "required": ["copy", "model"],
         "additionalProperties": false
@@ -5530,8 +6363,13 @@
         "type": "object",
         "description": "The original as it is now, without building it. Differs from a copy's `fromLevel`, `fromChangedAt` or `fromPackageVersion`: the original changed since the copy was made.",
         "properties": {
-          "level": { "type": "integer" },
-          "changedAt": { "type": "string", "format": "date-time" },
+          "level": {
+            "type": "integer"
+          },
+          "changedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
           "packageVersion": {
             "type": ["string", "null"],
             "description": "Null while the character's package is not loaded."
@@ -5547,11 +6385,22 @@
       "PlayValue": {
         "description": "A number, a text, or a count of ticks.",
         "anyOf": [
-          { "type": "number" },
-          { "type": "string", "maxLength": 2000 },
+          {
+            "type": "number"
+          },
+          {
+            "type": "string",
+            "maxLength": 2000
+          },
           {
             "type": "object",
-            "properties": { "checks": { "type": "integer", "minimum": 0, "maximum": 1000 } },
+            "properties": {
+              "checks": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 1000
+              }
+            },
             "required": ["checks"],
             "additionalProperties": false
           }
@@ -5560,17 +6409,55 @@
       "PlayState": {
         "type": "object",
         "description": "The play state: field id of the sheet (`field`, `usesField`, `playedByField`) to its value. At most 1000 fields.",
-        "propertyNames": { "minLength": 1, "maxLength": 300 },
-        "additionalProperties": { "$ref": "#/components/schemas/PlayValue" }
+        "propertyNames": {
+          "minLength": 1,
+          "maxLength": 300
+        },
+        "additionalProperties": {
+          "$ref": "#/components/schemas/PlayValue"
+        }
       },
       "PlayStateView": {
         "type": "object",
         "properties": {
-          "state": { "$ref": "#/components/schemas/PlayState" },
-          "version": { "type": "integer", "minimum": 0, "description": "0 while nothing is stored yet." },
-          "updatedAt": { "type": ["string", "null"], "format": "date-time" }
+          "state": {
+            "$ref": "#/components/schemas/PlayState"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "0 while nothing is stored yet."
+          },
+          "updatedAt": {
+            "type": ["string", "null"],
+            "format": "date-time"
+          }
         },
         "required": ["state", "version", "updatedAt"],
+        "additionalProperties": false
+      },
+      "PrintChoice": {
+        "type": "object",
+        "description": "What the download dialog offers first: the last download's choice. Until one was made: only the sheet, in the first design, empty.",
+        "properties": {
+          "parts": {
+            "type": "array",
+            "items": {
+              "enum": ["sheet", "cards", "texts"]
+            },
+            "minItems": 1,
+            "maxItems": 3,
+            "uniqueItems": true,
+            "description": "In file order."
+          },
+          "design": {
+            "enum": ["classic", "verbose"]
+          },
+          "state": {
+            "enum": ["empty", "filled"]
+          }
+        },
+        "required": ["parts", "design", "state"],
         "additionalProperties": false
       }
     }

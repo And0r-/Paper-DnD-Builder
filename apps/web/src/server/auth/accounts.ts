@@ -7,6 +7,7 @@
  * a password themselves.
  */
 import { randomUUID } from "node:crypto";
+import { printChoiceOf } from "@builder/sheet/printouts";
 import { z } from "zod";
 import type { App } from "../app.ts";
 import { HttpError } from "../api/http.ts";
@@ -213,5 +214,11 @@ export async function login(app: App, email: string, password: string, ip: strin
 }
 
 export function publicAccount(a: AccountRow) {
-  return { email: a.email, language: a.language, units: a.units, createdAt: a.created_at.toISOString() };
+  return {
+    email: a.email,
+    language: a.language,
+    units: a.units,
+    print: printChoiceOf(a.print_choice),
+    createdAt: a.created_at.toISOString(),
+  };
 }

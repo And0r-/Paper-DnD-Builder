@@ -16,6 +16,8 @@ export type AccountRow = {
   password_hash: string;
   language: string;
   units: Record<string, string>;
+  /** The last download's choice as stored; read through `printChoiceOf`. */
+  print_choice: unknown;
   created_at: Date;
 };
 
@@ -97,7 +99,7 @@ export type CharacterStateRow = {
 };
 
 const ACCESS_KEY_COLUMNS = "id, hint, created_at";
-const ACCOUNT_COLUMNS = "id, email, password_hash, language, units, created_at";
+const ACCOUNT_COLUMNS = "id, email, password_hash, language, units, print_choice, created_at";
 const DRAFT_COLUMNS =
   "id, account_id, package_id, package_version, version, document, finished_at, created_at, updated_at";
 const COPY_ENTRY_COLUMNS =
@@ -141,7 +143,7 @@ export class Store {
   }
 
   /** Inserts an account; returns undefined if the address already has one (concurrent sign-up). */
-  async createAccount(a: Omit<AccountRow, "units">): Promise<AccountRow | undefined> {
+  async createAccount(a: Omit<AccountRow, "units" | "print_choice">): Promise<AccountRow | undefined> {
     const rows = await this.db.query<AccountRow>(
       `INSERT INTO accounts (id, email, password_hash, language, units, created_at)
        VALUES ($1, $2, $3, $4, '{}'::jsonb, $5)
@@ -160,10 +162,12 @@ export class Store {
     accountId: string,
     language: string,
     units: Record<string, string>,
+    printChoice: object,
   ): Promise<AccountRow> {
     const rows = await this.db.query<AccountRow>(
-      `UPDATE accounts SET language = $2, units = $3::jsonb WHERE id = $1 RETURNING ${ACCOUNT_COLUMNS}`,
-      [accountId, language, units],
+      `UPDATE accounts SET language = $2, units = $3::jsonb, print_choice = $4::jsonb
+       WHERE id = $1 RETURNING ${ACCOUNT_COLUMNS}`,
+      [accountId, language, units, printChoice],
     );
     return rows[0]!;
   }
@@ -188,7 +192,7 @@ export class Store {
 
   async findSession(id: string, now: Date): Promise<SessionAccount | undefined> {
     const rows = await this.db.query<AccountRow & { session_id: string; refreshed_at: Date }>(
-      `SELECT s.id AS session_id, s.refreshed_at, a.id, a.email, a.password_hash, a.language, a.units, a.created_at
+      `SELECT s.id AS session_id, s.refreshed_at, a.id, a.email, a.password_hash, a.language, a.units, a.print_choice, a.created_at
        FROM sessions s JOIN accounts a ON a.id = s.account_id
        WHERE s.id = $1 AND s.expires_at > $2`,
       [id, now],
@@ -244,7 +248,7 @@ export class Store {
   /** The account a key belongs to. */
   async findAccountByKey(keyHash: string): Promise<{ key_id: string; account: AccountRow } | undefined> {
     const rows = await this.db.query<AccountRow & { key_id: string }>(
-      `SELECT k.id AS key_id, a.id, a.email, a.password_hash, a.language, a.units, a.created_at
+      `SELECT k.id AS key_id, a.id, a.email, a.password_hash, a.language, a.units, a.print_choice, a.created_at
        FROM access_keys k JOIN accounts a ON a.id = k.account_id
        WHERE k.key_hash = $1`,
       [keyHash],
