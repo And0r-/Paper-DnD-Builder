@@ -175,5 +175,15 @@
     "id": "trait.spore-friend",
     "kind": "trait",
     "source": "mistland"
+  },
+  {
+    "id": "trait.leaf-lore",
+    "kind": "trait",
+    "source": "mistland"
+  },
+  {
+    "id": "trait.root-lore",
+    "kind": "trait",
+    "source": "mistland"
   }
 ]

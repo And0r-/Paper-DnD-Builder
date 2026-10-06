@@ -282,6 +282,9 @@
         "atLevel": 3
       },
       {
+        "choice": "herb-craft"
+      },
+      {
         "value": "stamina",
         "add": "4 * (level - 3)",
         "atLevel": 4
