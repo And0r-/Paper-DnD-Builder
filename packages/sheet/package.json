@@ -9,7 +9,9 @@
     ".": "./src/index.ts",
     "./cards": "./src/cards.ts",
     "./printouts": "./src/printouts.ts",
-    "./testing": "./src/testing.ts"
+    "./testing": "./src/testing.ts",
+    "./designs": "./designs/geometry.ts",
+    "./designs/verbose": "./designs/verbose/index.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit -p ."

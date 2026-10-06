@@ -11,6 +11,7 @@ import {
   firstSentence,
   MESSAGES,
   SheetError,
+  sheetFields,
   type SheetModel,
   type SheetSection,
 } from "@builder/sheet";
@@ -111,7 +112,7 @@ function words(values: Iterable<TextValue | string>): Set<string> {
 
 function messageWords(language: string): Set<string> {
   const m = MESSAGES[language]!;
-  const { startValue, page, unitsUsed, createdOn, copyName, count, ...plain } = m;
+  const { startValue, page, unitsUsed, createdOn, copyName, asOfLevel, count, ...plain } = m;
   return words([
     ...Object.values(plain),
     startValue(""),
@@ -119,6 +120,7 @@ function messageWords(language: string): Set<string> {
     unitsUsed([]),
     createdOn(""),
     copyName(""),
+    asOfLevel(4),
     count("2", ""),
   ]);
 }
@@ -1621,5 +1623,199 @@ describe("the parts of a printout: sheet, cards, rules texts", () => {
     for (const bad of ["/URI", "/JavaScript", "/AcroForm", "/Annots", "/Helvetica"])
       expect(raw).not.toContain(bad);
     await expect(renderPdf(model, { parts: [] })).rejects.toThrow();
+  });
+});
+
+describe("the verbose design: original and copy, empty and filled", () => {
+  const river3 = () => demoCharacter(pkg, 3, "Mira Fennwick", "calling.river-runner");
+  const lantern20 = () => demoCharacter(pkg, 20, "Mira Fennwick", "calling.lantern-bearer");
+  const sheetOnly = { parts: ["sheet"], design: "verbose" } as const;
+  /** Ids in order, a run of the same id (a section split over pages) once. */
+  const runs = (ids: string[]) => ids.filter((id, i) => id !== ids[i - 1]);
+
+  /** A kept copy of `model`: what the screen stores, with a row and a value of the player's own. */
+  function keptCopy(model: SheetModel, name: string): SheetModel {
+    const sections = model.sections.map((s): SheetSection => {
+      if (s.kind === "featureTable" && s.id === "traits")
+        return {
+          ...s,
+          rows: [
+            ...s.rows,
+            {
+              id: "own-1",
+              name: "Marsh Lantern Trick",
+              marks: "",
+              text: "Twice a day the lantern hums a tune.",
+              uses: { boxes: 2 },
+              usesField: "sheet/traits/own-1/uses",
+              group: null,
+            },
+          ],
+        };
+      if (s.kind === "statBoxes" && s.id === "primary") {
+        // The player's own number in the first printed number of the box row.
+        const first = s.boxes.findIndex((b) => b.style === "number");
+        return { ...s, boxes: s.boxes.map((b, i) => (i === first ? { ...b, text: "99" } : b)) };
+      }
+      return s;
+    });
+    if (model.origin.kind !== "original") throw new Error("not an original");
+    return {
+      ...model,
+      sections,
+      origin: {
+        kind: "copy",
+        name,
+        createdAt: "2026-10-06T14:20:00.000Z",
+        fromLevel: model.origin.level,
+        fromPackageVersion: model.origin.packageVersion,
+      },
+    };
+  }
+
+  it("prints the sheet alone within its page targets, in one language and its units, never below 7 pt", async () => {
+    for (const [doc, pages] of [
+      [river3(), 2],
+      [lantern20(), 3],
+    ] as const) {
+      for (const [language, other, units, unitsLine] of [
+        ["de", "en", { length: "m", weight: "kg" }, "Einheiten: Meter, Kilogramm"],
+        ["en", "de", { length: "ft", weight: "lb" }, "Units: feet, pounds"],
+      ] as const) {
+        const model = buildSheetModel(pkg, doc, { language, units, createdAt });
+        const pdf = await renderPdf(model, sheetOnly);
+        const { text, pageTexts, minFontSize } = await extract(pdf);
+        const what = `level ${model.level} ${language}`;
+        // The sketch: two pages without slots, three with nine ranks of them; the plan allows five.
+        expect(pdf.pages, what).toBe(pages);
+        expect(pdf.pages).toBeLessThanOrEqual(5);
+        expect(minFontSize, what).toBeGreaterThanOrEqual(6.99);
+        for (const page of pageTexts) expect(page, what).toContain(unitsLine);
+        const foreign = foreignWords(language, other);
+        expect(
+          [...words([text])].filter((w) => foreign.has(w)),
+          what,
+        ).toEqual([]);
+        expect(text).not.toMatch(language === "de" ? /\d\s?(ft|Fuss|lb)\b/u : /\d\s?(m|kg)\b/u);
+      }
+    }
+  });
+
+  it("draws the sections and fields in the model's order, every field once, as the screen does", async () => {
+    for (const doc of [river3(), lantern20(), demoCharacter(pkg, 20)]) {
+      const original = buildSheetModel(pkg, doc, { language: "de", createdAt });
+      for (const model of [original, keptCopy(original, "Meine Fassung vom 6. Oktober 2026")]) {
+        const pdf = await renderPdf(model, { parts: ["sheet", "cards"] });
+        const sections = runs(pdf.sheetLayout.flat().map((p) => p.section.id));
+        expect(sections).toEqual(model.sections.map((s) => s.id));
+        expect(runs(pdf.fields.map((f) => f.id))).toEqual(sheetFields(model));
+        // Fields stay on their page, inside the margins.
+        for (const f of pdf.fields) {
+          expect(f.page).toBeGreaterThanOrEqual(1);
+          expect(f.x).toBeGreaterThanOrEqual(0);
+          expect(f.x + f.w).toBeLessThanOrEqual(210);
+          expect(f.y + f.h).toBeLessThanOrEqual(297);
+        }
+      }
+      expect(sheetFields(keptCopy(original, "x"))).toContain("sheet/traits/own-1/uses");
+    }
+  });
+
+  it("prints a kept copy as the player left it: own rows and numbers, its name and the original's level in the footer", async () => {
+    for (const [language, name, asOf] of [
+      ["de", "Meine Fassung vom 6. Oktober 2026", "Stand Stufe 20"],
+      ["en", "My version of 6 October 2026", "as of level 20"],
+    ] as const) {
+      const original = buildSheetModel(pkg, lantern20(), { language, createdAt });
+      const copy = keptCopy(original, name);
+      const pdf = await renderPdf(copy, sheetOnly);
+      const { text, pageTexts } = await extract(pdf);
+      expect(text).toContain("Marsh Lantern Trick");
+      expect(text).toContain("Twice a day the lantern hums a tune.");
+      for (const page of pageTexts) expect(page).toContain(`${name} · ${asOf}`);
+      expect(text).toContain("99");
+      // The footer of the original ("Mira Fennwick · Level 20 · Units …") is not there.
+      expect(text).not.toContain(`${original.name} · ${original.levelLabel} · ${original.unitsLine}`);
+      expect(pdf.pages).toBeLessThanOrEqual(5);
+      // Dated like the copy, not like the original.
+      const raw = Buffer.from(pdf.bytes).toString("latin1");
+      expect(raw).toContain("D:20261006142000");
+    }
+  });
+
+  it("shortens a copy's long name in the footer instead of setting it below 7 pt", async () => {
+    const original = buildSheetModel(pkg, river3(), { language: "en", createdAt });
+    const copy = keptCopy(original, `My version ${"with a very long name ".repeat(12)}`);
+    const { pageTexts, minFontSize } = await extract(await renderPdf(copy, sheetOnly));
+    expect(minFontSize).toBeGreaterThanOrEqual(6.99);
+    for (const page of pageTexts) {
+      expect(page).toContain("…");
+      expect(page).toContain("as of level 3");
+      expect(page).toContain("Units: feet");
+    }
+  });
+
+  it("writes the play state into the fields, cuts ticks at what a field holds, and skips what the sheet does not have", async () => {
+    const model = buildSheetModel(pkg, lantern20(), { language: "en", createdAt });
+    const boxes = model.sections.flatMap((s) => (s.kind === "statBoxes" ? s.boxes : []));
+    const pencil = boxes.find((b) => b.style === "pencil")!;
+    const circles = boxes.find((b) => b.style === "circles")!;
+    const squares = boxes.find((b) => b.style === "boxes")!;
+    const knack = model.sections
+      .flatMap((s) => (s.kind === "featureTable" ? s.rows : []))
+      .find((r) => r.uses !== null && "boxes" in r.uses && r.uses.boxes >= 2)!;
+    const notes = "Owe the ferryman two coins. Ask the bell keeper about the tower. ".repeat(6).trim();
+    const play = {
+      [pencil.field!]: 17,
+      [circles.field!]: { checks: 99 },
+      [squares.field!]: { checks: 1 },
+      [knack.usesField!]: { checks: 1 },
+      "sheet/header/playedBy": "Sam Ferry",
+      "sheet/gear/lines": "Spare wick",
+      "sheet/notes/notes": notes,
+      // Not on this sheet, or the wrong kind for the field: skipped.
+      "sheet/gone/away": 5,
+      [squares.field!.replace(/$/u, "-x")]: { checks: 2 },
+    };
+    const filled = await renderPdf(model, { ...sheetOnly, play });
+    const { text, minFontSize } = await extract(filled);
+    for (const written of ["17", "Sam Ferry", "Spare wick", "Owe the ferryman two coins."])
+      expect(text).toContain(written);
+    // Long notes get the lines they need: every word is printed.
+    const printed = new Set(words([text]));
+    for (const w of words([notes])) expect(printed.has(w), w).toBe(true);
+    expect(minFontSize).toBeGreaterThanOrEqual(6.99);
+
+    const at = (id: string) => filled.fields.filter((f) => f.id === id);
+    expect(at(pencil.field!)[0]).toMatchObject({ text: "17" });
+    expect(at(circles.field!)[0]).toMatchObject({ ticks: circles.circles });
+    expect(at(squares.field!)[0]).toMatchObject({ ticks: 1 });
+    expect(at(knack.usesField!)[0]).toMatchObject({ ticks: 1 });
+    expect(filled.fields.map((f) => f.id)).not.toContain("sheet/gone/away");
+    expect(runs(filled.fields.map((f) => f.id))).toEqual(sheetFields({ ...model, cards: [] }));
+
+    // A tick count on a field to write in, a text on one to tick: nothing.
+    const wrong = await renderPdf(model, {
+      ...sheetOnly,
+      play: { [pencil.field!]: { checks: 3 }, [circles.field!]: "three" },
+    });
+    expect(wrong.fields.filter((f) => f.text !== undefined || f.ticks !== undefined)).toEqual([]);
+    // Empty is empty: the same file as without a play state.
+    const empty = await renderPdf(model, { ...sheetOnly, play: {} });
+    const plain = await renderPdf(model, sheetOnly);
+    expect(Buffer.from(empty.bytes).equals(Buffer.from(plain.bytes))).toBe(true);
+    expect(Buffer.from(filled.bytes).equals(Buffer.from(plain.bytes))).toBe(false);
+  });
+
+  it("fills a copy with the same play state: a field of the player's own row too", async () => {
+    const original = buildSheetModel(pkg, river3(), { language: "de", createdAt });
+    const copy = keptCopy(original, "Meine Fassung vom 6. Oktober 2026");
+    const pdf = await renderPdf(copy, { ...sheetOnly, play: { "sheet/traits/own-1/uses": { checks: 7 } } });
+    expect(pdf.fields.find((f) => f.id === "sheet/traits/own-1/uses")).toMatchObject({ ticks: 2 });
+  });
+
+  it("refuses a design it has no painter for", async () => {
+    const model = buildSheetModel(pkg, river3(), { language: "de", createdAt });
+    await expect(renderPdf(model, { design: "classic" })).rejects.toThrow(/classic/);
   });
 });

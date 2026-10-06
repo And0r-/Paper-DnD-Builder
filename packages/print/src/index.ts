@@ -4,4 +4,4 @@
  * goes where (sheet.json); this module owns the visual design and knows
  * nothing about any game.
  */
-export { renderPdf, type RenderedPdf, type RenderOptions } from "./render.ts";
+export { renderPdf, type DrawnField, type RenderedPdf, type RenderOptions } from "./render.ts";

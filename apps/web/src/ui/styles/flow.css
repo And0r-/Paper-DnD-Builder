@@ -1519,3 +1519,13 @@
 .print-line__label {
   font-weight: var(--weight-semibold);
 }
+
+.print-version {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.print-version__select {
+  max-width: 100%;
+}

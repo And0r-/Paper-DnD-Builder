@@ -388,7 +388,7 @@ async function walk(server: TestServer): Promise<void> {
   );
   await call("GET", `/api/drafts/${id}/pdf?parts=poster`, undefined, k);
   await call("GET", `/api/drafts/${id}/pdf?design=classic`, undefined, k);
-  await call("GET", `/api/drafts/${id}/pdf?state=filled`, undefined, k);
+  await c.request("GET", `/api/drafts/${id}/pdf?parts=sheet&state=filled`, undefined, k);
   await call("GET", `/api/drafts/${id}/pdf?version=elsewhere`, undefined, k);
   const sheet = (await call("GET", `/api/drafts/${id}/sheet`, undefined, k)).json;
 
@@ -398,6 +398,12 @@ async function walk(server: TestServer): Promise<void> {
   await call("POST", copies, { name: "Mit Hausregeln", model: { ...sheet, name: "Mira" } }, k);
   await call("GET", copies, undefined, k);
   const copy = `${copies}/${kept.copy.id}`;
+  await c.request(
+    "GET",
+    `/api/drafts/${id}/pdf?parts=sheet,cards&version=${kept.copy.id}&state=filled`,
+    undefined,
+    k,
+  );
   await call("GET", copy, undefined, k);
   await call("PUT", copy, { version: 1, name: "Neu", model: kept.model }, k);
   await call("PUT", copy, { version: 1, name: "Alt" }, k);
