@@ -106,8 +106,10 @@ screenshots. Develop against the demo package.**
 
 The shared checkout only ever has `main` checked out and is updated with
 `git pull --ff-only`. Every task works in its own worktree
-(`git worktree add ../wt-<task> -b <branch> origin/main`) or its own clone,
-which is removed after the merge. If you find the shared checkout on another
+(`git worktree add ../wt-<task> -b <branch> origin/main`) or its own clone.
+Remove the worktree as soon as the PR is merged (`git worktree remove <path>`,
+then `git worktree prune`); a merged worktree left behind costs about 150 MB
+of disk. If you find the shared checkout on another
 branch, do not switch it; note it in your task and keep working in your own
 worktree. `pnpm install`, builds and test runs happen only in your own
 worktree, never in the shared checkout.
