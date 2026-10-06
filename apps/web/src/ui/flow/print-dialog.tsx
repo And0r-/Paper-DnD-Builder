@@ -1,0 +1,248 @@
+"use client";
+/**
+ * The download dialog of the done screen (sheet plan, sections 2 and 6):
+ * which parts go into the PDF (sheet, cards, rules texts), in which design,
+ * which version and whether the play state is filled in. Only the sheet
+ * is ticked until the player picks otherwise; the choice is kept on the
+ * account and offered again next time.
+ */
+import { PRINT_PARTS, type PrintChoice, type PrintPart } from "@builder/sheet/printouts";
+import { useEffect, useId, useState } from "react";
+import { useApp } from "../app-state.tsx";
+import { api, type Account, type SheetDesignInfo } from "../api.ts";
+import { Button } from "../components/Button.tsx";
+import { Dialog } from "../components/Dialog.tsx";
+import { Callout } from "../components/Feedback.tsx";
+import { Segmented } from "../components/Fields.tsx";
+import { Icon } from "../components/Icon.tsx";
+
+type PdfState = "idle" | "preparing" | "error" | "notYet";
+
+const PART_KEYS = {
+  sheet: { name: "print.sheet", text: "print.sheetText" },
+  cards: { name: "print.cards", text: "print.cardsText" },
+  texts: { name: "print.texts", text: "print.textsText" },
+} as const satisfies Record<PrintPart, { name: string; text: string }>;
+
+/** The file name the server gives in `filename*`, else the fallback. */
+function fileNameOf(res: Response, fallback: string): string {
+  const header = res.headers.get("content-disposition") ?? "";
+  const encoded = /filename\*=UTF-8''([^;]+)/i.exec(header)?.[1];
+  if (!encoded) return fallback;
+  try {
+    return decodeURIComponent(encoded);
+  } catch {
+    return fallback;
+  }
+}
+
+export function PrintDialog({
+  open,
+  onClose,
+  draftId,
+  name,
+  hasCards,
+}: {
+  open: boolean;
+  onClose: () => void;
+  draftId: string;
+  /** The character's name, for the file if the server gives none. */
+  name: string | undefined;
+  /** Whether the character has things that are cards; if not, cards cannot be ticked. */
+  hasCards: boolean;
+}) {
+  const { t, lang, account, setAccount } = useApp();
+  const [parts, setParts] = useState<Set<PrintPart>>(new Set());
+  const [design, setDesign] = useState<PrintChoice["design"]>("verbose");
+  const [designs, setDesigns] = useState<SheetDesignInfo[]>([]);
+  const [pdf, setPdf] = useState<PdfState>("idle");
+  const [noPart, setNoPart] = useState(false);
+  const id = useId();
+
+  // Every time it opens, it starts from what the account picked last.
+  useEffect(() => {
+    if (!open) return;
+    const stored = account?.print;
+    setParts(new Set(stored?.parts ?? ["sheet"]));
+    if (stored) setDesign(stored.design);
+    setPdf("idle");
+    setNoPart(false);
+    api<{ designs: SheetDesignInfo[] }>("GET", "/api/sheet-designs")
+      .then((r) => setDesigns(r.designs))
+      .catch(() => setDesigns([]));
+  }, [open, account?.print]);
+
+  const usable = (p: PrintPart) => p !== "cards" || hasCards;
+  const chosen = PRINT_PARTS.filter((p) => parts.has(p) && usable(p));
+
+  const toggle = (p: PrintPart) => {
+    setNoPart(false);
+    setParts((old) => {
+      const next = new Set(old);
+      if (next.has(p)) next.delete(p);
+      else next.add(p);
+      return next;
+    });
+  };
+
+  const download = async () => {
+    if (chosen.length === 0) {
+      setNoPart(true);
+      return;
+    }
+    setPdf("preparing");
+    // Kept for next time; a character without cards does not unlearn that cards were wanted.
+    const keep = PRINT_PARTS.filter((p) => (usable(p) ? parts.has(p) : account?.print.parts.includes(p)));
+    api<{ account: Account }>("PATCH", "/api/account/settings", { print: { parts: keep, design } })
+      .then((r) => setAccount(r.account))
+      .catch(() => {});
+    const query = new URLSearchParams({
+      parts: chosen.join(","),
+      design,
+      version: "original",
+      state: "empty",
+    });
+    try {
+      const res = await fetch(`/api/drafts/${draftId}/pdf?${query}`, {
+        credentials: "same-origin",
+        cache: "no-store",
+      });
+      if (res.status === 404 && !res.headers.get("content-type")?.includes("pdf")) {
+        const body = (await res.json().catch(() => null)) as { error?: { code?: string } } | null;
+        setPdf(body?.error?.code === "draftNotFound" ? "error" : "notYet");
+        return;
+      }
+      if (!res.ok) throw new Error(String(res.status));
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = fileNameOf(res, `${name || "character"}.pdf`);
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 10_000);
+      setPdf("idle");
+      onClose();
+    } catch {
+      setPdf("error");
+    }
+  };
+
+  return (
+    <Dialog
+      open={open}
+      onClose={onClose}
+      title={t("print.title")}
+      footer={
+        <>
+          <Button variant="secondary" onClick={onClose}>
+            {t("common.cancel")}
+          </Button>
+          <Button
+            icon="printer"
+            busy={pdf === "preparing"}
+            busyLabel={t("done.preparing")}
+            onClick={download}
+          >
+            {t("print.download")}
+          </Button>
+        </>
+      }
+    >
+      <fieldset className="print-parts" aria-describedby={noPart ? `${id}-none` : undefined}>
+        <legend className="print-parts__legend">{t("print.parts")}</legend>
+        {PRINT_PARTS.map((p) => {
+          const inputId = `${id}-${p}`;
+          const off = !usable(p);
+          const checked = parts.has(p) && !off;
+          return (
+            <div
+              key={p}
+              className={`option option--compact${checked ? " option--checked" : ""}${off ? " option--blocked" : ""}`}
+              onClick={(e) => {
+                // The whole card ticks, as on the choice screens.
+                if (off || (e.target as HTMLElement).closest("input, label")) return;
+                toggle(p);
+              }}
+            >
+              <div className="option__head">
+                <input
+                  className="option__input"
+                  type="checkbox"
+                  id={inputId}
+                  name={`${id}-parts`}
+                  value={p}
+                  checked={checked}
+                  disabled={off}
+                  onChange={() => toggle(p)}
+                  aria-describedby={`${inputId}-text`}
+                />
+                <span className="option__mark" aria-hidden="true">
+                  {checked && <Icon name="check" size={18} />}
+                </span>
+                <label className="option__name" htmlFor={inputId}>
+                  {t(PART_KEYS[p].name)}
+                </label>
+              </div>
+              <p className="option__short" id={`${inputId}-text`}>
+                {off ? t("print.cardsNone") : t(PART_KEYS[p].text)}
+              </p>
+            </div>
+          );
+        })}
+      </fieldset>
+      {noPart && (
+        <Callout tone="danger" role="alert" id={`${id}-none`}>
+          {t("print.noPart")}
+        </Callout>
+      )}
+      {designs.length > 1 && (
+        <Segmented
+          legend={t("print.design")}
+          options={designs.map((d) => ({
+            value: d.id as PrintChoice["design"],
+            label: d.name[lang] ?? d.id,
+          }))}
+          value={design}
+          onChange={setDesign}
+          help={designs.find((d) => d.id === design)?.description[lang]}
+        />
+      )}
+      <div className="print-line">
+        <span className="print-line__label">{t("print.version")}</span>
+        <span>{t("print.versionOriginal")}</span>
+      </div>
+      {/* The play state is not kept yet: shown, so the choice is known, but not to be ticked. */}
+      <div className="option option--compact option--blocked">
+        <div className="option__head">
+          <input
+            className="option__input"
+            type="checkbox"
+            id={`${id}-state`}
+            checked={false}
+            disabled
+            readOnly
+            aria-describedby={`${id}-state-text`}
+          />
+          <span className="option__mark" aria-hidden="true" />
+          <label className="option__name" htmlFor={`${id}-state`}>
+            {t("print.state")}
+          </label>
+        </div>
+        <p className="option__short" id={`${id}-state-text`}>
+          {t("print.stateSoon")}
+        </p>
+      </div>
+      <div aria-live="polite">
+        {pdf === "error" && (
+          <Callout tone="danger" role="alert">
+            {t("done.pdfError")}{" "}
+            <button type="button" className="link-button" onClick={download}>
+              {t("common.retry")}
+            </button>
+          </Callout>
+        )}
+        {pdf === "notYet" && <Callout tone="info">{t("done.pdfNotYet")}</Callout>}
+      </div>
+    </Dialog>
+  );
+}

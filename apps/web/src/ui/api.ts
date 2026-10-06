@@ -5,6 +5,7 @@
  */
 import type { ContentPackage, TextValue } from "@builder/format/pure";
 import type { DraftSummary, Evaluation, LevelUpState } from "@builder/core";
+import type { PrintChoice } from "@builder/sheet/printouts";
 
 export class ApiError extends Error {
   readonly status: number;
@@ -68,7 +69,16 @@ export interface Account {
   email: string;
   language: string;
   units: Record<string, string>;
+  /** What the download dialog offers first: the last download's choice. */
+  print: PrintChoice;
   createdAt: string;
+}
+
+/** A sheet design as `GET /api/sheet-designs` lists it; names per screen language. */
+export interface SheetDesignInfo {
+  id: string;
+  name: Record<string, string>;
+  description: Record<string, string>;
 }
 
 export interface PackageListEntry {
