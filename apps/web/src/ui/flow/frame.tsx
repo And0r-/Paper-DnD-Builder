@@ -7,6 +7,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   createContext,
+  Fragment,
   useContext,
   useEffect,
   useId,
@@ -16,6 +17,7 @@ import {
   useTransition,
   type ReactNode,
 } from "react";
+import type { CountedKey } from "../../i18n/index.ts";
 import { useApp } from "../app-state.tsx";
 import { Button, ButtonLink } from "../components/Button.tsx";
 import { Callout } from "../components/Feedback.tsx";
@@ -25,6 +27,7 @@ import { AppShell } from "../components/Shell.tsx";
 import { levelWord, ptext } from "../package-text.ts";
 import { useDraft } from "./draft-state.tsx";
 import { nextOpen, OVERVIEW_KEY, positionOf, progressFraction, type FlowEntry } from "./model.ts";
+import { stepChange, stepsSignature, type GoneEntry, type StepChange } from "./step-changes.ts";
 
 // ------------------------------------------------------------ explanation
 
@@ -53,6 +56,71 @@ function useWide(): boolean {
   return wide;
 }
 
+// ------------------------------------------------------------ step changes
+
+/** How long a step that came stays green, or one that went stays red (AND-96). */
+export const MARK_MS = 2500;
+/** How long a step that went takes to fold away after that. */
+const LEAVE_MS = 400;
+
+interface ShownChange extends StepChange {
+  /** "show": in colour; "leave": the colour fades and the steps that went fold away. */
+  phase: "show" | "leave";
+}
+
+const ChangeCtx = createContext<ShownChange | null>(null);
+
+/**
+ * The last change to the steps, while it is shown. Kept here, above the
+ * step list, so the list in the menu shows it too when the menu is opened
+ * in that moment, and the menu button can show it while the menu is shut.
+ */
+function useStepChange(entries: FlowEntry[]): ShownChange | null {
+  const sig = stepsSignature(entries);
+  const [seen, setSeen] = useState({ sig, entries });
+  const [shown, setShown] = useState<{ change: StepChange; phase: "show" | "leave" } | null>(null);
+  if (seen.sig !== sig) {
+    // Compared during render, so the new step is green in the very frame it appears.
+    setSeen({ sig, entries });
+    const change = stepChange(seen.entries, entries);
+    setShown(change && { change, phase: "show" });
+  }
+  useEffect(() => {
+    if (!shown) return;
+    const timer =
+      shown.phase === "show"
+        ? setTimeout(() => setShown({ ...shown, phase: "leave" }), MARK_MS)
+        : setTimeout(() => setShown(null), LEAVE_MS);
+    return () => clearTimeout(timer);
+  }, [shown]);
+  return useMemo(() => shown && { ...shown.change, phase: shown.phase }, [shown]);
+}
+
+/** A step that went, red and struck through for a moment, then folded away. Screen readers hear the sentence instead. */
+function GoneItem({ entry, leaving }: { entry: GoneEntry; leaving: boolean }) {
+  return (
+    <li
+      className={`steplist__item steplist__ghost${leaving ? " steplist__ghost--leaving" : ""}`}
+      aria-hidden="true"
+      data-gone={entry.key}
+    >
+      <span className="steplist__link steplist__link--gone">
+        <span className="steplist__mark">
+          <Icon name="minus" size={18} />
+        </span>
+        <span className="steplist__name">{entry.title}</span>
+      </span>
+    </li>
+  );
+}
+
+/** The steps that went and stood after `after` (undefined: at the top) in one list. */
+function goneAfter(gone: GoneEntry[], after: string | undefined, leaving: boolean): ReactNode {
+  return gone
+    .filter((g) => g.after === after)
+    .map((g) => <GoneItem key={`gone-${g.key}`} entry={g} leaving={leaving} />);
+}
+
 // ----------------------------------------------------------------- frame
 
 export function SaveStatus() {
@@ -69,11 +137,14 @@ function StepLink({
   entry,
   current,
   note,
+  mark,
 }: {
   entry: FlowEntry;
   current: string | undefined;
   /** A short line under the name ("Levels 4 to 19"). */
   note?: string | undefined;
+  /** Green: the step just came (or got more). Red: a part of it just went. */
+  mark?: "new" | "lost" | undefined;
 }) {
   const { t } = useApp();
   const here = entry.key === current;
@@ -82,7 +153,8 @@ function StepLink({
     <Link
       href={entry.href}
       aria-current={here ? "step" : undefined}
-      className={`steplist__link steplist__link--${state}`}
+      className={`steplist__link steplist__link--${state}${mark ? ` steplist__link--${mark}` : ""}`}
+      data-mark={mark}
     >
       <span className="steplist__mark" aria-hidden="true">
         {state === "done" ? (
@@ -116,28 +188,46 @@ function sectionStatus(all: FlowEntry[]): FlowEntry["status"] {
  * with its raise) reads as levels, not as a list of repeats.
  */
 function LevelRuns({
+  section,
   items,
   current,
   from,
 }: {
+  /** Key of the step these entries belong to. */
+  section: string;
   items: FlowEntry[];
   current: string | undefined;
   from: number;
 }) {
   const { t } = useApp();
   const { lp } = useDraft();
+  const change = useContext(ChangeCtx);
   const word = levelWord(lp);
+  const keys = new Set(items.map((e) => e.key));
+  // Parts that went from this step; one that followed an entry not listed here stands at the top.
+  const gone = (change?.gone ?? [])
+    .filter((g) => !g.whole && g.section === section)
+    .map((g) => (g.after !== undefined && keys.has(g.after) ? g : { ...g, after: undefined }));
+  const leaving = change?.phase === "leave";
+  const lit = change?.phase === "show" ? change.added : undefined;
+  if (items.length === 0 && gone.length === 0) return null;
   return (
     <ol className="steplist__parts">
+      {goneAfter(gone, undefined, leaving)}
       {items.map((e, i) => {
         const prev = i === 0 ? from : items[i - 1]!.atLevel;
         return (
-          <li key={e.key} className="steplist__item">
-            {e.atLevel !== prev && e.atLevel > lp.pkg.flow.level.min && (
-              <p className="steplist__level">{t("flow.fromLevel", { levelName: word, level: e.atLevel })}</p>
-            )}
-            <StepLink entry={e} current={current} />
-          </li>
+          <Fragment key={e.key}>
+            <li className="steplist__item">
+              {e.atLevel !== prev && e.atLevel > lp.pkg.flow.level.min && (
+                <p className="steplist__level">
+                  {t("flow.fromLevel", { levelName: word, level: e.atLevel })}
+                </p>
+              )}
+              <StepLink entry={e} current={current} mark={lit?.has(e.key) ? "new" : undefined} />
+            </li>
+            {goneAfter(gone, e.key, leaving)}
+          </Fragment>
         );
       })}
     </ol>
@@ -153,10 +243,25 @@ function LevelRuns({
 export function StepList({ current }: { current: string | undefined }) {
   const { t } = useApp();
   const { lp, entries } = useDraft();
+  const change = useContext(ChangeCtx);
   const list = useRef<HTMLDivElement>(null);
   const here = entries.find((e) => e.key === current);
   const heads = entries.filter((e) => e.part === 1);
   const word = levelWord(lp);
+  const leaving = change?.phase === "leave";
+  const lit = change?.phase === "show" ? change : undefined;
+  const wholeGone = (change?.gone ?? []).filter((g) => g.whole);
+  /**
+   * The mark of a step as it stands in the list: green when it came, or when
+   * a part came that is not on show (its step is shut); red when only a part
+   * went that is not on show.
+   */
+  const markOf = (head: FlowEntry, all: FlowEntry[], open: boolean): "new" | "lost" | undefined => {
+    if (!lit) return undefined;
+    if (lit.added.has(head.key) || (!open && all.some((e) => lit.added.has(e.key)))) return "new";
+    if (!open && lit.gone.some((g) => !g.whole && g.section === head.key)) return "lost";
+    return undefined;
+  };
   // Keep the current step in view inside the scrolling column.
   useEffect(() => {
     list.current?.querySelector("[aria-current='step']")?.scrollIntoView({ block: "nearest" });
@@ -165,47 +270,71 @@ export function StepList({ current }: { current: string | undefined }) {
     <div className="steplist" ref={list}>
       <p className="steplist__title">{t("flow.steps")}</p>
       <ol className="steplist__items">
-        {heads.map((head) => {
-          const all = entries.filter((e) => e.section === head.section);
-          const parts = all.slice(1);
-          const open = here !== undefined && here.section === head.section;
-          if (head.sectionTitle === undefined || all.length === 1) {
-            return (
-              <li key={head.key} className="steplist__item">
-                <StepLink entry={head} current={current} />
-                {open && parts.length > 0 && (
-                  <LevelRuns items={parts} current={current} from={head.atLevel} />
-                )}
-              </li>
-            );
-          }
-          // A gathered group: its own name, the levels it spans, and its steps inside.
-          const levels = [...new Set(all.map((e) => e.atLevel))];
-          const span =
-            levels.length > 1
-              ? t("flow.levelSpan", { levelName: word, from: levels[0]!, to: levels.at(-1)! })
-              : undefined;
-          const target = all.find((e) => e.status !== "done") ?? head;
-          return (
-            <li key={head.key} className="steplist__item">
-              <StepLink
-                entry={{ ...target, title: head.sectionTitle, status: sectionStatus(all) }}
-                current={open ? undefined : current}
-                note={span}
-              />
-              {open && <LevelRuns items={all} current={current} from={lp.pkg.flow.level.min} />}
-            </li>
-          );
-        })}
+        {goneAfter(wholeGone, undefined, leaving)}
+        {heads.map((head) => (
+          <Fragment key={head.key}>
+            <StepItem head={head} current={current} here={here} markOf={markOf} word={word} />
+            {goneAfter(wholeGone, head.key, leaving)}
+          </Fragment>
+        ))}
       </ol>
     </div>
+  );
+}
+
+/** One counted step in the list, with its parts while the player is in it. */
+function StepItem({
+  head,
+  current,
+  here,
+  markOf,
+  word,
+}: {
+  head: FlowEntry;
+  current: string | undefined;
+  here: FlowEntry | undefined;
+  markOf: (head: FlowEntry, all: FlowEntry[], open: boolean) => "new" | "lost" | undefined;
+  word: string;
+}) {
+  const { t } = useApp();
+  const { lp, entries } = useDraft();
+  const all = entries.filter((e) => e.section === head.section);
+  const parts = all.slice(1);
+  const open = here !== undefined && here.section === head.section;
+  const mark = markOf(head, all, open);
+  if (head.sectionTitle === undefined || all.length === 1) {
+    return (
+      <li className="steplist__item">
+        <StepLink entry={head} current={current} mark={mark} />
+        {open && <LevelRuns section={head.key} items={parts} current={current} from={head.atLevel} />}
+      </li>
+    );
+  }
+  // A gathered group: its own name, the levels it spans, and its steps inside.
+  const levels = [...new Set(all.map((e) => e.atLevel))];
+  const span =
+    levels.length > 1
+      ? t("flow.levelSpan", { levelName: word, from: levels[0]!, to: levels.at(-1)! })
+      : undefined;
+  const target = all.find((e) => e.status !== "done") ?? head;
+  return (
+    <li className="steplist__item">
+      <StepLink
+        entry={{ ...target, title: head.sectionTitle, status: sectionStatus(all) }}
+        current={open ? undefined : current}
+        note={span}
+        mark={open ? undefined : mark}
+      />
+      {open && <LevelRuns section={head.key} items={all} current={current} from={lp.pkg.flow.level.min} />}
+    </li>
   );
 }
 
 /** The layout of /c/[id]: shell with step list in the menu and as a left column. */
 export function FlowLayout({ current, children }: { current: string | undefined; children: ReactNode }) {
   const { t } = useApp();
-  const { lp, ev, draft } = useDraft();
+  const { lp, ev, draft, entries } = useDraft();
+  const change = useStepChange(entries);
   const [content, setContent] = useState<ReactNode>(null);
   const explain = useMemo<ExplainApi>(() => ({ content, show: setContent }), [content]);
   const nameState = ev.choices[lp.pkg.flow.characterName];
@@ -218,50 +347,98 @@ export function FlowLayout({ current, children }: { current: string | undefined;
   const showAside = wide && current !== undefined && current !== OVERVIEW_KEY && current !== "level";
   useEffect(() => setContent(null), [current]);
   return (
-    <ExplainCtx.Provider value={explain}>
-      <AppShell
-        title={
-          <span className="topbar__character">
-            <span className="topbar__name">{name || t("common.unnamed")}</span>
-            <span aria-hidden="true">·</span>
-            <span className="topbar__level">
-              {ptext(lp, "level.name")} {ev.level}
+    <ChangeCtx.Provider value={change}>
+      <ExplainCtx.Provider value={explain}>
+        <AppShell
+          title={
+            <span className="topbar__character">
+              <span className="topbar__name">{name || t("common.unnamed")}</span>
+              <span aria-hidden="true">·</span>
+              <span className="topbar__level">
+                {ptext(lp, "level.name")} {ev.level}
+              </span>
+              {/* A game master building for a player always sees whose character it is. */}
+              {draft.access === "gameMaster" && (
+                <span className="topbar__owner">{t("flow.forPlayer", { email: draft.owner.email })}</span>
+              )}
             </span>
-            {/* A game master building for a player always sees whose character it is. */}
-            {draft.access === "gameMaster" && (
-              <span className="topbar__owner">{t("flow.forPlayer", { email: draft.owner.email })}</span>
-            )}
-          </span>
-        }
-        status={<SaveStatus />}
-        menuExtra={<StepList current={current} />}
-        sidebar={wide ? <StepList current={current} /> : undefined}
-        aside={
-          showAside ? (
-            <div className="explain-panel" aria-live="off">
-              {content ?? <p className="explain-panel__empty">{t("option.explainEmpty")}</p>}
-            </div>
-          ) : undefined
-        }
-      >
-        {children}
-      </AppShell>
-    </ExplainCtx.Provider>
+          }
+          status={<SaveStatus />}
+          menuMark={<MenuMark change={change} />}
+          menuExtra={<StepList current={current} />}
+          sidebar={wide ? <StepList current={current} /> : undefined}
+          aside={
+            showAside ? (
+              <div className="explain-panel" aria-live="off">
+                {content ?? <p className="explain-panel__empty">{t("option.explainEmpty")}</p>}
+              </div>
+            ) : undefined
+          }
+        >
+          {children}
+        </AppShell>
+      </ExplainCtx.Provider>
+    </ChangeCtx.Provider>
   );
+}
+
+/**
+ * On phones the step list is shut in the menu: the menu button shows the
+ * change in the same colours, "+1" green, "−1" red, for as long as the list
+ * would. Wide screens show the list itself beside the question.
+ */
+function MenuMark({ change }: { change: ShownChange | null }) {
+  if (change?.phase !== "show") return null;
+  // Counted as the list shows them: a step that came with its parts is one.
+  const gone = change.gone.length;
+  const added = change.added.size;
+  return (
+    <span className="menu-mark" aria-hidden="true">
+      {added > 0 && <span className="menu-mark__count menu-mark__count--new">+{added}</span>}
+      {gone > 0 && <span className="menu-mark__count menu-mark__count--gone">−{gone}</span>}
+    </span>
+  );
+}
+
+/**
+ * Green for a moment when a count grows, red when it shrinks: "Step 3 of
+ * 12" says the change in the same colours as the step list, also on
+ * phones, where the list is shut in the menu.
+ */
+function useCountMark(count: number): "new" | "lost" | undefined {
+  const [seen, setSeen] = useState(count);
+  const [mark, setMark] = useState<"new" | "lost" | undefined>(undefined);
+  if (seen !== count) {
+    setSeen(count);
+    setMark(count > seen ? "new" : "lost");
+  }
+  useEffect(() => {
+    if (!mark) return;
+    const timer = setTimeout(() => setMark(undefined), MARK_MS);
+    return () => clearTimeout(timer);
+  }, [mark, seen]);
+  return mark;
+}
+
+function countClass(mark: "new" | "lost" | undefined): string {
+  return mark ? `progress__count progress__count--${mark}` : "progress__count";
 }
 
 export function ProgressHeader({ entry }: { entry: FlowEntry }) {
   const { t } = useApp();
   const { lp, entries } = useDraft();
+  const inFlow = entries.some((e) => e.key === entry.key);
+  const pos = positionOf(entries, entry);
+  const totalMark = useCountMark(pos.total);
+  const partsMark = useCountMark(pos.parts);
   // An earlier step opened from the overview during a level up: no count, it is not one of the new questions.
-  if (!entries.some((e) => e.key === entry.key)) {
+  if (!inFlow) {
     return (
       <div className="progress">
         <p className="progress__text">{t("raise.earlier")}</p>
       </div>
     );
   }
-  const pos = positionOf(entries, entry);
   const text = t("flow.progress", pos);
   const part = pos.parts > 1 ? t("flow.part", pos) : undefined;
   // A step a higher level brings says which level: the boons of levels 4 and 8 look alike.
@@ -285,42 +462,54 @@ export function ProgressHeader({ entry }: { entry: FlowEntry }) {
         <div className="progress__fill" style={{ width: `${Math.min(100, percent)}%` }} />
       </div>
       <p className="progress__text">
-        <span>{text}</span>
+        <span className={countClass(totalMark)} data-mark={totalMark}>
+          {text}
+        </span>
         <span aria-hidden="true"> · </span>
         <span className="progress__step">{pos.sectionTitle}</span>
-        {[part, level].filter(Boolean).map((x) => (
-          <span key={x}>
+        {part && (
+          <span>
             <span aria-hidden="true"> · </span>
-            <span>{x}</span>
+            <span className={countClass(partsMark)} data-mark={partsMark}>
+              {part}
+            </span>
           </span>
-        ))}
+        )}
+        {level && (
+          <span>
+            <span aria-hidden="true"> · </span>
+            <span>{level}</span>
+          </span>
+        )}
       </p>
     </div>
   );
 }
 
 /**
- * Note when a choice added or removed steps or parts, in one short line;
- * the count never changes without a word. Which ones they are stands in
- * the step list and the progress line, not in the note. A switch that
- * swaps parts only says what the new choice brings.
+ * One sentence for screen readers when a choice added or removed steps or
+ * parts; the count never changes without a word (AND-77). On screen the
+ * step list shows it instead (AND-96). Spoken by the planned count, so it
+ * speaks exactly when "Step x of y" or "Part x of y" changes.
  */
 export function StepNotice() {
   const { tc, list } = useApp();
   const { notice } = useDraft();
   const lines: string[] = [];
-  if (notice?.addedParts.length) lines.push(tc("flow.partsAdded", notice.addedParts.length));
-  else if (notice?.removedParts.length) lines.push(tc("flow.partsRemoved", notice.removedParts.length));
-  // After a first sentence the step count follows in a few words.
-  const too = lines.length > 0 ? "Too" : "";
-  if (notice?.added.length) lines.push(tc(`flow.stepAdded${too}`, notice.added.length));
-  if (notice?.removed.length) lines.push(tc(`flow.stepRemoved${too}`, notice.removed.length));
-  if (notice?.grown.length)
-    lines.push(tc("flow.stepGrown", notice.grown.length, { steps: list(notice.grown) }));
+  const say = (key: CountedKey, names: string[]) => {
+    if (names.length > 0) lines.push(tc(key, names.length, { steps: list(names) }));
+  };
+  if (notice) {
+    say("flow.stepAdded", notice.added);
+    say("flow.partsAdded", notice.addedParts);
+    say("flow.stepRemoved", notice.removed);
+    say("flow.partsRemoved", notice.removedParts);
+    say("flow.stepGrown", notice.grown);
+  }
   return (
-    <div aria-live="polite" className="step-notice">
-      {lines.length > 0 && <Callout tone="info">{lines.join(" ")}</Callout>}
-    </div>
+    <p aria-live="polite" className="step-notice visually-hidden">
+      {lines.join(" ")}
+    </p>
   );
 }
 

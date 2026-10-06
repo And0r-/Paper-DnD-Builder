@@ -24,6 +24,7 @@ export function AppShell({
   title,
   status,
   menuExtra,
+  menuMark,
   sidebar,
   aside,
   children,
@@ -35,6 +36,8 @@ export function AppShell({
   status?: ReactNode;
   /** Extra content at the top of the menu (the step list). */
   menuExtra?: ReactNode;
+  /** A short mark on the menu button (steps that came or went while the menu is shut). */
+  menuMark?: ReactNode;
   /** Left column on large screens (the step list). */
   sidebar?: ReactNode;
   /** Right column on large screens (the explanation). */
@@ -58,6 +61,7 @@ export function AppShell({
         >
           <Icon name="menu" />
           <span>{t("menu.open")}</span>
+          {menuMark}
         </button>
         <div className="topbar__title">
           {title ?? (
