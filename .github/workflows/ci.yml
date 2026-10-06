@@ -1,0 +1,64 @@
+# Runs on every pull request and on every push to main. The job names
+# ("check", "browser") are the status checks branch protection can require.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+# A newer push to the same branch cancels the older run; main keeps every run.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+env:
+  NEXT_TELEMETRY_DISABLED: "1"
+
+jobs:
+  check:
+    name: check
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      # Installs the pnpm version from "packageManager" in package.json.
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # Lint, typecheck, unit tests, formatting.
+      - run: pnpm check
+
+  browser:
+    name: browser
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # The Playwright version pinned in apps/web, with the system libraries
+      # Chromium needs on the runner.
+      - run: pnpm exec playwright install --with-deps chromium
+        working-directory: apps/web
+      # One retry so a single flaky run does not turn the check red; a test
+      # that fails twice still does.
+      - run: pnpm --filter @builder/web build
+      - run: pnpm exec playwright test --retries=1
+        working-directory: apps/web
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-results
+          path: apps/web/e2e/.results/
+          retention-days: 7
