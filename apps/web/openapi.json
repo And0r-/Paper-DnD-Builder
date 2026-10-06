@@ -23,24 +23,12 @@
     }
   ],
   "tags": [
-    {
-      "name": "Login"
-    },
-    {
-      "name": "Account"
-    },
-    {
-      "name": "Access keys"
-    },
-    {
-      "name": "Packages"
-    },
-    {
-      "name": "Characters"
-    },
-    {
-      "name": "Print"
-    },
+    { "name": "Login" },
+    { "name": "Account" },
+    { "name": "Access keys" },
+    { "name": "Packages" },
+    { "name": "Characters" },
+    { "name": "Print" },
     {
       "name": "Sheet copies",
       "description": "Copies of the sheet a player keeps and changes freely, and the play state. Kept apart from the character; the builder never reads them. Same access as the character: owner, game master of the owner's campaign, an access key of either; anyone else gets 404."
@@ -49,9 +37,7 @@
       "name": "Campaigns",
       "description": "Whoever makes a campaign leads it (game master) and adds players by mail address. The game master reaches every character of the players; a player sees only their own characters and the campaigns they are in. Anyone else gets 404."
     },
-    {
-      "name": "Server"
-    }
+    { "name": "Server" }
   ],
   "paths": {
     "/api/health": {
@@ -77,15 +63,9 @@
                       "items": {
                         "type": "object",
                         "properties": {
-                          "id": {
-                            "type": "string"
-                          },
-                          "version": {
-                            "type": "string"
-                          },
-                          "formatVersion": {
-                            "type": "string"
-                          }
+                          "id": { "type": "string" },
+                          "version": { "type": "string" },
+                          "formatVersion": { "type": "string" }
                         },
                         "required": ["id", "version", "formatVersion"],
                         "additionalProperties": false
@@ -93,9 +73,7 @@
                     },
                     "warnings": {
                       "type": "array",
-                      "items": {
-                        "type": "string"
-                      }
+                      "items": { "type": "string" }
                     }
                   },
                   "required": ["status", "packages", "warnings"],
@@ -2443,9 +2421,7 @@
             "in": "path",
             "required": true,
             "description": "Draft id (a UUID).",
-            "schema": {
-              "type": "string"
-            }
+            "schema": { "type": "string" }
           }
         ],
         "responses": {
@@ -2456,15 +2432,8 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "copies": {
-                      "type": "array",
-                      "items": {
-                        "$ref": "#/components/schemas/SheetCopy"
-                      }
-                    },
-                    "original": {
-                      "$ref": "#/components/schemas/OriginalStamp"
-                    }
+                    "copies": { "type": "array", "items": { "$ref": "#/components/schemas/SheetCopy" } },
+                    "original": { "$ref": "#/components/schemas/OriginalStamp" }
                   },
                   "required": ["copies", "original"],
                   "additionalProperties": false
@@ -2472,31 +2441,19 @@
               }
             }
           },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
           "404": {
             "description": "`draftNotFound` (also someone else's character: it looks exactly like a missing one)",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Error",
-                  "properties": {
-                    "error": {
-                      "properties": {
-                        "code": {
-                          "enum": ["draftNotFound"]
-                        }
-                      }
-                    }
-                  }
+                  "properties": { "error": { "properties": { "code": { "enum": ["draftNotFound"] } } } }
                 }
               }
             }
           },
-          "default": {
-            "$ref": "#/components/responses/ServerError"
-          }
+          "default": { "$ref": "#/components/responses/ServerError" }
         }
       },
       "post": {
@@ -2510,9 +2467,7 @@
             "in": "path",
             "required": true,
             "description": "Draft id (a UUID).",
-            "schema": {
-              "type": "string"
-            }
+            "schema": { "type": "string" }
           }
         ],
         "requestBody": {
@@ -2528,9 +2483,7 @@
                     "maxLength": 80,
                     "description": "One line, no control characters."
                   },
-                  "model": {
-                    "$ref": "#/components/schemas/SheetModel"
-                  }
+                  "model": { "$ref": "#/components/schemas/SheetModel" }
                 },
                 "additionalProperties": false
               }
@@ -2540,38 +2493,18 @@
         "responses": {
           "201": {
             "description": "The new copy.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SheetCopyView"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/SheetCopyView" } } }
           },
-          "400": {
-            "$ref": "#/components/responses/BadBody"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/CrossSite"
-          },
+          "400": { "$ref": "#/components/responses/BadBody" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/CrossSite" },
           "404": {
             "description": "`draftNotFound` (also someone else's character: it looks exactly like a missing one)",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Error",
-                  "properties": {
-                    "error": {
-                      "properties": {
-                        "code": {
-                          "enum": ["draftNotFound"]
-                        }
-                      }
-                    }
-                  }
+                  "properties": { "error": { "properties": { "code": { "enum": ["draftNotFound"] } } } }
                 }
               }
             }
@@ -2588,21 +2521,10 @@
                         "code": {
                           "enum": ["notFinished", "tooManyCopies", "originalChanged", "packageUnavailable"]
                         },
-                        "open": {
-                          "type": "array",
-                          "items": {
-                            "type": "string"
-                          }
-                        },
-                        "max": {
-                          "type": "integer"
-                        },
-                        "original": {
-                          "$ref": "#/components/schemas/OriginalStamp"
-                        },
-                        "packageId": {
-                          "type": "string"
-                        }
+                        "open": { "type": "array", "items": { "type": "string" } },
+                        "max": { "type": "integer" },
+                        "original": { "$ref": "#/components/schemas/OriginalStamp" },
+                        "packageId": { "type": "string" }
                       }
                     }
                   }
@@ -2619,12 +2541,8 @@
                   "properties": {
                     "error": {
                       "properties": {
-                        "code": {
-                          "enum": ["bodyTooLarge", "copyTooLarge"]
-                        },
-                        "max": {
-                          "type": "integer"
-                        }
+                        "code": { "enum": ["bodyTooLarge", "copyTooLarge"] },
+                        "max": { "type": "integer" }
                       }
                     }
                   }
@@ -2632,9 +2550,7 @@
               }
             }
           },
-          "415": {
-            "$ref": "#/components/responses/JsonRequired"
-          },
+          "415": { "$ref": "#/components/responses/JsonRequired" },
           "422": {
             "description": "`languageNotSupported`",
             "content": {
@@ -2644,18 +2560,9 @@
                   "properties": {
                     "error": {
                       "properties": {
-                        "code": {
-                          "enum": ["languageNotSupported"]
-                        },
-                        "language": {
-                          "type": "string"
-                        },
-                        "languages": {
-                          "type": "array",
-                          "items": {
-                            "type": "string"
-                          }
-                        }
+                        "code": { "enum": ["languageNotSupported"] },
+                        "language": { "type": "string" },
+                        "languages": { "type": "array", "items": { "type": "string" } }
                       }
                     }
                   }
@@ -2663,9 +2570,7 @@
               }
             }
           },
-          "default": {
-            "$ref": "#/components/responses/ServerError"
-          }
+          "default": { "$ref": "#/components/responses/ServerError" }
         }
       }
     },
@@ -2681,34 +2586,22 @@
             "in": "path",
             "required": true,
             "description": "Draft id (a UUID).",
-            "schema": {
-              "type": "string"
-            }
+            "schema": { "type": "string" }
           },
           {
             "name": "copyId",
             "in": "path",
             "required": true,
             "description": "Copy id (a UUID).",
-            "schema": {
-              "type": "string"
-            }
+            "schema": { "type": "string" }
           }
         ],
         "responses": {
           "200": {
             "description": "The copy.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SheetCopyView"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/SheetCopyView" } } }
           },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
           "404": {
             "description": "`draftNotFound` (also someone else's character), `copyNotFound`",
             "content": {
@@ -2716,21 +2609,13 @@
                 "schema": {
                   "$ref": "#/components/schemas/Error",
                   "properties": {
-                    "error": {
-                      "properties": {
-                        "code": {
-                          "enum": ["draftNotFound", "copyNotFound"]
-                        }
-                      }
-                    }
+                    "error": { "properties": { "code": { "enum": ["draftNotFound", "copyNotFound"] } } }
                   }
                 }
               }
             }
           },
-          "default": {
-            "$ref": "#/components/responses/ServerError"
-          }
+          "default": { "$ref": "#/components/responses/ServerError" }
         }
       },
       "put": {
@@ -2744,18 +2629,14 @@
             "in": "path",
             "required": true,
             "description": "Draft id (a UUID).",
-            "schema": {
-              "type": "string"
-            }
+            "schema": { "type": "string" }
           },
           {
             "name": "copyId",
             "in": "path",
             "required": true,
             "description": "Copy id (a UUID).",
-            "schema": {
-              "type": "string"
-            }
+            "schema": { "type": "string" }
           }
         ],
         "requestBody": {
@@ -2776,9 +2657,7 @@
                     "maxLength": 80,
                     "description": "One line, no control characters."
                   },
-                  "model": {
-                    "$ref": "#/components/schemas/SheetModel"
-                  }
+                  "model": { "$ref": "#/components/schemas/SheetModel" }
                 },
                 "required": ["version"],
                 "additionalProperties": false
@@ -2789,23 +2668,11 @@
         "responses": {
           "200": {
             "description": "The changed copy.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SheetCopyView"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/SheetCopyView" } } }
           },
-          "400": {
-            "$ref": "#/components/responses/BadBody"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/CrossSite"
-          },
+          "400": { "$ref": "#/components/responses/BadBody" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/CrossSite" },
           "404": {
             "description": "`draftNotFound` (also someone else's character), `copyNotFound`",
             "content": {
@@ -2813,13 +2680,7 @@
                 "schema": {
                   "$ref": "#/components/schemas/Error",
                   "properties": {
-                    "error": {
-                      "properties": {
-                        "code": {
-                          "enum": ["draftNotFound", "copyNotFound"]
-                        }
-                      }
-                    }
+                    "error": { "properties": { "code": { "enum": ["draftNotFound", "copyNotFound"] } } }
                   }
                 }
               }
@@ -2834,12 +2695,8 @@
                   "properties": {
                     "error": {
                       "properties": {
-                        "code": {
-                          "enum": ["versionConflict"]
-                        },
-                        "current": {
-                          "$ref": "#/components/schemas/SheetCopyView"
-                        }
+                        "code": { "enum": ["versionConflict"] },
+                        "current": { "$ref": "#/components/schemas/SheetCopyView" }
                       }
                     }
                   }
@@ -2856,12 +2713,8 @@
                   "properties": {
                     "error": {
                       "properties": {
-                        "code": {
-                          "enum": ["bodyTooLarge", "copyTooLarge"]
-                        },
-                        "max": {
-                          "type": "integer"
-                        }
+                        "code": { "enum": ["bodyTooLarge", "copyTooLarge"] },
+                        "max": { "type": "integer" }
                       }
                     }
                   }
@@ -2869,12 +2722,8 @@
               }
             }
           },
-          "415": {
-            "$ref": "#/components/responses/JsonRequired"
-          },
-          "default": {
-            "$ref": "#/components/responses/ServerError"
-          }
+          "415": { "$ref": "#/components/responses/JsonRequired" },
+          "default": { "$ref": "#/components/responses/ServerError" }
         }
       },
       "delete": {
@@ -2887,30 +2736,20 @@
             "in": "path",
             "required": true,
             "description": "Draft id (a UUID).",
-            "schema": {
-              "type": "string"
-            }
+            "schema": { "type": "string" }
           },
           {
             "name": "copyId",
             "in": "path",
             "required": true,
             "description": "Copy id (a UUID).",
-            "schema": {
-              "type": "string"
-            }
+            "schema": { "type": "string" }
           }
         ],
         "responses": {
-          "204": {
-            "description": "Done. No body."
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/CrossSite"
-          },
+          "204": { "description": "Done. No body." },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/CrossSite" },
           "404": {
             "description": "`draftNotFound` (also someone else's character), `copyNotFound`",
             "content": {
@@ -2918,21 +2757,13 @@
                 "schema": {
                   "$ref": "#/components/schemas/Error",
                   "properties": {
-                    "error": {
-                      "properties": {
-                        "code": {
-                          "enum": ["draftNotFound", "copyNotFound"]
-                        }
-                      }
-                    }
+                    "error": { "properties": { "code": { "enum": ["draftNotFound", "copyNotFound"] } } }
                   }
                 }
               }
             }
           },
-          "default": {
-            "$ref": "#/components/responses/ServerError"
-          }
+          "default": { "$ref": "#/components/responses/ServerError" }
         }
       }
     },
@@ -2948,47 +2779,27 @@
             "in": "path",
             "required": true,
             "description": "Draft id (a UUID).",
-            "schema": {
-              "type": "string"
-            }
+            "schema": { "type": "string" }
           }
         ],
         "responses": {
           "200": {
             "description": "The play state; `version: 0` and `{}` while nothing is stored.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/PlayStateView"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PlayStateView" } } }
           },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
           "404": {
             "description": "`draftNotFound` (also someone else's character: it looks exactly like a missing one)",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Error",
-                  "properties": {
-                    "error": {
-                      "properties": {
-                        "code": {
-                          "enum": ["draftNotFound"]
-                        }
-                      }
-                    }
-                  }
+                  "properties": { "error": { "properties": { "code": { "enum": ["draftNotFound"] } } } }
                 }
               }
             }
           },
-          "default": {
-            "$ref": "#/components/responses/ServerError"
-          }
+          "default": { "$ref": "#/components/responses/ServerError" }
         }
       },
       "put": {
@@ -3002,9 +2813,7 @@
             "in": "path",
             "required": true,
             "description": "Draft id (a UUID).",
-            "schema": {
-              "type": "string"
-            }
+            "schema": { "type": "string" }
           }
         ],
         "requestBody": {
@@ -3016,13 +2825,8 @@
                   {
                     "type": "object",
                     "properties": {
-                      "version": {
-                        "type": "integer",
-                        "minimum": 0
-                      },
-                      "state": {
-                        "$ref": "#/components/schemas/PlayState"
-                      }
+                      "version": { "type": "integer", "minimum": 0 },
+                      "state": { "$ref": "#/components/schemas/PlayState" }
                     },
                     "required": ["version", "state"],
                     "additionalProperties": false
@@ -3030,13 +2834,8 @@
                   {
                     "type": "object",
                     "properties": {
-                      "version": {
-                        "type": "integer",
-                        "minimum": 0
-                      },
-                      "clearChecks": {
-                        "const": true
-                      }
+                      "version": { "type": "integer", "minimum": 0 },
+                      "clearChecks": { "const": true }
                     },
                     "required": ["version", "clearChecks"],
                     "additionalProperties": false
@@ -3049,38 +2848,18 @@
         "responses": {
           "200": {
             "description": "The stored state.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/PlayStateView"
-                }
-              }
-            }
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PlayStateView" } } }
           },
-          "400": {
-            "$ref": "#/components/responses/BadBody"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/CrossSite"
-          },
+          "400": { "$ref": "#/components/responses/BadBody" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/CrossSite" },
           "404": {
             "description": "`draftNotFound` (also someone else's character: it looks exactly like a missing one)",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Error",
-                  "properties": {
-                    "error": {
-                      "properties": {
-                        "code": {
-                          "enum": ["draftNotFound"]
-                        }
-                      }
-                    }
-                  }
+                  "properties": { "error": { "properties": { "code": { "enum": ["draftNotFound"] } } } }
                 }
               }
             }
@@ -3094,12 +2873,8 @@
                   "properties": {
                     "error": {
                       "properties": {
-                        "code": {
-                          "enum": ["versionConflict"]
-                        },
-                        "current": {
-                          "$ref": "#/components/schemas/PlayStateView"
-                        }
+                        "code": { "enum": ["versionConflict"] },
+                        "current": { "$ref": "#/components/schemas/PlayStateView" }
                       }
                     }
                   }
@@ -3107,15 +2882,9 @@
               }
             }
           },
-          "413": {
-            "$ref": "#/components/responses/BodyTooLarge"
-          },
-          "415": {
-            "$ref": "#/components/responses/JsonRequired"
-          },
-          "default": {
-            "$ref": "#/components/responses/ServerError"
-          }
+          "413": { "$ref": "#/components/responses/BodyTooLarge" },
+          "415": { "$ref": "#/components/responses/JsonRequired" },
+          "default": { "$ref": "#/components/responses/ServerError" }
         }
       }
     },
@@ -4052,35 +3821,21 @@
       "SheetModel": {
         "type": "object",
         "properties": {
-          "version": {
-            "type": "number",
-            "const": 1
-          },
-          "language": {
-            "type": "string"
-          },
+          "version": { "type": "number", "const": 1 },
+          "language": { "type": "string" },
           "origin": {
             "oneOf": [
               {
                 "type": "object",
                 "properties": {
-                  "kind": {
-                    "type": "string",
-                    "const": "original"
-                  },
-                  "level": {
-                    "type": "integer",
-                    "minimum": -9007199254740991,
-                    "maximum": 9007199254740991
-                  },
+                  "kind": { "type": "string", "const": "original" },
+                  "level": { "type": "integer", "minimum": -9007199254740991, "maximum": 9007199254740991 },
                   "builtAt": {
                     "type": "string",
                     "format": "date-time",
                     "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
                   },
-                  "packageVersion": {
-                    "type": "string"
-                  },
+                  "packageVersion": { "type": "string" },
                   "changedAt": {
                     "type": "string",
                     "format": "date-time",
@@ -4093,13 +3848,8 @@
               {
                 "type": "object",
                 "properties": {
-                  "kind": {
-                    "type": "string",
-                    "const": "copy"
-                  },
-                  "name": {
-                    "type": "string"
-                  },
+                  "kind": { "type": "string", "const": "copy" },
+                  "name": { "type": "string" },
                   "createdAt": {
                     "type": "string",
                     "format": "date-time",
@@ -4110,9 +3860,7 @@
                     "minimum": -9007199254740991,
                     "maximum": 9007199254740991
                   },
-                  "fromPackageVersion": {
-                    "type": "string"
-                  },
+                  "fromPackageVersion": { "type": "string" },
                   "fromChangedAt": {
                     "type": "string",
                     "format": "date-time",
@@ -4124,41 +3872,19 @@
               }
             ]
           },
-          "packageId": {
-            "type": "string"
-          },
-          "name": {
-            "type": "string"
-          },
-          "level": {
-            "type": "integer",
-            "minimum": -9007199254740991,
-            "maximum": 9007199254740991
-          },
-          "levelLabel": {
-            "type": "string"
-          },
-          "packageName": {
-            "type": "string"
-          },
+          "packageId": { "type": "string" },
+          "name": { "type": "string" },
+          "level": { "type": "integer", "minimum": -9007199254740991, "maximum": 9007199254740991 },
+          "levelLabel": { "type": "string" },
+          "packageName": { "type": "string" },
           "units": {
             "type": "object",
-            "propertyNames": {
-              "type": "string"
-            },
-            "additionalProperties": {
-              "type": "string"
-            }
+            "propertyNames": { "type": "string" },
+            "additionalProperties": { "type": "string" }
           },
-          "unitsLine": {
-            "type": "string"
-          },
-          "attribution": {
-            "type": "string"
-          },
-          "createdOn": {
-            "type": "string"
-          },
+          "unitsLine": { "type": "string" },
+          "attribution": { "type": "string" },
+          "createdOn": { "type": "string" },
           "sections": {
             "type": "array",
             "items": {
@@ -4166,53 +3892,24 @@
                 {
                   "type": "object",
                   "properties": {
-                    "id": {
-                      "type": "string"
-                    },
-                    "span": {
-                      "type": "integer",
-                      "minimum": 1,
-                      "maximum": 9007199254740991
-                    },
-                    "title": {
-                      "type": "string"
-                    },
-                    "hint": {
-                      "type": "string"
-                    },
-                    "kind": {
-                      "type": "string",
-                      "const": "header"
-                    },
-                    "name": {
-                      "type": "string"
-                    },
-                    "summary": {
-                      "type": "string"
-                    },
-                    "packageName": {
-                      "type": "string"
-                    },
+                    "id": { "type": "string" },
+                    "span": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
+                    "title": { "type": "string" },
+                    "hint": { "type": "string" },
+                    "kind": { "type": "string", "const": "header" },
+                    "name": { "type": "string" },
+                    "summary": { "type": "string" },
+                    "packageName": { "type": "string" },
                     "fields": {
                       "type": "array",
                       "items": {
                         "type": "object",
-                        "properties": {
-                          "label": {
-                            "type": "string"
-                          },
-                          "text": {
-                            "type": "string"
-                          }
-                        },
+                        "properties": { "label": { "type": "string" }, "text": { "type": "string" } },
                         "required": ["label", "text"],
                         "additionalProperties": false
                       }
                     },
-                    "playedByField": {
-                      "type": "string",
-                      "minLength": 1
-                    }
+                    "playedByField": { "type": "string", "minLength": 1 }
                   },
                   "required": [
                     "id",
@@ -4230,59 +3927,24 @@
                 {
                   "type": "object",
                   "properties": {
-                    "id": {
-                      "type": "string"
-                    },
-                    "span": {
-                      "type": "integer",
-                      "minimum": 1,
-                      "maximum": 9007199254740991
-                    },
-                    "title": {
-                      "type": "string"
-                    },
-                    "hint": {
-                      "type": "string"
-                    },
-                    "kind": {
-                      "type": "string",
-                      "const": "statBoxes"
-                    },
+                    "id": { "type": "string" },
+                    "span": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
+                    "title": { "type": "string" },
+                    "hint": { "type": "string" },
+                    "kind": { "type": "string", "const": "statBoxes" },
                     "boxes": {
                       "type": "array",
                       "items": {
                         "type": "object",
                         "properties": {
-                          "valueId": {
-                            "type": "string"
-                          },
-                          "label": {
-                            "type": "string"
-                          },
-                          "style": {
-                            "type": "string",
-                            "enum": ["number", "pencil", "circles", "boxes"]
-                          },
-                          "text": {
-                            "type": "string"
-                          },
-                          "circles": {
-                            "type": "integer",
-                            "minimum": 0,
-                            "maximum": 9007199254740991
-                          },
-                          "squares": {
-                            "type": "integer",
-                            "minimum": 0,
-                            "maximum": 9007199254740991
-                          },
-                          "hint": {
-                            "type": "string"
-                          },
-                          "field": {
-                            "type": "string",
-                            "minLength": 1
-                          }
+                          "valueId": { "type": "string" },
+                          "label": { "type": "string" },
+                          "style": { "type": "string", "enum": ["number", "pencil", "circles", "boxes"] },
+                          "text": { "type": "string" },
+                          "circles": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                          "squares": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                          "hint": { "type": "string" },
+                          "field": { "type": "string", "minLength": 1 }
                         },
                         "required": ["valueId", "label", "style", "text", "circles", "squares", "hint"],
                         "additionalProperties": false
@@ -4295,65 +3957,34 @@
                 {
                   "type": "object",
                   "properties": {
-                    "id": {
-                      "type": "string"
-                    },
-                    "span": {
-                      "type": "integer",
-                      "minimum": 1,
-                      "maximum": 9007199254740991
-                    },
-                    "title": {
-                      "type": "string"
-                    },
-                    "hint": {
-                      "type": "string"
-                    },
-                    "kind": {
-                      "type": "string",
-                      "const": "scoreColumn"
-                    },
+                    "id": { "type": "string" },
+                    "span": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
+                    "title": { "type": "string" },
+                    "hint": { "type": "string" },
+                    "kind": { "type": "string", "const": "scoreColumn" },
                     "scores": {
                       "type": "array",
                       "items": {
                         "type": "object",
                         "properties": {
-                          "valueId": {
-                            "type": "string"
-                          },
-                          "label": {
-                            "type": "string"
-                          },
-                          "value": {
-                            "type": "string"
-                          },
-                          "derivedId": {
-                            "type": "string"
-                          },
-                          "derivedLabel": {
-                            "type": "string"
-                          },
-                          "derived": {
-                            "type": ["string", "null"]
-                          },
+                          "valueId": { "type": "string" },
+                          "label": { "type": "string" },
+                          "value": { "type": "string" },
+                          "derivedId": { "type": "string" },
+                          "derivedLabel": { "type": "string" },
+                          "derived": { "type": ["string", "null"] },
                           "extra": {
                             "anyOf": [
                               {
                                 "type": "object",
                                 "properties": {
-                                  "label": {
-                                    "type": "string"
-                                  },
-                                  "value": {
-                                    "type": "string"
-                                  }
+                                  "label": { "type": "string" },
+                                  "value": { "type": "string" }
                                 },
                                 "required": ["label", "value"],
                                 "additionalProperties": false
                               },
-                              {
-                                "type": "null"
-                              }
+                              { "type": "null" }
                             ]
                           }
                         },
@@ -4368,72 +3999,34 @@
                 {
                   "type": "object",
                   "properties": {
-                    "id": {
-                      "type": "string"
-                    },
-                    "span": {
-                      "type": "integer",
-                      "minimum": 1,
-                      "maximum": 9007199254740991
-                    },
-                    "title": {
-                      "type": "string"
-                    },
-                    "hint": {
-                      "type": "string"
-                    },
-                    "kind": {
-                      "type": "string",
-                      "const": "checkList"
-                    },
+                    "id": { "type": "string" },
+                    "span": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
+                    "title": { "type": "string" },
+                    "hint": { "type": "string" },
+                    "kind": { "type": "string", "const": "checkList" },
                     "items": {
                       "type": "array",
                       "items": {
                         "type": "object",
                         "properties": {
-                          "id": {
-                            "type": "string"
-                          },
-                          "name": {
-                            "type": "string"
-                          },
-                          "marked": {
-                            "type": "boolean"
-                          },
-                          "strong": {
-                            "type": "boolean"
-                          },
-                          "note": {
-                            "type": "string"
-                          },
+                          "id": { "type": "string" },
+                          "name": { "type": "string" },
+                          "marked": { "type": "boolean" },
+                          "strong": { "type": "boolean" },
+                          "note": { "type": "string" },
                           "total": {
                             "type": "object",
-                            "properties": {
-                              "text": {
-                                "type": "string"
-                              },
-                              "parts": {
-                                "type": "string"
-                              }
-                            },
+                            "properties": { "text": { "type": "string" }, "parts": { "type": "string" } },
                             "required": ["text", "parts"],
                             "additionalProperties": false
                           },
-                          "field": {
-                            "type": "string",
-                            "minLength": 1
-                          }
+                          "field": { "type": "string", "minLength": 1 }
                         },
                         "required": ["id", "name", "marked", "note", "total"],
                         "additionalProperties": false
                       }
                     },
-                    "legend": {
-                      "type": "array",
-                      "items": {
-                        "type": "string"
-                      }
-                    }
+                    "legend": { "type": "array", "items": { "type": "string" } }
                   },
                   "required": ["id", "span", "title", "hint", "kind", "items", "legend"],
                   "additionalProperties": false
@@ -4441,50 +4034,20 @@
                 {
                   "type": "object",
                   "properties": {
-                    "id": {
-                      "type": "string"
-                    },
-                    "span": {
-                      "type": "integer",
-                      "minimum": 1,
-                      "maximum": 9007199254740991
-                    },
-                    "title": {
-                      "type": "string"
-                    },
-                    "hint": {
-                      "type": "string"
-                    },
-                    "kind": {
-                      "type": "string",
-                      "const": "statTable"
-                    },
-                    "columns": {
-                      "type": "array",
-                      "items": {
-                        "type": "string"
-                      }
-                    },
-                    "wrap": {
-                      "type": "array",
-                      "items": {
-                        "type": "boolean"
-                      }
-                    },
+                    "id": { "type": "string" },
+                    "span": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
+                    "title": { "type": "string" },
+                    "hint": { "type": "string" },
+                    "kind": { "type": "string", "const": "statTable" },
+                    "columns": { "type": "array", "items": { "type": "string" } },
+                    "wrap": { "type": "array", "items": { "type": "boolean" } },
                     "rows": {
                       "type": "array",
                       "items": {
                         "type": "object",
                         "properties": {
-                          "name": {
-                            "type": "string"
-                          },
-                          "cells": {
-                            "type": "array",
-                            "items": {
-                              "type": "string"
-                            }
-                          }
+                          "name": { "type": "string" },
+                          "cells": { "type": "array", "items": { "type": "string" } }
                         },
                         "required": ["name", "cells"],
                         "additionalProperties": false
@@ -4497,50 +4060,22 @@
                 {
                   "type": "object",
                   "properties": {
-                    "id": {
-                      "type": "string"
-                    },
-                    "span": {
-                      "type": "integer",
-                      "minimum": 1,
-                      "maximum": 9007199254740991
-                    },
-                    "title": {
-                      "type": "string"
-                    },
-                    "hint": {
-                      "type": "string"
-                    },
-                    "kind": {
-                      "type": "string",
-                      "const": "featureTable"
-                    },
-                    "lead": {
-                      "type": "array",
-                      "items": {
-                        "type": "string"
-                      }
-                    },
+                    "id": { "type": "string" },
+                    "span": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
+                    "title": { "type": "string" },
+                    "hint": { "type": "string" },
+                    "kind": { "type": "string", "const": "featureTable" },
+                    "lead": { "type": "array", "items": { "type": "string" } },
                     "rows": {
                       "type": "array",
                       "items": {
                         "type": "object",
                         "properties": {
-                          "id": {
-                            "type": "string"
-                          },
-                          "name": {
-                            "type": "string"
-                          },
-                          "marks": {
-                            "type": "string"
-                          },
-                          "note": {
-                            "type": "string"
-                          },
-                          "text": {
-                            "type": "string"
-                          },
+                          "id": { "type": "string" },
+                          "name": { "type": "string" },
+                          "marks": { "type": "string" },
+                          "note": { "type": "string" },
+                          "text": { "type": "string" },
                           "uses": {
                             "anyOf": [
                               {
@@ -4571,46 +4106,29 @@
                                   },
                                   {
                                     "type": "object",
-                                    "properties": {
-                                      "text": {
-                                        "type": "string"
-                                      }
-                                    },
+                                    "properties": { "text": { "type": "string" } },
                                     "required": ["text"],
                                     "additionalProperties": false
                                   }
                                 ]
                               },
-                              {
-                                "type": "null"
-                              }
+                              { "type": "null" }
                             ]
                           },
-                          "usesField": {
-                            "type": "string",
-                            "minLength": 1
-                          },
+                          "usesField": { "type": "string", "minLength": 1 },
                           "group": {
                             "anyOf": [
                               {
                                 "type": "object",
                                 "properties": {
-                                  "key": {
-                                    "type": "string"
-                                  },
-                                  "title": {
-                                    "type": "string"
-                                  },
-                                  "hint": {
-                                    "type": "string"
-                                  }
+                                  "key": { "type": "string" },
+                                  "title": { "type": "string" },
+                                  "hint": { "type": "string" }
                                 },
                                 "required": ["key", "title", "hint"],
                                 "additionalProperties": false
                               },
-                              {
-                                "type": "null"
-                              }
+                              { "type": "null" }
                             ]
                           }
                         },
@@ -4618,12 +4136,7 @@
                         "additionalProperties": false
                       }
                     },
-                    "legend": {
-                      "type": "array",
-                      "items": {
-                        "type": "string"
-                      }
-                    }
+                    "legend": { "type": "array", "items": { "type": "string" } }
                   },
                   "required": ["id", "span", "title", "hint", "kind", "lead", "rows", "legend"],
                   "additionalProperties": false
@@ -4631,39 +4144,14 @@
                 {
                   "type": "object",
                   "properties": {
-                    "id": {
-                      "type": "string"
-                    },
-                    "span": {
-                      "type": "integer",
-                      "minimum": 1,
-                      "maximum": 9007199254740991
-                    },
-                    "title": {
-                      "type": "string"
-                    },
-                    "hint": {
-                      "type": "string"
-                    },
-                    "kind": {
-                      "type": "string",
-                      "const": "list"
-                    },
-                    "items": {
-                      "type": "array",
-                      "items": {
-                        "type": "string"
-                      }
-                    },
-                    "blankLines": {
-                      "type": "integer",
-                      "minimum": 0,
-                      "maximum": 9007199254740991
-                    },
-                    "field": {
-                      "type": "string",
-                      "minLength": 1
-                    }
+                    "id": { "type": "string" },
+                    "span": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
+                    "title": { "type": "string" },
+                    "hint": { "type": "string" },
+                    "kind": { "type": "string", "const": "list" },
+                    "items": { "type": "array", "items": { "type": "string" } },
+                    "blankLines": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                    "field": { "type": "string", "minLength": 1 }
                   },
                   "required": ["id", "span", "title", "hint", "kind", "items", "blankLines"],
                   "additionalProperties": false
@@ -4671,36 +4159,16 @@
                 {
                   "type": "object",
                   "properties": {
-                    "id": {
-                      "type": "string"
-                    },
-                    "span": {
-                      "type": "integer",
-                      "minimum": 1,
-                      "maximum": 9007199254740991
-                    },
-                    "title": {
-                      "type": "string"
-                    },
-                    "hint": {
-                      "type": "string"
-                    },
-                    "kind": {
-                      "type": "string",
-                      "const": "answers"
-                    },
+                    "id": { "type": "string" },
+                    "span": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
+                    "title": { "type": "string" },
+                    "hint": { "type": "string" },
+                    "kind": { "type": "string", "const": "answers" },
                     "rows": {
                       "type": "array",
                       "items": {
                         "type": "object",
-                        "properties": {
-                          "label": {
-                            "type": "string"
-                          },
-                          "text": {
-                            "type": "string"
-                          }
-                        },
+                        "properties": { "label": { "type": "string" }, "text": { "type": "string" } },
                         "required": ["label", "text"],
                         "additionalProperties": false
                       }
@@ -4712,30 +4180,12 @@
                 {
                   "type": "object",
                   "properties": {
-                    "id": {
-                      "type": "string"
-                    },
-                    "span": {
-                      "type": "integer",
-                      "minimum": 1,
-                      "maximum": 9007199254740991
-                    },
-                    "title": {
-                      "type": "string"
-                    },
-                    "hint": {
-                      "type": "string"
-                    },
-                    "kind": {
-                      "type": "string",
-                      "const": "helpBox"
-                    },
-                    "paragraphs": {
-                      "type": "array",
-                      "items": {
-                        "type": "string"
-                      }
-                    }
+                    "id": { "type": "string" },
+                    "span": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
+                    "title": { "type": "string" },
+                    "hint": { "type": "string" },
+                    "kind": { "type": "string", "const": "helpBox" },
+                    "paragraphs": { "type": "array", "items": { "type": "string" } }
                   },
                   "required": ["id", "span", "title", "hint", "kind", "paragraphs"],
                   "additionalProperties": false
@@ -4743,33 +4193,13 @@
                 {
                   "type": "object",
                   "properties": {
-                    "id": {
-                      "type": "string"
-                    },
-                    "span": {
-                      "type": "integer",
-                      "minimum": 1,
-                      "maximum": 9007199254740991
-                    },
-                    "title": {
-                      "type": "string"
-                    },
-                    "hint": {
-                      "type": "string"
-                    },
-                    "kind": {
-                      "type": "string",
-                      "const": "notes"
-                    },
-                    "lines": {
-                      "type": "integer",
-                      "minimum": 0,
-                      "maximum": 9007199254740991
-                    },
-                    "field": {
-                      "type": "string",
-                      "minLength": 1
-                    }
+                    "id": { "type": "string" },
+                    "span": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
+                    "title": { "type": "string" },
+                    "hint": { "type": "string" },
+                    "kind": { "type": "string", "const": "notes" },
+                    "lines": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                    "field": { "type": "string", "minLength": 1 }
                   },
                   "required": ["id", "span", "title", "hint", "kind", "lines"],
                   "additionalProperties": false
@@ -4782,40 +4212,20 @@
             "items": {
               "type": "object",
               "properties": {
-                "id": {
-                  "type": "string"
-                },
-                "typeLine": {
-                  "type": "string"
-                },
-                "name": {
-                  "type": "string"
-                },
+                "id": { "type": "string" },
+                "typeLine": { "type": "string" },
+                "name": { "type": "string" },
                 "fields": {
                   "type": "array",
                   "items": {
                     "type": "object",
-                    "properties": {
-                      "label": {
-                        "type": "string"
-                      },
-                      "value": {
-                        "type": "string"
-                      }
-                    },
+                    "properties": { "label": { "type": "string" }, "value": { "type": "string" } },
                     "required": ["label", "value"],
                     "additionalProperties": false
                   }
                 },
-                "table": {
-                  "type": "string"
-                },
-                "rules": {
-                  "type": "array",
-                  "items": {
-                    "type": "string"
-                  }
-                },
+                "table": { "type": "string" },
+                "rules": { "type": "array", "items": { "type": "string" } },
                 "uses": {
                   "anyOf": [
                     {
@@ -4823,11 +4233,7 @@
                         {
                           "type": "object",
                           "properties": {
-                            "boxes": {
-                              "type": "integer",
-                              "minimum": 1,
-                              "maximum": 9007199254740991
-                            }
+                            "boxes": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 }
                           },
                           "required": ["boxes"],
                           "additionalProperties": false
@@ -4835,39 +4241,24 @@
                         {
                           "type": "object",
                           "properties": {
-                            "count": {
-                              "type": "integer",
-                              "minimum": 1,
-                              "maximum": 9007199254740991
-                            }
+                            "count": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 }
                           },
                           "required": ["count"],
                           "additionalProperties": false
                         },
                         {
                           "type": "object",
-                          "properties": {
-                            "text": {
-                              "type": "string"
-                            }
-                          },
+                          "properties": { "text": { "type": "string" } },
                           "required": ["text"],
                           "additionalProperties": false
                         }
                       ]
                     },
-                    {
-                      "type": "null"
-                    }
+                    { "type": "null" }
                   ]
                 },
-                "usesField": {
-                  "type": "string",
-                  "minLength": 1
-                },
-                "hint": {
-                  "type": "string"
-                }
+                "usesField": { "type": "string", "minLength": 1 },
+                "hint": { "type": "string" }
               },
               "required": ["id", "typeLine", "name", "fields", "table", "rules", "uses", "hint"],
               "additionalProperties": false
@@ -4878,27 +4269,14 @@
             "items": {
               "type": "object",
               "properties": {
-                "id": {
-                  "type": "string"
-                },
-                "label": {
-                  "type": "string"
-                },
-                "text": {
-                  "type": "string"
-                },
+                "id": { "type": "string" },
+                "label": { "type": "string" },
+                "text": { "type": "string" },
                 "dependents": {
                   "type": "array",
                   "items": {
                     "type": "object",
-                    "properties": {
-                      "id": {
-                        "type": "string"
-                      },
-                      "label": {
-                        "type": "string"
-                      }
-                    },
+                    "properties": { "id": { "type": "string" }, "label": { "type": "string" } },
                     "required": ["id", "label"],
                     "additionalProperties": false
                   }
@@ -4913,38 +4291,18 @@
             "items": {
               "type": "object",
               "properties": {
-                "origin": {
-                  "type": "string"
-                },
-                "title": {
-                  "type": "string"
-                },
+                "origin": { "type": "string" },
+                "title": { "type": "string" },
                 "entries": {
                   "type": "array",
                   "items": {
                     "type": "object",
                     "properties": {
-                      "id": {
-                        "type": "string"
-                      },
-                      "name": {
-                        "type": "string"
-                      },
-                      "kindName": {
-                        "type": "string"
-                      },
-                      "rules": {
-                        "type": "array",
-                        "items": {
-                          "type": "string"
-                        }
-                      },
-                      "explain": {
-                        "type": "array",
-                        "items": {
-                          "type": "string"
-                        }
-                      }
+                      "id": { "type": "string" },
+                      "name": { "type": "string" },
+                      "kindName": { "type": "string" },
+                      "rules": { "type": "array", "items": { "type": "string" } },
+                      "explain": { "type": "array", "items": { "type": "string" } }
                     },
                     "required": ["id", "name", "kindName", "rules", "explain"],
                     "additionalProperties": false
@@ -6288,24 +5646,11 @@
         "type": "object",
         "description": "A kept copy of the sheet, without its model.",
         "properties": {
-          "id": {
-            "type": "string"
-          },
-          "name": {
-            "type": "string"
-          },
-          "createdAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "updatedAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "fromLevel": {
-            "type": "integer",
-            "description": "Level of the original it was made from."
-          },
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "updatedAt": { "type": "string", "format": "date-time" },
+          "fromLevel": { "type": "integer", "description": "Level of the original it was made from." },
           "fromChangedAt": {
             "type": "string",
             "format": "date-time",
@@ -6321,15 +5666,10 @@
           },
           "units": {
             "type": "object",
-            "additionalProperties": {
-              "type": "string"
-            },
+            "additionalProperties": { "type": "string" },
             "description": "Units the copy is written in."
           },
-          "version": {
-            "type": "integer",
-            "minimum": 1
-          }
+          "version": { "type": "integer", "minimum": 1 }
         },
         "required": [
           "id",
@@ -6349,12 +5689,8 @@
         "type": "object",
         "description": "A copy with its model. The model's `origin` is `{ kind: \"copy\", name, createdAt, fromLevel, fromPackageVersion, fromChangedAt }`.",
         "properties": {
-          "copy": {
-            "$ref": "#/components/schemas/SheetCopy"
-          },
-          "model": {
-            "$ref": "#/components/schemas/SheetModel"
-          }
+          "copy": { "$ref": "#/components/schemas/SheetCopy" },
+          "model": { "$ref": "#/components/schemas/SheetModel" }
         },
         "required": ["copy", "model"],
         "additionalProperties": false
@@ -6363,13 +5699,8 @@
         "type": "object",
         "description": "The original as it is now, without building it. Differs from a copy's `fromLevel`, `fromChangedAt` or `fromPackageVersion`: the original changed since the copy was made.",
         "properties": {
-          "level": {
-            "type": "integer"
-          },
-          "changedAt": {
-            "type": "string",
-            "format": "date-time"
-          },
+          "level": { "type": "integer" },
+          "changedAt": { "type": "string", "format": "date-time" },
           "packageVersion": {
             "type": ["string", "null"],
             "description": "Null while the character's package is not loaded."
@@ -6385,22 +5716,11 @@
       "PlayValue": {
         "description": "A number, a text, or a count of ticks.",
         "anyOf": [
-          {
-            "type": "number"
-          },
-          {
-            "type": "string",
-            "maxLength": 2000
-          },
+          { "type": "number" },
+          { "type": "string", "maxLength": 2000 },
           {
             "type": "object",
-            "properties": {
-              "checks": {
-                "type": "integer",
-                "minimum": 0,
-                "maximum": 1000
-              }
-            },
+            "properties": { "checks": { "type": "integer", "minimum": 0, "maximum": 1000 } },
             "required": ["checks"],
             "additionalProperties": false
           }
@@ -6409,29 +5729,15 @@
       "PlayState": {
         "type": "object",
         "description": "The play state: field id of the sheet (`field`, `usesField`, `playedByField`) to its value. At most 1000 fields.",
-        "propertyNames": {
-          "minLength": 1,
-          "maxLength": 300
-        },
-        "additionalProperties": {
-          "$ref": "#/components/schemas/PlayValue"
-        }
+        "propertyNames": { "minLength": 1, "maxLength": 300 },
+        "additionalProperties": { "$ref": "#/components/schemas/PlayValue" }
       },
       "PlayStateView": {
         "type": "object",
         "properties": {
-          "state": {
-            "$ref": "#/components/schemas/PlayState"
-          },
-          "version": {
-            "type": "integer",
-            "minimum": 0,
-            "description": "0 while nothing is stored yet."
-          },
-          "updatedAt": {
-            "type": ["string", "null"],
-            "format": "date-time"
-          }
+          "state": { "$ref": "#/components/schemas/PlayState" },
+          "version": { "type": "integer", "minimum": 0, "description": "0 while nothing is stored yet." },
+          "updatedAt": { "type": ["string", "null"], "format": "date-time" }
         },
         "required": ["state", "version", "updatedAt"],
         "additionalProperties": false
