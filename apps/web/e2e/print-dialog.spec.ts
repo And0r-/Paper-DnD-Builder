@@ -68,12 +68,13 @@ for (const lang of ["de", "en"] as const) {
       return readFile((await done.path())!);
     };
 
-    // Only the sheet, nothing else ticked; one design, so no choice of it; the play state not yet.
+    // Only the sheet, nothing else ticked; one design, so no choice of it; no copy, so the original; empty.
     await expect(part("print.sheet")).toBeChecked();
     await expect(part("print.cards")).not.toBeChecked();
     await expect(part("print.texts")).not.toBeChecked();
     await expect(dialog.getByText(m["print.versionOriginal"])).toBeVisible();
-    await expect(dialog.getByRole("checkbox", { name: m["print.state"] })).toBeDisabled();
+    await expect(dialog.getByRole("checkbox", { name: m["print.state"] })).not.toBeChecked();
+    await expect(dialog.getByRole("combobox", { name: m["print.version"] })).toHaveCount(0);
     await expect(dialog.getByText(m["print.design"])).toHaveCount(0);
     await expectOneLanguage(page, lang);
     await axe(page);
@@ -119,6 +120,54 @@ for (const lang of ["de", "en"] as const) {
     await expect(page.getByRole("button", { name: m["done.download"] })).toBeFocused();
   });
 }
+
+test("prints a kept copy with the play state filled in, and keeps the play state choice", async ({
+  page,
+  foreign,
+}) => {
+  void foreign;
+  const m = de;
+  await login(page, uniqueEmail("print-copy"), "de");
+  const id = await makeCharacter(page);
+  const made = (await (await page.request.post(`/api/drafts/${id}/sheet-copies`, { data: {} })).json()) as {
+    copy: { id: string; createdAt: string };
+  };
+  await page.request.put(`/api/drafts/${id}/state`, {
+    data: { version: 0, state: { "sheet/notes/notes": "Zwei Münzen beim Fährmann" } },
+  });
+  await page.goto(`/c/${id}/done`);
+  await page.getByRole("button", { name: m["done.download"] }).click();
+  const dialog = page.getByRole("dialog", { name: m["print.title"] });
+  const version = dialog.getByRole("combobox", { name: m["print.version"] });
+  await expect(version).toHaveValue("original");
+  const when = new Intl.DateTimeFormat("de", {
+    day: "numeric",
+    month: "long",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  const name = m["print.versionCopy"].replace("{date}", when.format(new Date(made.copy.createdAt)));
+  await version.selectOption({ label: name });
+  await dialog.getByRole("checkbox", { name: m["print.state"] }).check();
+  await expectOneLanguage(page, "de");
+  await axe(page);
+  await shot(page, "97-download-dialog-fassung-de");
+
+  const asked = page.waitForRequest(/\/pdf\?/);
+  const file = page.waitForEvent("download");
+  await dialog.getByRole("button", { name: m["print.download"], exact: true }).click();
+  const query = new URL((await asked).url()).searchParams;
+  expect([query.get("version"), query.get("state")]).toEqual([made.copy.id, "filled"]);
+  const pdf = await readFile((await (await file).path())!);
+  expect(pdf.subarray(0, 5).toString("latin1")).toBe("%PDF-");
+  await expect
+    .poll(
+      async () =>
+        ((await (await page.request.get("/api/account")).json()) as { account: { print: { state: string } } })
+          .account.print.state,
+    )
+    .toBe("filled");
+});
 
 test("a character without cards cannot tick them, and keeps the wish for the next one", async ({
   page,

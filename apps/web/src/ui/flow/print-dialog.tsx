@@ -4,7 +4,9 @@
  * which parts go into the PDF (sheet, cards, rules texts), in which design,
  * which version and whether the play state is filled in. Only the sheet
  * is ticked until the player picks otherwise; the choice is kept on the
- * account and offered again next time.
+ * account and offered again next time. The version is the original unless
+ * the character has kept copies; then the player picks one (the sheet
+ * screen opens the dialog on the copy it shows).
  */
 import { PRINT_PARTS, type PrintChoice, type PrintPart } from "@builder/sheet/printouts";
 import { useEffect, useId, useState } from "react";
@@ -17,6 +19,12 @@ import { Segmented } from "../components/Fields.tsx";
 import { Icon } from "../components/Icon.tsx";
 
 type PdfState = "idle" | "preparing" | "error" | "notYet";
+
+/** A kept copy of the sheet, as the list of copies gives it. */
+interface CopyEntry {
+  id: string;
+  createdAt: string;
+}
 
 const PART_KEYS = {
   sheet: { name: "print.sheet", text: "print.sheetText" },
@@ -42,6 +50,7 @@ export function PrintDialog({
   draftId,
   name,
   hasCards,
+  version: startVersion = "original",
 }: {
   open: boolean;
   onClose: () => void;
@@ -50,10 +59,15 @@ export function PrintDialog({
   name: string | undefined;
   /** Whether the character has things that are cards; if not, cards cannot be ticked. */
   hasCards: boolean;
+  /** The version picked when it opens: `original` or the id of a kept copy. */
+  version?: string;
 }) {
   const { t, lang, account, setAccount } = useApp();
   const [parts, setParts] = useState<Set<PrintPart>>(new Set());
   const [design, setDesign] = useState<PrintChoice["design"]>("verbose");
+  const [filled, setFilled] = useState(false);
+  const [version, setVersion] = useState(startVersion);
+  const [copies, setCopies] = useState<CopyEntry[]>([]);
   const [designs, setDesigns] = useState<SheetDesignInfo[]>([]);
   const [pdf, setPdf] = useState<PdfState>("idle");
   const [noPart, setNoPart] = useState(false);
@@ -65,12 +79,26 @@ export function PrintDialog({
     const stored = account?.print;
     setParts(new Set(stored?.parts ?? ["sheet"]));
     if (stored) setDesign(stored.design);
+    setFilled(stored?.state === "filled");
+    setVersion(startVersion);
     setPdf("idle");
     setNoPart(false);
     api<{ designs: SheetDesignInfo[] }>("GET", "/api/sheet-designs")
       .then((r) => setDesigns(r.designs))
       .catch(() => setDesigns([]));
-  }, [open, account?.print]);
+    api<{ copies: CopyEntry[] }>("GET", `/api/drafts/${draftId}/sheet-copies`)
+      .then((r) => setCopies(r.copies))
+      .catch(() => setCopies([]));
+  }, [open, account?.print, draftId, startVersion]);
+
+  // A copy is named by when it was kept, in the screen's language ("7. Oktober, 14:20"), as in the sketch.
+  const when = new Intl.DateTimeFormat(lang, {
+    day: "numeric",
+    month: "long",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  const copyName = (c: CopyEntry) => t("print.versionCopy", { date: when.format(new Date(c.createdAt)) });
 
   const usable = (p: PrintPart) => p !== "cards" || hasCards;
   const chosen = PRINT_PARTS.filter((p) => parts.has(p) && usable(p));
@@ -93,14 +121,16 @@ export function PrintDialog({
     setPdf("preparing");
     // Kept for next time; a character without cards does not unlearn that cards were wanted.
     const keep = PRINT_PARTS.filter((p) => (usable(p) ? parts.has(p) : account?.print.parts.includes(p)));
-    api<{ account: Account }>("PATCH", "/api/account/settings", { print: { parts: keep, design } })
+    const state = filled ? "filled" : "empty";
+    api<{ account: Account }>("PATCH", "/api/account/settings", { print: { parts: keep, design, state } })
       .then((r) => setAccount(r.account))
       .catch(() => {});
     const query = new URLSearchParams({
       parts: chosen.join(","),
       design,
-      version: "original",
-      state: "empty",
+      // A copy deleted meanwhile prints the original rather than nothing.
+      version: copies.some((c) => c.id === version) ? version : "original",
+      state,
     });
     try {
       const res = await fetch(`/api/drafts/${draftId}/pdf?${query}`, {
@@ -207,29 +237,56 @@ export function PrintDialog({
           help={designs.find((d) => d.id === design)?.description[lang]}
         />
       )}
-      <div className="print-line">
-        <span className="print-line__label">{t("print.version")}</span>
-        <span>{t("print.versionOriginal")}</span>
-      </div>
-      {/* The play state is not kept yet: shown, so the choice is known, but not to be ticked. */}
-      <div className="option option--compact option--blocked">
+      {copies.length === 0 ? (
+        <div className="print-line">
+          <span className="print-line__label">{t("print.version")}</span>
+          <span>{t("print.versionOriginal")}</span>
+        </div>
+      ) : (
+        <div className="print-version">
+          <label className="print-line__label" htmlFor={`${id}-version`}>
+            {t("print.version")}
+          </label>
+          <select
+            className="select print-version__select"
+            id={`${id}-version`}
+            value={copies.some((c) => c.id === version) ? version : "original"}
+            onChange={(e) => setVersion(e.target.value)}
+          >
+            <option value="original">{t("print.versionOriginal")}</option>
+            {copies.map((c) => (
+              <option key={c.id} value={c.id}>
+                {copyName(c)}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+      <div
+        className={`option option--compact${filled ? " option--checked" : ""}`}
+        onClick={(e) => {
+          if ((e.target as HTMLElement).closest("input, label")) return;
+          setFilled((f) => !f);
+        }}
+      >
         <div className="option__head">
           <input
             className="option__input"
             type="checkbox"
             id={`${id}-state`}
-            checked={false}
-            disabled
-            readOnly
+            checked={filled}
+            onChange={() => setFilled((f) => !f)}
             aria-describedby={`${id}-state-text`}
           />
-          <span className="option__mark" aria-hidden="true" />
+          <span className="option__mark" aria-hidden="true">
+            {filled && <Icon name="check" size={18} />}
+          </span>
           <label className="option__name" htmlFor={`${id}-state`}>
             {t("print.state")}
           </label>
         </div>
         <p className="option__short" id={`${id}-state-text`}>
-          {t("print.stateSoon")}
+          {t("print.stateText")}
         </p>
       </div>
       <div aria-live="polite">
