@@ -1000,10 +1000,13 @@ function placeSections(pen: Pen, sections: SheetSection[], bottomOf: (page: numb
 
 // ------------------------------------------------------------------ cards
 
+/** A card field; `wide` takes a row of its own across the card. */
+type CardField = Card["fields"][number] & { wide?: boolean };
+
 interface CardFace {
   typeLine: string;
   name: string;
-  fields: Card["fields"];
+  fields: CardField[];
   table: string;
   rules: string[];
   rulesSize: number;
@@ -1017,6 +1020,8 @@ interface CardFace {
 const CARD_INNER_W = CARD_W - 2 * CARD_PAD;
 const CARD_HEAD_BOTTOM = 16;
 const FIELD_ROW_H = 8.5;
+/** A wide field whose label and value fit on one line takes this much. */
+const INLINE_ROW_H = 5.5;
 const CARD_RULES_BOTTOM = CARD_H - CARD_PAD - 6;
 /** A card hint longer than this many lines is cut with "…": it must never crowd out the rules. */
 const CARD_HINT_LINES = 2;
@@ -1029,6 +1034,8 @@ interface FieldLayout {
   top: number;
   /** Left edge, relative to the card's inner left edge. */
   left: number;
+  /** Label and value on one line: the value's left edge after the label. */
+  inline?: number;
 }
 
 /** Lines a value may take in half the card before it gets the whole width. */
@@ -1042,12 +1049,21 @@ const HALF_FIELD_LINES = 2;
  * into half the width grew the card's head so much that "at the table" ran
  * into the footer.
  */
-function cardFields(pen: Pen, fields: Card["fields"]): { fields: FieldLayout[]; height: number } {
+function cardFields(pen: Pen, fields: CardField[]): { fields: FieldLayout[]; height: number } {
   const half = CARD_INNER_W / 2;
   const cw = half - 1;
   const laid = fields.map((f) => {
+    // A wide field that fits on one line, label then value, keeps the card's head short.
+    const labelW = pen.width(f.label, S.cardLabel) + 2;
+    if (f.wide === true && labelW + pen.width(f.value, S.cardValue) <= CARD_INNER_W)
+      return {
+        label: { style: S.cardLabel, lines: [f.label] },
+        value: { style: S.cardValue, lines: [f.value] },
+        wide: true,
+        inline: labelW,
+      };
     const narrow = pen.label(f.value, S.cardValue, cw, 8);
-    const wide = narrow.lines.length > HALF_FIELD_LINES;
+    const wide = f.wide === true || narrow.lines.length > HALF_FIELD_LINES;
     const w = wide ? CARD_INNER_W : cw;
     return {
       label: pen.label(f.label, S.cardLabel, w),
@@ -1068,7 +1084,7 @@ function cardFields(pen: Pen, fields: Card["fields"]): { fields: FieldLayout[]; 
   let top = 0;
   for (const row of rows) {
     row.forEach(({ wide: _, ...l }, i) => out.push({ ...l, top, left: i * half }));
-    top += FIELD_ROW_H + Math.max(...row.map(extra));
+    top += row[0]!.inline !== undefined ? INLINE_ROW_H : FIELD_ROW_H + Math.max(...row.map(extra));
   }
   return { fields: out, height: fields.length === 0 ? 0 : top + 4 };
 }
@@ -1111,12 +1127,15 @@ function cardHintHeight(pen: Pen, hint: string[]): number {
  */
 function cardFaces(pen: Pen, card: Card, messages: Messages): CardFace[] {
   const hint = cardHint(pen, card.hint);
-  const { rulesTop } = cardBlocks(pen, card);
+  // The origin line (the numbers the thing is used with, by where it came from) goes under the fields, across the card.
+  const fields: CardField[] = card.origin ? [...card.fields, { ...card.origin, wide: true }] : card.fields;
+  const { rulesTop } = cardBlocks(pen, { fields, table: card.table });
   // "At the table" is never cut or moved; where it reaches down to the
   // hint, the hint gives way on this card (continuation cards still have it).
   const firstHint = rulesTop - 4.2 > CARD_RULES_BOTTOM - cardHintHeight(pen, hint) ? [] : hint;
   const base: CardFace = {
     ...card,
+    fields,
     hint: firstHint,
     rules: [],
     rulesSize: RULES_SIZES[0]!,
@@ -1172,6 +1191,11 @@ function drawCard(pen: Pen, face: CardFace, model: SheetModel, x: number, y: num
     fields.forEach((f) => {
       const fx = left + f.left;
       const fy = yy + 4 + f.top;
+      if (f.inline !== undefined) {
+        pen.text(f.label.lines[0]!, fx, fy + 0.6, f.label.style);
+        pen.text(f.value.lines[0]!, fx + f.inline, fy + 0.6, f.value.style);
+        return;
+      }
       const labelLh = pen.lineHeight(f.label.style, 1.15);
       const valueLh = pen.lineHeight(f.value.style, 1.15);
       f.label.lines.forEach((l, i) => pen.text(l, fx, fy + i * labelLh, f.label.style));

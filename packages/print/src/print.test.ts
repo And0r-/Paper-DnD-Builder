@@ -233,6 +233,34 @@ describe("printed character (demo package)", () => {
     expect(cards).toContain("Ende.");
   });
 
+  it("prints a card's origin line under its fields, on one row when it fits (format 0.16)", async () => {
+    const herbalist = demoCharacter(pkg, 3, "Mira Fennwick", "calling.herbalist");
+    const { model, pdf } = await print("de", {}, pkg, herbalist);
+    const lines = model.cards.map((c) => c.origin);
+    expect(lines.every((l) => l !== undefined)).toBe(true);
+    const page = (await positions(pdf))[pdf.sheetPages]!;
+    const grid = { y: (297 - 3 * 88) / 2, h: 88 };
+    // One label per card: the calling's name or the borrowed knack's label, each before its numbers.
+    const labels = page.filter((p) => ["KRÄUTERKUNDIGE", "GELIEHEN, MIT HERZ"].includes(p.str));
+    expect(labels).toHaveLength(model.cards.length);
+    const numbers = page.filter((p) => /^Ziel \d+ · Treffer [+-]\d+$/u.test(p.str));
+    expect(numbers).toHaveLength(model.cards.length);
+    for (const label of labels) {
+      const row = Math.floor((label.y - grid.y) / grid.h);
+      // Under the fields (below "Du brauchst"), above "at the table".
+      const card = page.filter(
+        (p) => Math.floor((p.y - grid.y) / grid.h) === row && Math.abs(p.x - label.x) < 1,
+      );
+      const need = card.find((p) => p.str === "DU BRAUCHST" || p.str === "PRO RAST")!;
+      const table = card.find((p) => p.str === "AM TISCH")!;
+      expect(label.y).toBeGreaterThan(need.y);
+      expect(label.y).toBeLessThan(table.y);
+    }
+    // The calling's short label fits beside its numbers; the longer one does too or takes a row of its own.
+    const short = labels.find((p) => p.str === "KRÄUTERKUNDIGE")!;
+    expect(numbers.some((n) => Math.abs(n.y - short.y) < 0.5 && n.x > short.x + short.w)).toBe(true);
+  });
+
   it("prints the kind's hint on every card, above the footer, cut rather than crowding out the rules", async () => {
     const hint = pkg.texts["de"]!["card.knack.hint"] as string;
     const { model, pdf } = await print("de", {});
@@ -1445,7 +1473,7 @@ describe("what a game master would otherwise write on the sheet by hand (demo pa
   it("prints the text variant whose condition holds, filled with the same values (format 0.15)", () => {
     // Lantern staff: "blunt" up to level 4, "blunt or bright" from level 5 on (demo package).
     const harm = (d: DraftDocument, language: string) =>
-      section(buildPrintModel(pkg, d, { language }), "attacks", "statTable").rows[0]!.cells[1];
+      section(buildSheetModel(pkg, d, { language }), "attacks", "statTable").rows[0]!.cells[1];
     expect(harm(doc, "de")).toBe("1W6 +0, stumpf");
     const five = demoCharacter(pkg, 5);
     expect(harm(five, "de")).toMatch(/^1W6 [+-]\d+, stumpf oder hell$/u);
@@ -1505,8 +1533,8 @@ describe("the PDF made from the sheet model", () => {
   // or the demo package changes these: then check the sample PDFs and
   // update them.
   const before = {
-    de: { pages: 4, sha256: "7ed11acdfdc54207d53592d5c57a2f0a5c3ad3e08030f3ef864a3b400c7696bb" },
-    en: { pages: 4, sha256: "de1881a9a3d64e09bc57d5524dcbe8aec4109f15ded9180b10232a9646a98efc" },
+    de: { pages: 4, sha256: "03d55a5af06eb8fada912a448f9324519eb820a8339049d788090359bea8cb7a" },
+    en: { pages: 4, sha256: "b9a1fb0fd38655f22d494188954dbf2c6eb29879b23988a55303721192f717b9" },
   };
 
   it("is unchanged for the level 20 demo character with cards", async () => {
