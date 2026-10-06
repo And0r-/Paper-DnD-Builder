@@ -390,21 +390,22 @@ function drawUses(pen: Pen, uses: Uses, right: number, y: number, s: TextStyle):
 
 /**
  * The heading of a group of table rows: its title and, on the same line if
- * it fits, its hint ("Rank 2 · no slot needed"). Returns the new top.
+ * it fits, its hint ("Rank 2 · no slot needed"), under a darker line. Kept
+ * low, as a table of many ranks gets one per rank. Returns the new top.
  */
-function drawRowGroup(pen: Pen, group: RowGroup, x: number, y: number, w: number): number {
-  const top = y + 1.2;
+function drawRowGroup(pen: Pen, group: RowGroup, x: number, y: number, w: number, first: boolean): number {
+  if (!first) pen.line(x, y - 0.6, x + w, y - 0.6, 0.6, "#555");
+  const top = y + 0.3;
   const baseline = top + S.rowGroup.size * 0.8 * MM_PER_PT;
   const title = pen.fit(group.title, S.rowGroup, w);
   pen.text(group.title, x, baseline, title);
-  let bottom = top + pen.lineHeight(S.rowGroup, 1.2);
+  let bottom = top + pen.lineHeight(S.rowGroup, 1.1);
   if (group.hint !== "") {
     const after = pen.width(group.title, title) + 3;
     if (pen.width(group.hint, S.hint) <= w - after) pen.text(group.hint, x + after, baseline, S.hint);
-    else bottom = pen.paragraph(group.hint, x, bottom, w, S.hint, 1.2);
+    else bottom = pen.paragraph(group.hint, x, bottom, w, S.hint, 1.15);
   }
-  pen.line(x, bottom + 0.4, x + w, bottom + 0.4, 0.5, "#777");
-  return bottom + 1;
+  return bottom;
 }
 
 /** Draws one section (or only measures it, if the pen is dry). Returns its height. */
@@ -487,18 +488,20 @@ function drawSection(pen: Pen, s: SheetSection, x: number, top: number, w: numbe
       break;
     }
     case "featureTable": {
-      const nameW = Math.min(36, w * 0.36);
+      // The marks get room of their own at the right end of the name column, so names wrap no sooner.
+      const marksW = Math.max(0, ...s.rows.map((r) => pen.width(r.marks, S.mark)));
+      const markRoom = marksW > 0 ? marksW + 1.5 : 0;
+      const nameW = Math.min(36, w * 0.36) + markRoom;
       // A column for the use boxes, as wide as the widest row needs.
       const usesW = Math.max(0, ...s.rows.map((r) => usesWidth(pen, r.uses, S.small)));
       const textW = w - nameW - (usesW > 0 ? usesW + 3 : 0);
-      // The marks take the right end of the name column, so the text column stays where it was.
-      const marksW = Math.max(0, ...s.rows.map((r) => pen.width(r.marks, S.mark)));
       for (const lead of s.lead) y = pen.paragraph(lead, x, y, w, S.small) + 1;
       let group: string | null = null;
       for (const row of s.rows) {
-        if (row.group !== null && row.group.key !== group) y = drawRowGroup(pen, row.group, x, y, w);
+        if (row.group !== null && row.group.key !== group)
+          y = drawRowGroup(pen, row.group, x, y, w, row === s.rows[0]);
         group = row.group?.key ?? null;
-        const nameLines = pen.wrap(row.name, S.fieldName, nameW - 2 - (marksW > 0 ? marksW + 1.5 : 0));
+        const nameLines = pen.wrap(row.name, S.fieldName, nameW - 2 - markRoom);
         const textLines = pen.wrap(row.text, S.small, textW);
         if (row.marks !== "")
           pen.text(row.marks, x + nameW - 2, y + 0.8 + S.fieldName.size * 0.8 * MM_PER_PT, S.mark, "right");
