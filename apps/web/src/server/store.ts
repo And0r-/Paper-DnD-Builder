@@ -68,10 +68,41 @@ export type PlayerRow = {
   added_at: Date;
 };
 
+/** A kept copy of a character's sheet, without its model (the list). */
+export type SheetCopyEntry = {
+  id: string;
+  draft_id: string;
+  name: string;
+  created_at: Date;
+  updated_at: Date;
+  from_level: number;
+  from_changed_at: Date;
+  from_package_version: string;
+  language: string;
+  units: Record<string, string>;
+  version: number;
+};
+
+/** The model is the sheet model as stored; it is checked on the way in, not on the way out. */
+export type SheetCopyRow = SheetCopyEntry & { model: Record<string, unknown> };
+
+/** A value of the play state: a number, a text, or a count of ticks. */
+export type PlayValue = number | string | { checks: number };
+
+export type CharacterStateRow = {
+  draft_id: string;
+  state: Record<string, PlayValue>;
+  version: number;
+  updated_at: Date;
+};
+
 const ACCESS_KEY_COLUMNS = "id, hint, created_at";
 const ACCOUNT_COLUMNS = "id, email, password_hash, language, units, created_at";
 const DRAFT_COLUMNS =
   "id, account_id, package_id, package_version, version, document, finished_at, created_at, updated_at";
+const COPY_ENTRY_COLUMNS =
+  "id, draft_id, name, created_at, updated_at, from_level, from_changed_at, from_package_version, language, units, version";
+const COPY_COLUMNS = `${COPY_ENTRY_COLUMNS}, model`;
 const DRAFT_COLUMNS_D = DRAFT_COLUMNS.split(", ")
   .map((c) => `d.${c}`)
   .join(", ");
@@ -390,5 +421,114 @@ export class Store {
        WHERE p.campaign_id = $1 ORDER BY d.updated_at DESC, d.id`,
       [campaignId],
     );
+  }
+  // ------------------------------------------------------------ sheet copies
+  // Every statement names the draft: a copy is only reached through its
+  // character, whose access the route has checked.
+
+  /** Inserts a copy unless the character already has `max`; returns undefined then. */
+  async createSheetCopy(c: SheetCopyRow, max: number): Promise<SheetCopyRow | undefined> {
+    const rows = await this.db.query<SheetCopyRow>(
+      `INSERT INTO sheet_copies (id, draft_id, name, created_at, updated_at, from_level, from_changed_at,
+         from_package_version, language, units, model, version)
+       SELECT $1, $2, $3, $4, $4, $5, $6, $7, $8, $9::jsonb, $10::jsonb, 1
+       WHERE (SELECT count(*) FROM sheet_copies WHERE draft_id = $2) < $11
+       RETURNING ${COPY_COLUMNS}`,
+      [
+        c.id,
+        c.draft_id,
+        c.name,
+        c.created_at,
+        c.from_level,
+        c.from_changed_at,
+        c.from_package_version,
+        c.language,
+        c.units,
+        c.model,
+        max,
+      ],
+    );
+    return rows[0];
+  }
+
+  async listSheetCopies(draftId: string): Promise<SheetCopyEntry[]> {
+    return this.db.query<SheetCopyEntry>(
+      `SELECT ${COPY_ENTRY_COLUMNS} FROM sheet_copies WHERE draft_id = $1 ORDER BY created_at, id`,
+      [draftId],
+    );
+  }
+
+  async findSheetCopy(draftId: string, id: string): Promise<SheetCopyRow | undefined> {
+    const rows = await this.db.query<SheetCopyRow>(
+      `SELECT ${COPY_COLUMNS} FROM sheet_copies WHERE id = $1 AND draft_id = $2`,
+      [id, draftId],
+    );
+    return rows[0];
+  }
+
+  /**
+   * Stores a new name and/or model only if the copy is still at
+   * `expectedVersion`. Returns undefined when it moved on or is gone.
+   */
+  async updateSheetCopy(
+    draftId: string,
+    id: string,
+    expectedVersion: number,
+    next: { name?: string; model?: Record<string, unknown>; now: Date },
+  ): Promise<SheetCopyRow | undefined> {
+    const rows = await this.db.query<SheetCopyRow>(
+      `UPDATE sheet_copies
+       SET name = COALESCE($4, name), model = COALESCE($5::jsonb, model), updated_at = $6, version = version + 1
+       WHERE id = $1 AND draft_id = $2 AND version = $3
+       RETURNING ${COPY_COLUMNS}`,
+      [id, draftId, expectedVersion, next.name ?? null, next.model ?? null, next.now],
+    );
+    return rows[0];
+  }
+
+  async deleteSheetCopy(draftId: string, id: string): Promise<boolean> {
+    const rows = await this.db.query(
+      "DELETE FROM sheet_copies WHERE id = $1 AND draft_id = $2 RETURNING id",
+      [id, draftId],
+    );
+    return rows.length > 0;
+  }
+
+  // -------------------------------------------------------------- play state
+
+  async findCharacterState(draftId: string): Promise<CharacterStateRow | undefined> {
+    const rows = await this.db.query<CharacterStateRow>(
+      "SELECT draft_id, state, version, updated_at FROM character_states WHERE draft_id = $1",
+      [draftId],
+    );
+    return rows[0];
+  }
+
+  /**
+   * Stores the play state only if it is still at `expectedVersion`; version
+   * 0 is "none stored yet". Returns undefined when someone else wrote first.
+   */
+  async putCharacterState(
+    draftId: string,
+    expectedVersion: number,
+    state: Record<string, PlayValue>,
+    now: Date,
+  ): Promise<CharacterStateRow | undefined> {
+    const rows =
+      expectedVersion === 0
+        ? await this.db.query<CharacterStateRow>(
+            `INSERT INTO character_states (draft_id, state, version, updated_at)
+             VALUES ($1, $2::jsonb, 1, $3)
+             ON CONFLICT (draft_id) DO NOTHING
+             RETURNING draft_id, state, version, updated_at`,
+            [draftId, state, now],
+          )
+        : await this.db.query<CharacterStateRow>(
+            `UPDATE character_states SET state = $3::jsonb, updated_at = $4, version = version + 1
+             WHERE draft_id = $1 AND version = $2
+             RETURNING draft_id, state, version, updated_at`,
+            [draftId, expectedVersion, state, now],
+          );
+    return rows[0];
   }
 }
