@@ -7,7 +7,16 @@
 import type { Page } from "@playwright/test";
 import de from "../src/i18n/messages/de.json" with { type: "json" };
 import en from "../src/i18n/messages/en.json" with { type: "json" };
-import { expect, expectOneLanguage, login, makeCharacter, shot, test, uniqueEmail } from "./helpers.ts";
+import {
+  chooseLanguage,
+  expect,
+  expectOneLanguage,
+  login,
+  makeCharacter,
+  shot,
+  test,
+  uniqueEmail,
+} from "./helpers.ts";
 
 /** A level-3 draft with only these answers, made through the API. */
 async function draftWith(page: Page, answers: [string, unknown][]): Promise<string> {
@@ -143,7 +152,7 @@ test("numbers and things say where they come from, in both languages", async ({ 
   await checkAll(page, id, early, "de");
 
   await page.goto("/settings");
-  await page.getByText("English", { exact: true }).click();
+  await chooseLanguage(page, "en");
   await expect(page.getByRole("heading", { level: 1, name: en["settings.title"] })).toBeVisible();
   await checkAll(page, id, early, "en");
 });

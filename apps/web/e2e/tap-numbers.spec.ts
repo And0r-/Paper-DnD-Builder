@@ -43,9 +43,10 @@ test("fixed numbers: tap to give, tap to take back, no dropdowns", async ({ page
   // "Choose for me" is there before anything is touched.
   await expect(page.locator(".shortcuts").getByRole("button", { name: m["flow.chooseForMe"] })).toBeVisible();
 
-  // The other way: the numbers to give, and which one goes next. No dropdown anywhere.
+  // The other way: the numbers to give, and which one goes next. No dropdown in the step
+  // (the language switch in the top bar is one, AND-153).
   await page.getByText(m["dist.array"], { exact: true }).click();
-  await expect(page.locator("select")).toHaveCount(0);
+  await expect(page.getByRole("main").locator("select")).toHaveCount(0);
   await expect(page.locator(".array-assign__tray")).toContainText("Zu vergeben:");
   await expect(status(page)).toHaveText("Wohin kommt die 11? Tippe auf einen Wert unten.");
   await shot(page, "60-zahlen-antippen-start");

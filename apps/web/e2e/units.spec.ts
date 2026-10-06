@@ -6,7 +6,7 @@
 import type { Page } from "@playwright/test";
 import de from "../src/i18n/messages/de.json" with { type: "json" };
 import en from "../src/i18n/messages/en.json" with { type: "json" };
-import { expect, login, makeCharacter, shot, test, uniqueEmail } from "./helpers.ts";
+import { chooseLanguage, expect, login, makeCharacter, shot, test, uniqueEmail } from "./helpers.ts";
 
 async function storedUnits(page: Page) {
   return page.evaluate(async () => {
@@ -53,7 +53,7 @@ test("units the reader never chose follow the language", async ({ page, foreign 
   const sent = page.waitForRequest(
     (r) => r.url().endsWith("/api/account/settings") && r.method() === "PATCH",
   );
-  await page.getByText("English", { exact: true }).click();
+  await chooseLanguage(page, "en");
   expect((await sent).postDataJSON()).toEqual({ language: "en" });
   await expect(page.getByRole("radio", { name: "Same as the language (feet)" })).toBeChecked();
   expect(await storedUnits(page)).toEqual({});
@@ -89,7 +89,7 @@ test("units switch at once everywhere and chosen units stay with a new language"
   await page.goto("/settings");
   await page.getByText("Meter", { exact: true }).click();
   await expect(page.getByText("Beispiel: 9 Meter")).toBeVisible();
-  await page.getByText("English", { exact: true }).click();
+  await chooseLanguage(page, "en");
   await expect(page.getByRole("radio", { name: "meters", exact: true })).toBeChecked();
   expect(await storedUnits(page)).toMatchObject({ length: "m" });
   expect(await folkPace(page, id, "en")).toContain("Your pace is 7.5 meters.");

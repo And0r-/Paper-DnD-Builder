@@ -61,11 +61,17 @@ export async function passwordFor(email: string): Promise<string> {
   throw new Error(`no password mail to ${email}`);
 }
 
+/** Switches the language with the switch in the top bar, which every screen has (AND-153). */
+export async function chooseLanguage(page: Page, lang: "de" | "en"): Promise<void> {
+  await page.getByRole("banner").getByRole("combobox").selectOption(lang);
+  await expect(page.locator("html")).toHaveAttribute("lang", lang);
+}
+
 /** Logs in through the screens: address, mail, password. Ends on "My characters". */
 export async function login(page: Page, email: string, lang: "de" | "en" = "de"): Promise<void> {
   const m = lang === "de" ? de : en;
   await page.goto("/login");
-  if (lang === "en") await page.getByText("English", { exact: true }).click();
+  if (lang === "en") await chooseLanguage(page, "en");
   await expect(page.getByRole("heading", { name: m["login.title"] })).toBeVisible();
   await page.getByLabel(m["login.emailLabel"]).fill(email);
   await page.getByRole("button", { name: m["login.send"] }).click();
