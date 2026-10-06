@@ -181,4 +181,96 @@ describe("explainValue", () => {
       ]);
     });
   });
+
+  describe("stamina that adds the might bonus on every level", () => {
+    // A calling's stamina in one formula: a start, then a step and the bonus on each further level.
+    const withStamina = (formula: string, folkAdd?: string): ContentPackage => {
+      const p = structuredClone(pkg);
+      p.values.find((v) => v.id === "stamina")!.formula = "0";
+      for (const t of p.things) t.grants = t.grants?.filter((g) => g.value !== "stamina");
+      p.things
+        .find((t) => t.id === "calling.lantern-bearer")!
+        .grants!.push({ value: "stamina", add: formula });
+      if (folkAdd)
+        p.things.find((t) => t.id === "folk.hillfolk")!.grants!.push({ value: "stamina", add: folkAdd });
+      return p;
+    };
+    const lanternBearer = (might: number): [string, unknown][] => [
+      ...LANTERN_BEARER.slice(0, 4),
+      ["scores", { method: 0, assign: { mightBase: might, graceBase: 7, witBase: 8, heartBase: 6 } }],
+    ];
+    const explain = (p: ContentPackage, level: number, might: number) => {
+      const ev = evaluateDraft(p, build(p, level, lanternBearer(might)));
+      return explainValue(p, ev, "stamina");
+    };
+    const calling = { kind: "thing", thing: "calling.lantern-bearer" } as const;
+    const bonus = { kind: "values", values: ["mightBonus"] } as const;
+    const big = "10 + mightBonus + (level - 1) * (6 + mightBonus)";
+    const small = "8 + mightBonus + (level - 1) * (5 + mightBonus)";
+
+    it("counts the bonus of every level to the bonus, not only the first", () => {
+      // might 12: bonus 2. 10 + 4 × 6 = 34 from the calling, 5 × 2 = 10 from the bonus.
+      expect(explain(withStamina(big), 5, 12)).toEqual({
+        total: 44,
+        parts: [
+          { amount: 34, source: calling },
+          { amount: 10, source: bonus },
+        ],
+      });
+      expect(explain(withStamina(small), 5, 12)).toEqual({
+        total: 38,
+        parts: [
+          { amount: 28, source: calling },
+          { amount: 10, source: bonus },
+        ],
+      });
+    });
+
+    it("keeps a thing that adds per level as its own part", () => {
+      // might 9: bonus 1. 8 + 4 × 5 = 28, 5 × 1 = 5, and 1 per level from the folk.
+      expect(explain(withStamina(small, "level"), 5, 9)).toEqual({
+        total: 38,
+        parts: [
+          { amount: 28, source: calling },
+          { amount: 5, source: bonus },
+          { amount: 5, source: { kind: "thing", thing: "folk.hillfolk" } },
+        ],
+      });
+    });
+
+    it("splits the first and the last level the same way", () => {
+      expect(explain(withStamina(big), 1, 12)?.parts).toEqual([
+        { amount: 10, source: calling },
+        { amount: 2, source: bonus },
+      ]);
+      expect(explain(withStamina(big), 20, 12)).toEqual({
+        total: 164,
+        parts: [
+          { amount: 124, source: calling },
+          { amount: 40, source: bonus },
+        ],
+      });
+    });
+
+    it("leaves a term whole when a value at 0 is not the value left out", () => {
+      // floor((might - 10) / 2) does not grow by the same with each point of might.
+      const p = withStamina("10 + floor((might - 10) / 2)");
+      expect(explain(p, 1, 12)?.parts).toEqual([{ amount: 11, source: calling }]);
+    });
+
+    it("names two values together when neither share stands without the other", () => {
+      // might 12: the bonus 2 times the practice belongs to both.
+      const p = withStamina("10");
+      p.values.find((v) => v.id === "stamina")!.formula = "mightBonus * practice";
+      const ev = evaluateDraft(p, build(p, 1, lanternBearer(12)));
+      expect(ev.values["practice"]).toBeGreaterThan(0);
+      expect(explainValue(p, ev, "stamina")?.parts).toEqual([
+        {
+          amount: 2 * ev.values["practice"]!,
+          source: { kind: "values", values: ["mightBonus", "practice"] },
+        },
+        { amount: 10, source: calling },
+      ]);
+    });
+  });
 });
