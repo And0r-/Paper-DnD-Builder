@@ -16,6 +16,9 @@
         "vars": {
           "bonus": "lanternStaffHarm"
         }
+      },
+      "traits": {
+        "text": "stat-value.item.lantern-staff.traits"
       }
     },
     "tags": ["armed"]
@@ -37,6 +40,9 @@
         "vars": {
           "bonus": "boatHookHarm"
         }
+      },
+      "traits": {
+        "text": "stat-value.item.boat-hook.traits"
       }
     },
     "tags": ["armed"]
@@ -174,6 +180,9 @@
       },
       "range": {
         "text": "stat-value.item.sling.range"
+      },
+      "traits": {
+        "text": "stat-value.item.sling.traits"
       }
     }
   }

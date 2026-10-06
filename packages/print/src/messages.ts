@@ -25,6 +25,8 @@ export interface Messages {
   continuesOnNextCard: string;
   yes: string;
   no: string;
+  /** "8 × Rope": how many of a thing the character has. */
+  count: (n: string, name: string) => string;
 }
 
 export const MESSAGES: Readonly<Record<string, Messages>> = {
@@ -44,6 +46,7 @@ export const MESSAGES: Readonly<Record<string, Messages>> = {
     continuesOnNextCard: "weiter auf der nächsten Karte",
     yes: "ja",
     no: "nein",
+    count: (n, name) => `${n} × ${name}`,
   },
   en: {
     playedBy: "Played by",
@@ -61,6 +64,7 @@ export const MESSAGES: Readonly<Record<string, Messages>> = {
     continuesOnNextCard: "continues on the next card",
     yes: "yes",
     no: "no",
+    count: (n, name) => `${n} × ${name}`,
   },
 };
 

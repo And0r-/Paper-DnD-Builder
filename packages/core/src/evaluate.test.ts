@@ -1,5 +1,5 @@
 import { DEMO_PACKAGE_DIR } from "@builder/demo-package";
-import { validatePackageDir, type ContentPackage } from "@builder/format";
+import { validatePackageDir, type ContentPackage, type Thing } from "@builder/format";
 import { beforeAll, describe, expect, it } from "vitest";
 import {
   applyChange,
@@ -319,6 +319,7 @@ describe("a complete level 3 character", () => {
       of: "calling",
       thing: "calling.lantern-bearer",
       things: ["item.lantern-staff", "item.provisions", "trait.steady-flame"],
+      counts: { "item.provisions": 3 },
       values: [
         { value: "stamina", add: 18 },
         { value: "lanternSlots1", add: 2 },
@@ -497,5 +498,42 @@ describe("applyChange", () => {
     const r = applyChange(pkg, base(), { type: "answer", choice: "calling", answer: null });
     if (!r.ok) throw new Error("rejected");
     expect(r.doc.answers).toEqual({});
+  });
+});
+
+describe("counts (format 0.13)", () => {
+  /** The demo package with the lantern bearer's grants changed by `edit`. */
+  const withGrants = (edit: (grants: NonNullable<Thing["grants"]>) => void): ContentPackage => ({
+    ...pkg,
+    things: pkg.things.map((t) => {
+      if (t.id !== "calling.lantern-bearer") return t;
+      const grants = structuredClone(t.grants ?? []);
+      edit(grants);
+      return { ...t, grants };
+    }),
+  });
+  const held = (p: ContentPackage, id: string) =>
+    evaluateDraft(p, build(3, LANTERN_BEARER_L3)).things.find((h) => h.id === id);
+
+  it("adds up the counts of every grant that gives a thing", () => {
+    // 3 provisions from the lantern bearer, 2 from the ferry child.
+    expect(held(pkg, "item.provisions")).toMatchObject({ grantedBy: "calling.lantern-bearer", count: 5 });
+    // A grant without a count gives one of a counted thing.
+    const one = withGrants((g) => delete g.find((x) => x.thing === "item.provisions")!.count);
+    expect(held(one, "item.provisions")?.count).toBe(3);
+  });
+
+  it("does not count a thing no grant gives with a count: twice is still once", () => {
+    expect(held(pkg, "item.rope")?.count).toBeUndefined();
+    const twice = withGrants((g) => g.push({ thing: "item.rope" }));
+    expect(held(twice, "item.rope")?.count).toBeUndefined();
+    const counted = withGrants((g) => g.push({ thing: "item.rope", count: 2 }));
+    expect(held(counted, "item.rope")?.count).toBe(3);
+  });
+
+  it("does not let a count change has() or count()", () => {
+    const many = withGrants((g) => (g.find((x) => x.thing === "item.provisions")!.count = 40));
+    const doc = build(3, LANTERN_BEARER_L3);
+    expect(evaluateDraft(many, doc).values).toEqual(evaluateDraft(pkg, doc).values);
   });
 });

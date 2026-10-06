@@ -3,7 +3,15 @@
     "id": "folk.moorfolk",
     "kind": "folk",
     "source": "mistland",
-    "grants": [{ "value": "pace", "add": 25 }, { "thing": "trait.mist-sight" }]
+    "grants": [
+      {
+        "value": "pace",
+        "add": 25
+      },
+      {
+        "thing": "trait.mist-sight"
+      }
+    ]
   },
   {
     "id": "folk.hillfolk",
@@ -11,9 +19,17 @@
     "source": "mistland",
     "tags": ["bonus-talent"],
     "grants": [
-      { "value": "pace", "add": 20 },
-      { "value": "stamina", "add": 2 },
-      { "thing": "trait.stone-steady" }
+      {
+        "value": "pace",
+        "add": 20
+      },
+      {
+        "value": "stamina",
+        "add": 2
+      },
+      {
+        "thing": "trait.stone-steady"
+      }
     ]
   },
   {
@@ -21,9 +37,16 @@
     "kind": "folk",
     "source": "mistland",
     "grants": [
-      { "value": "pace", "add": 30 },
-      { "thing": "trait.salt-blood" },
-      { "choice": "coastfolk-talent" }
+      {
+        "value": "pace",
+        "add": 30
+      },
+      {
+        "thing": "trait.salt-blood"
+      },
+      {
+        "choice": "coastfolk-talent"
+      }
     ]
   },
   {
@@ -31,10 +54,26 @@
     "kind": "upbringing",
     "source": "mistland",
     "grants": [
-      { "value": "grace", "add": 1 },
-      { "thing": "talent.weather-sense" },
-      { "thing": "talent.haggling" },
-      { "thing": "item.rope" }
+      {
+        "value": "grace",
+        "add": 1
+      },
+      {
+        "thing": "talent.weather-sense"
+      },
+      {
+        "thing": "talent.haggling"
+      },
+      {
+        "thing": "item.rope"
+      },
+      {
+        "thing": "item.provisions",
+        "count": 2
+      },
+      {
+        "thing": "flair.haggling"
+      }
     ]
   },
   {
@@ -42,10 +81,21 @@
     "kind": "upbringing",
     "source": "mistland",
     "grants": [
-      { "thing": "talent.legends" },
-      { "thing": "talent.listening" },
-      { "thing": "item.small-bell" },
-      { "choice": "bell-tower-gifts" }
+      {
+        "thing": "talent.legends"
+      },
+      {
+        "thing": "talent.listening"
+      },
+      {
+        "thing": "flair.listening"
+      },
+      {
+        "thing": "item.small-bell"
+      },
+      {
+        "choice": "bell-tower-gifts"
+      }
     ]
   }
 ]

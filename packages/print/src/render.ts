@@ -61,7 +61,7 @@ interface TextStyle {
  * Marks the font has no glyph for; they are drawn as shapes so a package
  * text like "● = trained" prints as written.
  */
-const SHAPES = /([●○□■→])/u;
+const SHAPES = /([●○◉□■→])/u;
 
 /**
  * Characters the font has no glyph for, mapped to one it has. Package texts
@@ -260,6 +260,10 @@ class Pen {
       d.circle(cx * PT_PER_MM, cy * PT_PER_MM, em * 0.3 * PT_PER_MM);
       if (mark === "●") d.fill(color);
       else d.stroke(color);
+    } else if (mark === "◉") {
+      // As the strong mark in a check list: a dot with a ring around it.
+      d.circle(cx * PT_PER_MM, cy * PT_PER_MM, em * 0.34 * PT_PER_MM).stroke(color);
+      d.circle(cx * PT_PER_MM, cy * PT_PER_MM, em * 0.2 * PT_PER_MM).fill(color);
     } else if (mark === "□" || mark === "■") {
       const side = em * 0.6;
       d.rect((cx - side / 2) * PT_PER_MM, (cy - side / 2) * PT_PER_MM, side * PT_PER_MM, side * PT_PER_MM);
@@ -343,6 +347,9 @@ const S = {
   cardValue: { font: "bold", size: 9 },
   cardHeading: { font: "bold", size: 7, caps: true, spacing: 0.06 },
   cardTable: { size: 8.5 },
+  extraValue: { font: "bold", size: 11 },
+  fieldLabel: { size: 7, caps: true, color: "#555", spacing: 0.06 },
+  fieldValue: { font: "semibold", size: 9.5 },
 } satisfies Record<string, TextStyle>;
 
 const RULES_SIZES = [7.5, 7.25, 7];
@@ -432,7 +439,20 @@ function drawSection(pen: Pen, s: SheetSection, x: number, top: number, w: numbe
         pen.rect(x, y, w, h, { width: 0.7, radius: 1.5 });
         above.forEach((l, j) => pen.text(l, x + w - 2, y + 3.4 + j * aboveLh, S.hint, "right"));
         label.lines.forEach((l, j) => pen.text(l, x + 3, top + 5 + j * labelLh, label.style));
-        pen.text(sc.value, x + 3, body + 15.5, pen.fit(sc.value, S.scoreValue, w - 25, 12));
+        const valueStyle = pen.fit(sc.value, S.scoreValue, w - 25, 12);
+        pen.text(sc.value, x + 3, body + 15.5, valueStyle);
+        if (sc.extra) {
+          // Between the score and the circle: a small label over the number, both ending on the score's baseline.
+          const left = x + 3 + pen.width(sc.value, valueStyle) + 3;
+          const right = sc.derived !== null ? x + w - 19 : x + w - 3;
+          const value = pen.fit(sc.extra.value, S.extraValue, right - left, 8);
+          const label = pen.label(sc.extra.label, S.hint, right - left);
+          const lh = pen.lineHeight(label.style, 1.1);
+          pen.text(sc.extra.value, left, body + 15.5, value);
+          label.lines.forEach((l, j) =>
+            pen.text(l, left, body + 11.2 - (label.lines.length - 1 - j) * lh, label.style),
+          );
+        }
         if (sc.derived !== null) {
           const cx = x + w - 11;
           pen.circle(cx, body + 11.5, 6.3, { width: 0.7 });
@@ -472,7 +492,8 @@ function drawSection(pen: Pen, s: SheetSection, x: number, top: number, w: numbe
         for (const [c, { item, name, note, lh, parts, partsLh }] of row.entries()) {
           const cx = x + c * (cw + 4);
           const cy = rowTop + 4.5;
-          pen.circle(cx + 2, cy - 1.3, 1.6, { fill: item.marked });
+          pen.circle(cx + 2, cy - 1.3, item.strong ? 1.1 : 1.6, { fill: item.marked });
+          if (item.strong) pen.circle(cx + 2, cy - 1.3, 2, { width: 0.5 });
           name.lines.forEach((l, j) => pen.text(l, cx + 5.5, cy + j * lh, name.style));
           const noteLh = pen.lineHeight(note.style, 1.15);
           note.lines.forEach((l, j) => pen.text(l, cx + cw - 9.5, cy + j * noteLh, note.style, "right"));
@@ -505,7 +526,9 @@ function drawSection(pen: Pen, s: SheetSection, x: number, top: number, w: numbe
         const textLines = pen.wrap(row.text, S.small, textW);
         if (row.marks !== "")
           pen.text(row.marks, x + nameW - 2, y + 0.8 + S.fieldName.size * 0.8 * MM_PER_PT, S.mark, "right");
-        const nameBottom = pen.lines(nameLines, x, y + 0.8, S.fieldName, 1.2);
+        let nameBottom = pen.lines(nameLines, x, y + 0.8, S.fieldName, 1.2);
+        if (row.note)
+          nameBottom = pen.lines(pen.wrap(row.note, S.hint, nameW - 2), x, nameBottom, S.hint, 1.2);
         const textBottom = pen.lines(textLines, x + nameW, y + 0.9, S.small, 1.25);
         drawUses(pen, row.uses, x + w, y + 0.9 + S.small.size * 0.8 * MM_PER_PT, S.small);
         y = Math.max(nameBottom, textBottom) + 1.4;
@@ -576,14 +599,30 @@ function drawStatTable(
   w: number,
 ): number {
   const gap = 2.5;
+  const wrap = s.columns.map((_, i) => s.wrap?.[i] === true);
+  // Words in a wrapping column are lighter than the numbers: they are read when needed.
+  const cellStyle = (i: number) => (wrap[i] ? S.small : S.fieldName);
   const natural = s.columns.map((label, i) =>
-    Math.max(pen.width(label, S.cardLabel), ...s.rows.map((r) => pen.width(r.cells[i]!, S.fieldName))),
+    Math.max(pen.width(label, S.cardLabel), ...s.rows.map((r) => pen.width(r.cells[i]!, cellStyle(i)))),
   );
+  const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0);
   const minName = Math.min(28, w * 0.3);
   const room = w - minName - s.columns.length * gap;
-  const scale = Math.min(1, room / natural.reduce((a, b) => a + b, 0));
-  const widths = natural.map((n) => n * scale);
-  const nameW = w - widths.reduce((a, b) => a + b, 0) - s.columns.length * gap;
+  // Columns that keep to one line get their width first; a wrapping column
+  // shares what is left with the names, never more than it needs.
+  const fixed = natural.map((n, i) => (wrap[i] ? 0 : n));
+  const scale = Math.min(1, room / Math.max(1, sum(fixed)));
+  const longestName = Math.max(0, ...s.rows.map((r) => pen.width(r.name, S.fieldName))) + 1;
+  const free = room - sum(fixed) * scale;
+  const wrapNatural = sum(natural.filter((_, i) => wrap[i]));
+  const nameShare = Math.max(0, Math.min(longestName - minName, free * 0.4));
+  const wrapRoom = Math.min(wrapNatural, free - nameShare);
+  const widths = natural.map((n, i) =>
+    wrap[i]
+      ? Math.max(pen.width(s.columns[i]!, S.cardLabel), (wrapRoom * n) / Math.max(1, wrapNatural))
+      : n * scale,
+  );
+  const nameW = w - sum(widths) - s.columns.length * gap;
   const left = widths.map((_, i) => x + nameW + gap + widths.slice(0, i).reduce((a, b) => a + b + gap, 0));
   const labels = s.columns.map((label, i) => pen.label(label, S.cardLabel, widths[i]!));
   const labelLh = pen.lineHeight(S.cardLabel, 1.15);
@@ -596,7 +635,7 @@ function drawStatTable(
     row.cells.forEach((cell, i) => {
       bottom = Math.max(
         bottom,
-        pen.lines(pen.wrap(cell, S.fieldName, widths[i]!), left[i]!, top, S.fieldName, 1.2),
+        pen.lines(pen.wrap(cell, cellStyle(i), widths[i]!), left[i]!, top, cellStyle(i), 1.2),
       );
     });
     y = bottom + 1.4;
@@ -624,8 +663,32 @@ function drawHeader(
   pen.text(s.packageName, x + w, y + 4, pen.fit(s.packageName, S.meta, side), "right");
   pen.text(pen.messages.playedBy, x + w - side, y + 11.5, S.meta);
   pen.line(x + w - side, y + 15, x + w, y + 15, 0.4, "#777");
-  pen.line(x, y + 18.5, x + w, y + 18.5, 1);
-  return 19;
+  let rule = y + 18.5;
+  if (s.fields.length > 0) {
+    // One cell per answer: its label small, then the answer; an open one gets a line to write on.
+    const gap = 4;
+    const cw = (w - (s.fields.length - 1) * gap) / s.fields.length;
+    s.fields.forEach((f, i) => {
+      const cx = x + i * (cw + gap);
+      const label = pen.fit(f.label, S.fieldLabel, cw * 0.45);
+      const lw = pen.width(f.label, label) + 2;
+      pen.text(f.label, cx, y + 21, label);
+      if (f.text === "") pen.line(cx + lw, y + 21.5, cx + cw, y + 21.5, 0.4, "#999");
+      else pen.text(f.text, cx + lw, y + 21, pen.fit(f.text, S.fieldValue, cw - lw, 7));
+    });
+    rule = y + 23.5;
+  }
+  pen.line(x, rule, x + w, rule, 1);
+  return rule - y + 0.5;
+}
+
+const SQUARE = 3.2;
+const SQUARE_GAP = 1.4;
+
+/** Squares per row in a box `bw` wide, and how many rows `n` of them take. */
+function squareRows(n: number, bw: number): { perRow: number; rows: number } {
+  const perRow = Math.max(1, Math.floor((bw - 6 + SQUARE_GAP) / (SQUARE + SQUARE_GAP)));
+  return { perRow, rows: Math.ceil(n / perRow) };
 }
 
 function drawStatBoxes(pen: Pen, boxes: StatBox[], x: number, y: number, w: number): number {
@@ -636,7 +699,10 @@ function drawStatBoxes(pen: Pen, boxes: StatBox[], x: number, y: number, w: numb
   const labels = boxes.map((b) => pen.label(b.label, S.sectionTitle, bw - 3));
   const labelLh = pen.lineHeight(S.sectionTitle, 1.15);
   const extra = (Math.max(1, ...labels.map((l) => l.lines.length)) - 1) * labelLh;
-  const h = 22.5 + extra + Math.max(1, ...hints.map((l) => l.length)) * 2.7;
+  // More squares than fit a row go on in more rows; the boxes grow for them.
+  const squaresExtra =
+    Math.max(0, ...boxes.map((b) => squareRows(b.squares, bw).rows - 1)) * (SQUARE + SQUARE_GAP);
+  const h = 22.5 + extra + squaresExtra + Math.max(1, ...hints.map((l) => l.length)) * 2.7;
   boxes.forEach((b, i) => {
     const bx = x + i * (bw + 4);
     const mid = bx + bw / 2;
@@ -652,6 +718,20 @@ function drawStatBoxes(pen: Pen, boxes: StatBox[], x: number, y: number, w: numb
       pen.rect(fx, top + 8, fw, 11, { stroke: "#777", width: 0.4, radius: 1 });
       const what = pen.label(pen.messages.pencil, { size: 7, color: "#555" }, fw - 2);
       what.lines.forEach((l, j) => pen.text(l, fx + 1, top + 10.6 + j * 2.6, what.style));
+    } else if (b.style === "boxes") {
+      // With a text ("5 × d10") the squares go under it, like circles; alone, they take its place.
+      if (b.text !== "")
+        pen.text(b.text, mid, top + 13.2, pen.fit(b.text, S.circlesValue, bw - 4, 9), "center");
+      const { perRow, rows } = squareRows(b.squares, bw);
+      const first = b.text !== "" ? top + 16.2 : top + 12.5 - ((rows - 1) * (SQUARE + SQUARE_GAP)) / 2;
+      for (let r = 0; r < rows; r++) {
+        const inRow = Math.min(perRow, b.squares - r * perRow);
+        const left = mid - (inRow * SQUARE + (inRow - 1) * SQUARE_GAP) / 2;
+        for (let c = 0; c < inRow; c++)
+          pen.rect(left + c * (SQUARE + SQUARE_GAP), first + r * (SQUARE + SQUARE_GAP), SQUARE, SQUARE, {
+            width: 0.6,
+          });
+      }
     } else if (b.style === "circles") {
       // The number as well as the circles: how many is read at a glance, the circles are for ticking.
       pen.text(b.text, mid, top + 13.2, pen.fit(b.text, S.circlesValue, bw - 4, 12), "center");
@@ -662,7 +742,7 @@ function drawStatBoxes(pen: Pen, boxes: StatBox[], x: number, y: number, w: numb
     } else {
       pen.text(b.text, mid, top + 18, pen.fit(b.text, S.bigValue, bw - 4, 12), "center");
     }
-    hints[i]!.forEach((l, j) => pen.text(l, mid, top + 23.8 + j * 2.7, S.hint, "center"));
+    hints[i]!.forEach((l, j) => pen.text(l, mid, top + squaresExtra + 23.8 + j * 2.7, S.hint, "center"));
   });
   return y + h;
 }
@@ -780,8 +860,9 @@ function splitSection(s: SheetSection, n: number, m: Messages): [SheetSection, S
  * MAX_PAGE_GAP white, is split, between its rows, and goes on on the next
  * page under its title marked as continued; nothing is ever cut off.
  */
-function placeSections(pen: Pen, sections: SheetSection[], bottom: number): Placed[][] {
+function placeSections(pen: Pen, sections: SheetSection[], bottomOf: (page: number) => number): Placed[][] {
   const pages: Placed[][] = [[]];
+  let bottom = bottomOf(0);
   const pageTop = (n: number) => MARGIN + (n > 0 ? CONTINUATION_HEADER_H : 0);
   let floor = new Array<number>(12).fill(pageTop(0));
   let previousY = pageTop(0);
@@ -843,6 +924,7 @@ function placeSections(pen: Pen, sections: SheetSection[], bottom: number): Plac
       keep(splitToFit(section, w, bottom - spot.y, MIN_SPLIT_ROWS));
     if (spot.y + height > bottom && pages.at(-1)!.length > 0) {
       pages.push([]);
+      bottom = bottomOf(pages.length - 1);
       floor = new Array<number>(12).fill(pageTop(pages.length - 1));
       previousY = pageTop(pages.length - 1);
       // Notes that end the sheet alone on a new page take the whole page
@@ -1140,12 +1222,17 @@ export async function renderPdf(model: PrintModel): Promise<RenderedPdf> {
   const attributionLh = pen.lineHeight(S.footer, 1.2);
   const sheetAttribution = pen.wrap(model.attribution, S.footer, CONTENT_W).filter((l) => l !== "");
   const cardAttribution = pen.wrap(model.attribution, S.footer, PAGE_W - 2 * GRID_X).filter((l) => l !== "");
-  const sheetBottom =
-    CONTENT_BOTTOM -
-    (model.cards.length === 0 && sheetAttribution.length > 0
-      ? sheetAttribution.length * attributionLh + 2
-      : 0);
-  const sheetPages = placeSections(pen, model.sections, sheetBottom);
+  const reserve =
+    model.cards.length === 0 && sheetAttribution.length > 0 ? sheetAttribution.length * attributionLh + 2 : 0;
+  // Only the last page gives up that room, and which page is last shows
+  // after placing: the pages before it keep their full height (a page 1
+  // that holds its boxes without cards must hold them with cards too).
+  const full = placeSections(pen, model.sections, () => CONTENT_BOTTOM);
+  const lastFull = full.length - 1;
+  const sheetPages =
+    reserve === 0
+      ? full
+      : placeSections(pen, model.sections, (page) => CONTENT_BOTTOM - (page >= lastFull ? reserve : 0));
   const faces = model.cards.flatMap((c) => cardFaces(pen, c, m));
   const cardPages = Math.ceil(faces.length / CARDS_PER_PAGE);
   const total = sheetPages.length + cardPages;

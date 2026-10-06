@@ -22,7 +22,8 @@
         "thing": "item.lantern-staff"
       },
       {
-        "thing": "item.provisions"
+        "thing": "item.provisions",
+        "count": 3
       },
       {
         "choice": "talents-lantern-bearer"

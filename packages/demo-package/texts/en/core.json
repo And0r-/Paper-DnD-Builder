@@ -9,7 +9,6 @@
     "rank.name": "Rank",
     "summary.line": "{{var:calling}} · Level {{var:level}}",
     "sheet.attribution": "Mistland is an invented demo world. License: GNU AGPL 3.0. Fishing net: community addition, CC0.",
-
     "kind.folk.name": "Folk",
     "kind.upbringing.name": "Upbringing",
     "kind.calling.name": "Calling",
@@ -19,10 +18,8 @@
     "kind.knack.name": "Knack",
     "kind.item.name": "Gear",
     "kind.handling.name": "Handling",
-
     "group.helping.name": "For helping",
     "group.daring.name": "For daring moments",
-
     "choice.folk.title": "Folk",
     "choice.folk.question": "Where does your character come from?",
     "choice.folk.intro": "Your folk are the people you grew up with. They decide how fast you are and what you can do from birth.",
@@ -117,7 +114,6 @@
     "choice.looks.title": "Looks",
     "choice.looks.question": "What does your character look like?",
     "choice.looks.intro": "One or two sentences are enough. You can skip this.",
-
     "step.character.title": "Your character",
     "step.character.question": "Who is your character?",
     "step.character.intro": "First, picture roughly who you want to play. The numbers come later. With every choice after this, you can ask: what fits my character?",
@@ -130,7 +126,6 @@
     "step.looks.title": "Looks",
     "step.looks.question": "How do you picture your character?",
     "step.looks.intro": "Last, you give your character a face. This doesn't change any numbers.",
-
     "names.suggestions": [
       "Mira",
       "Tobin",
@@ -143,7 +138,6 @@
       "Joss",
       "Talia"
     ],
-
     "value.might.name": "Might",
     "value.might.explain": "How strong you are. Helps with carrying, lifting and pushing.",
     "value.grace.name": "Grace",
@@ -177,7 +171,6 @@
     "value.carry.name": "Carrying load",
     "value.carry.explain": "This is how much you can carry without slowing down.",
     "value.age.name": "Age",
-
     "stat.reach.name": "Reach",
     "stat.duration.name": "Lasts",
     "stat.uses.name": "Per rest",
@@ -194,7 +187,6 @@
     "stat-value.herbs": "herbs",
     "stat-value.nothing": "nothing",
     "stat-value.always": "always",
-
     "unit.ft.short": "ft",
     "unit.ft.long": "feet",
     "unit.ft.longOne": "foot",
@@ -207,17 +199,14 @@
     "unit.kg.short": "kg",
     "unit.kg.long": "kilograms",
     "unit.kg.longOne": "kilogram",
-
     "card.knack.typeLine": "{{var:kind}} · Rank {{var:rank}}",
     "card.knack.hint": "Tick one box per use. After a rest, all boxes are free again.",
-
     "sheet.primary.title": "At the table",
-
     "sheet.primary.nerve": "Nerve",
     "sheet.scores.title": "Scores",
     "sheet.scores.hint": "Add the number in the circle to matching rolls.",
     "sheet.talents.title": "Talents",
-    "sheet.talents.hint": "● = trained. Add the number in the box to your roll.",
+    "sheet.talents.hint": "● = trained, ◉ = with flair: practice twice. Add the number in the box to your roll.",
     "sheet.traits.title": "Abilities",
     "sheet.traits.hint": "□ = used once: tick it. Erase after a rest.",
     "sheet.knacks.title": "Knacks",
@@ -235,7 +224,6 @@
     "sheet.how-to-play.text": "1. Say what your character wants to do. 2. The game leader says if you need to roll. 3. Roll and add the matching number. 4. The game leader tells you what happens.",
     "sheet.about.title": "About me",
     "sheet.notes.title": "Notes",
-
     "glossary.stamina.name": "Stamina",
     "glossary.stamina.short": "How much you can take before you have to give up.",
     "glossary.stamina.explain.what": "Stamina is a number on your sheet. Every hit takes some of it away.",
@@ -280,7 +268,6 @@
     "glossary.game-leader.short": "The person who runs the game and describes the world.",
     "glossary.game-leader.explain.what": "One person at the table doesn't play a character of their own. They tell the story and play everyone else.",
     "glossary.game-leader.explain.table": "They tell you when to roll. Ask them when you're stuck.",
-
     "folk.moorfolk.name": "Moorfolk",
     "folk.moorfolk.short": "You know every path through mist and mud.",
     "folk.moorfolk.goodIf": "Good if you like moving quietly and surely.",
@@ -299,7 +286,6 @@
     "folk.coastfolk.explain.what": "The coastfolk live from fishing and trade. They swim as soon as they can walk.",
     "folk.coastfolk.explain.table": "You can swim and hold your breath for a long time. Your pace is {{length:30}}. You learn 1 [[glossary:talent|talent]]: Climbing, Listening or Weather Sense.",
     "folk.coastfolk.explain.example": "Example: A key falls into the harbor. You dive after it and bring it back.",
-
     "upbringing.ferry-child.name": "Ferry Child",
     "upbringing.ferry-child.short": "You grew up on a ferry, between wind and traders.",
     "upbringing.ferry-child.goodIf": "Good if you like talking to people.",
@@ -310,7 +296,6 @@
     "upbringing.bell-tower.goodIf": "Good if you like solving riddles.",
     "upbringing.bell-tower.explain.what": "You helped the bell ringer and read old stories at night. You hear every quiet sound.",
     "upbringing.bell-tower.explain.table": "You get the talents Legends and Listening. You also get a small bell. After your base scores, you add +2 and +1 to might, wit or heart.",
-
     "calling.lantern-bearer.name": "Lantern Bearer",
     "calling.lantern-bearer.short": "You bring light into the dark and keep the group together.",
     "calling.lantern-bearer.knacks.change": "After each long rest you may swap one knack for another from your calling.",
@@ -330,7 +315,6 @@
     "calling.herbalist.explain.what": "A calling for people who gather, mix and heal. You carry an herb satchel and make plants work for you.",
     "calling.herbalist.explain.table": "At the table, you often have the right idea. Your knacks hold enemies in place or help with healing.",
     "calling.herbalist.explain.example": "Example: A bear attacks. You make roots grow out of the ground. They hold it tight.",
-
     "path.lightwarden.name": "Lightwarden",
     "path.lightwarden.short": "Your light protects everyone standing close to you.",
     "path.lightwarden.goodIf": "Good if you want to protect your group.",
@@ -346,7 +330,6 @@
     "path.mushroom-whisperer.goodIf": "Good if you want to uncover secrets.",
     "path.mushroom-whisperer.explain.what": "You've made friends with the mushrooms deep in the forest.",
     "path.mushroom-whisperer.explain.table": "Spores can't hurt you. You learn the knack Spore Veil.",
-
     "talent.climbing.name": "Climbing",
     "talent.climbing.short": "You get up walls, trees and rocks.",
     "talent.climbing.explain.what": "You know where to find a hold.",
@@ -379,7 +362,6 @@
     "talent.weather-sense.short": "You know when rain, storm or mist is coming.",
     "talent.weather-sense.explain.what": "You read clouds, wind and birds.",
     "talent.weather-sense.explain.table": "When you predict the weather, add 2 to your roll.",
-
     "trait.mist-sight.name": "Mist Sight",
     "trait.mist-sight.short": "Mist and dusk don't bother you.",
     "trait.mist-sight.explain.what": "Your eyes are used to the mist.",
@@ -416,7 +398,6 @@
     "trait.spore-friend.short": "Spores and mushroom poison can't hurt you.",
     "trait.spore-friend.explain.what": "The mushrooms think you're one of them.",
     "trait.spore-friend.explain.table": "Spore clouds and poisonous mushrooms can't harm you.",
-
     "knack.spark-shower.name": "Spark Shower",
     "knack.spark-shower.short": "A burst of bright sparks dazzles your enemies.",
     "knack.spark-shower.goodIf": "Good if you want to hold enemies back.",
@@ -518,7 +499,6 @@
     "knack.spore-veil.short": "A cloud of spores hides your group.",
     "knack.spore-veil.explain.what": "You open a mushroom. A thick cloud spreads {{length:15}} wide.",
     "knack.spore-veil.explain.table": "For 1 minute, nobody can see through the cloud. You can hide inside it.",
-
     "item.lantern-staff.name": "Lantern Staff",
     "item.lantern-staff.short": "A staff with a lantern on top.",
     "item.lantern-staff.explain.what": "It's a walking stick and a light in one.",
@@ -540,7 +520,7 @@
     "item.small-bell.explain.what": "It rings bright and far.",
     "item.small-bell.explain.table": "When you ring it, your group hears you even in the mist.",
     "item.provisions.name": "Provisions",
-    "item.provisions.short": "Food and water for 5 days.",
+    "item.provisions.short": "Food and water for one day.",
     "item.provisions.explain.what": "Bread, cheese, dried fruit and a bottle.",
     "item.provisions.explain.table": "Cross off one day each time you camp on the road.",
     "item.travel-cloak.name": "Travel Cloak",
@@ -596,7 +576,6 @@
     "handling.trail-boots.short": "In your trail boots, you don't slip.",
     "handling.trail-boots.explain.what": "You know every step on wet stone and moss.",
     "handling.trail-boots.explain.table": "On slippery ground, you don't fall.",
-
     "stat.roll.name": "Roll",
     "stat.hit.name": "Hit",
     "stat.harm.name": "Harm",
@@ -611,6 +590,37 @@
     "item.sling.short": "A leather strap for throwing stones.",
     "item.sling.goodIf": "Good if you would rather hit from afar.",
     "item.sling.explain.what": "A leather strap and a pouch of round river pebbles.",
-    "item.sling.explain.table": "You hit things that are far away."
+    "item.sling.explain.table": "You hit things that are far away.",
+    "value.mightHold.name": "Hold fast with might",
+    "value.graceHold.name": "Hold fast with grace",
+    "value.witHold.name": "Hold fast with wit",
+    "value.heartHold.name": "Hold fast with heart",
+    "value.mightHold.explain": "Add this number when you hold fast against something with might.",
+    "value.graceHold.explain": "Add this number when you hold fast against something with grace.",
+    "value.witHold.explain": "Add this number when you hold fast against something with wit.",
+    "value.heartHold.explain": "Add this number when you hold fast against something with heart.",
+    "sheet.scores.hold": "Hold fast",
+    "value.restDice.name": "Rest dice",
+    "value.restDice.explain": "When you rest, roll some and get that much stamina back.",
+    "value.restDie.name": "Size of rest dice",
+    "value.closeCallsMade.name": "Close calls made",
+    "value.closeCallsMade.explain": "At 0 stamina you roll every round: tick what works out here.",
+    "value.closeCallsMissed.name": "Close calls missed",
+    "value.closeCallsMissed.explain": "Tick what goes wrong here. When all three are ticked, it is over.",
+    "sheet.recovery.title": "Rest and peril",
+    "sheet.recovery.rest-dice": "{{var:count}} × d{{var:die}}",
+    "kind.flair.name": "Flair",
+    "flair.haggling.name": "Shrewd trader",
+    "flair.haggling.short": "When you haggle, you add your practice twice.",
+    "flair.haggling.explain.what": "On the ferry you traded every day.",
+    "flair.haggling.explain.table": "When you haggle, add your practice twice.",
+    "flair.listening.name": "Keen ear",
+    "flair.listening.short": "When you listen, you add your practice twice.",
+    "flair.listening.explain.what": "In the bell tower you hear every note.",
+    "flair.listening.explain.table": "When you listen, add your practice twice.",
+    "stat.traits.name": "Traits",
+    "stat-value.item.lantern-staff.traits": "Two hands, glows {{length:10|short}} around",
+    "stat-value.item.boat-hook.traits": "Long (still hits at {{length:10|short}}), pulls foes close",
+    "stat-value.item.sling.traits": "Needs stones"
   }
 }
