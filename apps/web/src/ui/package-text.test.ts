@@ -7,6 +7,7 @@ import { stepTitle } from "./flow/model.ts";
 import {
   choiceTexts,
   distributeMethodLabels,
+  formatValue,
   grantedValue,
   isYesNoValue,
   measureContext,
@@ -46,14 +47,29 @@ describe("names of the ways to distribute", () => {
 describe("what you get", () => {
   const lp = {
     lang: "de",
-    texts: { "value.trained.name": "Geübt im Klettern", "value.stamina.name": "Ausdauer" },
+    texts: {
+      "value.trained.name": "Geübt im Klettern",
+      "value.stamina.name": "Ausdauer",
+      "value.toughness.name": "Zähigkeit",
+      "value.restDie.name": "Rastwürfel",
+      "value.restDie.amount": "W{{var:n}}",
+      "value.might.name": "Kraft",
+    },
     pkg: {
       units: [],
       values: [
         { id: "trained", source: "s", default: 0, max: 1 },
         { id: "stamina", source: "s", default: 4 },
         { id: "capped", source: "s", min: 0, max: 1, formula: "1" },
+        { id: "toughness", source: "s", default: 0, min: 1 },
+        { id: "restDie", source: "s", default: 0 },
+        { id: "might", source: "s", default: 0 },
       ],
+      flow: {
+        choices: [
+          { id: "scores", kind: "distribute", targets: ["might"], methods: [{ method: "pointBuy" }] },
+        ],
+      },
     },
   } as unknown as LoadedPackage;
   const ctx = measureContext(lp, undefined);
@@ -67,6 +83,22 @@ describe("what you get", () => {
     expect(isYesNoValue(lp, "stamina")).toBe(false);
     expect(isYesNoValue(lp, "capped")).toBe(false);
     expect(grantedValue(lp, ctx, "stamina", 15)).toBe("Ausdauer +15");
+  });
+
+  it("names a value a thing gives as it is, a share of it with its sign (AND-120)", () => {
+    // Nothing else makes this value: the thing gives it, it is no bonus.
+    expect(grantedValue(lp, ctx, "toughness", 44, 44)).toBe("Zähigkeit 44");
+    expect(grantedValue(lp, ctx, "toughness", 44, 49)).toBe("Zähigkeit 44");
+    // A small share on top of what another thing gives stays a bonus.
+    expect(grantedValue(lp, ctx, "toughness", 5, 49)).toBe("Zähigkeit +5");
+    // A value with a base of its own (a default, or set by a choice) only gets bonuses.
+    expect(grantedValue(lp, ctx, "stamina", 15, 15)).toBe("Ausdauer +15");
+    expect(grantedValue(lp, ctx, "might", 2, 2)).toBe("Kraft +2");
+  });
+
+  it("writes a value the package's own way, without a sign", () => {
+    expect(grantedValue(lp, ctx, "restDie", 10, 10)).toBe("Rastwürfel W10");
+    expect(formatValue(lp, ctx, "restDie", 8, true)).toBe("W8");
   });
 });
 

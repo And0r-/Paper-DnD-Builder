@@ -285,6 +285,8 @@ export function describeAnswer(
   list: Translator["list"],
   /** Values said elsewhere on the screen (what grows with the level), left out here. */
   skipValues: ReadonlySet<string> = new Set(),
+  /** The character's values, so a thing that gives a whole value says it without a sign. */
+  values?: Readonly<Record<string, number>>,
 ): string | undefined {
   const answer = state.answer as Record<string, unknown> | undefined;
   const choice = choiceOf(lp, state.id);
@@ -293,7 +295,7 @@ export function describeAnswer(
     case "info":
     case "pickOne":
     case "pickMany": {
-      const p = answerThings(lp, ctx, state, skipValues);
+      const p = answerThings(lp, ctx, state, skipValues, values);
       const parts = p ? [...p.things.map((id) => thingName(lp, id)), ...p.values] : [];
       return parts.length > 0 ? list(parts) : undefined;
     }
@@ -330,6 +332,7 @@ export function answerThings(
   ctx: MeasureContext,
   state: ChoiceState,
   skipValues: ReadonlySet<string> = new Set(),
+  values?: Readonly<Record<string, number>>,
 ): { things: string[]; values: string[] } | undefined {
   const answer = state.answer as Record<string, unknown> | undefined;
   switch (state.kind) {
@@ -339,7 +342,7 @@ export function answerThings(
             things: state.info.things,
             values: state.info.values
               .filter((v) => !skipValues.has(v.value))
-              .map((v) => grantedValue(lp, ctx, v.value, v.add)),
+              .map((v) => grantedValue(lp, ctx, v.value, v.add, values?.[v.value])),
           }
         : undefined;
     case "pickOne":

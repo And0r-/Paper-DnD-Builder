@@ -616,6 +616,7 @@
     "value.restDice.name": "Rest dice",
     "value.restDice.explain": "When you rest, roll some and get that much stamina back.",
     "value.restDie.name": "Size of rest dice",
+    "value.restDie.amount": "d{{var:n}}",
     "value.closeCallsMade.name": "Close calls made",
     "value.closeCallsMade.explain": "At 0 stamina you roll every round: tick what works out here.",
     "value.closeCallsMissed.name": "Close calls missed",

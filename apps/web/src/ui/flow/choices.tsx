@@ -84,7 +84,7 @@ function Grants({ lp, thing, level }: { lp: LoadedPackage; thing: Thing; level: 
     }
   }
   for (const [value, add] of adds) {
-    items.push(<li key={`v-${value}`}>{grantedValue(lp, ctx, value, add)}</li>);
+    items.push(<li key={`v-${value}`}>{grantedValue(lp, ctx, value, add, ev.values[value])}</li>);
   }
   for (const [i, g] of (thing.grants ?? []).entries()) {
     if ((g.atLevel ?? 1) > level) continue;
@@ -1202,7 +1202,7 @@ export function InfoChoice({ state }: { state: ChoiceState }) {
       <ul className="gifts__list">
         {explained.map((v) => (
           <li className="gift" key={`v-${v.value}`}>
-            <p className="gift__name">{grantedValue(lp, ctx, v.value, v.add)}</p>
+            <p className="gift__name">{grantedValue(lp, ctx, v.value, v.add, ev.values[v.value])}</p>
             <p className="gift__text">
               <RichText lp={lp} text={ptext(lp, `value.${v.value}.explain`)} />
             </p>
@@ -1213,7 +1213,7 @@ export function InfoChoice({ state }: { state: ChoiceState }) {
           <li className="gift">
             <ul className="gift__numbers">
               {plainValues.map((v) => (
-                <li key={v.value}>{grantedValue(lp, ctx, v.value, v.add)}</li>
+                <li key={v.value}>{grantedValue(lp, ctx, v.value, v.add, ev.values[v.value])}</li>
               ))}
             </ul>
           </li>

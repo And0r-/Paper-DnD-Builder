@@ -890,6 +890,7 @@ export function validatePackageFiles(files: PackageFiles): ValidationResult {
   for (const v of values) {
     need(`value.${v.id}.name`, `name of value ${lit(v.id)}`);
     optional.add(`value.${v.id}.explain`);
+    optional.add(`value.${v.id}.amount`);
   }
   for (const s of statKeys) need(`stat.${s}.name`, `label of stat ${lit(s)}`);
   for (const k of statTextKeys) need(k, "stat text");

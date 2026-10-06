@@ -176,7 +176,11 @@ export function stepTexts(
   };
 }
 
-/** A value or a change of it, in the reader's units if the value is a quantity ("+7,5 m"). */
+/**
+ * A value or a change of it, in the reader's units if the value is a quantity
+ * ("+7,5 m"). A value the package writes its own way (`value.<id>.amount`,
+ * for example a die "d{{var:n}}") is written that way, without a sign.
+ */
 export function formatValue(
   lp: LoadedPackage,
   ctx: MeasureContext,
@@ -184,6 +188,8 @@ export function formatValue(
   n: number,
   signed = false,
 ): string {
+  const own = ptext(lp, `value.${valueId}.amount`);
+  if (own !== undefined) return plain(ctx, own, { n });
   const unit = lp.pkg.values.find((v) => v.id === valueId)?.unit;
   const sign = signed ? (n >= 0 ? "+" : "−") : n < 0 ? "−" : "";
   const abs = Math.abs(n);
@@ -191,6 +197,21 @@ export function formatValue(
     ? formatMeasure(ctx, { amount: abs, unit }, "short")
     : new Intl.NumberFormat(lp.lang).format(abs);
   return sign + body;
+}
+
+/**
+ * A value that starts at nothing: no formula, no table, no default and no
+ * choice that sets it. What things add to it is the value itself, not a
+ * bonus on something else.
+ */
+function startsEmpty(lp: LoadedPackage, valueId: string): boolean {
+  const v = lp.pkg.values.find((x) => x.id === valueId);
+  if (!v || v.formula !== undefined || v.byLevel !== undefined || (v.default ?? 0) !== 0) return false;
+  return !lp.pkg.flow.choices.some(
+    (c) =>
+      (c.kind === "number" && c.target === valueId) ||
+      (c.kind === "distribute" && c.targets.includes(valueId) && c.methods.some((m) => m.method !== "raise")),
+  );
 }
 
 /**
@@ -203,11 +224,24 @@ export function isYesNoValue(lp: LoadedPackage, valueId: string): boolean {
   return !!v && !v.unit && !v.formula && v.max === 1 && (v.min ?? 0) === 0 && (v.default ?? 0) === 0;
 }
 
-/** One gained value for "What you get": "Stamina +15", or just the name for a yes/no value. */
-export function grantedValue(lp: LoadedPackage, ctx: MeasureContext, valueId: string, add: number): string {
+/**
+ * One gained value for "What you get": "Stamina +15", or just the name for a
+ * yes/no value. A thing that gives most of a value that starts empty gives
+ * the value itself ("Toughness 44"); smaller shares of it, and additions to
+ * a value with a base of its own, keep their sign ("Toughness +5").
+ * `total` is the character's whole value, when known.
+ */
+export function grantedValue(
+  lp: LoadedPackage,
+  ctx: MeasureContext,
+  valueId: string,
+  add: number,
+  total?: number,
+): string {
   const name = ptext(lp, `value.${valueId}.name`) ?? valueId;
   if (isYesNoValue(lp, valueId) && add > 0) return name;
-  return `${name} ${formatValue(lp, ctx, valueId, add, true)}`;
+  const gives = add > 0 && startsEmpty(lp, valueId) && (total === undefined || add * 2 >= total);
+  return `${name} ${formatValue(lp, ctx, valueId, add, !gives)}`;
 }
 
 /**

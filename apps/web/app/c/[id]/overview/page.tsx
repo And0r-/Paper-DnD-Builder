@@ -124,14 +124,14 @@ export default function OverviewPage() {
                     return distributeLines(lp, ctx, ev, state, targets, assign, { t, list }, summed);
                   }
                   // Names of things explain themselves on hover and tap: their text is not on this screen.
-                  const named = answerThings(lp, ctx, state, grown);
+                  const named = answerThings(lp, ctx, state, grown, ev.values);
                   const text =
                     named && named.things.length + named.values.length > 0
                       ? listNodes(t, [
                           ...named.things.map((id) => <ThingName key={id} lp={lp} id={id} />),
                           ...named.values,
                         ])
-                      : describeAnswer(lp, ctx, state, list, grown);
+                      : describeAnswer(lp, ctx, state, list, grown, ev.values);
                   const prefix = s.choices.length > 1 ? `${choiceTexts(lp, c, state, ctx).title}: ` : "";
                   return [
                     <>
