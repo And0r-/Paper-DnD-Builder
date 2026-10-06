@@ -57,6 +57,8 @@ export interface SheetSettings {
   units?: Readonly<Record<string, string>>;
   /** When the sheet is made: printed in the footer and stored in the PDF. */
   createdAt?: Date;
+  /** When the character last changed (the original's `changedAt`). */
+  changedAt?: Date;
 }
 
 export type StatBox = z.infer<typeof statBoxSchema>;
@@ -657,7 +659,13 @@ export function buildSheetModel(
   return {
     version: 1,
     language,
-    origin: { kind: "original", level: ev.level, builtAt: createdAt.toISOString() },
+    origin: {
+      kind: "original",
+      level: ev.level,
+      builtAt: createdAt.toISOString(),
+      packageVersion: pkg.manifest.version,
+      ...(settings.changedAt ? { changedAt: settings.changedAt.toISOString() } : {}),
+    },
     packageId: pkg.manifest.id,
     name,
     level: ev.level,

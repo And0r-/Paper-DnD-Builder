@@ -45,7 +45,12 @@ describe("sheet model", () => {
 
   it("says it is the original, at which level and when it was made", () => {
     const model = sheet(level20);
-    expect(model.origin).toEqual({ kind: "original", level: 20, builtAt: "2026-10-04T12:00:00.000Z" });
+    expect(model.origin).toEqual({
+      kind: "original",
+      level: 20,
+      builtAt: "2026-10-04T12:00:00.000Z",
+      packageVersion: pkg.manifest.version,
+    });
     expect(model.level).toBe(20);
     expect(model.packageId).toBe("demo");
   });

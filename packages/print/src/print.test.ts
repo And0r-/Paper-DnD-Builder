@@ -111,13 +111,14 @@ function words(values: Iterable<TextValue | string>): Set<string> {
 
 function messageWords(language: string): Set<string> {
   const m = MESSAGES[language]!;
-  const { startValue, page, unitsUsed, createdOn, count, ...plain } = m;
+  const { startValue, page, unitsUsed, createdOn, copyName, count, ...plain } = m;
   return words([
     ...Object.values(plain),
     startValue(""),
     page(1, 2),
     unitsUsed([]),
     createdOn(""),
+    copyName(""),
     count("2", ""),
   ]);
 }

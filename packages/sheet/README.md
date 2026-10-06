@@ -20,8 +20,10 @@ What the model has besides words and numbers:
   only: `sheet/<section>/<value>`, `sheet/<section>/<thing>/uses`,
   `cards/<thing>/uses`. A place keeps its id when the character goes up a
   level.
-- **Origin**: `{ kind: "original", level, builtAt }`; a kept copy will be
-  `{ kind: "copy", name, createdAt, fromLevel }`.
+- **Origin**: `{ kind: "original", level, builtAt, packageVersion,
+changedAt? }`; a kept copy is `{ kind: "copy", name, createdAt,
+fromLevel, fromPackageVersion, fromChangedAt? }`, the same facts of the
+  original it was made from. Any difference: the original changed since.
 - **Dependents** per value: the values that change with it, from the
   package's formulas and the grants of the character's things
   (`dependentValues` in `@builder/core`).

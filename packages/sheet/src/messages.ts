@@ -17,6 +17,8 @@ export interface Messages {
   /** Footer: which units the document uses, e.g. "meters, kilograms". */
   unitsUsed: (units: string[]) => string;
   createdOn: (date: string) => string;
+  /** Name of a copy of the sheet the player keeps, until they give it one. */
+  copyName: (date: string) => string;
   cards: string;
   printHint: string;
   atTheTable: string;
@@ -37,6 +39,7 @@ export const MESSAGES: Readonly<Record<string, Messages>> = {
     unnamed: "Ohne Namen",
     page: (n, of) => `Seite ${n} von ${of}`,
     unitsUsed: (u) => `Einheiten: ${u.join(", ")}`,
+    copyName: (d) => `Meine Fassung vom ${d}`,
     createdOn: (d) => `Erstellt am ${d}`,
     cards: "Karten",
     printHint: "In Originalgrösse (100 %) drucken. An den Linien ausschneiden.",
@@ -55,6 +58,7 @@ export const MESSAGES: Readonly<Record<string, Messages>> = {
     unnamed: "No name yet",
     page: (n, of) => `Page ${n} of ${of}`,
     unitsUsed: (u) => `Units: ${u.join(", ")}`,
+    copyName: (d) => `My version of ${d}`,
     createdOn: (d) => `Made on ${d}`,
     cards: "Cards",
     printHint: "Print at actual size (100%). Cut along the lines.",
