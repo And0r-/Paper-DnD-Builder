@@ -25,4 +25,5 @@ for (const dir of dirs) {
   console.log(formatReport(dir, result));
   if (!result.ok || (strict && result.warnings.length > 0)) failed = true;
 }
-process.exit(failed ? 1 : 0);
+// Not process.exit(): it ends the process before a pipe has taken all of stdout, and long reports lost their end.
+process.exitCode = failed ? 1 : 0;

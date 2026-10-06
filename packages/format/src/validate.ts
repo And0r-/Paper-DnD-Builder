@@ -28,7 +28,7 @@ import {
   type Units,
   type Value,
 } from "./schema.ts";
-import { parseTemplate, TemplateSyntaxError } from "./template.ts";
+import { parseTemplate, sentences, TemplateSyntaxError, visibleText } from "./template.ts";
 import { formatVersionMismatch } from "./version.ts";
 
 export interface Issue {
@@ -1036,11 +1036,23 @@ export function validatePackageFiles(files: PackageFiles): ValidationResult {
   const escaped = [...unitWords].map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
   const fixedUnit =
     escaped.length > 0 ? new RegExp(`\\d\\s*(?:${escaped.join("|")})(?![\\p{L}])`, "u") : undefined;
+  // The package name may spell out what the package is; the sheet header fits it to its box.
   const LIMITS: [RegExp, number][] = [
-    [/\.name$/, 30],
-    [/\.short$/, 120],
+    [/^(?!package\.)[^]*\.name$/, 30],
     [/\.goodIf$/, 80],
   ];
+  // A thing a feature table prints and no card explains is used at the table from its short
+  // text alone, so that text may carry every limit of the rule (10.3).
+  const printedAlone = new Set(
+    sheet.sections.flatMap((s) =>
+      s.kind === "featureTable"
+        ? resolveOptions(s.things).flatMap((t) => (t.card ? [] : [`${t.id}.short`]))
+        : [],
+    ),
+  );
+  // Official rules texts stay verbatim; their plain units are counted per file, not listed.
+  const rulesKeys = new Set([...thingById.values()].map((t) => `${t.id}.rules`));
+  const verbatimUnits = new Map<string, number>(); // file → rules texts with a plain unit
 
   const quantitiesByKey = new Map<string, Map<string, string>>(); // key → lang → quantities signature
   for (const lang of manifest.languages) {
@@ -1062,13 +1074,20 @@ export function validatePackageFiles(files: PackageFiles): ValidationResult {
         warn(file, p, "text is not used by anything in the package");
       if (value === null) continue;
       if (typeof value === "string") {
-        for (const [re, max] of LIMITS) {
-          if (re.test(key) && !key.startsWith("unit.") && value.length > max) {
-            warn(file, p, `is ${value.length} characters long; the style limit is ${max}`);
+        const shown = visibleText(value);
+        const limits: [RegExp, number][] = [...LIMITS, [/\.short$/, printedAlone.has(key) ? 240 : 120]];
+        for (const [re, max] of limits) {
+          if (re.test(key) && !key.startsWith("unit.") && shown.length > max) {
+            warn(file, p, `is ${shown.length} characters long as shown; the style limit is ${max}`);
           }
         }
+        if (printedAlone.has(key) && sentences(shown).length > 3) {
+          warn(file, p, `has ${sentences(shown).length} sentences; the style limit is 3`);
+        }
         if (fixedUnit?.test(value.replace(/\{\{[^}]*\}\}/g, "")) && !key.startsWith("unit.")) {
-          warn(file, p, "states a unit as plain text; use a placeholder like {{length:30}} so it converts");
+          if (rulesKeys.has(key)) verbatimUnits.set(file, (verbatimUnits.get(file) ?? 0) + 1);
+          else
+            warn(file, p, "states a unit as plain text; use a placeholder like {{length:30}} so it converts");
         }
       }
       if (/\.explain\.what$/.test(key)) {
@@ -1131,6 +1150,13 @@ export function validatePackageFiles(files: PackageFiles): ValidationResult {
       const detail = [...perLang].map(([l, s]) => `${l}: ${s || "none"}`).join("; ");
       warn("texts/", key, `languages state different quantities (${detail})`);
     }
+  }
+  for (const [file, n] of verbatimUnits) {
+    warn(
+      file,
+      "",
+      `${n} official rules text(s) state a unit as plain text; they stay verbatim, so readers see that unit unconverted`,
+    );
   }
 
   return finish({
