@@ -463,6 +463,109 @@
   visibility: hidden;
 }
 
+/* On a phone: a box to tick is one row, its name and number left, the ticks right, compact
+   (24 px, 8 px apart, WCAG 2.5.8), so rest and close calls stay short. */
+@media (max-width: 899.98px) {
+  .vsheet__box--boxes,
+  .vsheet__box--circles {
+    --sheet-tick: 24px;
+    display: grid;
+    grid-column: 1 / -1;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "label ticks"
+      "value ticks"
+      "hint hint";
+    align-items: center;
+    justify-items: start;
+    gap: 0 var(--space-3);
+    text-align: left;
+  }
+
+  .vsheet__box--boxes > .vsheet__box-label,
+  .vsheet__box--circles > .vsheet__box-label {
+    grid-area: label;
+    overflow-wrap: normal;
+  }
+
+  .vsheet__box--boxes > .vsheet__box-value,
+  .vsheet__box--circles > .vsheet__box-value {
+    grid-area: value;
+    font-size: var(--text-lg);
+    white-space: nowrap;
+  }
+
+  .vsheet__box--boxes > .vsheet__box-hint,
+  .vsheet__box--circles > .vsheet__box-hint {
+    grid-area: hint;
+    margin-top: var(--space-1);
+  }
+
+  .vsheet__box--boxes > .sheet-ticks,
+  .vsheet__box--circles > .sheet-ticks {
+    grid-area: ticks;
+    justify-self: end;
+    justify-content: flex-end;
+    gap: 8px;
+    max-width: calc(6 * 24px + 5 * 8px);
+  }
+
+  /* A table's rows one under the other: the name, then each value under its column's name. */
+  .vsheet__table,
+  .vsheet__table tbody,
+  .vsheet__table tr,
+  .vsheet__table th,
+  .vsheet__table td {
+    display: block;
+  }
+
+  .vsheet__table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+
+  .vsheet__table tbody tr {
+    position: relative;
+    padding: var(--space-2) var(--sheet-touch) var(--space-2) 0;
+    border-bottom: 1px solid var(--color-line);
+  }
+
+  .vsheet__table tbody th,
+  .vsheet__table tbody td {
+    padding: 0;
+    border: 0;
+    white-space: normal;
+  }
+
+  .vsheet__table tbody td {
+    display: grid;
+    grid-template-columns: 7.5rem minmax(0, 1fr);
+    gap: var(--space-2);
+  }
+
+  .vsheet__table tbody td::before {
+    content: attr(data-col);
+    color: var(--color-ink-muted);
+    font-size: var(--text-xs);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+
+  .vsheet__table tbody td.vsheet__row-tools {
+    position: absolute;
+    top: var(--space-1);
+    right: 0;
+    display: block;
+  }
+
+  .vsheet__table tbody td.vsheet__row-tools::before {
+    content: none;
+  }
+}
+
 /* ---------------------------------------------------------- the A4 page */
 
 @media (min-width: 900px) {

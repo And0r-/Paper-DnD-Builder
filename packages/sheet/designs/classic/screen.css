@@ -422,6 +422,102 @@
   }
 }
 
+/* On a phone: a box to tick is one row, its name and number left, the ticks right, compact
+   (24 px, 8 px apart, WCAG 2.5.8), so rest and close calls stay short. */
+@media (max-width: 899.98px) {
+  .csheet__box--boxes,
+  .csheet__box--circles {
+    --sheet-tick: 24px;
+    display: grid;
+    grid-column: 1 / -1;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "label ticks"
+      "value ticks";
+    align-items: center;
+    justify-items: start;
+    gap: 0 var(--space-3);
+    text-align: left;
+  }
+
+  .csheet__box--boxes > .csheet__box-label,
+  .csheet__box--circles > .csheet__box-label {
+    grid-area: label;
+    overflow-wrap: normal;
+  }
+
+  .csheet__box--boxes > .csheet__box-value,
+  .csheet__box--circles > .csheet__box-value {
+    grid-area: value;
+    font-size: var(--text-lg);
+    white-space: nowrap;
+  }
+
+  .csheet__box--boxes > .sheet-ticks,
+  .csheet__box--circles > .sheet-ticks {
+    grid-area: ticks;
+    justify-self: end;
+    justify-content: flex-end;
+    gap: 8px;
+    max-width: calc(6 * 24px + 5 * 8px);
+  }
+
+  /* A table's rows one under the other: the name, then each value under its column's name. */
+  .csheet__table,
+  .csheet__table tbody,
+  .csheet__table tr,
+  .csheet__table th,
+  .csheet__table td {
+    display: block;
+  }
+
+  .csheet__table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+
+  .csheet__table tbody tr {
+    position: relative;
+    padding: var(--space-2) var(--sheet-touch) var(--space-2) 0;
+    border-bottom: 1px solid var(--color-line);
+  }
+
+  .csheet__table tbody th,
+  .csheet__table tbody td {
+    padding: 0;
+    border: 0;
+    white-space: normal;
+  }
+
+  .csheet__table tbody td {
+    display: grid;
+    grid-template-columns: 7.5rem minmax(0, 1fr);
+    gap: var(--space-2);
+  }
+
+  .csheet__table tbody td::before {
+    content: attr(data-col);
+    color: var(--color-ink-muted);
+    font-size: var(--text-xs);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+
+  .csheet__table tbody td.csheet__row-tools {
+    position: absolute;
+    top: var(--space-1);
+    right: 0;
+    display: block;
+  }
+
+  .csheet__table tbody td.csheet__row-tools::before {
+    content: none;
+  }
+}
+
 /* ---------------------------------------------------------- the A4 page */
 
 @media (min-width: 900px) {

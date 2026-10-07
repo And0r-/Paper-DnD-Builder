@@ -484,7 +484,11 @@ function StatTable({ s, i, ui, rowName }: Props<"statTable"> & { rowName: string
                 <ui.Text path={at(i, "rows", j, "name")} value={r.name} label={rowName} />
               </th>
               {r.cells.map((c, k) => (
-                <td key={k} className={s.wrap?.[k] ? "vsheet__wrap" : undefined}>
+                <td
+                  key={k}
+                  data-col={s.columns[k] ?? ""}
+                  className={s.wrap?.[k] ? "vsheet__wrap" : undefined}
+                >
                   <ui.Text path={at(i, "rows", j, "cells", k)} value={c} label={s.columns[k] ?? s.title} />
                 </td>
               ))}

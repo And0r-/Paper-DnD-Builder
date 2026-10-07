@@ -410,6 +410,7 @@ function StatTable({ s, i, ui, rowName }: Props<"statTable"> & { rowName: string
               {r.cells.map((c, k) => (
                 <td
                   key={k}
+                  data-col={s.columns[k] ?? ""}
                   className={
                     s.wrap?.[k] ? "csheet__wrap" : c.length <= SHORT_CELL ? "csheet__short" : undefined
                   }
