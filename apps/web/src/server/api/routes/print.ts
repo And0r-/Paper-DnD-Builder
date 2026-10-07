@@ -96,7 +96,12 @@ export function fileNames(parts: readonly string[]): string {
   let who = ascii(first);
   if (who.length > 40) who = who.slice(0, 40).replace(/-[^-]*$/u, "") || who.slice(0, 40);
   const plain = [who || "character", ...rest.map(ascii).filter((p) => p !== "")].join("-");
-  return `attachment; filename="${plain}.pdf"; filename*=UTF-8''${encodeURIComponent(`${parts.join(" - ")}.pdf`)}`;
+  // RFC 5987 allows none of ' ( ) * unencoded; encodeURIComponent leaves them.
+  const encoded = encodeURIComponent(`${parts.join(" - ")}.pdf`).replace(
+    /['()*]/g,
+    (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`,
+  );
+  return `attachment; filename="${plain}.pdf"; filename*=UTF-8''${encoded}`;
 }
 
 /**
