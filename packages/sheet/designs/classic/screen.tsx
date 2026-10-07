@@ -269,7 +269,7 @@ function Box({
   }
   const max = b.style === "circles" ? b.circles : b.style === "boxes" ? b.squares : 0;
   return (
-    <div className={`csheet__box csheet__box--${b.style}`}>
+    <div className={`csheet__box csheet__box--${b.style}`} style={{ "--cs-marks": max } as CSSProperties}>
       {b.text !== "" && b.style !== "circles" && (
         <p className="csheet__box-value">
           <ui.Text path={[...path, "text"]} value={b.text} label={b.label} />
@@ -384,7 +384,7 @@ function CheckList({ s, i, ui }: Props<"checkList">) {
 }
 
 /** A cell up to this long keeps one line, as a number does on paper; a longer one wraps. */
-const SHORT_CELL = 28;
+const SHORT_CELL = 12;
 
 function StatTable({ s, i, ui, rowName }: Props<"statTable"> & { rowName: string }) {
   return (

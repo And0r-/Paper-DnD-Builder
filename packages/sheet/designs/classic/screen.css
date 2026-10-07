@@ -547,9 +547,7 @@
   }
 
   .csheet__more > .csheet__section--answers,
-  .csheet__more > .csheet__section--notes,
-  .csheet__apart > .csheet__section--answers,
-  .csheet__apart > .csheet__section--notes {
+  .csheet__apart > .csheet__section--answers {
     break-inside: avoid;
   }
 
@@ -682,7 +680,7 @@
 
   /* The boxes at the table in rows as in the PDF, whatever section they come from: the numbers,
      a wide box per pencil value, then all boxes to tick in one row. */
-  .csheet__cluster {
+  .csheet__page > .csheet__cluster {
     display: flex;
     flex-flow: row wrap;
     gap: var(--cs-box-gap);
@@ -704,10 +702,17 @@
     flex: 1 1 100%;
   }
 
+  /* Each box as wide as its marks in one row, up to four a row, so three never break
+     into two and one; the marks 6 px apart, which keeps the 24 px a pointer needs (WCAG 2.5.8). */
   .csheet__cluster .csheet__box--circles,
   .csheet__cluster .csheet__box--boxes {
     order: 3;
-    flex: 1 1 15mm;
+    flex: 1 1 max(15mm, calc(min(var(--cs-marks, 0), 4) * (var(--sheet-tick) + 6px) - 6px + 1.5mm));
+    padding-inline: 0.5mm;
+  }
+
+  .csheet__cluster .sheet-ticks {
+    gap: 6px;
   }
 
   .csheet__cluster .csheet__box .sheet-ticks {
@@ -809,10 +814,16 @@
     text-align: center;
   }
 
+  /* Name and number on one line at the row's foot, as written on paper; the dot beside them. */
   .csheet__check {
+    align-items: end;
     gap: 1.5mm;
     min-height: var(--cs-row);
     border-bottom: 0;
+  }
+
+  .csheet__check > .csheet__dot {
+    margin-bottom: 0.6mm;
   }
 
   .csheet__check-total {
@@ -822,11 +833,14 @@
   }
 
   /* A number sits on its line, as written on paper; the place to tap stays 24 px high. */
-  .csheet__check-total .sheet-text,
+  .csheet__check .sheet-text,
   .csheet__cell dd .sheet-text,
   .csheet__answer dd .sheet-text {
     display: inline-flex;
     align-items: flex-end;
+  }
+
+  .csheet__check-total .sheet-text {
     justify-content: flex-end;
   }
 
