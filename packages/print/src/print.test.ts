@@ -2126,6 +2126,27 @@ describe("the classic design: original and copy, empty and filled", () => {
     expect(last.x + last.w / 2).toBeGreaterThan(CLASSIC_GEOMETRY.page.width - CLASSIC_GEOMETRY.margin - 30);
   });
 
+  it("keeps a short apart part off a page of its own, its short list in one column", async () => {
+    const lantern3 = demoCharacter(pkg, 3, "Mira Fennwick", "calling.lantern-bearer");
+    for (const [language] of languages) {
+      const model = buildSheetModel(pkg, lantern3, { language, createdAt });
+      const plan = classicPlan(model.sections);
+      expect(plan.apartPage).toBe(true);
+      const pdf = await renderPdf(model, sheetOnly);
+      // Under the notes on page 2, not on an almost empty page 3.
+      expect(pdf.sheetPages, language).toBe(2);
+      const apart = new Set(plan.parts.apart.map((i) => model.sections[i]!.id));
+      const last = pdf.sheetLayout.at(-1)!;
+      expect(last.filter((p) => apart.has(p.section.id)).length, language).toBeGreaterThan(0);
+      // The rest under the box rows in one column: every block of it at the left margin.
+      const rest = last.filter((p) => apart.has(p.section.id) && p.section.kind !== "statBoxes");
+      expect(rest.length).toBeGreaterThan(0);
+      expect(new Set(rest.map((p) => Math.round(p.x)))).toEqual(new Set([CLASSIC_GEOMETRY.margin]));
+      const { text } = await extract(pdf);
+      expect(text).not.toContain(MESSAGES[language]!.continued);
+    }
+  });
+
   it("shows titles and short lines: no hints, no help box", async () => {
     for (const [language] of languages) {
       const model = buildSheetModel(pkg, lantern20(), { language, createdAt });

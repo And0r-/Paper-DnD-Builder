@@ -668,6 +668,9 @@ function answerBlocks(c: Ctx, s: Section<"answers">): Block[] {
   ];
 }
 
+/** A rest of the apart part up to this high (mm) stays in one column: a short list is not split. */
+const SHORT_REST = 90;
+
 /** Lines notes keep at least when they come last and shrink to the room left. */
 const LEAST_NOTE_LINES = 2;
 
@@ -972,41 +975,70 @@ export function layClassic(
     if (after.length > 0) main.nextColumn();
   }
   main.place(after);
-  main.finish();
 
-  const placedSoFar = [...items, ...left.placed, ...main.placed];
-  if (plan.apartPage) {
-    const page = Math.max(1, ...placedSoFar.map((p) => p.frame.page)) + 1;
-    const y0 = g.margin + g.continuationHead;
+  /**
+   * The apart part (box rows across the page, the rest in two columns of
+   * about equal length) from `y0` on `page`. With `only`, null unless all of
+   * it fits on that page. A short rest stays in one column.
+   */
+  const layApart = (page: number, y0: number, only: boolean): Item[] | null => {
     const wide = new Flow(c, () => ({ page, x: g.margin, y: y0, w: width, bottom: bottom(page) }));
     const boxes = apartSections.filter((s) => s.kind === "statBoxes");
-    wide.place(boxes.flatMap((s) => boxRowBlocks(c, s as Section<"statBoxes">)));
-    // The rest in two columns of about equal length: the lowest bottom at which all of it fits in two.
+    if (
+      wide.place(
+        boxes.flatMap((s) => boxRowBlocks(c, s as Section<"statBoxes">)),
+        1,
+      ).length > 0 &&
+      only
+    )
+      return null;
     const rest = apartSections.filter((s) => s.kind !== "statBoxes").flatMap((s) => otherBlocks(c, s));
     const restTop = wide.placed.length > 0 ? wide.at + g.rowGap : y0;
-    const fits = (end: number) => {
+    const fits = (end: number, n = 2) => {
       const f = new Flow(c, (i) => ({
         ...later(page, restTop)(i),
         bottom: Math.min(end, bottom(page + Math.floor(i / 2))),
       }));
-      return f.place(rest, 2).length === 0 ? f : null;
+      return f.place(rest, n).length === 0 ? f : null;
     };
-    let lo = restTop + 10;
-    let hi = bottom(page);
-    let columns = fits(hi);
-    if (columns) {
-      while (hi - lo > 1) {
-        const mid = (lo + hi) / 2;
-        if (fits(mid)) hi = mid;
-        else lo = mid;
+    let columns = fits(Math.min(restTop + SHORT_REST, bottom(page)), 1);
+    if (!columns) {
+      let lo = restTop + 10;
+      let hi = bottom(page);
+      columns = fits(hi);
+      if (columns) {
+        while (hi - lo > 1) {
+          const mid = (lo + hi) / 2;
+          if (fits(mid)) hi = mid;
+          else lo = mid;
+        }
+        columns = fits(hi)!;
+      } else if (only) return null;
+      else {
+        columns = new Flow(c, later(page, restTop));
+        columns.place(rest);
       }
-      columns = fits(hi)!;
-    } else {
-      columns = new Flow(c, later(page, restTop));
-      columns.place(rest);
     }
-    placedSoFar.push(...wide.placed, ...columns.placed);
-  }
+    return [...wide.placed, ...columns.placed];
+  };
+
+  const placedSoFar = [...items, ...left.placed, ...main.placed];
+  // The apart part has a page of its own. Only when it would fill less than 40 % of that page, it
+  // goes under the last page's end if all of it fits there; the notes then keep their lines.
+  const lastPage = Math.max(1, ...placedSoFar.map((p) => p.frame.page));
+  const pageTop = g.margin + g.continuationHead;
+  const own = plan.apartPage ? layApart(lastPage + 1, pageTop, false)! : [];
+  const ownEnd = Math.max(pageTop, ...own.map((p) => p.y + p.block.h(p.frame.w)));
+  const end = Math.max(
+    0,
+    ...placedSoFar.filter((p) => p.frame.page === lastPage).map((p) => p.y + p.block.h(p.frame.w)),
+  );
+  const short =
+    own.every((p) => p.frame.page === lastPage + 1) &&
+    ownEnd - pageTop < 0.4 * (bottom(lastPage + 1) - pageTop);
+  const under = own.length > 0 && short && lastPage > 1 ? layApart(lastPage, end + 2 * g.rowGap, true) : null;
+  if (!under) main.finish();
+  placedSoFar.push(...(under ?? own));
 
   // Per page, in the design's order (the screen's order on a phone); a section's own blocks keep theirs.
   const rank = new Map(plan.order.map((i, k) => [sections[i]!, k]));
