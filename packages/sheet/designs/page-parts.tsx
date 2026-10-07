@@ -31,7 +31,9 @@ export function PageFooter({
     <footer className={`${prefix}__footer`}>
       <span className={`${prefix}__footer-line`}>
         <span className={`${prefix}__footer-who`}>{who}</span>
-        <span className={`${prefix}__footer-rest`}>{rest.map((r) => ` · ${r}`).join("")}</span>
+        {/* Where the line wraps, a dot stays at the end of the line before (a no-break space before it). */}
+        {rest.length > 0 && <span className={`${prefix}__footer-sep`}>{" · "}</span>}
+        <span className={`${prefix}__footer-rest`}>{rest.join("\u00a0· ")}</span>
       </span>
       <span className={`${prefix}__footer-date`}>{model.createdOn}</span>
     </footer>

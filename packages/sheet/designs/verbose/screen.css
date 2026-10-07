@@ -461,6 +461,7 @@
 }
 
 .vsheet__footer-rest,
+.vsheet__footer-sep,
 .vsheet__footer-date {
   flex: none;
   white-space: pre;
