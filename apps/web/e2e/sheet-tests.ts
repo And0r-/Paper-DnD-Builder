@@ -217,8 +217,9 @@ export function sheetTests(device: "phone" | "desk"): void {
       // In the copy, changes go into it: no second copy. A line written in, then crossed out.
       const gear = model.sections.find((s) => s.kind === "list")!;
       await page.getByRole("button", { name: `Zeile dazu bei ${gear.title}` }).click();
-      await page.getByRole("button", { name: `${gear.title}: ${m["sheet.empty"]}. Ändern` }).click();
+      // The new row's first field is ready to type in (AND-207).
       const line = page.getByRole("region", { name: gear.title }).locator("input.sheet-edit");
+      await expect(line).toBeFocused();
       await line.fill("Langes Seil");
       await line.press("Enter");
       await expect(page.getByRole("button", { name: `${gear.title}: Langes Seil. Ändern` })).toBeVisible();
