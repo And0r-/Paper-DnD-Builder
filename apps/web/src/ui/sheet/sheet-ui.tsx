@@ -1,0 +1,234 @@
+"use client";
+/**
+ * What a sheet design draws with (`SheetUi`): texts that turn into an input
+ * at the same place when tapped, places to write and tick, and buttons for
+ * rows. Tap, type, done: Enter, Tab or a tap elsewhere keeps the change,
+ * Escape takes it back. No window, no question, nothing opens below.
+ */
+import {
+  pencilValue,
+  tickAt,
+  ticksOf,
+  withRowAdded,
+  withRowRemoved,
+  withText,
+  writtenOf,
+  type PlayValue,
+} from "@builder/sheet";
+import type { SheetFieldProps, SheetRowProps, SheetTextProps, SheetUi } from "@builder/sheet/designs/screens";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type KeyboardEvent,
+  type ReactNode,
+} from "react";
+import { useApp } from "../app-state.tsx";
+import { Icon } from "../components/Icon.tsx";
+import type { SheetController } from "./sheet-state.ts";
+
+const Ctx = createContext<SheetController | null>(null);
+
+export function SheetUiProvider({ sheet, children }: { sheet: SheetController; children: ReactNode }) {
+  return <Ctx.Provider value={sheet}>{children}</Ctx.Provider>;
+}
+
+function useSheetCtx(): SheetController {
+  const ctx = useContext(Ctx);
+  if (!ctx) throw new Error("sheet ui outside SheetUiProvider");
+  return ctx;
+}
+
+/** A plain number ("12", "+2") brings up the number pad on a phone. */
+const NUMBER = /^[+-−]?\d+$/u;
+
+function SheetText({ path, value, label, multiline }: SheetTextProps) {
+  const { t } = useApp();
+  const sheet = useSheetCtx();
+  const [editing, setEditing] = useState(false);
+  const shown = useRef<HTMLSpanElement>(null);
+  const width = useRef(0);
+  const refocus = useRef(false);
+
+  if (!sheet.editable) return <>{value}</>;
+
+  const stop = (keep: boolean, text: string) => {
+    setEditing(false);
+    if (keep && text !== value) sheet.changeModel((m) => withText(m, path, text));
+    // After Enter or Escape, back on the text, so the keyboard goes on from where it was.
+    if (refocus.current) requestAnimationFrame(() => shown.current?.focus({ preventScroll: true }));
+    refocus.current = false;
+  };
+
+  if (editing) {
+    const common = {
+      className: `sheet-edit${multiline ? " sheet-edit--multiline" : ""}`,
+      defaultValue: value,
+      "aria-label": label,
+      autoFocus: true,
+      onBlur: (e: { currentTarget: { value: string } }) => stop(true, e.currentTarget.value),
+      onKeyDown: (e: KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+        if (e.key === "Escape") {
+          e.preventDefault();
+          refocus.current = true;
+          e.currentTarget.value = value;
+          e.currentTarget.blur();
+        } else if (e.key === "Enter" && !(multiline && e.shiftKey)) {
+          e.preventDefault();
+          refocus.current = true;
+          e.currentTarget.blur();
+        }
+      },
+      onFocus: (e: { currentTarget: HTMLInputElement | HTMLTextAreaElement }) => e.currentTarget.select(),
+      style: { minWidth: `${Math.max(width.current, 24)}px` },
+    };
+    return multiline ? (
+      <textarea {...common} rows={Math.max(1, Math.ceil(value.length / 60))} />
+    ) : (
+      <input {...common} type="text" inputMode={NUMBER.test(value) ? "numeric" : undefined} />
+    );
+  }
+  const begin = () => {
+    width.current = shown.current?.getBoundingClientRect().width ?? 0;
+    setEditing(true);
+  };
+  return (
+    <span
+      ref={shown}
+      className={`sheet-text${value === "" ? " sheet-text--empty" : ""}`}
+      role="button"
+      tabIndex={0}
+      aria-label={t("sheet.change", { label, value: value === "" ? t("sheet.empty") : value })}
+      onClick={begin}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          begin();
+        }
+      }}
+    >
+      {value}
+    </span>
+  );
+}
+
+function SheetField({ field, label, shape = "square", lines }: SheetFieldProps) {
+  const { t } = useApp();
+  const sheet = useSheetCtx();
+  const stored: PlayValue | undefined = sheet.state[field.id];
+
+  if (field.kind === "ticks") {
+    const ticked = ticksOf(stored, field.max);
+    return (
+      <span
+        className={`sheet-ticks sheet-ticks--${shape}`}
+        role="group"
+        aria-label={label}
+        data-field={field.id}
+      >
+        {Array.from({ length: field.max }, (_, i) => (
+          <button
+            key={i}
+            type="button"
+            className="sheet-tick"
+            aria-pressed={i < ticked}
+            aria-label={t("sheet.tick", { label, n: i + 1, max: field.max })}
+            onClick={() => {
+              const next = tickAt(ticked, i);
+              sheet.setField(field.id, next === 0 ? undefined : { checks: next });
+            }}
+          />
+        ))}
+      </span>
+    );
+  }
+  return <WrittenField field={field} label={label} lines={lines} value={writtenOf(stored)} />;
+}
+
+/** A box or lines to write on; kept when left, like the texts. */
+function WrittenField({
+  field,
+  label,
+  lines,
+  value,
+}: Pick<SheetFieldProps, "field" | "label"> & { lines: number | undefined; value: string }) {
+  const sheet = useSheetCtx();
+  const [text, setText] = useState(value);
+  // What another device or a reload brings, unless it is being written in.
+  const focused = useRef(false);
+  useEffect(() => {
+    if (!focused.current) setText(value);
+  }, [value]);
+  const keep = () => {
+    focused.current = false;
+    const next = field.kind === "pencil" ? pencilValue(text) : text.trim() === "" ? undefined : text;
+    if (writtenOf(next) !== value) sheet.setField(field.id, next);
+  };
+  const common = {
+    value: text,
+    "aria-label": label,
+    "data-field": field.id,
+    onChange: (e: { currentTarget: { value: string } }) => setText(e.currentTarget.value),
+    onFocus: () => (focused.current = true),
+    onBlur: keep,
+  };
+  if (field.kind === "text" && lines !== undefined && lines > 0) {
+    return (
+      <textarea
+        {...common}
+        className="sheet-lines"
+        rows={lines}
+        style={{ "--sheet-lines": String(lines) } as CSSProperties}
+      />
+    );
+  }
+  return (
+    <input
+      {...common}
+      type="text"
+      className={field.kind === "pencil" ? "sheet-pencil" : "sheet-write"}
+      inputMode={field.kind === "pencil" ? "numeric" : undefined}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") e.currentTarget.blur();
+      }}
+    />
+  );
+}
+
+function AddRow({ section, label }: SheetRowProps) {
+  const { t } = useApp();
+  const sheet = useSheetCtx();
+  if (!sheet.editable) return null;
+  return (
+    <button
+      type="button"
+      className="sheet-row-add"
+      aria-label={t("sheet.addRowLabel", { section: label })}
+      onClick={() => sheet.changeModel((m) => withRowAdded(m, section))}
+    >
+      <Icon name="plus" size={18} />
+      <span>{t("sheet.addRow")}</span>
+    </button>
+  );
+}
+
+function RemoveRow({ section, row, label }: SheetRowProps & { row: number }) {
+  const { t } = useApp();
+  const sheet = useSheetCtx();
+  if (!sheet.editable) return null;
+  return (
+    <button
+      type="button"
+      className="sheet-row-remove"
+      aria-label={t("sheet.removeRow", { section: label, n: row + 1 })}
+      onClick={() => sheet.changeModel((m) => withRowRemoved(m, section, row))}
+    >
+      <Icon name="close" size={16} />
+    </button>
+  );
+}
+
+export const SHEET_UI: SheetUi = { Text: SheetText, Field: SheetField, AddRow, RemoveRow };

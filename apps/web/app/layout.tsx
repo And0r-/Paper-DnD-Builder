@@ -9,6 +9,8 @@ import "../src/ui/styles/tokens.css";
 import "../src/ui/styles/base.css";
 import "../src/ui/styles/components.css";
 import "../src/ui/styles/flow.css";
+import "../src/ui/styles/sheet.css";
+import "@builder/sheet/designs/verbose/screen.css";
 
 export const viewport: Viewport = {
   width: "device-width",
