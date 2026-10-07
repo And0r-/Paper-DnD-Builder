@@ -1,0 +1,812 @@
+/*
+ * The design "classic" on screen. Measures come from the design's geometry
+ * as --cs-* variables on .csheet; colours and type from the app's tokens.
+ * Phone first: sections as cards, one under the other in the design's
+ * order. From the page width (900 px) on: an A4 page with the three columns
+ * of page 1, the band under them and two columns after.
+ *
+ * The screen's own parts (texts to change, fields to write and tick) take
+ * their sizes from --sheet-tick, --sheet-number and --sheet-touch.
+ */
+
+.csheet {
+  --sheet-tick: var(--target-min);
+  --sheet-touch: var(--target-min);
+  --sheet-number: 1.75rem;
+  color: var(--color-ink);
+  font-family: var(--font-body);
+}
+
+.csheet p,
+.csheet ul,
+.csheet dl,
+.csheet dd,
+.csheet h1,
+.csheet h2 {
+  margin: 0;
+}
+
+.csheet ul {
+  padding: 0;
+  list-style: none;
+}
+
+.csheet__page,
+.csheet__page > div {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.csheet__page > div:empty {
+  display: none;
+}
+
+.csheet__section,
+.csheet__extras {
+  padding: var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-1);
+  min-width: 0;
+}
+
+.csheet__title {
+  margin-bottom: var(--space-2);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-bold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.csheet__label,
+.csheet__box-label,
+.csheet__score-label {
+  color: var(--color-ink-muted);
+  font-size: var(--text-xs);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  overflow-wrap: anywhere;
+}
+
+.csheet__package,
+.csheet__check-note,
+.csheet__feature-note,
+.csheet__marks,
+.csheet__legend,
+.csheet__lead,
+.csheet__start,
+.csheet__pencil-what,
+.csheet__footer {
+  color: var(--color-ink-muted);
+  font-size: var(--text-xs);
+  line-height: var(--text-xs-lh);
+}
+
+/* Header */
+
+.csheet__header {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.csheet__name {
+  font-size: var(--text-2xl);
+  line-height: var(--text-2xl-lh);
+  font-weight: var(--weight-bold);
+}
+
+.csheet__fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr));
+  gap: var(--space-2) var(--space-4);
+}
+
+/* The label comes first for screen readers and stands under its line, as on paper. */
+.csheet__cell,
+.csheet__answer {
+  display: flex;
+  flex-direction: column-reverse;
+  justify-content: flex-start;
+}
+
+.csheet__cell dd {
+  min-height: var(--sheet-touch);
+  border-bottom: 1px solid var(--color-border);
+  font-weight: var(--weight-semibold);
+}
+
+/* Boxes */
+
+.csheet__boxes {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.csheet__box-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(6rem, 1fr));
+  gap: var(--space-2);
+}
+
+.csheet__box-row--pencil {
+  grid-template-columns: 1fr;
+}
+
+.csheet__box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-1);
+  padding: var(--space-2);
+  border: 2px solid var(--color-ink);
+  border-radius: var(--radius-sm);
+  text-align: center;
+  min-width: 0;
+}
+
+.csheet__box--pencil {
+  align-items: stretch;
+  text-align: left;
+}
+
+.csheet__box--pencil .csheet__box-label {
+  text-align: center;
+}
+
+.csheet__box-value {
+  font-size: var(--sheet-number);
+  line-height: 1.2;
+  font-weight: var(--weight-bold);
+}
+
+/* Scores */
+
+.csheet__scores {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(8rem, 1fr));
+  gap: var(--space-2);
+}
+
+.csheet__score {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-1);
+  padding: var(--space-2);
+  border: 2px solid var(--color-ink);
+  border-radius: var(--radius-md);
+  text-align: center;
+}
+
+.csheet__score-label {
+  color: var(--color-ink);
+  font-weight: var(--weight-bold);
+}
+
+.csheet__score-big {
+  font-size: var(--sheet-number);
+  line-height: 1.1;
+  font-weight: var(--weight-bold);
+}
+
+.csheet__score-oval {
+  min-width: 3rem;
+  padding: 0 var(--space-2);
+  border: 2px solid var(--color-ink);
+  border-radius: 999px;
+  font-weight: var(--weight-semibold);
+}
+
+/* Check lists */
+
+.csheet__checks {
+  display: grid;
+}
+
+.csheet__check {
+  display: grid;
+  grid-template-columns: auto auto 1fr auto;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--sheet-touch);
+  border-bottom: 1px solid var(--color-line);
+}
+
+.csheet__check-total {
+  min-width: 2.5rem;
+  border-bottom: 1px solid var(--color-ink);
+  font-weight: var(--weight-bold);
+  text-align: right;
+}
+
+.csheet__dot {
+  width: 0.9rem;
+  height: 0.9rem;
+  box-sizing: border-box;
+  border: 2px solid var(--color-ink);
+  border-radius: 50%;
+}
+
+.csheet__dot--on {
+  background: var(--color-ink);
+}
+
+.csheet__dot--strong {
+  outline: 2px solid var(--color-ink);
+  outline-offset: 2px;
+}
+
+.csheet__legend {
+  margin-top: var(--space-2);
+}
+
+/* Tables */
+
+.csheet__table-wrap {
+  overflow-x: auto;
+}
+
+.csheet__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+}
+
+.csheet__table th,
+.csheet__table td {
+  padding: var(--space-1);
+  border-bottom: 1px solid var(--color-line);
+  text-align: left;
+  vertical-align: top;
+}
+
+.csheet__table thead th {
+  color: var(--color-ink-muted);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-regular);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.csheet__table td:not(.csheet__wrap) {
+  white-space: nowrap;
+}
+
+.csheet__row-tools {
+  width: 1px;
+}
+
+/* Features */
+
+.csheet__lead {
+  margin-bottom: var(--space-2);
+}
+
+.csheet__group {
+  margin-top: var(--space-3);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-bold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.csheet__feature-wrap {
+  position: relative;
+  padding-right: var(--sheet-touch);
+}
+
+/* The screen's button to cross a row out, at the row's end. */
+.csheet__feature-wrap > :last-child:not(.csheet__feature) {
+  position: absolute;
+  top: 0;
+  right: 0;
+}
+
+.csheet__feature {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  grid-template-areas:
+    "name marks uses"
+    "text text text";
+  gap: var(--space-1) var(--space-2);
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--color-line);
+}
+
+.csheet__feature-name {
+  grid-area: name;
+  display: flex;
+  flex-direction: column;
+}
+
+.csheet__feature-title {
+  font-weight: var(--weight-semibold);
+}
+
+.csheet__marks {
+  grid-area: marks;
+  font-weight: var(--weight-bold);
+}
+
+.csheet__feature-text {
+  grid-area: text;
+}
+
+.csheet__uses {
+  grid-area: uses;
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--text-xs);
+}
+
+/* Lists, answers, lines */
+
+.csheet__list li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--sheet-touch);
+  border-bottom: 1px solid var(--color-line);
+}
+
+.csheet__list li > :first-child {
+  flex: 1;
+}
+
+.csheet__answers {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.csheet__answer dd {
+  border-bottom: 1px solid var(--color-border);
+}
+
+.csheet__open {
+  min-height: var(--sheet-touch);
+}
+
+.csheet__lines {
+  height: calc(var(--cs-lines) * 2.25rem);
+  background: repeating-linear-gradient(
+    to bottom,
+    transparent 0,
+    transparent calc(2.25rem - 1px),
+    var(--color-border) calc(2.25rem - 1px),
+    var(--color-border) 2.25rem
+  );
+}
+
+.csheet__footer {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+/* ---------------------------------------------------------- the A4 page */
+
+@media (min-width: 900px) {
+  .csheet {
+    /* As on paper, but never below what a pointer can hit (24 px, WCAG 2.2). */
+    --sheet-tick: max(var(--cs-square), 24px);
+    --sheet-touch: auto;
+    --sheet-number: var(--cs-mid);
+    font-size: var(--cs-body);
+    line-height: 1.25;
+  }
+
+  .csheet__page {
+    display: grid;
+    grid-template-columns: var(--cs-a) var(--cs-b) var(--cs-c);
+    grid-template-areas:
+      "head head head"
+      "a b cluster"
+      "a b c"
+      "band band c"
+      "more more more"
+      "apart apart apart"
+      "foot foot foot";
+    grid-template-rows: auto auto auto 1fr;
+    gap: 4mm var(--cs-gap);
+    align-content: start;
+    box-sizing: border-box;
+    width: var(--cs-page-w);
+    min-height: var(--cs-page-h);
+    margin: 0 auto;
+    padding: var(--cs-margin);
+    background: #fff;
+    color: #000;
+    box-shadow: var(--shadow-2);
+  }
+
+  .csheet__page > div {
+    gap: var(--cs-row-gap);
+  }
+
+  .csheet__head {
+    grid-area: head;
+  }
+
+  .csheet__cluster {
+    grid-area: cluster;
+  }
+
+  .csheet__a {
+    grid-area: a;
+  }
+
+  .csheet__b {
+    grid-area: b;
+  }
+
+  .csheet__c {
+    grid-area: c;
+  }
+
+  .csheet__band {
+    grid-area: band;
+    align-self: end;
+  }
+
+  .csheet__footer {
+    grid-area: foot;
+  }
+
+  /* After page 1: two columns, as on page 2 of the PDF. */
+  .csheet__page > .csheet__more {
+    grid-area: more;
+    display: block;
+    columns: 2;
+    column-gap: var(--cs-column-gap);
+  }
+
+  .csheet__page > .csheet__apart {
+    grid-area: apart;
+    display: block;
+    columns: 2;
+    column-gap: var(--cs-column-gap);
+    padding-top: 6mm;
+  }
+
+  .csheet__apart > .csheet__section--statBoxes {
+    column-span: all;
+  }
+
+  .csheet__more > .csheet__section,
+  .csheet__apart > .csheet__section {
+    margin-bottom: var(--cs-row-gap);
+  }
+
+  .csheet__more .csheet__feature-wrap,
+  .csheet__more .csheet__answer,
+  .csheet__apart .csheet__feature-wrap {
+    break-inside: avoid;
+  }
+
+  .csheet__section,
+  .csheet__extras {
+    padding: 0;
+    border-radius: 0;
+    background: none;
+    box-shadow: none;
+  }
+
+  .csheet__title {
+    min-height: 24px;
+    margin-bottom: 1.4mm;
+    padding-bottom: 0.4mm;
+    border-bottom: 0.3mm solid #222;
+    font-size: var(--cs-sectionTitle);
+  }
+
+  .csheet__label,
+  .csheet__box-label,
+  .csheet__package,
+  .csheet__check-note,
+  .csheet__feature-note,
+  .csheet__marks,
+  .csheet__legend,
+  .csheet__lead,
+  .csheet__start,
+  .csheet__pencil-what,
+  .csheet__table thead th,
+  .csheet__uses,
+  .csheet__footer {
+    color: #333;
+    font-size: var(--cs-min);
+    line-height: 1.2;
+  }
+
+  /* The boxes at the table and the scores have no title on paper; screen readers keep it. */
+  .csheet__cluster .csheet__title,
+  .csheet__a .csheet__title,
+  .csheet__b .csheet__section--statBoxes .csheet__title {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  /* Header */
+
+  .csheet__header {
+    grid-template-columns: var(--cs-name-w) 1fr;
+    gap: 0 4mm;
+  }
+
+  .csheet__package {
+    grid-column: 1 / -1;
+    text-align: right;
+  }
+
+  .csheet__name {
+    padding-bottom: 0.4mm;
+    border-bottom: 0.2mm solid #222;
+    font-size: var(--cs-name);
+    line-height: 1.15;
+  }
+
+  .csheet__summary {
+    margin-top: 1.5mm;
+    font-size: var(--cs-summary);
+  }
+
+  .csheet__fields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 2mm 3mm;
+    padding: 1.5mm 2mm;
+    border: 0.2mm solid #222;
+    border-radius: var(--cs-radius);
+  }
+
+  .csheet__cell dd {
+    min-height: 0;
+    border-bottom: 0.15mm solid #9a9a9a;
+    font-size: var(--cs-value);
+  }
+
+  /* Boxes */
+
+  .csheet__boxes {
+    gap: var(--cs-box-gap);
+  }
+
+  .csheet__box-row {
+    grid-template-columns: repeat(auto-fill, minmax(20mm, 1fr));
+    gap: var(--cs-box-gap);
+  }
+
+  .csheet__box-row--pencil {
+    grid-template-columns: 1fr;
+  }
+
+  .csheet__box {
+    min-height: var(--cs-number-h);
+    padding: 1.2mm 1mm;
+    border-width: 0.2mm;
+    border-color: #222;
+    border-radius: var(--cs-radius);
+  }
+
+  .csheet__box--pencil {
+    min-height: var(--cs-pencil-h);
+  }
+
+  .csheet__box--circles,
+  .csheet__box--boxes {
+    min-height: var(--cs-marks-h);
+  }
+
+  .csheet__box-label {
+    font-size: var(--cs-label);
+  }
+
+  .csheet__box--boxes .csheet__box-value {
+    font-size: var(--cs-value);
+  }
+
+  /* After the score column, in column B: the number in a small box, the name beside it. */
+  .csheet__b .csheet__box-row--numbers {
+    grid-template-columns: 1fr;
+  }
+
+  .csheet__b .csheet__box--number {
+    display: grid;
+    grid-template-columns: var(--cs-side-w) 1fr;
+    align-items: center;
+    min-height: var(--cs-side-h);
+    padding: 0;
+    border: 0;
+    text-align: left;
+  }
+
+  .csheet__b .csheet__box--number .csheet__box-value {
+    display: grid;
+    place-items: center;
+    height: var(--cs-side-h);
+    border: 0.2mm solid #222;
+    border-radius: 1.2mm;
+  }
+
+  .csheet__b .csheet__box--number .csheet__box-label {
+    padding: 1mm 2mm;
+    border: 0.2mm solid #222;
+    border-left: 0;
+    border-radius: 0 1mm 1mm 0;
+    color: #000;
+    font-weight: var(--weight-bold);
+    letter-spacing: 0.08em;
+  }
+
+  /* Scores */
+
+  .csheet__scores {
+    grid-template-columns: 1fr;
+    gap: 2.5mm;
+  }
+
+  .csheet__score {
+    grid-template-rows: auto 1fr auto;
+    min-height: var(--cs-score-h);
+    padding: 1.2mm 1mm 1.5mm;
+    border-width: 0.2mm;
+    border-color: #222;
+    border-radius: 2mm;
+  }
+
+  .csheet__score-label {
+    font-size: var(--cs-sectionTitle);
+    letter-spacing: 0.08em;
+  }
+
+  .csheet__score-big {
+    align-self: center;
+    font-size: var(--cs-bigValue);
+  }
+
+  .csheet__score-oval {
+    min-width: var(--cs-oval-w);
+    min-height: var(--cs-oval-h);
+    box-sizing: border-box;
+    padding: 0 1mm;
+    border-width: 0.2mm;
+    font-size: var(--cs-value);
+  }
+
+  /* Check lists in a frame, the title at the bottom */
+
+  .csheet__extras,
+  .csheet__b .csheet__section--checkList {
+    display: flex;
+    flex-direction: column;
+    padding: 1.5mm 2mm;
+    border: 0.2mm solid #222;
+    border-radius: var(--cs-radius);
+  }
+
+  .csheet__b .csheet__section--checkList .csheet__title {
+    order: 1;
+    margin: 1mm 0 0;
+    border: 0;
+    text-align: center;
+  }
+
+  .csheet__title--center {
+    border: 0;
+    text-align: center;
+  }
+
+  .csheet__check {
+    gap: 1.5mm;
+    min-height: var(--cs-row);
+    border-bottom: 0;
+  }
+
+  .csheet__check-total {
+    min-width: 6.5mm;
+    border-bottom-width: 0.15mm;
+    font-size: var(--cs-value);
+  }
+
+  .csheet__dot {
+    width: var(--cs-dot);
+    height: var(--cs-dot);
+    border-width: 0.2mm;
+  }
+
+  /* Tables */
+
+  .csheet__table {
+    border-collapse: separate;
+    border-spacing: 1mm 0.6mm;
+    font-size: var(--cs-value);
+  }
+
+  .csheet__table th,
+  .csheet__table td {
+    padding: 0.6mm 1mm;
+    border: 0.15mm solid #9a9a9a;
+  }
+
+  .csheet__table thead th,
+  .csheet__table thead td,
+  .csheet__row-tools {
+    border: 0;
+  }
+
+  .csheet__table tbody th {
+    font-size: var(--cs-rowName);
+  }
+
+  /* Features */
+
+  .csheet__feature-wrap {
+    padding-right: 0;
+  }
+
+  .csheet__feature-wrap > :last-child:not(.csheet__feature) {
+    right: -7mm;
+  }
+
+  .csheet__feature {
+    grid-template-columns: minmax(0, 36%) auto 1fr auto;
+    grid-template-areas: "name marks text uses";
+    gap: 0 1.5mm;
+    padding: 0.6mm 0 0.8mm;
+    border-bottom: 0.1mm solid #9a9a9a;
+  }
+
+  .csheet__feature-title {
+    font-size: var(--cs-rowName);
+  }
+
+  .csheet__group {
+    margin-top: 1.2mm;
+    font-size: var(--cs-min);
+  }
+
+  /* Lists and answers on lines */
+
+  .csheet__list ul {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    column-gap: 3mm;
+  }
+
+  .csheet__list li {
+    min-height: var(--cs-list-line);
+    border-bottom: 0.15mm solid #9a9a9a;
+  }
+
+  .csheet__answer dd {
+    min-height: 5mm;
+    border-bottom: 0.15mm solid #9a9a9a;
+    font-size: var(--cs-value);
+    font-weight: var(--weight-semibold);
+  }
+
+  .csheet__open {
+    min-height: 10mm;
+  }
+
+  .csheet__lines {
+    height: calc(var(--cs-lines) * var(--cs-line));
+    background: repeating-linear-gradient(
+      to bottom,
+      transparent 0,
+      transparent calc(var(--cs-line) - 0.15mm),
+      #9a9a9a calc(var(--cs-line) - 0.15mm),
+      #9a9a9a var(--cs-line)
+    );
+  }
+
+  .csheet__footer {
+    align-self: end;
+    padding-top: 1mm;
+    border-top: 0.1mm solid #999;
+  }
+}

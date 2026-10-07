@@ -7,6 +7,7 @@
  */
 import type { ComponentType } from "react";
 import { SHEET_DESIGNS } from "../src/printouts.ts";
+import { ClassicSheet } from "./classic/screen.tsx";
 import type { SheetScreenProps } from "./types.ts";
 import { VerboseSheet } from "./verbose/screen.tsx";
 
@@ -14,6 +15,7 @@ export type { SheetFieldProps, SheetRowProps, SheetScreenProps, SheetTextProps, 
 
 export const SCREEN_DESIGNS: Readonly<Record<string, ComponentType<SheetScreenProps>>> = {
   verbose: VerboseSheet,
+  classic: ClassicSheet,
 };
 
 /** The screen of design `id`, or of the default design for one this build does not draw. */
