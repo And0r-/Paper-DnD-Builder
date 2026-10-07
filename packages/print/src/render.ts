@@ -16,6 +16,7 @@ import {
   inFileOrder,
   MESSAGES,
   SHEET_DESIGNS,
+  withCardsAsSheet,
   type Card,
   type Messages,
   type PlayState,
@@ -579,7 +580,8 @@ export async function renderPdf(model: SheetModel, options: RenderOptions = {}):
   });
 
   const pen = new Pen(doc, model.language, m, fonts);
-  pen.play = options.play ?? {};
+  // The screen ticks the sheet; a card shows the same ticks as the sheet's row of its thing.
+  pen.play = withCardsAsSheet(model, options.play ?? {});
   const grid: Grid = { pen, g: geometry, st: gridStyles(geometry) };
   const sheetBottom = contentBottom(geometry);
 

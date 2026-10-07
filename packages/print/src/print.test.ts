@@ -1931,6 +1931,22 @@ describe("the verbose design: original and copy, empty and filled", () => {
     expect(Buffer.from(filled.bytes).equals(Buffer.from(plain.bytes))).toBe(false);
   });
 
+  it("ticks a card's use boxes as the sheet's row of the same thing, unless the card has its own", async () => {
+    const model = buildSheetModel(pkg, lantern20(), { language: "en", createdAt });
+    const rows = model.sections.flatMap((s) => (s.kind === "featureTable" ? s.rows : []));
+    const card = model.cards.find((c) => c.usesField && rows.some((r) => r.id === c.id && r.usesField))!;
+    expect(card).toBeDefined();
+    const row = rows.find((r) => r.id === card.id)!;
+    const pdf = await renderPdf(model, { play: { [row.usesField!]: { checks: 1 } } });
+    expect(pdf.fields.find((f) => f.id === card.usesField)).toMatchObject({ ticks: 1 });
+    const own = await renderPdf(model, {
+      play: { [row.usesField!]: { checks: 1 }, [card.usesField!]: { checks: 2 } },
+    });
+    expect(own.fields.find((f) => f.id === card.usesField)?.ticks).toBe(
+      Math.min(2, "boxes" in card.uses! ? card.uses.boxes : 0),
+    );
+  });
+
   it("fills a copy with the same play state: a field of the player's own row too", async () => {
     const original = buildSheetModel(pkg, river3(), { language: "de", createdAt });
     const copy = keptCopy(original, "Meine Fassung vom 6. Oktober 2026");
