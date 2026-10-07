@@ -44,6 +44,26 @@ describe("migrate", () => {
     expect(rows.map((r) => r.id)).toEqual(migrations.map((m) => m.id));
   });
 
+  it("names the access keys made before names, by the day they were made", async () => {
+    const migrations = await loadMigrations(new URL("../migrations/", import.meta.url));
+    const at = migrations.findIndex((m) => m.id === "0008_access_key_names");
+    await migrate(db, migrations.slice(0, at));
+    await db.query(
+      `INSERT INTO accounts (id, email, password_hash, language, created_at)
+       VALUES ('00000000-0000-4000-8000-000000000001', 'a@example.org', 'x', 'de', now())`,
+    );
+    await db.query(
+      `INSERT INTO access_keys (id, account_id, key_hash, hint, created_at)
+       VALUES ('00000000-0000-4000-8000-000000000002', '00000000-0000-4000-8000-000000000001',
+               'h', 'cbk_abcdef', '2026-10-04T23:30:00Z')`,
+    );
+
+    await migrate(db, migrations);
+
+    const rows = await db.query("SELECT name, expires_at, kind FROM access_keys");
+    expect(rows).toEqual([{ name: "2026-10-04", expires_at: null, kind: "personal" }]);
+  });
+
   it("is idempotent", async () => {
     const migrations = [migration("0001_a", "CREATE TABLE a (x int)")];
     await migrate(db, migrations);

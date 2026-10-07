@@ -140,7 +140,7 @@ export function createApiHandler(app: App, routes: Route[] = ROUTES): (req: Requ
 async function loadSession(app: App, req: Request, out: Headers): Promise<Session | undefined> {
   const key = readBearerKey(req.headers.get("authorization"));
   if (key !== undefined) {
-    const found = key === null ? undefined : await app.store.findAccountByKey(accessKeyHash(key));
+    const found = key === null ? undefined : await app.store.findAccountByKey(accessKeyHash(key), app.now());
     return found && { id: found.key_id, via: "key", account: found.account };
   }
   const secure = app.config.secureCookies;

@@ -5,8 +5,12 @@
  * A key is 256 random bits, like a session token, so it cannot be guessed
  * and needs no slow hash or attempt limit: the database stores its SHA-256
  * only, and a leaked database holds no usable key. The key is shown once,
- * when it is made; the owner sees the first characters (`hint`) and the
- * date in the list and can withdraw a key at any time.
+ * when it is made; the owner sees its name, the first characters (`hint`)
+ * and the date in the list and can withdraw a key at any time.
+ *
+ * A key may carry an end (`expires_at`); past it, the key is refused like a
+ * withdrawn one. Nothing sets an end yet: it is there for keys a later
+ * assistant in the web screens makes for itself.
  */
 import { createHash, randomBytes } from "node:crypto";
 
@@ -18,6 +22,9 @@ const HINT_LENGTH = KEY_PREFIX.length + 6;
 
 /** Enough for every tool someone uses; stops a loop from filling the table. */
 export const MAX_KEYS_PER_ACCOUNT = 20;
+
+/** Longest name of a key, in characters; the database checks it too. */
+export const MAX_KEY_NAME = 80;
 
 export function newAccessKey(): string {
   return KEY_PREFIX + randomBytes(32).toString("base64url");

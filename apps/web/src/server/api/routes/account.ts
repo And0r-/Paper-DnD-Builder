@@ -1,7 +1,13 @@
 import { randomUUID } from "node:crypto";
 import { printChoiceOf, printChoiceSchema, SHEET_DESIGNS } from "@builder/sheet/printouts";
 import { z } from "zod";
-import { accessKeyHash, accessKeyHint, MAX_KEYS_PER_ACCOUNT, newAccessKey } from "../../auth/access-keys.ts";
+import {
+  accessKeyHash,
+  accessKeyHint,
+  MAX_KEY_NAME,
+  MAX_KEYS_PER_ACCOUNT,
+  newAccessKey,
+} from "../../auth/access-keys.ts";
 import { publicAccount, renewPassword, UI_LANGUAGES } from "../../auth/accounts.ts";
 import { clearSessionCookie } from "../../auth/session.ts";
 import { HttpError, json, readJson } from "../http.ts";
@@ -10,7 +16,23 @@ import type { AccessKeyRow } from "../../store.ts";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
-const publicKey = (k: AccessKeyRow) => ({ id: k.id, hint: k.hint, createdAt: k.created_at.toISOString() });
+const publicKey = (k: AccessKeyRow) => ({
+  id: k.id,
+  name: k.name,
+  hint: k.hint,
+  createdAt: k.created_at.toISOString(),
+});
+
+const newKeySchema = z.strictObject({
+  /** What the key is for, in the owner's words ("the laptop at home"). Shown in the list only. */
+  name: z
+    .string()
+    .trim()
+    .min(1)
+    .max(MAX_KEY_NAME)
+    // eslint-disable-next-line no-control-regex -- a name is one line of plain text
+    .refine((s) => !/[\u0000-\u001f\u007f]/.test(s), "no control characters"),
+});
 
 const settingsSchema = z.strictObject({
   language: z.enum(UI_LANGUAGES).optional(),
@@ -88,13 +110,14 @@ export const accountRoutes: Route[] = [
       // Only the person makes keys: a key that leaked cannot make itself a successor
       // that outlives withdrawing it.
       if (session.via === "key") throw new HttpError(403, "keyCannotMakeKeys");
-      await readJson(ctx.req, z.strictObject({}));
+      const { name } = await readJson(ctx.req, newKeySchema);
       const key = newAccessKey();
       const row = await ctx.app.store.createAccessKey(
         {
           id: randomUUID(),
           account_id: session.account.id,
           key_hash: accessKeyHash(key),
+          name,
           hint: accessKeyHint(key),
           created_at: ctx.app.now(),
         },
