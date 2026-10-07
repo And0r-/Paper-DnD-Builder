@@ -630,6 +630,7 @@
     "value.witHold.explain": "Add this number when you hold fast against something with wit.",
     "value.heartHold.explain": "Add this number when you hold fast against something with heart.",
     "sheet.scores.hold": "Hold fast",
+    "sheet.scores.bonus": "Bonus",
     "value.restDice.name": "Rest dice",
     "value.restDice.explain": "When you rest, roll some and get that much stamina back.",
     "value.restDie.name": "Size of rest dice",

@@ -120,9 +120,14 @@ test.describe("at a desk", () => {
     await expect
       .poll(() => sheet.locator(".vsheet__footer").count())
       .toBe(await pdfPages(page, id, "verbose"));
-    const paper = await box(sheet.locator(".vsheet__paper").first());
-    const rolls = await box(sheet.locator("[data-section=rolls]"));
-    expect(rolls.y + rolls.height).toBeLessThanOrEqual(paper.y + paper.height);
+    // Until the PDF's places come from the server the screen packs by its own heights, which
+    // may put the rolls on page 2 for a moment: wait for the PDF's.
+    const overhang = async () => {
+      const paper = await box(sheet.locator(".vsheet__paper").first());
+      const rolls = await box(sheet.locator("[data-section=rolls]"));
+      return rolls.y + rolls.height - (paper.y + paper.height);
+    };
+    await expect.poll(overhang).toBeLessThanOrEqual(0);
   });
 
   test("classic, a copy with many rows: page 1 stays A4, the gear goes on under its title, continued", async ({

@@ -145,6 +145,39 @@ test.describe("at a desk", () => {
     expect(await help.evaluate((e) => (e as HTMLElement).innerText)).toMatch(/\n2\.\s/u);
   });
 
+  test("verbose: the scores' circles one under the other, nothing past its column (AND-223)", async ({
+    page,
+  }) => {
+    const sheet = await openSheet(page, await level20(page), "verbose");
+    const column = sheet.locator(".vsheet__section--scoreColumn");
+    const lefts = await column
+      .locator(".vsheet__score-derived")
+      .evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().left)));
+    expect(lefts.length).toBeGreaterThan(1);
+    expect(new Set(lefts).size).toBe(1);
+    const right = (await box(column)).x + (await box(column)).width;
+    for (const s of await column.locator(".vsheet__score").all()) {
+      const b = await box(s);
+      expect(b.x + b.width).toBeLessThanOrEqual(right + 1);
+    }
+    // A check's number stays in its row, not over the dot of the column beside it.
+    // Dot, name and number on one line; where the number comes from below them.
+    const middle = (b: { y: number; height: number }) => b.y + b.height / 2;
+    for (const row of await sheet.locator(".vsheet__check").all()) {
+      const [r, total] = [await box(row), await box(row.locator(".vsheet__check-total"))];
+      expect(total.x + total.width).toBeLessThanOrEqual(r.x + r.width + 1);
+      const [dot, name] = [
+        await box(row.locator(".vsheet__dot")),
+        await box(row.locator(".vsheet__check-name")),
+      ];
+      expect(Math.abs(middle(dot) - middle(total))).toBeLessThan(3);
+      expect(Math.abs(middle(name) - middle(total))).toBeLessThan(3);
+      const parts = row.locator(".vsheet__check-parts");
+      if ((await parts.count()) > 0)
+        expect((await box(parts)).y).toBeGreaterThanOrEqual(total.y + total.height - 1);
+    }
+  });
+
   test("the download dialog fits a window 900 px high", async ({ page }) => {
     await openSheet(page, await level20(page), "verbose");
     await page.getByRole("button", { name: m["sheet.download"] }).click();

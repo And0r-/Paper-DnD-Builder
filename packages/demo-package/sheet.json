@@ -84,24 +84,28 @@
         {
           "value": "might",
           "derived": "mightBonus",
+          "derivedLabel": "sheet.scores.bonus",
           "extra": "mightHold",
           "extraLabel": "sheet.scores.hold"
         },
         {
           "value": "grace",
           "derived": "graceBonus",
+          "derivedLabel": "sheet.scores.bonus",
           "extra": "graceHold",
           "extraLabel": "sheet.scores.hold"
         },
         {
           "value": "wit",
           "derived": "witBonus",
+          "derivedLabel": "sheet.scores.bonus",
           "extra": "witHold",
           "extraLabel": "sheet.scores.hold"
         },
         {
           "value": "heart",
           "derived": "heartBonus",
+          "derivedLabel": "sheet.scores.bonus",
           "extra": "heartHold",
           "extraLabel": "sheet.scores.hold"
         }
