@@ -171,6 +171,7 @@
       "id": "knacks",
       "kind": "featureTable",
       "span": 8,
+      "apart": true,
       "things": {
         "kind": "knack"
       },
@@ -218,6 +219,7 @@
       "id": "lantern-slots",
       "kind": "statBoxes",
       "span": 12,
+      "apart": true,
       "when": "has('calling.lantern-bearer')",
       "boxes": [
         {
@@ -256,6 +258,7 @@
       "id": "lantern-slots-high",
       "kind": "statBoxes",
       "span": 12,
+      "apart": true,
       "boxes": [
         {
           "value": "lanternSlots6",
@@ -296,6 +299,7 @@
       "id": "mastery",
       "kind": "answers",
       "span": 4,
+      "apart": true,
       "when": "has('calling.lantern-bearer') and level >= 18",
       "choices": ["lantern-mastery"]
     },

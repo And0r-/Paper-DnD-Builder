@@ -129,7 +129,7 @@ describe("cross-file rules", () => {
     [
       "format version",
       (f) => (f.get("manifest.json").formatVersion = "0.3"),
-      "manifest.json formatVersion: package is written for format 0.3, this builder understands 0.16",
+      "manifest.json formatVersion: package is written for format 0.3, this builder understands 0.18",
     ],
     [
       "duplicate thing",
@@ -1143,5 +1143,24 @@ describe("card lines by origin (format 0.16)", () => {
     const r = mutate(change);
     expect(r.ok).toBe(false);
     expect(messages(r)).toContain(expected);
+  });
+});
+
+describe("sections apart (format 0.18)", () => {
+  const knacks = (f: RawFiles) => f.get("sheet.json").sections.find((s: { id: string }) => s.id === "knacks");
+
+  it("accepts the demo package's apart sections, and a package without them", () => {
+    expect(mutate(() => {}).ok).toBe(true);
+    expect(
+      mutate((f) => {
+        for (const s of f.get("sheet.json").sections) delete s.apart;
+      }).ok,
+    ).toBe(true);
+  });
+
+  it("rejects an apart that is not true or false", () => {
+    const r = mutate((f) => (knacks(f).apart = "page"));
+    expect(r.ok).toBe(false);
+    expect(messages(r).some((m) => m.startsWith("sheet.json sections[") && m.includes(".apart"))).toBe(true);
   });
 });

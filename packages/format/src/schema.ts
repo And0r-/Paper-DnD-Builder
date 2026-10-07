@@ -453,6 +453,8 @@ const sectionBase = {
   span,
   /** Section is printed only while this expression is true (title included). */
   when: expr.optional(),
+  /** Section belongs to a part of the sheet of its own; a design may set such parts apart. */
+  apart: z.boolean().optional(),
 };
 const statKey = z.string().regex(VALUE_ID_PATTERN, "stat keys are camelCase");
 

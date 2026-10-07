@@ -69,6 +69,8 @@ export const featureRowSchema = z.strictObject({
 const sectionBase = {
   id: z.string(),
   span: z.number().int().min(1),
+  /** The package sets this section apart (format `apart`); only some designs show it so. */
+  apart: z.boolean().optional(),
   title: text,
   hint: text,
 };
