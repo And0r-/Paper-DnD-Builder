@@ -133,7 +133,7 @@ describe("where the PDF breaks the sheet's pages", () => {
     const pdf = await renderPdf(model, { parts: ["sheet"], design: "verbose" });
     expect(res.json.pages).toBe(pdf.sheetPages);
     expect(res.json.sections).toHaveLength(model.sections.length);
-    expect(res.json.sections[0]).toEqual({ page: 0, col: 0 });
+    expect(res.json.sections[0]).toEqual({ page: 0, col: 0, cols: [0] });
 
     expect((await client.call("POST", `/api/drafts/${id}/sheet-places`, { model, design: "x" })).status).toBe(
       400,

@@ -72,7 +72,7 @@ for (const lang of ["de", "en"] as const) {
     await expect(part("print.sheet")).toBeChecked();
     await expect(part("print.cards")).not.toBeChecked();
     await expect(part("print.texts")).not.toBeChecked();
-    await expect(dialog.getByText(m["print.versionOriginal"])).toBeVisible();
+    await expect(dialog.getByText(m["sheet.original"])).toBeVisible();
     await expect(dialog.getByRole("checkbox", { name: m["print.state"] })).not.toBeChecked();
     await expect(dialog.getByRole("combobox", { name: m["print.version"] })).toHaveCount(0);
     const design = (name: string) => dialog.getByRole("radio", { name, exact: true });

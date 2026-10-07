@@ -11,7 +11,14 @@ import { ClassicSheet } from "./classic/screen.tsx";
 import type { SheetScreenProps } from "./types.ts";
 import { VerboseSheet } from "./verbose/screen.tsx";
 
-export type { SheetFieldProps, SheetRowProps, SheetScreenProps, SheetTextProps, SheetUi } from "./types.ts";
+export type {
+  PrintPlaces,
+  SheetFieldProps,
+  SheetRowProps,
+  SheetScreenProps,
+  SheetTextProps,
+  SheetUi,
+} from "./types.ts";
 
 export const SCREEN_DESIGNS: Readonly<Record<string, ComponentType<SheetScreenProps>>> = {
   verbose: VerboseSheet,

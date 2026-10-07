@@ -385,12 +385,22 @@
 
 /* Lists, answers, help, lines */
 
+/* An entry a line; what the play state writes goes on lines of the same height right under it. */
+.vsheet__list {
+  --list-pitch: calc(var(--sheet-touch) + 1px);
+}
+
 .vsheet__list li {
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  min-height: var(--sheet-touch);
+  box-sizing: border-box;
+  min-height: var(--list-pitch);
   border-bottom: 1px solid var(--color-line);
+}
+
+.vsheet__list .sheet-lines {
+  --sheet-pitch: var(--list-pitch);
 }
 
 .vsheet__list li > :first-child {
@@ -750,9 +760,19 @@
     font-size: var(--vs-fieldName);
   }
 
+  /* Equal columns, but a box with many marks (rest dice) as wide as half of them in a row. */
   .vsheet__boxes {
-    grid-template-columns: repeat(var(--vs-boxes), minmax(0, 1fr));
+    grid-template-columns: repeat(var(--vs-boxes), minmax(auto, 1fr));
     gap: var(--vs-box-gap);
+  }
+
+  .vsheet__box--boxes,
+  .vsheet__box--circles {
+    min-width: calc(var(--sheet-per-row, 1) * (var(--sheet-tick) + 6px) - 6px + 3mm + 0.6mm);
+  }
+
+  .vsheet__box .sheet-ticks {
+    max-width: calc(var(--sheet-per-row, 1) * (var(--sheet-tick) + 6px) - 6px);
   }
 
   .vsheet__box {
@@ -885,8 +905,11 @@
     font-size: 7.5pt;
   }
 
+  .vsheet__list {
+    --list-pitch: max(var(--vs-line), 25px);
+  }
+
   .vsheet__list li {
-    min-height: var(--vs-line);
     border-bottom: 0.1mm solid #bbb;
   }
 

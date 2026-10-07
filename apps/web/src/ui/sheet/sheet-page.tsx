@@ -9,8 +9,10 @@
  * bar has only the menu, the name and "saved"; the tools are the group
  * "Sheet" at the top of the app's menu.
  */
+import type { SheetModel } from "@builder/sheet";
 import { cardCount } from "@builder/sheet/cards";
 import { screenDesign } from "@builder/sheet/designs/screens";
+import type { PrintPlaces } from "@builder/sheet/designs/screens";
 import { SHEET_DESIGNS, type PrintChoice } from "@builder/sheet/printouts";
 import { useEffect, useId, useMemo, useState, type ReactNode } from "react";
 import { LANGUAGE_NAMES, UI_LANGUAGES, isUiLanguage } from "../../i18n/index.ts";
@@ -70,6 +72,8 @@ export function SheetPage() {
 
   const design = account?.print.design ?? SHEET_DESIGNS[0]!.id;
   const Design = screenDesign(design);
+  const nameOnSheet = useNameInView(sheet.model !== null, design);
+  const places = usePrintPlaces(draft.id, sheet.model, design);
   const finished = draft.status === "finished";
   const canRaise = finished && ev.level < lp.pkg.flow.level.max;
   const tools = {
@@ -93,7 +97,12 @@ export function SheetPage() {
 
   return (
     <AppShell
-      title={<span className="sheet-topbar__name">{name ?? t("common.unnamed")}</span>}
+      // The name once at the top: in the bar only once the sheet's own has scrolled away.
+      title={
+        <span className="sheet-topbar__name" hidden={nameOnSheet}>
+          {name ?? t("common.unnamed")}
+        </span>
+      }
       status={<SaveLine sheet={sheet} />}
       menuExtra={<SheetTools {...tools} variant="menu" />}
       wide
@@ -111,7 +120,7 @@ export function SheetPage() {
         <SheetBody sheet={sheet} draftId={draft.id}>
           {sheet.model && (
             <SheetUiProvider sheet={sheet}>
-              <Design model={sheet.model} ui={SHEET_UI} />
+              <Design model={sheet.model} ui={SHEET_UI} places={places} />
             </SheetUiProvider>
           )}
         </SheetBody>
@@ -126,6 +135,47 @@ export function SheetPage() {
       />
     </AppShell>
   );
+}
+
+/**
+ * Where the PDF breaks the pages of the sheet as shown, for the design to
+ * break its pages on screen there too: asked a short pause after the model
+ * or the design last changed. Null until known, or when asking failed (the design
+ * then breaks by its own rule).
+ */
+function usePrintPlaces(draftId: string, model: SheetModel | null, design: string): PrintPlaces | null {
+  const [places, setPlaces] = useState<{ design: string; places: PrintPlaces } | null>(null);
+  useEffect(() => {
+    if (!model) return;
+    let gone = false;
+    const timer = setTimeout(() => {
+      api<PrintPlaces>("POST", `/api/drafts/${draftId}/sheet-places`, { model, design })
+        .then((p) => !gone && setPlaces({ design, places: p }))
+        .catch(() => {});
+    }, 400);
+    return () => {
+      gone = true;
+      clearTimeout(timer);
+    };
+  }, [draftId, model, design]);
+  // The places of an earlier state of the model hold until the new ones come: a row more
+  // rarely moves a page break, and the pages do not jump twice.
+  return places?.design === design && places.places.sections.length === model?.sections.length
+    ? places.places
+    : null;
+}
+
+/** Whether the name at the head of the sheet is on screen. */
+function useNameInView(shown: boolean, design: string): boolean {
+  const [inView, setInView] = useState(false);
+  useEffect(() => {
+    const name = shown ? document.querySelector("article[lang] h1") : null;
+    if (!name) return setInView(false);
+    const seen = new IntersectionObserver(([e]) => setInView(e?.isIntersecting ?? false));
+    seen.observe(name);
+    return () => seen.disconnect();
+  }, [shown, design]);
+  return inView;
 }
 
 function SheetBody({
@@ -202,7 +252,13 @@ function SheetTools({
     </div>
   );
   const clear = (
-    <Button variant="secondary" onClick={sheet.clearChecks} disabled={sheet.load !== "ready"}>
+    // In the menu it closes the menu, so the sheet shows the ticks gone and "Undo" beside "Saved".
+    <Button
+      variant="secondary"
+      onClick={sheet.clearChecks}
+      disabled={sheet.load !== "ready"}
+      data-closes-menu={variant === "menu" ? "" : undefined}
+    >
       {t("sheet.clearChecks")}
     </Button>
   );

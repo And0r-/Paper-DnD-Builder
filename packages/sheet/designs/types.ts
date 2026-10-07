@@ -50,7 +50,20 @@ export interface SheetUi {
   RemoveRow: ComponentType<SheetRowProps & { row: number }>;
 }
 
+/**
+ * Where the PDF starts each section (page and grid column from 0, and the
+ * columns it takes on that page; null for one it does not show), and how
+ * many pages it has: a design that breaks
+ * pages on screen breaks them there too, though its sections are taller.
+ */
+export interface PrintPlaces {
+  pages: number;
+  sections: ({ page: number; col: number; cols: number[] } | null)[];
+}
+
 export interface SheetScreenProps {
   model: SheetModel;
   ui: SheetUi;
+  /** The PDF's places for this model, once known. */
+  places?: PrintPlaces | null;
 }
