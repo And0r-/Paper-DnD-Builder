@@ -525,12 +525,21 @@ describe("counts (format 0.13)", () => {
     expect(held(one, "item.provisions")?.count).toBe(3);
   });
 
-  it("does not count a thing no grant gives with a count: twice is still once", () => {
+  it("adds up a thing of a counted kind from two sources, without a count on either", () => {
+    // Provisions come with a count, so items are counted: the ferry child's
+    // rope and one from the calling are two ropes (a staff from two kits).
     expect(held(pkg, "item.rope")?.count).toBeUndefined();
     const twice = withGrants((g) => g.push({ thing: "item.rope" }));
-    expect(held(twice, "item.rope")?.count).toBeUndefined();
+    expect(held(twice, "item.rope")?.count).toBe(2);
     const counted = withGrants((g) => g.push({ thing: "item.rope", count: 2 }));
     expect(held(counted, "item.rope")?.count).toBe(3);
+  });
+
+  it("does not count a thing of a kind no grant gives with a count: twice is still once", () => {
+    // The ferry child grants haggling too; a talent from two sources is one talent.
+    const twice = withGrants((g) => g.push({ thing: "talent.haggling" }));
+    expect(held(twice, "talent.haggling")).toBeDefined();
+    expect(held(twice, "talent.haggling")?.count).toBeUndefined();
   });
 
   it("does not let a count change has() or count()", () => {
