@@ -18,6 +18,8 @@ export interface SheetTextProps {
   label: string;
   /** Paragraphs rather than one line. */
   multiline?: boolean;
+  /** What to show while not changing it, if not `value` as it is (steps a line each); changed is `value`. */
+  shown?: string;
 }
 
 export interface SheetFieldProps {

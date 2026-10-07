@@ -13,6 +13,7 @@ import { fileURLToPath } from "node:url";
 import PDFDocument from "pdfkit";
 import {
   DEFAULT_API_PARTS,
+  footerWords,
   inFileOrder,
   MESSAGES,
   SHEET_DESIGNS,
@@ -448,12 +449,8 @@ function pageFooter(pen: Pen, g: GridGeometry, model: SheetModel, page: number, 
   const line = footerLine(g);
   pen.line(left, line, right, line, 0.3, "#999");
   const room = right - left - 40;
-  const m = pen.messages;
   const words = (who: string, copyName: string) =>
-    (model.origin.kind === "copy"
-      ? [who, copyName, m.asOfLevel(model.origin.fromLevel), model.unitsLine, m.page(page, total)]
-      : [who, model.levelLabel, model.unitsLine, m.page(page, total)]
-    ).join(" · ");
+    [who, ...footerWords(model, page, total, copyName).rest].join(" · ");
   const fits = (text: string) => pen.width(text, { ...style, size: g.type.min }) <= room;
   const cut = (text: string, n: number) => (n >= text.length ? text : `${text.slice(0, n).trimEnd()}…`);
   // The copy's name (its date and time) tells copies apart: the character's name gives way first.

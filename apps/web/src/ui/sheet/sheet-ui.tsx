@@ -62,7 +62,7 @@ function lastRowStart(model: SheetModel, index: number): (string | number)[] | n
 /** A plain number ("12", "+2") brings up the number pad on a phone. */
 const NUMBER = /^[+-−]?\d+$/u;
 
-function SheetText({ path, value, label, multiline }: SheetTextProps) {
+function SheetText({ path, value, label, multiline, shown: display }: SheetTextProps) {
   const { t } = useApp();
   const sheet = useSheetCtx();
   const [editing, setEditing] = useState(false);
@@ -76,7 +76,7 @@ function SheetText({ path, value, label, multiline }: SheetTextProps) {
     if (sheet.editable) setEditing(true);
   }, [key, sheet.editable]);
 
-  if (!sheet.editable) return <>{value}</>;
+  if (!sheet.editable) return <>{display ?? value}</>;
 
   const stop = (keep: boolean, text: string) => {
     setEditing(false);
@@ -133,7 +133,7 @@ function SheetText({ path, value, label, multiline }: SheetTextProps) {
         }
       }}
     >
-      {value}
+      {display ?? value}
     </span>
   );
 }

@@ -6,6 +6,7 @@
  */
 export { cardCount, isCard } from "./cards.ts";
 export { copyWhen, isTimeZone, type CopyWhen } from "./copy-name.ts";
+export { footerWords } from "./footer.ts";
 export {
   hasRows,
   pencilValue,
@@ -26,6 +27,7 @@ export { MESSAGES, PRINT_LANGUAGES, type Messages } from "./messages.ts";
 export {
   buildSheetModel,
   firstSentence,
+  steps,
   MAX_SQUARES,
   MAX_USE_BOXES,
   sheetFields,

@@ -115,6 +115,11 @@ const ORDINAL_DOT = new Set([
  * in languages that write ordinals with a dot, one after a number ("des 1.
  * Grades").
  */
+/** A help text written as "1. … 2. …" in one string, a step a line (screen and PDF). */
+export function steps(text: string): string[] {
+  return text.split(/\s+(?=\d{1,2}\.\s)/u);
+}
+
 export function firstSentence(s: string, language: string): string {
   const ordinals = ORDINAL_DOT.has(language.split("-")[0]!);
   const end = ordinals
