@@ -16,8 +16,11 @@ beforeEach(async () => {
   await signIn(owner, server, "owner@example.org");
 });
 
-async function makeKey(client: Client = owner): Promise<{ id: string; hint: string; secret: string }> {
-  const res = await client.call("POST", "/api/account/keys", {});
+async function makeKey(
+  client: Client = owner,
+  name = "Laptop at home",
+): Promise<{ id: string; name: string; hint: string; secret: string }> {
+  const res = await client.call("POST", "/api/account/keys", { name });
   expect(res.status, JSON.stringify(res.json)).toBe(201);
   return res.json.key;
 }
@@ -86,13 +89,69 @@ describe("making, listing and withdrawing keys", () => {
 
     const list = await owner.call("GET", "/api/account/keys");
     expect(list.status).toBe(200);
-    expect(list.json.keys).toEqual([{ id: key.id, hint: key.hint, createdAt: "2026-10-04T10:00:00.000Z" }]);
+    expect(list.json.keys).toEqual([
+      { id: key.id, name: "Laptop at home", hint: key.hint, createdAt: "2026-10-04T10:00:00.000Z" },
+    ]);
     expect(JSON.stringify(list.json)).not.toContain(key.secret);
 
     const rows = await server.db.query<Record<string, unknown>>("SELECT * FROM access_keys");
     expect(rows).toHaveLength(1);
     expect(rows[0]!["key_hash"]).toBe(accessKeyHash(key.secret));
     expect(JSON.stringify(rows)).not.toContain(key.secret);
+  });
+
+  it("carries a name of 1 to 80 characters, trimmed", async () => {
+    expect((await makeKey(owner, "  Desktop at home  ")).name).toBe("Desktop at home");
+    expect((await makeKey(owner, "ü".repeat(80))).name).toHaveLength(80);
+    for (const body of [
+      {},
+      { name: "" },
+      { name: "   " },
+      { name: "x".repeat(81) },
+      { name: "a\nb" },
+      { name: 7 },
+    ]) {
+      const res = await owner.call("POST", "/api/account/keys", body);
+      expect(res.status, JSON.stringify(body)).toBe(400);
+      expect(res.json.error.code).toBe("badRequest");
+    }
+    // Nothing a caller sends sets an end or a kind.
+    const res = await owner.call("POST", "/api/account/keys", {
+      name: "Assistant",
+      expiresAt: "2026-10-05T00:00:00.000Z",
+      kind: "assistant",
+    });
+    expect(res.status).toBe(400);
+    const rows = await server.db.query("SELECT name, expires_at, kind FROM access_keys ORDER BY name");
+    expect(rows).toEqual([
+      { name: "Desktop at home", expires_at: null, kind: "personal" },
+      { name: "ü".repeat(80), expires_at: null, kind: "personal" },
+    ]);
+  });
+
+  it("refuses a key past its end like a withdrawn one", async () => {
+    const key = await makeKey();
+    const t = tool(key.secret);
+    expect((await t.call("GET", "/api/account")).status).toBe(200);
+
+    // Not settable over the API yet; a later assistant's keys will carry an end.
+    const now = server.app.now();
+    const setEnd = (at: Date) =>
+      server.db.query("UPDATE access_keys SET expires_at = $2 WHERE id = $1", [key.id, at]);
+    await setEnd(new Date(now.getTime() + 60_000));
+    expect((await t.call("GET", "/api/account")).status).toBe(200);
+
+    await setEnd(new Date(now.getTime() - 1));
+    const res = await t.call("GET", "/api/drafts");
+    expect(res.status).toBe(401);
+    expect(res.json.error).toEqual({ code: "keyNotValid" });
+    // The same at the very moment it ends.
+    await setEnd(now);
+    expect((await t.call("GET", "/api/account")).json.error).toEqual({ code: "keyNotValid" });
+    // The owner still sees it in the list and can withdraw it.
+    expect((await owner.call("GET", "/api/account/keys")).json.keys.map((k: { id: string }) => k.id)).toEqual(
+      [key.id],
+    );
   });
 
   it("works as `Authorization: Bearer`, and a withdrawn key gets 401 at once", async () => {
@@ -180,7 +239,7 @@ describe("making, listing and withdrawing keys", () => {
   it("cannot make keys itself, but can withdraw them", async () => {
     const key = await makeKey();
     const t = tool(key.secret);
-    const res = await t.call("POST", "/api/account/keys", {});
+    const res = await t.call("POST", "/api/account/keys", { name: "Successor" });
     expect(res.status).toBe(403);
     expect(res.json.error).toEqual({ code: "keyCannotMakeKeys" });
     expect((await t.call("DELETE", `/api/account/keys/${key.id}`)).status).toBe(204);
@@ -189,7 +248,7 @@ describe("making, listing and withdrawing keys", () => {
 
   it("allows at most 20 keys per account", async () => {
     for (let i = 0; i < 20; i++) await makeKey();
-    const res = await owner.call("POST", "/api/account/keys", {});
+    const res = await owner.call("POST", "/api/account/keys", { name: "One more" });
     expect(res.status).toBe(422);
     expect(res.json.error).toEqual({ code: "tooManyKeys", max: 20 });
   });

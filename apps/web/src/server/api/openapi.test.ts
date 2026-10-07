@@ -321,13 +321,14 @@ async function walk(server: TestServer): Promise<void> {
   await call("POST", "/api/account/password");
 
   // Keys.
-  const made = await call("POST", "/api/account/keys", {});
+  const made = await call("POST", "/api/account/keys", { name: "Laptop at home" });
+  await call("POST", "/api/account/keys", { name: "" });
   const key: string = made.json.key.secret;
   await call("GET", "/api/account/keys");
   await call("GET", "/api/account", undefined, { authorization: "Bearer cbk_unknown" });
-  await call("POST", "/api/account/keys", {}, { authorization: `Bearer ${key}` });
+  await call("POST", "/api/account/keys", { name: "Next" }, { authorization: `Bearer ${key}` });
   await call("DELETE", "/api/account/keys/00000000-0000-4000-8000-000000000000");
-  const second = await call("POST", "/api/account/keys", {});
+  const second = await call("POST", "/api/account/keys", { name: "Second" });
   await call("DELETE", `/api/account/keys/${second.json.key.id}`);
 
   // Packages.

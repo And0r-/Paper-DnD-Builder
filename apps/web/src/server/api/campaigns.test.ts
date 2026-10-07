@@ -334,7 +334,7 @@ describe("who sees what", () => {
 
   it("gives an access key the same rights as the screen", async () => {
     const d = await newDraft(player);
-    const key = (await gm.call("POST", "/api/account/keys", {})).json.key.secret;
+    const key = (await gm.call("POST", "/api/account/keys", { name: "Laptop" })).json.key.secret;
     const res = await server.fetch(
       new Request(`http://builder.test/api/drafts/${d.id}`, { headers: { authorization: `Bearer ${key}` } }),
     );

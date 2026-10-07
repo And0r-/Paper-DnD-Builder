@@ -475,7 +475,8 @@ describe("who may reach copies and play state", () => {
     expect((await player.call("GET", `${base()}/state`)).json.state).toEqual({ a: 1 });
 
     // An access key of the player.
-    const key = (await player.call("POST", "/api/account/keys", {})).json.key.secret as string;
+    const key = (await player.call("POST", "/api/account/keys", { name: "Laptop" })).json.key
+      .secret as string;
     const k = { authorization: `Bearer ${key}` };
     const tool = new Client(server, "203.0.113.9");
     expect((await tool.call("GET", `${base()}/sheet-copies`, undefined, k)).json.copies).toHaveLength(1);

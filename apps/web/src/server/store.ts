@@ -42,6 +42,8 @@ export interface SessionAccount {
 /** An access key as its owner sees it; the hash never leaves the store. */
 export type AccessKeyRow = {
   id: string;
+  /** What its owner called it; display only. */
+  name: string;
   hint: string;
   created_at: Date;
 };
@@ -98,7 +100,7 @@ export type CharacterStateRow = {
   updated_at: Date;
 };
 
-const ACCESS_KEY_COLUMNS = "id, hint, created_at";
+const ACCESS_KEY_COLUMNS = "id, name, hint, created_at";
 const ACCOUNT_COLUMNS = "id, email, password_hash, language, units, print_choice, created_at";
 const DRAFT_COLUMNS =
   "id, account_id, package_id, package_version, version, document, finished_at, created_at, updated_at";
@@ -229,11 +231,11 @@ export class Store {
   /** Inserts a key unless the account already has `max`; returns undefined then. */
   async createAccessKey(k: AccessKeyRow & { account_id: string; key_hash: string }, max: number) {
     const rows = await this.db.query<AccessKeyRow>(
-      `INSERT INTO access_keys (id, account_id, key_hash, hint, created_at)
-       SELECT $1, $2, $3, $4, $5
-       WHERE (SELECT count(*) FROM access_keys WHERE account_id = $2) < $6
+      `INSERT INTO access_keys (id, account_id, key_hash, name, hint, created_at)
+       SELECT $1, $2, $3, $4, $5, $6
+       WHERE (SELECT count(*) FROM access_keys WHERE account_id = $2) < $7
        RETURNING ${ACCESS_KEY_COLUMNS}`,
-      [k.id, k.account_id, k.key_hash, k.hint, k.created_at, max],
+      [k.id, k.account_id, k.key_hash, k.name, k.hint, k.created_at, max],
     );
     return rows[0];
   }
@@ -245,13 +247,16 @@ export class Store {
     );
   }
 
-  /** The account a key belongs to. */
-  async findAccountByKey(keyHash: string): Promise<{ key_id: string; account: AccountRow } | undefined> {
+  /** The account a key belongs to; none for a key past its end. */
+  async findAccountByKey(
+    keyHash: string,
+    now: Date,
+  ): Promise<{ key_id: string; account: AccountRow } | undefined> {
     const rows = await this.db.query<AccountRow & { key_id: string }>(
       `SELECT k.id AS key_id, a.id, a.email, a.password_hash, a.language, a.units, a.print_choice, a.created_at
        FROM access_keys k JOIN accounts a ON a.id = k.account_id
-       WHERE k.key_hash = $1`,
-      [keyHash],
+       WHERE k.key_hash = $1 AND (k.expires_at IS NULL OR k.expires_at > $2)`,
+      [keyHash, now],
     );
     const row = rows[0];
     if (!row) return undefined;

@@ -19,7 +19,8 @@ it, so the file and the server cannot drift apart.
   program (a script, later a language model) sends an
   [access key](#access-keys): `Authorization: Bearer cbk_...`. Routes
   marked 🔒 answer `401` without either: `notLoggedIn` with neither,
-  `keyNotValid` for a key that is unknown, withdrawn or malformed.
+  `keyNotValid` for a key that is unknown, withdrawn, past its end or
+  malformed.
 - A request with an `Authorization` header is judged by the key alone,
   never by a cookie it also carries.
 - Errors: `{ "error": { "code": "...", ...details } }`. Codes are stable and
@@ -44,15 +45,21 @@ it, so the file and the server cannot drift apart.
 A person makes a key on the settings screen and gives it to a program they
 trust. The key can do everything the screens can, in this account only.
 
-| Method & path                     | Body | Result                                                                                                                   |
-| --------------------------------- | ---- | ------------------------------------------------------------------------------------------------------------------------ |
-| 🔒 `GET /api/account/keys`        | —    | `{ keys: [{ id, hint, createdAt }] }`, oldest first. `hint` is the first 10 characters of the key.                       |
-| 🔒 `POST /api/account/keys`       | `{}` | `201 { key: { id, hint, createdAt, secret } }`. `secret` is the key, in this answer only. `422 tooManyKeys` (`max`, 20). |
-| 🔒 `DELETE /api/account/keys/:id` | —    | `204`. Withdrawn at once: the next request with the key gets `401 keyNotValid`. `404 keyNotFound`.                       |
+| Method & path                     | Body       | Result                                                                                                                                                                                     |
+| --------------------------------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 🔒 `GET /api/account/keys`        | —          | `{ keys: [{ id, name, hint, createdAt }] }`, oldest first. `hint` is the first 10 characters of the key.                                                                                   |
+| 🔒 `POST /api/account/keys`       | `{ name }` | `201 { key: { id, name, hint, createdAt, secret } }`. `secret` is the key, in this answer only. `400 badRequest` for a name that is not 1 to 80 characters. `422 tooManyKeys` (`max`, 20). |
+| 🔒 `DELETE /api/account/keys/:id` | —          | `204`. Withdrawn at once: the next request with the key gets `401 keyNotValid`. `404 keyNotFound`.                                                                                         |
 
 - A key is `cbk_` and 43 random characters (256 bits). The server stores
-  only its SHA-256, the hint and the date; nothing about when or what for
-  it is used. A leaked database holds no usable key.
+  only its SHA-256, the hint, the name and the date; nothing about when it
+  is used. A leaked database holds no usable key.
+- `name` says what the key is for, in the owner's words ("the laptop at
+  home"): trimmed, 1 to 80 characters, one line. Display only. Keys made
+  before names existed are named by the day they were made (`2026-10-04`).
+- A key can carry an end; past it, the key gets `401 keyNotValid` like a
+  withdrawn one. Nothing sets an end yet: keys made on the settings screen
+  last until withdrawn.
 - **Making a key needs the browser session.** A request with a key gets
   `403 keyCannotMakeKeys`, so a leaked key cannot make itself a successor
   that outlives withdrawing it. Listing and withdrawing work with a key.
@@ -495,7 +502,7 @@ Tests: [`sheet-copies.test.ts`](src/server/api/sheet-copies.test.ts).
 | `400`  | `badQuery`             | A query parameter has a value the API does not know (`parameter`, `value`).                        |
 | `400`  | `designNotAvailable`   | A planned sheet design not drawn yet (`designs` lists those that are); `422` in the settings.      |
 | `401`  | `notLoggedIn`          | No session cookie and no `Authorization` header.                                                   |
-| `401`  | `keyNotValid`          | The access key is unknown, withdrawn or not `Bearer cbk_...`.                                      |
+| `401`  | `keyNotValid`          | The access key is unknown, withdrawn, past its end or not `Bearer cbk_...`.                        |
 | `401`  | `wrongMailOrPassword`  | Login failed.                                                                                      |
 | `403`  | `crossSite`            | A change sent from another site.                                                                   |
 | `403`  | `keyCannotMakeKeys`    | Making an access key with an access key.                                                           |
