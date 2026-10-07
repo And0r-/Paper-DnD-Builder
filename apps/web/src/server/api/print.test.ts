@@ -159,7 +159,9 @@ describe("the parts of a printout", () => {
     const classic = await client.request("GET", `/api/drafts/${id}/pdf?parts=sheet&design=classic`);
     expect(classic.status).toBe(200);
     expect(
-      (await bytes(classic)).equals(Buffer.from((await renderPdf(model, { parts: ["sheet"], design: "classic" })).bytes)),
+      (await bytes(classic)).equals(
+        Buffer.from((await renderPdf(model, { parts: ["sheet"], design: "classic" })).bytes),
+      ),
     ).toBe(true);
   });
 

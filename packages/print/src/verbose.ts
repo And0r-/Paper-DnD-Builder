@@ -11,7 +11,17 @@
  */
 import { columnLeft, contentWidth, spanWidth, type GridGeometry } from "@builder/sheet/designs";
 import type { Messages, RowGroup, SheetSection, StatBox } from "@builder/sheet";
-import { drawUses, hint, INK, MM_PER_PT, S, sectionTitle, usesWidth, type Pen, type TextStyle } from "./pen.ts";
+import {
+  drawUses,
+  hint,
+  INK,
+  MM_PER_PT,
+  S,
+  sectionTitle,
+  usesWidth,
+  type Pen,
+  type TextStyle,
+} from "./pen.ts";
 
 /** A section as laid out: notes and lists may carry the play state's lines to write on them. */
 export type Laid = SheetSection & { written?: string[] | undefined };

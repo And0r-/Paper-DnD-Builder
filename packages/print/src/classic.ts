@@ -819,7 +819,11 @@ export function layClassic(
   const cluster = clusterBlock(c, clustered);
   const cTop = cluster ? at(cluster, p1(cols.c.x, top, cols.c.w)) + 4 : top;
   // The boxes of all of them are in that one block; the others are there too.
-  for (const s of clustered.slice(1)) at(measured(c, s, () => 0), p1(cols.c.x, top, cols.c.w));
+  for (const s of clustered.slice(1))
+    at(
+      measured(c, s, () => 0),
+      p1(cols.c.x, top, cols.c.w),
+    );
 
   // Column A: the scores; their further numbers top of B.
   const scores = part("scores")[0] as Section<"scoreColumn"> | undefined;
