@@ -5,6 +5,22 @@
  * No layout and no PDF here, and nothing about any game.
  */
 export { cardCount, isCard } from "./cards.ts";
+export {
+  hasRows,
+  pencilValue,
+  playFields,
+  rowCount,
+  shownState,
+  textAt,
+  tickAt,
+  ticksOf,
+  withRowAdded,
+  withRowRemoved,
+  withText,
+  writtenOf,
+  type ModelPath,
+  type PlayField,
+} from "./edit.ts";
 export { MESSAGES, PRINT_LANGUAGES, type Messages } from "./messages.ts";
 export {
   buildSheetModel,

@@ -8,7 +8,9 @@
  */
 import { cardCount } from "@builder/sheet/cards";
 import { useSearchParams } from "next/navigation";
+import Link from "next/link";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { api } from "../../../../src/ui/api.ts";
 import { useApp } from "../../../../src/ui/app-state.tsx";
 import { Button, ButtonLink } from "../../../../src/ui/components/Button.tsx";
 import { EmptyState } from "../../../../src/ui/components/Feedback.tsx";
@@ -28,7 +30,7 @@ import { useMeasure } from "../../../../src/ui/components/RichText.tsx";
 const NEWS_MAX = 6;
 
 export default function DonePage() {
-  const { t, list } = useApp();
+  const { t, tc, list } = useApp();
   const { lp, ev, doc, draft } = useDraft();
   const ctx = useMeasure(lp);
   const params = useSearchParams();
@@ -80,6 +82,15 @@ export default function DonePage() {
   // Only promise cards when the PDF has some: not every character has things that are cards.
   const hasCards = useMemo(() => cardCount(lp.pkg, ev) > 0, [lp.pkg, ev]);
   useEffect(() => headingRef.current?.focus(), []);
+  // The player's own versions of the sheet, if any: the line leads to them.
+  const [copies, setCopies] = useState(0);
+  const finished = draft.status === "finished";
+  useEffect(() => {
+    if (!finished) return;
+    api<{ copies: unknown[] }>("GET", `/api/drafts/${draft.id}/sheet-copies`)
+      .then((r) => setCopies(r.copies.length))
+      .catch(() => {});
+  }, [draft.id, finished]);
 
   if (draft.status !== "finished") {
     return (
@@ -148,6 +159,11 @@ export default function DonePage() {
         />
         <p className="done__tip">{t(hasCards ? "done.tip" : "done.tipSheetOnly")}</p>
       </div>
+      {copies > 0 && (
+        <p className="done__copies">
+          {tc("done.copies", copies)} <Link href={`/c/${draft.id}/bogen`}>{t("done.toSheet")}</Link>
+        </p>
+      )}
       <Origins />
       <p className="note">{t("done.editHint")}</p>
       <div className="done__next">

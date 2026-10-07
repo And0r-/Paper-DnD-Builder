@@ -218,13 +218,13 @@ describe("kept copies of the sheet", () => {
     expect((await player.call("GET", url)).json.copy.version).toBe(1);
   });
 
-  it("keeps at most ten copies per character", async () => {
+  it("keeps at most fifty copies per character", async () => {
     for (let i = 0; i < MAX_COPIES_PER_CHARACTER; i++) await newCopy();
     const eleventh = await player.call("POST", `${base()}/sheet-copies`, {});
     expect(eleventh.status).toBe(409);
     expect(eleventh.json.error).toEqual({ code: "tooManyCopies", max: MAX_COPIES_PER_CHARACTER });
 
-    // Deleting one makes room again; another character has its own ten.
+    // Deleting one makes room again; another character has its own fifty.
     const list = (await player.call("GET", `${base()}/sheet-copies`)).json.copies;
     expect((await player.call("DELETE", `${base()}/sheet-copies/${list[0].id}`)).status).toBe(204);
     await newCopy();
@@ -271,6 +271,32 @@ describe("kept copies of the sheet", () => {
       expect(res.json.error.code).toBe("copyNotFound");
     }
     expect((await player.call("GET", `${base()}/sheet-copies/not-a-uuid`)).status).toBe(404);
+  });
+
+  it("remembers per account the version opened last; a new copy is opened", async () => {
+    const list = async (c: Client) => (await c.call("GET", `${base()}/sheet-copies`)).json;
+    expect(await list(player)).toMatchObject({ opened: null, max: MAX_COPIES_PER_CHARACTER });
+    const first = await newCopy();
+    expect((await list(player)).opened).toBe(first.copy.id);
+    // The game master looks at the same character on their own.
+    expect((await list(gm)).opened).toBe(null);
+
+    const view = (body: object, c: Client = player) => c.call("PUT", `${base()}/sheet-view`, body);
+    expect((await view({ copyId: null })).json).toEqual({ opened: null });
+    expect((await list(player)).opened).toBe(null);
+    expect((await view({ copyId: first.copy.id }, gm)).status).toBe(200);
+    expect((await list(gm)).opened).toBe(first.copy.id);
+    expect((await list(player)).opened).toBe(null);
+
+    // Only a copy of this character; a deleted one falls back to the original.
+    const other = (await finished(1)).draft.id;
+    const elsewhere = (await player.call("POST", `/api/drafts/${other}/sheet-copies`, {})).json.copy.id;
+    expect((await view({ copyId: elsewhere })).json.error.code).toBe("copyNotFound");
+    expect((await view({ copyId: "not-a-uuid" })).status).toBe(404);
+    expect((await view({})).status).toBe(400);
+    expect((await view({ copyId: first.copy.id }, stranger)).status).toBe(404);
+    expect((await player.call("DELETE", `${base()}/sheet-copies/${first.copy.id}`)).status).toBe(204);
+    expect((await list(gm)).opened).toBe(null);
   });
 
   it("refuses a copy of a character that is not finished", async () => {

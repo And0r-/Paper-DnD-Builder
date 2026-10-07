@@ -10,6 +10,7 @@
  */
 import { PRINT_PARTS, type PrintChoice, type PrintPart } from "@builder/sheet/printouts";
 import { useEffect, useId, useState } from "react";
+import { copyName } from "../sheet/copy-name.ts";
 import { useApp } from "../app-state.tsx";
 import { api, type Account, type SheetDesignInfo } from "../api.ts";
 import { Button } from "../components/Button.tsx";
@@ -92,14 +93,6 @@ export function PrintDialog({
   }, [open, account?.print, draftId, startVersion]);
 
   // A copy is named by when it was kept, in the screen's language ("7. Oktober, 14:20"), as in the sketch.
-  const when = new Intl.DateTimeFormat(lang, {
-    day: "numeric",
-    month: "long",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-  const copyName = (c: CopyEntry) => t("print.versionCopy", { date: when.format(new Date(c.createdAt)) });
-
   const usable = (p: PrintPart) => p !== "cards" || hasCards;
   const chosen = PRINT_PARTS.filter((p) => parts.has(p) && usable(p));
 
@@ -256,7 +249,7 @@ export function PrintDialog({
             <option value="original">{t("print.versionOriginal")}</option>
             {copies.map((c) => (
               <option key={c.id} value={c.id}>
-                {copyName(c)}
+                {copyName(t, lang, c)}
               </option>
             ))}
           </select>
