@@ -414,6 +414,26 @@
   white-space: pre;
 }
 
+/* On a phone the line is short: a copy's footer wraps rather than widen the page. */
+@media (max-width: 899.98px) {
+  .csheet__footer {
+    flex-wrap: wrap;
+    gap: 0 var(--space-4);
+  }
+
+  .csheet__footer-line {
+    flex-wrap: wrap;
+    white-space: normal;
+  }
+
+  .csheet__footer-rest {
+    flex: 0 1 auto;
+    min-width: 0;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+}
+
 /* On a phone there are no pages: one footer at the end, no page heads. */
 @media (max-width: 899.98px) {
   .csheet__cont,

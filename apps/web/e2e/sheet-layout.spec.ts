@@ -181,6 +181,25 @@ test.describe("on a phone", () => {
     }
   });
 
+  for (const lang of ["de", "en"] as const) {
+    test(`a kept copy's footer wraps: no page wider than the phone (${lang})`, async ({ page }) => {
+      await login(page, uniqueEmail("sheet-copy-phone"), lang);
+      const id = await makeCharacter(page);
+      expect((await page.request.post(`/api/drafts/${id}/sheet-copies`, { data: {} })).status()).toBe(201);
+      for (const design of DESIGNS) {
+        const sheet = await openSheet(page, id, design);
+        const prefix = design === "classic" ? "csheet" : "vsheet";
+        await expect(sheet.locator(`.${prefix}__footer`).last()).toBeVisible();
+        expect(
+          await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth),
+          `${design} ${lang}`,
+        ).toBeLessThanOrEqual(0);
+        const footer = await box(sheet.locator(`.${prefix}__footer`).last());
+        expect(footer.x + footer.width, `${design} ${lang}`).toBeLessThanOrEqual(390);
+      }
+    });
+  }
+
   test("the menu: inside the drawer, in the sketch's order; stamina with − and +", async ({ page }) => {
     await login(page, uniqueEmail("sheet-menu"));
     // Level 3: one that can still go up, so "level up" is in the menu.

@@ -456,6 +456,26 @@
   white-space: pre;
 }
 
+/* On a phone the line is short: a copy's footer wraps rather than widen the page. */
+@media (max-width: 899.98px) {
+  .vsheet__footer {
+    flex-wrap: wrap;
+    gap: 0 var(--space-4);
+  }
+
+  .vsheet__footer-line {
+    flex-wrap: wrap;
+    white-space: normal;
+  }
+
+  .vsheet__footer-rest {
+    flex: 0 1 auto;
+    min-width: 0;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+}
+
 /* Measures a millimetre of the screen, for placing the sections on pages. */
 .vsheet__mm {
   position: absolute;
