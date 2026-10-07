@@ -16,6 +16,9 @@ await build({
   format: "esm",
   target: "node20",
   legalComments: "eof",
+  // Text as written, not as \x escapes: an escape cuts a word in two, and the
+  // check for rulebook terms in the download then sees half a word.
+  charset: "utf8",
   // Some dependencies are CommonJS and call require() for Node's own modules.
   banner: {
     js: [

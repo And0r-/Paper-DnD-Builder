@@ -69,6 +69,40 @@ trust. The key can do everything the screens can, in this account only.
   `Authorization` without a CORS preflight, which the builder does not
   answer.
 
+## MCP
+
+A zip for a language model on the player's own computer (Claude Desktop,
+Claude Code, Cursor, any MCP program over stdio). The server in it,
+[`packages/mcp`](../../packages/mcp), talks to this API with an access key
+and to nothing else.
+
+| Method & path                      | Body          | Result                                                                                                                                              |
+| ---------------------------------- | ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 🔒 `POST /api/account/mcp-package` | `{ withKey }` | `200`, `application/zip`, `builder-mcp.zip`. With `withKey: true` also the headers `X-Builder-Key` (the new key) and `X-Builder-Key-Id` (its `id`). |
+
+| File in the zip              | What                                                                                                                                  |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `server.mjs`                 | The MCP server, one file, runs with Node 20 or newer. Bundled from `packages/mcp` when the web app is built.                          |
+| `config.json`                | `{ "baseUrl", "key" }`. `baseUrl` is the configured public address (`BASE_URL`), never the `Host` header. `key` is empty without one. |
+| `claude_desktop_config.json` | A ready `mcpServers` entry with a path placeholder (`PATH/server.mjs`, `PFAD/server.mjs`) the guide says to replace.                  |
+| `README.md`                  | The guide in the account's language, address and key name filled in; without a key it says where one goes.                            |
+
+- **A new key needs the browser session**, as for `POST /api/account/keys`.
+  With a key instead, `withKey: true` gets `403 keyCannotMakeKeys` and
+  nothing is made; `withKey: false` gives the zip without a key.
+- The new key is named for the day in the account's language
+  (`MCP package, 2026-10-06`, `MCP-Paket, 6.10.2026`) and counts towards
+  the 20 keys (`422 tooManyKeys`).
+- The key is in this answer only: in `config.json` and in `X-Builder-Key`,
+  for the settings screen to show it once. The server keeps its hash, as
+  for every key. The answer is `Cache-Control: no-store`.
+- Why headers and not a JSON envelope with the zip in base64: the browser
+  saves the body as the file it is, without decoding a third more bytes,
+  and a program that only wants the zip ignores the headers.
+- The zip is made per request in memory; nothing is written to disk.
+- `503 baseUrlNotSet`: the server has no `BASE_URL`. `503 mcpPackageMissing`:
+  the build has no `server.mjs`. In both cases no key is made.
+
 ## Packages
 
 | Method & path                          | Result                                                                                   |
@@ -543,7 +577,7 @@ Tests: [`sheet-copies.test.ts`](src/server/api/sheet-copies.test.ts).
 | `401`  | `keyNotValid`          | The access key is unknown, withdrawn, past its end or not `Bearer cbk_...`.                        |
 | `401`  | `wrongMailOrPassword`  | Login failed.                                                                                      |
 | `403`  | `crossSite`            | A change sent from another site.                                                                   |
-| `403`  | `keyCannotMakeKeys`    | Making an access key with an access key.                                                           |
+| `403`  | `keyCannotMakeKeys`    | Making an access key with an access key (also the MCP package with `withKey: true`).               |
 | `403`  | `gameMasterOnly`       | A player of the campaign calls a game master's route.                                              |
 | `403`  | `ownerOnly`            | A game master deletes a player's character; only the owner does.                                   |
 | `404`  | `notFound`             | No such API path.                                                                                  |
@@ -581,6 +615,8 @@ Tests: [`sheet-copies.test.ts`](src/server/api/sheet-copies.test.ts).
 | `500`  | `packageRuleError`     | The package's rules could not be worked out (a bug in the package); `message`.                     |
 | `502`  | `mailFailed`           | The mail server refused the mail (password or invitation); nothing changed.                        |
 | `503`  | `mailNotConfigured`    | The server has no mail set up.                                                                     |
+| `503`  | `baseUrlNotSet`        | The server has no public address (`BASE_URL`); the MCP package cannot say where the builder is.    |
+| `503`  | `mcpPackageMissing`    | This build has no `server.mjs` for the MCP package.                                                |
 
 `changeRejected` reasons (`error.reason.code`): `levelOutOfRange` (`min`,
 `max`), `levelNotHigher` (`level`), `unknownChoice`, `notAsked` (the choice

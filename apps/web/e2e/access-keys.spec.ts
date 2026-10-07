@@ -79,9 +79,10 @@ for (const lang of ["de", "en"] as const) {
     expect(after.status()).toBe(401);
     expect((await after.json()).error.code).toBe("keyNotValid");
 
-    // The privacy page names the keys.
+    // The privacy page names the keys and the language model package.
     await page.goto("/privacy");
     await expect(page.getByText(m["privacy.keys"])).toBeVisible();
+    await expect(page.getByText(m["privacy.languageModel"])).toBeVisible();
     await expectOneLanguage(page, lang);
   });
 }

@@ -33,6 +33,7 @@ export default function PrivacyPage() {
           <ul>
             <li>{t("privacy.noTracking")}</li>
             <li>{t("privacy.noThirdParty")}</li>
+            <li>{t("privacy.languageModel")}</li>
           </ul>
           <p>{t("privacy.delete")}</p>
           <Button variant="secondary" icon="arrowLeft" onClick={() => router.back()}>

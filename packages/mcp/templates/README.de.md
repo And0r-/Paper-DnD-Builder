@@ -6,8 +6,21 @@ Charakter auf Stufe 3“ oder „Warum hat mein Charakter hier eine 8?“. Das
 Sprachmodell liest dann deine Charaktere, erklärt Werte und trägt deine
 Antworten ein.
 
+{{#KEY}}
 Das Paket gehört zu deinem Konto auf **{{BASE_URL}}**. Der Zugangsschlüssel
 darin heisst in deinen Einstellungen **„{{KEY_NAME}}“**.
+{{/KEY}}
+{{^KEY}}
+Das Paket gehört zum Charakterbuilder auf **{{BASE_URL}}**. Es enthält noch
+keinen Zugangsschlüssel. So trägst du einen ein:
+
+1. Melde dich auf {{BASE_URL}} an und öffne **Einstellungen →
+   Zugangsschlüssel**.
+2. Erzeuge einen neuen Schlüssel und kopiere ihn. Er beginnt mit `cbk_`.
+3. Öffne die Datei `config.json` aus diesem Paket mit einem Texteditor.
+   Setze den Schlüssel zwischen die Anführungszeichen hinter `"key"`, so:
+   `"key": "cbk_..."`. Speichern.
+{{/KEY}}
 
 > **Datenschutz**
 >
@@ -34,7 +47,8 @@ Entpacke das Zip in einen Ordner, der bleibt, zum Beispiel
 `Dokumente/charakterbuilder`. Nicht im Ordner „Downloads“ lassen, den räumt
 man gern auf.
 
-Im Ordner liegen `server.mjs`, `config.json` und diese Anleitung. Merke dir
+Im Ordner liegen `server.mjs`, `config.json`,
+`claude_desktop_config.json` und diese Anleitung. Merke dir
 den vollen Pfad zu `server.mjs`, zum Beispiel
 `C:\Users\du\Documents\charakterbuilder\server.mjs` oder
 `/Users/du/Documents/charakterbuilder/server.mjs`. Unten steht dafür
@@ -138,7 +152,7 @@ geraten ist:
 
 1. Melde dich auf {{BASE_URL}} an.
 2. Öffne **Einstellungen → Zugangsschlüssel**.
-3. Ziehe den Schlüssel **„{{KEY_NAME}}“** zurück.
+3. Ziehe den Schlüssel {{#KEY}}**„{{KEY_NAME}}“**{{/KEY}}{{^KEY}}aus `config.json`{{/KEY}} zurück.
 
 Ab dann lehnt der Builder den Schlüssel sofort ab. Das Sprachmodell meldet
 dann, dass der Schlüssel nicht mehr gilt. Lösche danach den Ordner mit
