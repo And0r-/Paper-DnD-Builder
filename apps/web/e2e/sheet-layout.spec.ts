@@ -33,10 +33,23 @@ async function openSheet(page: Page, id: string, design: string): Promise<Locato
 
 const box = async (l: Locator) => (await l.boundingBox())!;
 
-/** Elements whose content is wider than they are: words broken nowhere, run past their edge. */
+/** Labels run past their edge or with a word broken over two lines ("GLÜCKSMARKE / N"). */
 async function overflowing(l: Locator): Promise<string[]> {
   return l.evaluateAll((els) =>
-    els.filter((e) => e.scrollWidth > e.clientWidth + 1).map((e) => e.textContent ?? ""),
+    els
+      .filter((e) => {
+        if (e.scrollWidth > e.clientWidth + 1) return true;
+        const text = e.querySelector(".sheet-text")?.firstChild ?? e.firstChild;
+        if (!text || text.nodeType !== Node.TEXT_NODE) return false;
+        const words = [...(text.textContent ?? "").matchAll(/\S+/gu)];
+        return words.some((w) => {
+          const r = document.createRange();
+          r.setStart(text, w.index);
+          r.setEnd(text, w.index + w[0].length);
+          return new Set([...r.getClientRects()].map((c) => Math.round(c.top))).size > 1;
+        });
+      })
+      .map((e) => e.textContent ?? ""),
   );
 }
 

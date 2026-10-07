@@ -46,13 +46,16 @@ export interface PackedSection {
  * before it, so a short section moves up beside a tall one; a section that
  * does not fit starts the next page. Unlike the PDF, a section is never
  * split: where the PDF would split it (moving it would leave more than
- * `maxGap` white), it stays and makes its page longer. Heights and the
- * result in mm.
+ * `maxGap` white), it stays and makes its page longer. The screen draws a
+ * little taller than paper (help never under 12 px, room to tap): a
+ * section that runs past the page's foot by at most `slack` stays too, so
+ * it lands where the PDF has it. Heights and the result in mm.
  */
 export function packSections(
   sections: readonly { span: number; height: number }[],
   g: GridGeometry = VERBOSE_GEOMETRY,
   maxGap = 85,
+  slack = 0,
 ): PackedSection[] {
   const columns = g.columns;
   const bottom = contentBottom(g);
@@ -73,7 +76,7 @@ export function packSections(
       return best;
     };
     let spot = place();
-    if (spot.y + s.height > bottom && onPage > 0 && bottom - spot.y <= maxGap) {
+    if (spot.y + s.height > bottom + slack && onPage > 0 && bottom - spot.y <= maxGap) {
       page++;
       onPage = 0;
       floor = new Array<number>(columns).fill(pageTop(page));

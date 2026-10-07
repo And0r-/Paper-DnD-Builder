@@ -572,8 +572,8 @@
 
 @media (min-width: 900px) {
   .vsheet {
-    /* As on paper, but never below what a pointer can hit (24 px, WCAG 2.2). */
-    --sheet-tick: max(var(--vs-square), 24px);
+    /* Ticks of 18 px, 24 px apart: each keeps the 24 px a pointer needs (WCAG 2.2, 2.5.8, spacing). */
+    --sheet-tick: max(var(--vs-square), 18px);
     --sheet-touch: auto;
     --sheet-number: var(--vs-bigValue);
     font-size: var(--vs-body);
@@ -742,8 +742,18 @@
     border-radius: var(--vs-radius);
   }
 
+  /* A long word in a box is set smaller rather than broken ("GLÜCKSMARKEN"). */
+  .vsheet__box {
+    container-type: inline-size;
+  }
+
   .vsheet__box-label {
-    font-size: var(--vs-sectionTitle);
+    overflow-wrap: normal;
+    font-size: min(var(--vs-sectionTitle), 11cqi);
+  }
+
+  .vsheet__box .sheet-ticks {
+    gap: 6px;
   }
 
   .vsheet__box-hint {

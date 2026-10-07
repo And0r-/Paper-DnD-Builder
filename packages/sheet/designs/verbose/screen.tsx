@@ -62,6 +62,8 @@ const at = (i: number, ...rest: (string | number)[]) => ["sections", i, ...rest]
 /** Room between two pages on screen, in mm. */
 const PAGE_GAP = 8;
 const DESK = "(min-width: 900px)";
+/** How far (mm) a section may run past a page's foot on screen, where it is taller than on paper. */
+const SCREEN_SLACK = 40;
 
 interface Pages {
   at: PackedSection[];
@@ -96,6 +98,9 @@ function usePages(box: RefObject<HTMLDivElement | null>, model: SheetModel): Pag
             span: s.span,
             height: sections[i]!.getBoundingClientRect().height / mm,
           })),
+          G,
+          undefined,
+          SCREEN_SLACK,
         );
         const heights: number[] = [];
         at.forEach((p, i) => {
