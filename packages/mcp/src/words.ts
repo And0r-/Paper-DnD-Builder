@@ -73,12 +73,15 @@ export class Words {
     };
   }
 
-  /** The character list's one-line summary: thing keys become names. */
+  /**
+   * The character list's one-line summary: thing keys become names. Null
+   * while something it names is not chosen yet, as in the web app.
+   */
   summaryLine(line: Readonly<Record<string, string | number | null>>): string | null {
     const vars: Record<string, string | number> = {};
     for (const [k, v] of Object.entries(line)) {
-      if (v === null) vars[k] = "";
-      else vars[k] = typeof v === "number" ? v : this.name(v);
+      if (v === null) return null;
+      vars[k] = typeof v === "number" ? v : this.name(v);
     }
     return this.text("summary.line", vars);
   }

@@ -49,8 +49,35 @@ export function createMcpRoute(
     if (Number(req.headers.get("content-length") ?? 0) > MAX_BODY) {
       return rpcError(413, "The request is too large.");
     }
-    return handler(req);
+    // Content-Length may be absent (chunked) or lie: count while reading.
+    const body = req.body ? await readCapped(req.body) : undefined;
+    if (body === null) return rpcError(413, "The request is too large.");
+    return handler(body ? new Request(req.url, { method: req.method, headers: req.headers, body }) : req);
   };
+}
+
+/** The whole body, or null as soon as it grows past `MAX_BODY`. */
+async function readCapped(stream: ReadableStream<Uint8Array>): Promise<Uint8Array<ArrayBuffer> | null> {
+  const reader = stream.getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    if (size > MAX_BODY) {
+      await reader.cancel();
+      return null;
+    }
+    chunks.push(value);
+  }
+  const out = new Uint8Array(size);
+  let at = 0;
+  for (const c of chunks) {
+    out.set(c, at);
+    at += c.byteLength;
+  }
+  return out;
 }
 
 /** An error the way `createHttpHandler` answers one: JSON-RPC with no id. */

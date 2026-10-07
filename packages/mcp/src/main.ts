@@ -40,6 +40,18 @@ async function main(): Promise<void> {
 }
 
 main().catch((e: unknown) => {
-  console.error(e instanceof ConfigError ? e.message : e);
+  console.error(e instanceof ConfigError ? e.message : (listenProblem(e) ?? e));
   process.exit(1);
 });
+
+/** A port that cannot be had is the player's to fix: one line, no stack. */
+function listenProblem(e: unknown): string | undefined {
+  const { code, port } = (e ?? {}) as { code?: unknown; port?: unknown };
+  if (code === "EADDRINUSE") {
+    return `Port ${String(port)} is already in use. Stop the program using it, or start with another PORT.`;
+  }
+  if (code === "EACCES") {
+    return `Port ${String(port)} may not be used by this user. Start with another PORT, for example 8787.`;
+  }
+  return undefined;
+}

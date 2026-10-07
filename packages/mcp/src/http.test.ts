@@ -112,6 +112,21 @@ describe("server.mjs without a key", () => {
     expect(get.headers.get("allow")).toBe("POST");
   });
 
+  it("says in one line, without a stack, when the port is taken", async () => {
+    const port = new URL(mcpUrl).port;
+    const second = spawn(process.execPath, [MAIN], {
+      env: { PATH: process.env["PATH"], BUILDER_BASE_URL: "http://127.0.0.1:9", PORT: port },
+      stdio: ["ignore", "ignore", "pipe"],
+    });
+    let stderr = "";
+    second.stderr!.on("data", (chunk: Buffer) => (stderr += chunk.toString()));
+    const code = await new Promise<number | null>((resolve) => second.once("exit", resolve));
+    expect(code).toBe(1);
+    expect(stderr).toBe(
+      `Port ${port} is already in use. Stop the program using it, or start with another PORT.\n`,
+    );
+  });
+
   it("takes no key from the address", async () => {
     expect((await post({}, `${mcpUrl}?key=${GOOD}`)).status).toBe(401);
   });

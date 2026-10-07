@@ -32,6 +32,8 @@ describe("the stdio server", () => {
     try {
       expect(client.getServerVersion()?.name).toBe(SERVER_NAME);
       expect(stderr).toBe("private, stdio\n");
+      // The tool list never changes, so no change is promised.
+      expect(client.getServerCapabilities()?.tools).toEqual({});
       const { tools } = await client.listTools();
       expect(tools.map((t) => t.name)).toEqual(TOOLS.map((t) => t.name));
       expect(tools.map((t) => t.description)).toEqual(TOOLS.map((t) => t.description));
@@ -49,6 +51,13 @@ describe("the stdio server", () => {
     expect(TOOLS.map((t) => t.name).sort()).toEqual(Object.keys(TOOL_DESCRIPTIONS).sort());
     expect(TOOLS).toHaveLength(13);
     for (const t of TOOLS) expect(t.description).toBe(TOOL_DESCRIPTIONS[t.name]);
+  });
+
+  it("names each kind of choice in set_answer as list_options reports it", () => {
+    for (const kind of ["pickOne", "pickMany", "distribute", "number", "text"]) {
+      expect(TOOL_DESCRIPTIONS.set_answer).toContain(`${kind} {`);
+    }
+    expect(TOOL_DESCRIPTIONS.set_answer).not.toMatch(/points \{/);
   });
 
   it("hands a file over as an embedded resource next to the JSON text", () => {

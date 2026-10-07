@@ -176,6 +176,8 @@ describe("the shared tools over the API, with nothing but a key", () => {
       const characterId: string = started.data.characterId;
       expect(started.data).toMatchObject({ level: 3, state: "open", canFinish: false });
       expect(started.data.openChoices.length).toBeGreaterThan(0);
+      // No half summary line (" · Level 3") while what it names is not chosen.
+      expect((await call("list_characters")).data[0]).toMatchObject({ name: null, summary: null });
 
       // Finishing too early names what is open.
       const early = await call("finish_character", { characterId });
@@ -199,10 +201,14 @@ describe("the shared tools over the API, with nothing but a key", () => {
       const raised = await call("level_up", { characterId, level: 5 });
       expect(raised.isError, JSON.stringify(raised.data)).toBeFalsy();
       expect(raised.data.raised).toEqual({ from: 3, to: 5 });
-      expect(raised.data.newChoices.length).toBeGreaterThan(0);
-      // Open now: the new choices, and older ones that ask for more at the higher level; nothing else.
+      // toAnswer is everything open: the new choices, and older ones that ask for more at the
+      // higher level, each marked; a model answering only the new ones would get stuck.
       const openIds = raised.data.openChoices.map((c: { choice: string }) => c.choice);
-      for (const c of raised.data.newChoices) expect(openIds).toContain(c.choice);
+      const toAnswer: { choice: string; new?: true; morePlaces?: true }[] = raised.data.toAnswer;
+      expect(toAnswer.map((c) => c.choice)).toEqual(openIds);
+      expect(toAnswer.filter((c) => c.new).length).toBeGreaterThan(0);
+      expect(toAnswer.filter((c) => c.morePlaces).length).toBeGreaterThan(0);
+      for (const c of toAnswer) expect(Boolean(c.new) !== Boolean(c.morePlaces), c.choice).toBe(true);
       const answeredAt5 = await answerAllOpen(call, characterId);
       // A copy (`<choice>@<pick>`) comes once the pick that brings it is answered.
       expect(answeredAt5.filter((id) => !id.includes("@"))).toEqual(openIds);
@@ -304,7 +310,10 @@ describe("the shared tools over the API, with nothing but a key", () => {
       const res = await call(name);
       expect(res.isError).toBe(true);
       expect(res.data.message).toMatch(/does not accept the access key/);
-      expect(res.data.message).toMatch(/Settings/);
+      // Both places a key can be, the program's BUILDER_KEY first, and where to make a new one.
+      expect(res.data.message).toMatch(/Settings, Access keys/);
+      expect(res.data.message).toMatch(/BUILDER_KEY/);
+      expect(res.data.message).toMatch(/config\.json/);
     }
   });
 

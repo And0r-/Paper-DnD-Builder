@@ -143,6 +143,52 @@ describe("/mcp", () => {
     expect((await post(route, { ...auth, origin: "http://builder.test" })).status).toBe(200);
   });
 
+  it("refuses a body over 1 MB with 413, also without Content-Length", async () => {
+    const route = mcp();
+    const auth = { authorization: `Bearer ${(await makeKey()).secret}` };
+    const big = new TextEncoder().encode(" ".repeat(1_100_000));
+    const chunked = () =>
+      new ReadableStream<Uint8Array>({
+        start(c) {
+          // Sent in pieces, as a chunked body arrives; no Content-Length at all.
+          for (let at = 0; at < big.length; at += 64 * 1024) c.enqueue(big.subarray(at, at + 64 * 1024));
+          c.close();
+        },
+      });
+    const send = (body: BodyInit, headers: Record<string, string> = {}) =>
+      route(
+        new Request("http://builder.test/mcp", {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            "x-forwarded-for": "198.51.100.4",
+            ...auth,
+            ...headers,
+          },
+          body,
+          duplex: "half",
+        } as RequestInit),
+      );
+    const res = await send(chunked());
+    expect(res.status).toBe(413);
+    expect((await res.json()).error.message).toMatch(/too large/);
+    // Announced by Content-Length: refused the same.
+    expect((await send(big, { "content-length": String(big.length) })).status).toBe(413);
+    // A small chunked body still gets through.
+    const small = new TextEncoder().encode(JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list" }));
+    const ok = await send(
+      new ReadableStream<Uint8Array>({
+        start(c) {
+          c.enqueue(small);
+          c.close();
+        },
+      }),
+      { accept: "application/json, text/event-stream" },
+    );
+    expect(ok.status).toBe(200);
+    expect((await ok.json()).result.tools).toHaveLength(TOOLS.length);
+  });
+
   it("limits requests per address, with or without a key", async () => {
     const route = mcp();
     const { max } = LIMITS.mcpRequestsPerIp;

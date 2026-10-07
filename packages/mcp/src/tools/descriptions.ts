@@ -33,13 +33,13 @@ export const TOOL_DESCRIPTIONS = {
     "shared list). Empty means the character can be finished.",
   list_options:
     "Show everything about one choice: the question, its options with name, short text, what it is, what " +
-    "you do with it, who it suits, whether it is recommended and its badge; for a points choice the values, " +
+    "you do with it, who it suits, whether it is recommended and its badge; for a distribute choice the values, " +
     "methods and a recommended answer; and the exact shape the answer must have. Show the player the options " +
     "before answering.",
   set_answer:
     "Answer one choice of a character, or remove its answer with answer null. The shape follows the " +
     'choice\'s kind (see list_options): pickOne {"pick": "<option id>"}, pickMany {"picks": [...]}, ' +
-    'points {"method": <index>, "assign": {"<value id>": <number>}}, number {"value": <number>}, ' +
+    'distribute {"method": <index>, "assign": {"<value id>": <number>}}, number {"value": <number>}, ' +
     'text {"text": "..."}. If the rules refuse the answer, the result says why and nothing changes. ' +
     "An answer can change what is asked after it, never what comes before.",
   answer_pool:
@@ -52,8 +52,9 @@ export const TOOL_DESCRIPTIONS = {
     "Change the level of a character that is not finished yet. Answers stay; choices of other levels come " +
     "or go. To raise a finished character use level_up instead.",
   level_up:
-    "Raise a finished character to a higher level. Every answer stays; the result lists only the new " +
-    "choices the higher level asks. Answer them, then finish the character again.",
+    "Raise a finished character to a higher level. Every answer stays. toAnswer in the result lists every " +
+    "choice the higher level asks: new choices and choices that got more places (more picks or points). " +
+    "Answer all of them (list_open_choices shows the same), then finish the character again.",
   finish_character:
     "Mark a character as finished once nothing is open. If something is still open, nothing changes and " +
     "the result lists the open choices.",
