@@ -520,6 +520,7 @@
   }
 
   .vsheet__table thead {
+    display: block;
     position: absolute;
     width: 1px;
     height: 1px;
@@ -559,6 +560,7 @@
     top: var(--space-1);
     right: 0;
     display: block;
+    width: auto;
   }
 
   .vsheet__table tbody td.vsheet__row-tools::before {
