@@ -16,7 +16,7 @@ import {
   type SheetSection,
 } from "@builder/sheet";
 import { demoCharacter, loadDemoPackage, raisedCharacter } from "@builder/sheet/testing";
-import { classicPlan } from "@builder/sheet/designs/classic";
+import { CLASSIC_GEOMETRY, classicPlan, firstColumns } from "@builder/sheet/designs/classic";
 import { renderPdf, type RenderedPdf } from "./render.ts";
 
 let pkg: ContentPackage;
@@ -133,7 +133,18 @@ function words(values: Iterable<TextValue | string>): Set<string> {
 
 function messageWords(language: string): Set<string> {
   const m = MESSAGES[language]!;
-  const { startValue, page, unitsUsed, createdOn, copyName, asOfLevel, count, ...plain } = m;
+  const {
+    startValue,
+    page,
+    unitsUsed,
+    createdOn,
+    copyName,
+    copyNameAt,
+    copyFile,
+    asOfLevel,
+    count,
+    ...plain
+  } = m;
   return words([
     ...Object.values(plain),
     startValue(""),
@@ -141,6 +152,8 @@ function messageWords(language: string): Set<string> {
     unitsUsed([]),
     createdOn(""),
     copyName(""),
+    copyNameAt("", ""),
+    copyFile("", ""),
     asOfLevel(4),
     count("2", ""),
   ]);
@@ -1849,6 +1862,23 @@ describe("the verbose design: original and copy, empty and filled", () => {
     }
   });
 
+  it("shortens a long character name in a copy's footer first: the copy's date and time stay whole", async () => {
+    for (const design of ["verbose", "classic"] as const) {
+      const original = buildSheetModel(pkg, river3(), { language: "de", createdAt });
+      // The longest name the builder takes (40 letters).
+      const copy = keptCopy(
+        { ...original, name: "Mirabella Fennwick-Ottersteg von Hollern" },
+        "Meine Fassung vom 7. Oktober, 09:40",
+      );
+      const { pageTexts, minFontSize } = await extract(await renderPdf(copy, { ...sheetOnly, design }));
+      expect(minFontSize).toBeGreaterThanOrEqual(6.99);
+      for (const page of pageTexts) {
+        expect(page, design).toContain("Meine Fassung vom 7. Oktober, 09:40 · Stand Stufe 3");
+        expect(page, design).toMatch(/Mirabella[^·]*… · Meine Fassung/u);
+      }
+    }
+  });
+
   it("writes the play state into the fields, cuts ticks at what a field holds, and skips what the sheet does not have", async () => {
     const model = buildSheetModel(pkg, lantern20(), { language: "en", createdAt });
     const boxes = model.sections.flatMap((s) => (s.kind === "statBoxes" ? s.boxes : []));
@@ -1899,6 +1929,22 @@ describe("the verbose design: original and copy, empty and filled", () => {
     const plain = await renderPdf(model, sheetOnly);
     expect(Buffer.from(empty.bytes).equals(Buffer.from(plain.bytes))).toBe(true);
     expect(Buffer.from(filled.bytes).equals(Buffer.from(plain.bytes))).toBe(false);
+  });
+
+  it("ticks a card's use boxes as the sheet's row of the same thing, unless the card has its own", async () => {
+    const model = buildSheetModel(pkg, lantern20(), { language: "en", createdAt });
+    const rows = model.sections.flatMap((s) => (s.kind === "featureTable" ? s.rows : []));
+    const card = model.cards.find((c) => c.usesField && rows.some((r) => r.id === c.id && r.usesField))!;
+    expect(card).toBeDefined();
+    const row = rows.find((r) => r.id === card.id)!;
+    const pdf = await renderPdf(model, { play: { [row.usesField!]: { checks: 1 } } });
+    expect(pdf.fields.find((f) => f.id === card.usesField)).toMatchObject({ ticks: 1 });
+    const own = await renderPdf(model, {
+      play: { [row.usesField!]: { checks: 1 }, [card.usesField!]: { checks: 2 } },
+    });
+    expect(own.fields.find((f) => f.id === card.usesField)?.ticks).toBe(
+      Math.min(2, "boxes" in card.uses! ? card.uses.boxes : 0),
+    );
   });
 
   it("fills a copy with the same play state: a field of the player's own row too", async () => {
@@ -1961,6 +2007,59 @@ describe("the classic design: original and copy, empty and filled", () => {
         expect([...words([text])].filter((w) => !known.has(w))).toEqual([]);
       }
     }
+  });
+
+  it("keeps long entries in their column, a long name off the box beside it, the harm on one line", async () => {
+    const original = buildSheetModel(pkg, lantern20(), { language: "de", createdAt });
+    const name = "Mirabella Fennwick-Ottersteg von Hollernd";
+    expect(name).toHaveLength(41);
+    const long = (n: number) =>
+      `Eigene Zeile ${n}: ein ziemlich langer Eintrag, der in keine halbe Spalte passt`;
+    const model: SheetModel = {
+      ...original,
+      sections: original.sections.map((s) =>
+        s.kind === "header"
+          ? { ...s, name }
+          : s.kind === "list"
+            ? { ...s, items: [...s.items, long(1), long(2), long(3)] }
+            : s,
+      ),
+    };
+    const pdf = await renderPdf(model, sheetOnly);
+    const { text } = await extract(pdf);
+    const page = (await positions(pdf))[0]!;
+    const g = CLASSIC_GEOMETRY;
+    const cols = firstColumns(g);
+    // Every word of the long entries is printed; nothing left of column C runs into it.
+    expect(text.match(/passt/gu)).toHaveLength(3);
+    const head = g.margin + g.first.head;
+    for (const p of page.filter((q) => q.y > head && q.x < cols.c.x))
+      expect(p.x + p.w, p.str).toBeLessThanOrEqual(cols.c.x - 1);
+    // The name: all of it, ending before the box beside it.
+    const nameEnd = g.margin + g.first.nameWidth;
+    const named = page.filter((p) => p.y < head && p.x < nameEnd);
+    expect(named.map((p) => p.str).join(" ")).toContain("Hollernd");
+    for (const p of named) expect(p.x + p.w, p.str).toBeLessThanOrEqual(nameEnd);
+    // The longest number of the attack table on one line.
+    const table = model.sections.find((s) => s.kind === "statTable");
+    if (table?.kind !== "statTable") throw new Error("no table");
+    const cells = table.rows[0]!.cells.filter((_, i) => !table.wrap?.[i]);
+    const longest = cells.reduce((a, b) => (b.length > a.length ? b : a));
+    expect(longest.length).toBeGreaterThan(15);
+    expect(page.map((p) => p.str)).toContain(longest);
+  });
+
+  it("goes on with a list in the next column only with entries, not with empty lines", async () => {
+    for (const doc of [river3(), lantern20()])
+      for (const [language] of languages) {
+        const model = buildSheetModel(pkg, doc, { language, createdAt });
+        const { text } = await extract(await renderPdf(model, sheetOnly));
+        const m = MESSAGES[language]!;
+        for (const s of model.sections.filter((x) => x.kind === "list"))
+          expect(text.toLowerCase(), `${language} ${s.title}`).not.toContain(
+            `${s.title} · ${m.continued}`.toLowerCase(),
+          );
+      }
   });
 
   it("gives the package's apart sections a page of their own when one is a box row, else runs them on", async () => {

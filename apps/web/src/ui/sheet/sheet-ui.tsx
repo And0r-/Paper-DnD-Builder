@@ -10,14 +10,15 @@ import {
   tickAt,
   ticksOf,
   withRowAdded,
-  withRowRemoved,
   withText,
   writtenOf,
   type PlayValue,
+  type SheetModel,
 } from "@builder/sheet";
 import type { SheetFieldProps, SheetRowProps, SheetTextProps, SheetUi } from "@builder/sheet/designs/screens";
 import {
   createContext,
+  useCallback,
   useContext,
   useEffect,
   useRef,
@@ -42,18 +43,40 @@ function useSheetCtx(): SheetController {
   return ctx;
 }
 
+/**
+ * The text a row just added starts with, as its path: it opens for typing
+ * as soon as it is on the screen. Outside React state, so it outlives the
+ * sheet being drawn anew (the first change to the original makes a copy).
+ */
+let openNext: string | null = null;
+
+/** The first text of the last row of section `index`. */
+function lastRowStart(model: SheetModel, index: number): (string | number)[] | null {
+  const s = model.sections[index];
+  if (s?.kind === "list") return ["sections", index, "items", s.items.length - 1];
+  if (s?.kind === "statTable" || s?.kind === "featureTable")
+    return ["sections", index, "rows", s.rows.length - 1, "name"];
+  return null;
+}
+
 /** A plain number ("12", "+2") brings up the number pad on a phone. */
 const NUMBER = /^[+-−]?\d+$/u;
 
-function SheetText({ path, value, label, multiline }: SheetTextProps) {
+function SheetText({ path, value, label, multiline, shown: display }: SheetTextProps) {
   const { t } = useApp();
   const sheet = useSheetCtx();
   const [editing, setEditing] = useState(false);
   const shown = useRef<HTMLSpanElement>(null);
   const width = useRef(0);
   const refocus = useRef(false);
+  const key = JSON.stringify(path);
+  useEffect(() => {
+    if (openNext !== key) return;
+    openNext = null;
+    if (sheet.editable) setEditing(true);
+  }, [key, sheet.editable]);
 
-  if (!sheet.editable) return <>{value}</>;
+  if (!sheet.editable) return <>{display ?? value}</>;
 
   const stop = (keep: boolean, text: string) => {
     setEditing(false);
@@ -110,12 +133,12 @@ function SheetText({ path, value, label, multiline }: SheetTextProps) {
         }
       }}
     >
-      {value}
+      {display ?? value}
     </span>
   );
 }
 
-function SheetField({ field, label, shape = "square", lines }: SheetFieldProps) {
+function SheetField({ field, label, shape = "square", lines, start }: SheetFieldProps) {
   const { t } = useApp();
   const sheet = useSheetCtx();
   const stored: PlayValue | undefined = sheet.state[field.id];
@@ -145,35 +168,85 @@ function SheetField({ field, label, shape = "square", lines }: SheetFieldProps) 
       </span>
     );
   }
-  return <WrittenField field={field} label={label} lines={lines} value={writtenOf(stored)} />;
+  return <WrittenField field={field} label={label} lines={lines} start={start} value={writtenOf(stored)} />;
 }
 
-/** A box or lines to write on; kept when left, like the texts. */
+/** A pause in typing this long saves what is written so far. */
+const WRITE_PAUSE_MS = 600;
+
+/**
+ * A box or lines to write on. Saved while writing (after a short pause),
+ * when left, and when the page is left or hidden: a note typed just before
+ * a reload or closing the tab is not lost.
+ */
 function WrittenField({
   field,
   label,
   lines,
+  start,
   value,
-}: Pick<SheetFieldProps, "field" | "label"> & { lines: number | undefined; value: string }) {
-  const sheet = useSheetCtx();
+}: Pick<SheetFieldProps, "field" | "label"> & {
+  lines: number | undefined;
+  start: string | undefined;
+  value: string;
+}) {
+  const { t } = useApp();
+  const { setField } = useSheetCtx();
   const [text, setText] = useState(value);
   // What another device or a reload brings, unless it is being written in.
   const focused = useRef(false);
   useEffect(() => {
     if (!focused.current) setText(value);
   }, [value]);
-  const keep = () => {
-    focused.current = false;
-    const next = field.kind === "pencil" ? pencilValue(text) : text.trim() === "" ? undefined : text;
-    if (writtenOf(next) !== value) sheet.setField(field.id, next);
-  };
+  // The latest text and stored value, for a save from a timer or a page event.
+  const latest = useRef({ text, value });
+  useEffect(() => {
+    latest.current = { text, value };
+  }, [text, value]);
+  const pause = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const keep = useCallback(() => {
+    clearTimeout(pause.current);
+    pause.current = undefined;
+    const { text: now, value: stored } = latest.current;
+    const next = field.kind === "pencil" ? pencilValue(now) : now.trim() === "" ? undefined : now;
+    if (writtenOf(next) !== stored) {
+      setField(field.id, next);
+      // Saved: the stored value is this now, even before the next render.
+      latest.current = { text: now, value: writtenOf(next) };
+    }
+  }, [field.id, field.kind, setField]);
+  useEffect(() => {
+    const leave = () => {
+      if (pause.current !== undefined) keep();
+    };
+    const hidden = () => {
+      if (document.visibilityState === "hidden") leave();
+    };
+    window.addEventListener("pagehide", leave);
+    document.addEventListener("visibilitychange", hidden);
+    return () => {
+      window.removeEventListener("pagehide", leave);
+      document.removeEventListener("visibilitychange", hidden);
+      // Gone from the screen (another version, another page) with something unsaved.
+      leave();
+    };
+  }, [keep]);
   const common = {
     value: text,
     "aria-label": label,
     "data-field": field.id,
-    onChange: (e: { currentTarget: { value: string } }) => setText(e.currentTarget.value),
+    onChange: (e: { currentTarget: { value: string } }) => {
+      const next = e.currentTarget.value;
+      setText(next);
+      latest.current = { ...latest.current, text: next };
+      clearTimeout(pause.current);
+      pause.current = setTimeout(keep, WRITE_PAUSE_MS);
+    },
     onFocus: () => (focused.current = true),
-    onBlur: keep,
+    onBlur: () => {
+      focused.current = false;
+      keep();
+    },
   };
   if (field.kind === "text" && lines !== undefined && lines > 0) {
     return (
@@ -185,7 +258,7 @@ function WrittenField({
       />
     );
   }
-  return (
+  const input = (
     <input
       {...common}
       type="text"
@@ -195,6 +268,36 @@ function WrittenField({
         if (e.key === "Enter") e.currentTarget.blur();
       }}
     />
+  );
+  if (field.kind !== "pencil" || start === undefined) return input;
+  // − and +: one less or more than what is written, or than the start value while nothing is.
+  const step = (by: number) => {
+    const from = [text, start].map((s) => pencilValue(s)).find((v) => typeof v === "number");
+    const next = String((from ?? 0) + by);
+    setText(next);
+    latest.current = { ...latest.current, text: next };
+    keep();
+  };
+  return (
+    <span className="sheet-stepper">
+      <button
+        type="button"
+        className="sheet-step"
+        aria-label={t("sheet.less", { label })}
+        onClick={() => step(-1)}
+      >
+        −
+      </button>
+      {input}
+      <button
+        type="button"
+        className="sheet-step"
+        aria-label={t("sheet.more", { label })}
+        onClick={() => step(1)}
+      >
+        +
+      </button>
+    </span>
   );
 }
 
@@ -207,7 +310,14 @@ function AddRow({ section, label }: SheetRowProps) {
       type="button"
       className="sheet-row-add"
       aria-label={t("sheet.addRowLabel", { section: label })}
-      onClick={() => sheet.changeModel((m) => withRowAdded(m, section))}
+      onClick={() =>
+        sheet.changeModel((m) => {
+          const next = withRowAdded(m, section);
+          const start = next === m ? null : lastRowStart(next, section);
+          openNext = start && JSON.stringify(start);
+          return next;
+        })
+      }
     >
       <Icon name="plus" size={18} />
       <span>{t("sheet.addRow")}</span>
@@ -224,7 +334,7 @@ function RemoveRow({ section, row, label }: SheetRowProps & { row: number }) {
       type="button"
       className="sheet-row-remove"
       aria-label={t("sheet.removeRow", { section: label, n: row + 1 })}
-      onClick={() => sheet.changeModel((m) => withRowRemoved(m, section, row))}
+      onClick={() => sheet.removeRow(section, row)}
     >
       <Icon name="close" size={16} />
     </button>

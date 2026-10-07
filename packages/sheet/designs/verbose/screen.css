@@ -166,7 +166,8 @@
 
 .vsheet__scores {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(8.5rem, 1fr));
+  /* Wide enough for "Standhalten +3" beside the circle, else it spills over. */
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 13rem), 1fr));
   gap: var(--space-2);
 }
 
@@ -437,12 +438,143 @@
   font-size: var(--text-xs);
 }
 
+/* Who is cut first where the line is short; which sheet, the units and the page stay whole. */
+.vsheet__footer-line {
+  display: flex;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.vsheet__footer-who {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.vsheet__footer-rest,
+.vsheet__footer-date {
+  flex: none;
+  white-space: pre;
+}
+
+/* Measures a millimetre of the screen, for placing the sections on pages. */
+.vsheet__mm {
+  position: absolute;
+  width: 0;
+  height: 100mm;
+  visibility: hidden;
+}
+
+/* On a phone: a box to tick is one row, its name and number left, the ticks right, compact
+   (24 px, 8 px apart, WCAG 2.5.8), so rest and close calls stay short. */
+@media (max-width: 899.98px) {
+  .vsheet__box--boxes,
+  .vsheet__box--circles {
+    --sheet-tick: 24px;
+    display: grid;
+    grid-column: 1 / -1;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "label ticks"
+      "value ticks"
+      "hint hint";
+    align-items: center;
+    justify-items: start;
+    gap: 0 var(--space-3);
+    text-align: left;
+  }
+
+  .vsheet__box--boxes > .vsheet__box-label,
+  .vsheet__box--circles > .vsheet__box-label {
+    grid-area: label;
+    overflow-wrap: normal;
+  }
+
+  .vsheet__box--boxes > .vsheet__box-value,
+  .vsheet__box--circles > .vsheet__box-value {
+    grid-area: value;
+    font-size: var(--text-lg);
+    white-space: nowrap;
+  }
+
+  .vsheet__box--boxes > .vsheet__box-hint,
+  .vsheet__box--circles > .vsheet__box-hint {
+    grid-area: hint;
+    margin-top: var(--space-1);
+  }
+
+  .vsheet__box--boxes > .sheet-ticks,
+  .vsheet__box--circles > .sheet-ticks {
+    grid-area: ticks;
+    justify-self: end;
+    justify-content: flex-end;
+    gap: 8px;
+    max-width: calc(6 * 24px + 5 * 8px);
+  }
+
+  /* A table's rows one under the other: the name, then each value under its column's name. */
+  .vsheet__table,
+  .vsheet__table tbody,
+  .vsheet__table tr,
+  .vsheet__table th,
+  .vsheet__table td {
+    display: block;
+  }
+
+  .vsheet__table thead {
+    display: block;
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+
+  .vsheet__table tbody tr {
+    position: relative;
+    padding: var(--space-2) var(--sheet-touch) var(--space-2) 0;
+    border-bottom: 1px solid var(--color-line);
+  }
+
+  .vsheet__table tbody th,
+  .vsheet__table tbody td {
+    padding: 0;
+    border: 0;
+    white-space: normal;
+  }
+
+  .vsheet__table tbody td {
+    display: grid;
+    grid-template-columns: 7.5rem minmax(0, 1fr);
+    gap: var(--space-2);
+  }
+
+  .vsheet__table tbody td::before {
+    content: attr(data-col);
+    color: var(--color-ink-muted);
+    font-size: var(--text-xs);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+
+  .vsheet__table tbody td.vsheet__row-tools {
+    position: absolute;
+    top: var(--space-1);
+    right: 0;
+    display: block;
+    width: auto;
+  }
+
+  .vsheet__table tbody td.vsheet__row-tools::before {
+    content: none;
+  }
+}
+
 /* ---------------------------------------------------------- the A4 page */
 
 @media (min-width: 900px) {
   .vsheet {
-    /* As on paper, but never below what a pointer can hit (24 px, WCAG 2.2). */
-    --sheet-tick: max(var(--vs-square), 24px);
+    /* Ticks of 18 px, 24 px apart: each keeps the 24 px a pointer needs (WCAG 2.2, 2.5.8, spacing). */
+    --sheet-tick: max(var(--vs-square), 18px);
     --sheet-touch: auto;
     --sheet-number: var(--vs-bigValue);
     font-size: var(--vs-body);
@@ -508,6 +640,61 @@
     margin-top: 1mm;
   }
 
+  /* "How your turn goes": a step a line, as in the PDF. */
+  .vsheet__help p {
+    white-space: pre-line;
+  }
+
+  /* What a sentence explains is read on screen, not at arm's length: never below 12 px. */
+  .vsheet__hint,
+  .vsheet__box-hint,
+  .vsheet__group-hint {
+    font-size: max(var(--vs-hint), 12px);
+  }
+
+  /* Placed on pages: each section where the PDF's rule puts it, the pages drawn behind. */
+  .vsheet--paged .vsheet__page {
+    display: block;
+    position: relative;
+    isolation: isolate;
+    height: var(--vs-sheet-h);
+    min-height: 0;
+    padding: 0;
+    background: none;
+    box-shadow: none;
+  }
+
+  .vsheet--paged .vsheet__section {
+    position: absolute;
+    box-sizing: border-box;
+  }
+
+  .vsheet__paper {
+    position: absolute;
+    left: 0;
+    z-index: -1;
+    box-sizing: border-box;
+    width: var(--vs-page-w);
+    padding: var(--vs-margin);
+    background: #fff;
+    box-shadow: var(--shadow-2);
+  }
+
+  .vsheet__cont {
+    margin: 0;
+    padding-bottom: 1mm;
+    border-bottom: 0.3mm solid #222;
+    font-size: var(--vs-body);
+    font-weight: var(--weight-bold);
+  }
+
+  .vsheet__paper .vsheet__footer {
+    position: absolute;
+    right: var(--vs-margin);
+    bottom: var(--vs-margin);
+    left: var(--vs-margin);
+  }
+
   .vsheet__header {
     grid-template-columns: 1fr minmax(0, 60mm);
     gap: 1mm 4mm;
@@ -556,8 +743,18 @@
     border-radius: var(--vs-radius);
   }
 
+  /* A long word in a box is set smaller rather than broken ("GLÜCKSMARKEN"). */
+  .vsheet__box {
+    container-type: inline-size;
+  }
+
   .vsheet__box-label {
-    font-size: var(--vs-sectionTitle);
+    overflow-wrap: normal;
+    font-size: min(var(--vs-sectionTitle), 11cqi);
+  }
+
+  .vsheet__box .sheet-ticks {
+    gap: 6px;
   }
 
   .vsheet__box-hint {
@@ -595,8 +792,9 @@
     font-size: 12pt;
   }
 
+  /* Two columns from 90 mm on, as in the PDF. */
   .vsheet__checks {
-    grid-template-columns: repeat(auto-fill, minmax(min(100%, 80mm), 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 43mm), 1fr));
     column-gap: 4mm;
   }
 
@@ -644,9 +842,22 @@
     font-size: var(--vs-small);
   }
 
+  /* As in the PDF: the marks at the end of the name's column, before the text; the note under the name. */
   .vsheet__feature-name {
-    flex-direction: column;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: baseline;
+    column-gap: 1.5mm;
     font-size: var(--vs-fieldName);
+  }
+
+  .vsheet__feature-name > .vsheet__marks {
+    grid-row: 1;
+    grid-column: 2;
+  }
+
+  .vsheet__feature-name > .vsheet__feature-note {
+    grid-column: 1 / -1;
   }
 
   .vsheet__group {
@@ -692,4 +903,10 @@
     padding-top: 1mm;
     border-top: 0.1mm solid #999;
   }
+}
+
+/* The player's own rows after the package's groups: set off, under no group's heading. */
+.vsheet__feature-wrap--own {
+  margin-top: var(--space-3);
+  border-top: 2px solid var(--color-line);
 }

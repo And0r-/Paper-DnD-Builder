@@ -7,6 +7,8 @@
 
 export interface Messages {
   playedBy: string;
+  /** What the first place of a row holds, for a screen reader: the row's name. */
+  rowName: string;
   /** Small in the corner of a field the player fills in by hand: what goes there and with what. */
   pencil: string;
   /** Hint under a pencil box: the value to start with. */
@@ -19,6 +21,10 @@ export interface Messages {
   createdOn: (date: string) => string;
   /** Name of a copy of the sheet the player keeps, until they give it one. */
   copyName: (date: string) => string;
+  /** The copy as the screen and the PDF name it: when it was made, to the minute. */
+  copyNameAt: (date: string, time: string) => string;
+  /** The copy in a file name, without characters a file system refuses ("Version October 7 09-40"). */
+  copyFile: (date: string, time: string) => string;
   /** Footer of a kept copy: the level of the original it was made from. */
   asOfLevel: (level: number) => string;
   cards: string;
@@ -43,12 +49,15 @@ export interface Messages {
 export const MESSAGES: Readonly<Record<string, Messages>> = {
   de: {
     playedBy: "Gespielt von",
+    rowName: "Name",
     pencil: "Aktuell, mit Bleistift:",
     startValue: (n) => `Startwert ${n}`,
     unnamed: "Ohne Namen",
     page: (n, of) => `Seite ${n} von ${of}`,
     unitsUsed: (u) => `Einheiten: ${u.join(", ")}`,
     copyName: (d) => `Meine Fassung vom ${d}`,
+    copyNameAt: (d, t) => `Meine Fassung vom ${d}, ${t}`,
+    copyFile: (d, t) => `Fassung ${d} ${t.replace(/:/g, "-")}`,
     asOfLevel: (n) => `Stand Stufe ${n}`,
     createdOn: (d) => `Erstellt am ${d}`,
     cards: "Karten",
@@ -67,12 +76,15 @@ export const MESSAGES: Readonly<Record<string, Messages>> = {
   },
   en: {
     playedBy: "Played by",
+    rowName: "Name",
     pencil: "Current, in pencil:",
     startValue: (n) => `Start at ${n}`,
     unnamed: "No name yet",
     page: (n, of) => `Page ${n} of ${of}`,
     unitsUsed: (u) => `Units: ${u.join(", ")}`,
     copyName: (d) => `My version of ${d}`,
+    copyNameAt: (d, t) => `My version of ${d}, ${t}`,
+    copyFile: (d, t) => `Version ${d} ${t.replace(/:/g, "-")}`,
     asOfLevel: (n) => `as of level ${n}`,
     createdOn: (d) => `Made on ${d}`,
     cards: "Cards",

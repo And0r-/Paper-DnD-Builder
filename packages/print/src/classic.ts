@@ -196,7 +196,13 @@ function headerBlock(c: Ctx, s: Section<"header">): Block {
   return measured(c, s, (x, y, w) => {
     pen.text(s.packageName, x + w, y + 3, pen.fit(s.packageName, st.small, w / 3), "right");
     const nw = g.first.nameWidth;
-    pen.text(s.name, x + 0.5, y + 11, pen.fit(s.name, st.name, nw - 1, 12));
+    // A long name is set smaller, down to 9 pt, then in two lines; it never reaches the box beside it.
+    const name = pen.fit(s.name, st.name, nw - 1, 9);
+    if (pen.width(s.name, name) <= nw - 1) pen.text(s.name, x + 0.5, y + 11, name);
+    else {
+      const two = pen.wrapWords(s.name, { ...st.name, size: 9 }, nw - 1);
+      pen.lines(two.lines.slice(0, 2), x + 0.5, y + 4.2, two.style, 1.1);
+    }
     pen.line(x, y + 13, x + nw, y + 13, 0.6, LINE);
     pen.text(s.summary, x + 0.5, y + 18, pen.fit(s.summary, st.summary, nw));
     const bx = x + nw + 4;
@@ -248,7 +254,10 @@ function scoresBlock(c: Ctx, s: Section<"scoreColumn">): Block {
   });
 }
 
-/** Top of column B: the further number of every score that has one, as a list with circles. */
+/**
+ * Top of column B: the further number of every score that has one, as a list. No circle: the
+ * package does not say which of them are trained, and an empty circle would say "not trained".
+ */
 function extrasBlock(c: Ctx, s: Section<"scoreColumn">): Block | null {
   const { pen, g, st } = c;
   const extras = s.scores.filter((sc) => sc.extra);
@@ -261,10 +270,9 @@ function extrasBlock(c: Ctx, s: Section<"scoreColumn">): Block | null {
     pen.text(title, x + w / 2, y + 4, pen.fit(title, st.title, w - 4), "center");
     extras.forEach((sc, i) => {
       const base = y + 9 + i * row;
-      pen.circle(x + 3.5, base - 1.1, g.box.dot / 2);
-      pen.text(sc.extra!.value, x + 12, base, pen.fit(sc.extra!.value, st.value, 6), "right");
-      pen.line(x + 6, base + 0.6, x + 12.5, base + 0.6, 0.4, LINE);
-      pen.text(sc.label, x + 14, base, pen.fit(sc.label, st.body, w - 16));
+      pen.text(sc.extra!.value, x + 9, base, pen.fit(sc.extra!.value, st.value, 6), "right");
+      pen.line(x + 3, base + 0.6, x + 9.5, base + 0.6, 0.4, LINE);
+      pen.text(sc.label, x + 11, base, pen.fit(sc.label, st.body, w - 13));
     });
     return h;
   });
@@ -423,38 +431,79 @@ function clusterBlock(c: Ctx, sections: Section<"statBoxes">[]): Block | null {
 function statTableBlocks(c: Ctx, s: Section<"statTable">): Block[] {
   const { pen, g, st } = c;
   const wraps = (i: number) => s.wrap?.[i] === true;
-  const nameW = (w: number) =>
-    Math.min(w * 0.28, Math.max(18, ...s.rows.map((r) => pen.width(r.name, st.rowName))) + 4);
-  // A narrow column is as wide as its widest cell or heading; wrapping columns share the rest.
+  const small = { ...st.value, size: g.type.min };
+  const names = Math.max(18, ...s.rows.map((r) => pen.width(r.name, st.rowName))) + 4;
+  // A heading may take two lines, small and not in capitals: it needs its longest word so.
+  const plain = { ...st.label, caps: false, spacing: 0 };
+  const headW = (col: string) => Math.max(0, ...col.split(/\s+/u).map((word) => pen.width(word, plain)));
+  // A narrow column is as wide as its widest cell or heading; when they do not all fit, each gives
+  // way evenly down to its widest cell at the smallest size. Wrapping columns share the rest.
   const natural = s.columns.map(
     (col, i) =>
       Math.max(pen.width(col, st.label), ...s.rows.map((r) => pen.width(r.cells[i] ?? "", st.value)), 8) + 3,
   );
-  const colW = (w: number, i: number) => {
+  // A long cell (a row written by hand) wraps rather than take the room of the others.
+  const least = s.columns.map(
+    (col, i) =>
+      Math.min(32, Math.max(headW(col), ...s.rows.map((r) => pen.width(r.cells[i] ?? "", small)), 5)) + 2.5,
+  );
+  // A wrapping column is never narrower than its longest word.
+  const words = (t: string, style: TextStyle) =>
+    Math.max(0, ...t.split(/\s+/u).map((word) => pen.width(word, style)));
+  const wrapMin = s.columns.map((col, i) =>
+    wraps(i) ? Math.max(15, headW(col), ...s.rows.map((r) => words(r.cells[i] ?? "", st.small))) + 3 : 0,
+  );
+  const sum = (a: number[]) => a.reduce((t, n, j) => t + (wraps(j) ? 0 : n), 0);
+  const wrapRoom = wrapMin.reduce((a, b) => a + b, 0);
+  // The name column gives way first (down to 16 mm), so the numbers keep one line.
+  const nameW = (w: number) => {
+    const wide = Math.min(w * 0.28, names);
+    const short = w - wide - wrapRoom - sum(least);
+    return short >= 0 ? wide : Math.max(16, wide + short);
+  };
+  const widths = (w: number): number[] => {
     const rest = w - nameW(w);
-    const wrapCount = s.columns.filter((_, j) => wraps(j)).length;
-    const fixed = natural.reduce((a, n, j) => a + (wraps(j) ? 0 : n), 0);
-    // Wrapping columns keep at least 20 mm; narrow ones give way if needed.
-    const scale = Math.min(1, (rest - 20 * wrapCount) / Math.max(1, fixed));
-    return wraps(i) ? (rest - fixed * scale) / Math.max(1, wrapCount) : natural[i]! * scale;
+    const room = rest - wrapRoom;
+    const [nat, low] = [sum(natural), sum(least)];
+    const fixed = s.columns.map((_, i) =>
+      nat <= room
+        ? natural[i]!
+        : low <= room
+          ? least[i]! + ((natural[i]! - least[i]!) * (room - low)) / Math.max(1, nat - low)
+          : (least[i]! * room) / Math.max(1, low),
+    );
+    // What is left goes to the wrapping columns, by their least.
+    const left = rest - sum(fixed);
+    return fixed.map((f, i) => (wraps(i) ? (left * wrapMin[i]!) / Math.max(1, wrapRoom) : f));
+  };
+  /** A cell's lines: one line at the largest size that fits, else wrapped small. */
+  const cellLines = (text: string, cw: number, wrap: boolean) => {
+    const one = pen.fit(text, st.value, cw - 1);
+    if (!wrap && pen.width(text, one) <= cw - 0.6) return { lines: [text], style: one, wrapped: false };
+    return { lines: pen.wrap(text, st.small, cw - 2), style: st.small, wrapped: true };
   };
   const lefts = (x: number, w: number) => {
     const out: number[] = [];
     let at = x + nameW(w);
-    s.columns.forEach((_, i) => {
+    for (const cw of widths(w)) {
       out.push(at);
-      at += colW(w, i);
-    });
+      at += cw;
+    }
     return out;
   };
   const head = measured(
     c,
     s,
     (x, y, w) => {
-      // A heading wider than its column at 7 pt takes two lines.
+      // A heading wider than its column at 7 pt takes two lines; if one has to lose its
+      // capitals for that, all headings of the table go without, so they read as one row.
       let lines = 1;
+      const ws = widths(w);
+      let labels = s.columns.map((col, i) => pen.label(col, st.label, ws[i]! - 1.5));
+      if (labels.some((l) => !l.style.caps))
+        labels = s.columns.map((col, i) => pen.label(col, plain, ws[i]! - 1.5));
       lefts(x, w).forEach((cx, i) => {
-        const label = pen.label(s.columns[i]!, st.label, colW(w, i) - 1.5);
+        const label = labels[i]!;
         lines = Math.max(lines, label.lines.length);
         label.lines.forEach((l, k) => pen.text(l, cx + 0.5, y + 2.6 + k * 2.8, label.style));
       });
@@ -462,26 +511,29 @@ function statTableBlocks(c: Ctx, s: Section<"statTable">): Block[] {
     },
     { keep: true },
   );
+  const lead = pen.lineHeight(st.small, 1.1);
   const row = (name: string, cells: string[]) =>
     measured(c, s, (x, y, w) => {
-      // A wrapping cell makes the whole row taller.
+      const ws = widths(w);
+      const nw = nameW(w) - 3;
+      const nameLines =
+        pen.width(name, pen.fit(name, st.rowName, nw)) <= nw ? null : pen.wrap(name, st.small, nw);
+      const shown = s.columns.map((_, i) => cellLines(cells[i] ?? "", ws[i]! - 1.5, wraps(i)));
+      // A wrapped cell or name makes the whole row taller.
       const rh = Math.max(
         g.box.tableRow,
-        ...s.columns.map((_, i) =>
-          wraps(i)
-            ? pen.wrap(cells[i] ?? "", st.small, colW(w, i) - 3.5).length * pen.lineHeight(st.small, 1.1) +
-              1.4
-            : 0,
-        ),
+        (nameLines?.length ?? 0) * lead + 1.4,
+        ...shown.map((sh) => (sh.wrapped ? sh.lines.length * lead + 1.4 : 0)),
       );
       pen.rect(x, y + 0.4, nameW(w) - 1, rh, { width: 0.4, stroke: RULE });
-      pen.text(name, x + 1, y + 3.8, pen.fit(name, st.rowName, nameW(w) - 3));
+      if (nameLines) pen.lines(nameLines, x + 1, y + 1.1, st.small, 1.1);
+      else pen.text(name, x + 1, y + 3.8, pen.fit(name, st.rowName, nw));
       lefts(x, w).forEach((cx, i) => {
-        const cw = colW(w, i) - 1.5;
+        const cw = ws[i]! - 1.5;
         pen.rect(cx, y + 0.4, cw, rh, { width: 0.4, stroke: RULE });
-        const cell = cells[i] ?? "";
-        if (wraps(i)) pen.paragraph(cell, cx + 1, y + 1.1, cw - 2, st.small, 1.1);
-        else pen.text(cell, cx + cw / 2, y + 3.8, pen.fit(cell, st.value, cw - 1), "center");
+        const sh = shown[i]!;
+        if (sh.wrapped) pen.lines(sh.lines, cx + 1, y + 1.1, sh.style, 1.1);
+        else pen.text(sh.lines[0]!, cx + cw / 2, y + 3.8, sh.style, "center");
       });
       return rh + 1.4;
     });
@@ -521,6 +573,9 @@ function featureBlocks(c: Ctx, s: Section<"featureTable">): Block[] {
           keep: true,
         }),
       );
+    } else if (r.group === null && group !== null) {
+      // The player's own rows after the package's groups: a gap, under no group's heading.
+      out.push(measured(c, s, () => 2.4, { keep: true }));
     }
     group = r.group?.key ?? null;
     out.push(measured(c, s, (x, y, w) => featureRow(c, r, x, y, w)));
@@ -531,50 +586,52 @@ function featureBlocks(c: Ctx, s: Section<"featureTable">): Block[] {
 }
 
 /**
- * A list on lines, two to a row; with `room` (mm), empty lines fill it. What
- * the play state wrote goes on the empty lines, in order.
+ * A list on lines, an entry a line, wrapped onto the next line where it is
+ * longer; with `room` (mm), empty lines fill it, and only so many: empty
+ * lines never go on in another column. What the play state wrote goes on
+ * the empty lines, in order.
  */
-function listBlocks(c: Ctx, s: Section<"list">, room = 0, columns = 2): Block[] {
+function listBlocks(c: Ctx, s: Section<"list">, room = 0): Block[] {
   const { pen, g, st } = c;
   const line = g.box.listLine;
-  const cellW = (w: number) => (w - 3 * (columns - 1)) / columns;
-  // Written lines are wrapped to the width of a cell in the band (columns of the same width later).
+  // Written lines are wrapped to the width of the band (columns later are narrower, and wrap again).
   const bandW = firstColumns(g).a.w + g.first.gap + firstColumns(g).b.w;
-  const written = pen.wrap(pen.written(s.field), st.written, cellW(bandW) - 1).filter((l) => l.trim() !== "");
-  const fit = Math.max(0, Math.floor((room - g.titleHeight - 1) / line)) * columns;
-  const blank = Math.max(s.blankLines, written.length, fit - s.items.length);
-  const cells = [
-    ...s.items.map((t) => ({ t, blank: -1 })),
-    ...Array.from({ length: blank }, (_, i) => ({ t: "", blank: i })),
-  ];
-  while (cells.length % columns !== 0) cells.push({ t: "", blank: cells.length - s.items.length });
-  const rows: (typeof cells)[] = [];
-  for (let i = 0; i < cells.length; i += columns) rows.push(cells.slice(i, i + columns));
-  const firstBlank = rows.findIndex((r) => r.some((cell) => cell.blank >= 0));
-  return [
-    ...titled(c, s),
-    ...rows.map((row, ri) =>
-      measured(c, s, (x, y, w) => {
-        const cw = cellW(w);
-        const base = y + line - 1;
-        if (ri === firstBlank && s.blankLines + written.length > 0)
-          pen.field(s.field, x, y, w, line, { text: written.join("\n") });
-        row.forEach((cell, k) => {
-          const cx = x + k * (cw + 3);
-          const text = cell.blank >= 0 ? (written[cell.blank] ?? "") : cell.t;
-          if (text !== "")
-            pen.text(
-              text,
-              cx + 0.5,
-              base - 0.8,
-              pen.fit(text, cell.blank >= 0 ? st.written : st.body, cw - 1),
-            );
-          pen.line(cx, base, cx + cw, base, 0.4, RULE);
-        });
-        return line;
-      }),
-    ),
-  ];
+  const written = pen.wrap(pen.written(s.field), st.written, bandW - 1).filter((l) => l.trim() !== "");
+  const entryLines = (t: string, w: number) => pen.wrap(t, st.body, w - 1);
+  const used = s.items.reduce((n, t) => n + entryLines(t, bandW).length, 0);
+  // The flow leaves 0.6 mm after every block: the title, each entry, the empty lines.
+  const fit = Math.max(0, Math.floor((room - g.titleHeight - 0.6 * (s.items.length + 2) - 1) / line));
+  const blank = Math.max(written.length, room > 0 ? fit - used : s.blankLines);
+  const entries = s.items.map((t) =>
+    measured(c, s, (x, y, w) => {
+      const lines = entryLines(t, w);
+      lines.forEach((l, i) => {
+        const base = y + (i + 1) * line - 1;
+        pen.text(l, x + 0.5, base - 0.8, st.body);
+        pen.line(x, base, x + w, base, 0.4, RULE);
+      });
+      return lines.length * line;
+    }),
+  );
+  const blanks =
+    blank <= 0
+      ? []
+      : [
+          measured(c, s, (x, y, w) => {
+            const text = written.join("\n");
+            const shown = pen.wrap(text, st.written, w - 1).filter((l) => l.trim() !== "");
+            const n = Math.max(blank, shown.length);
+            if (s.blankLines + written.length > 0) pen.field(s.field, x, y, w, n * line, { text });
+            for (let i = 0; i < n; i++) {
+              const base = y + (i + 1) * line - 1;
+              const l = shown[i];
+              if (l) pen.text(l, x + 0.5, base - 0.8, pen.fit(l, st.written, w - 1));
+              pen.line(x, base, x + w, base, 0.4, RULE);
+            }
+            return n * line;
+          }),
+        ];
+  return [...titled(c, s), ...entries, ...blanks];
 }
 
 /** Answers on a line each, the question small under it; an open one gets two lines to write on. */

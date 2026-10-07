@@ -18,6 +18,8 @@ export interface SheetTextProps {
   label: string;
   /** Paragraphs rather than one line. */
   multiline?: boolean;
+  /** What to show while not changing it, if not `value` as it is (steps a line each); changed is `value`. */
+  shown?: string;
 }
 
 export interface SheetFieldProps {
@@ -27,6 +29,11 @@ export interface SheetFieldProps {
   shape?: "circle" | "square";
   /** Lines to write on, for a text field. */
   lines?: number;
+  /**
+   * For a pencil field: the value to count from while nothing is written
+   * ("18"). Given, the field has − and + beside it on a phone.
+   */
+  start?: string;
 }
 
 export interface SheetRowProps {

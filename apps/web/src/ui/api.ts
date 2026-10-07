@@ -28,15 +28,29 @@ export class ApiError extends Error {
   }
 }
 
-export async function api<T>(method: string, path: string, body?: unknown): Promise<T> {
+/** The browser sends at most this much with `keepalive`; a larger body goes as an ordinary request. */
+const KEEPALIVE_MAX_BYTES = 60_000;
+
+/**
+ * `keepalive`: the request goes out even if the page is closed or reloaded
+ * right after it was started (a note typed just before leaving).
+ */
+export async function api<T>(
+  method: string,
+  path: string,
+  body?: unknown,
+  options: { keepalive?: boolean } = {},
+): Promise<T> {
   let res: Response;
+  const json = body !== undefined ? JSON.stringify(body) : undefined;
   try {
     res = await fetch(path, {
       method,
       credentials: "same-origin",
       cache: "no-store",
-      headers: body !== undefined ? { "content-type": "application/json" } : {},
-      ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+      headers: json !== undefined ? { "content-type": "application/json" } : {},
+      ...(json !== undefined ? { body: json } : {}),
+      ...(options.keepalive && new Blob([json ?? ""]).size <= KEEPALIVE_MAX_BYTES ? { keepalive: true } : {}),
     });
   } catch {
     throw new ApiError(0, "network");

@@ -10,7 +10,7 @@
  * screen then shows that copy, and the account opens it next time. A write
  * that another device beat (409) loads what is stored and says so.
  */
-import type { PlayValue, SheetModel } from "@builder/sheet";
+import { withRowRemoved, type PlayValue, type SheetModel } from "@builder/sheet";
 import { useCallback, useEffect, useMemo, useReducer, useRef } from "react";
 import { api, ApiError } from "../api.ts";
 import { useApp } from "../app-state.tsx";
@@ -34,6 +34,13 @@ export type SaveState = "idle" | "saving" | "saved" | "error" | "offline";
 /** A short line about something the player did not do themselves. */
 export type SheetNotice = "otherDevice" | "copyGone" | "limit";
 
+/** What can be taken back for a short while: every tick rubbed out, or a row crossed out. */
+export type SheetUndoKind = "checks" | "row";
+interface Undo {
+  kind: SheetUndoKind;
+  run: () => void;
+}
+
 interface Live {
   load: "loading" | "ready" | "error";
   copies: CopyEntry[];
@@ -48,11 +55,14 @@ interface Live {
   notice: SheetNotice | null;
   modelDirty: boolean;
   stateDirty: boolean;
+  undo: Undo | null;
 }
 
 type CopyView = { copy: CopyEntry; model: SheetModel };
 
 const RETRY_MS = 3000;
+/** How long "undo" stays next to "saved". */
+export const UNDO_MS = 10_000;
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 export function useSheet(draftId: string) {
@@ -72,7 +82,23 @@ export function useSheet(draftId: string) {
     notice: null,
     modelDirty: false,
     stateDirty: false,
+    undo: null,
   });
+  const undoTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  /** Offers `undo` until the time is up or anything else changes. */
+  const offerUndo = useCallback((undo: Undo | null) => {
+    clearTimeout(undoTimer.current);
+    live.current.undo = undo;
+    if (undo) {
+      undoTimer.current = setTimeout(() => {
+        if (live.current.undo === undo) {
+          live.current.undo = null;
+          render();
+        }
+      }, UNDO_MS);
+    }
+  }, []);
+  useEffect(() => () => clearTimeout(undoTimer.current), []);
   const queue = useRef<Promise<void>>(Promise.resolve());
   const pending = useRef(0);
   const base = `/api/drafts/${draftId}`;
@@ -255,12 +281,36 @@ export function useSheet(draftId: string) {
       if (next === S.model) return;
       S.model = next;
       S.notice = null;
+      offerUndo(null);
       const queued = S.modelDirty;
       S.modelDirty = true;
       render();
       if (!queued) enqueue(saveModel);
     },
-    [canEdit, enqueue, saveModel],
+    [canEdit, enqueue, saveModel, offerUndo],
+  );
+
+  /** Crosses out a row; "undo" puts it back as long as the section was not changed since. */
+  const removeRow = useCallback(
+    (section: number, row: number) => {
+      const S = live.current;
+      const before = S.model?.sections[section];
+      changeModel((m) => withRowRemoved(m, section, row));
+      const after = S.model?.sections[section];
+      if (!before || !after || before === after) return;
+      const same = JSON.stringify(after);
+      offerUndo({
+        kind: "row",
+        run: () =>
+          changeModel((m) =>
+            JSON.stringify(m.sections[section]) === same
+              ? { ...m, sections: m.sections.map((s, i) => (i === section ? before : s)) }
+              : m,
+          ),
+      });
+      render();
+    },
+    [changeModel, offerUndo],
   );
 
   // ------------------------------------------------------------ play state
@@ -271,10 +321,13 @@ export function useSheet(draftId: string) {
     S.stateDirty = false;
     const sent = S.state;
     try {
-      const r = await api<{ state: Record<string, PlayValue>; version: number }>("PUT", `${base}/state`, {
-        version: S.stateVersion,
-        state: sent,
-      });
+      // Kept alive: a note written just before the page is left still arrives.
+      const r = await api<{ state: Record<string, PlayValue>; version: number }>(
+        "PUT",
+        `${base}/state`,
+        { version: S.stateVersion, state: sent },
+        { keepalive: true },
+      );
       S.stateVersion = r.version;
       if (S.state === sent) S.state = r.state;
     } catch (error) {
@@ -296,18 +349,36 @@ export function useSheet(draftId: string) {
       else next[id] = value;
       S.state = next;
       S.notice = null;
+      offerUndo(null);
       const queued = S.stateDirty;
       S.stateDirty = true;
       render();
       if (!queued) enqueue(saveState);
     },
-    [enqueue, saveState],
+    [enqueue, saveState, offerUndo],
   );
 
   const clearChecks = useCallback(() => {
     const S = live.current;
+    const ticks = Object.fromEntries(Object.entries(S.state).filter(([, v]) => typeof v === "object"));
     S.state = Object.fromEntries(Object.entries(S.state).filter(([, v]) => typeof v !== "object"));
     S.notice = null;
+    // Undo ticks again what was ticked; whatever was written since stays.
+    offerUndo(
+      Object.keys(ticks).length === 0
+        ? null
+        : {
+            kind: "checks",
+            run: () => {
+              const S = live.current;
+              S.state = { ...S.state, ...ticks };
+              const queued = S.stateDirty;
+              S.stateDirty = true;
+              render();
+              if (!queued) enqueue(saveState);
+            },
+          },
+    );
     render();
     enqueue(async () => {
       try {
@@ -326,7 +397,7 @@ export function useSheet(draftId: string) {
       }
       render();
     });
-  }, [base, enqueue]);
+  }, [base, enqueue, saveState, offerUndo]);
 
   // -------------------------------------------------------------- versions
 
@@ -336,6 +407,7 @@ export function useSheet(draftId: string) {
       const S = live.current;
       if (version === S.version) return;
       S.notice = null;
+      offerUndo(null);
       enqueue(async () => {
         if (version === ORIGINAL) await openOriginal();
         else await openCopy(version);
@@ -345,7 +417,7 @@ export function useSheet(draftId: string) {
         );
       });
     },
-    [base, enqueue, openCopy, openOriginal],
+    [base, enqueue, openCopy, openOriginal, offerUndo],
   );
 
   const S = live.current;
@@ -366,8 +438,18 @@ export function useSheet(draftId: string) {
         render();
       },
       editable: canEdit(),
+      undo: S.undo?.kind ?? null,
+      /** Takes back the last "clear all ticks" or crossed-out row, once. */
+      runUndo: () => {
+        const undo = live.current.undo;
+        if (!undo) return;
+        offerUndo(null);
+        undo.run();
+        render();
+      },
       atLimit: S.version === ORIGINAL && S.copies.length >= S.max,
       changeModel,
+      removeRow,
       setField,
       clearChecks,
       select,
@@ -383,9 +465,12 @@ export function useSheet(draftId: string) {
       S.state,
       S.save,
       S.notice,
+      S.undo,
       load,
       canEdit,
       changeModel,
+      removeRow,
+      offerUndo,
       setField,
       clearChecks,
       select,

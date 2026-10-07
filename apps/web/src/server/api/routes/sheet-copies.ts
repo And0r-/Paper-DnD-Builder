@@ -76,10 +76,21 @@ function copyEntry(c: SheetCopyEntry) {
   };
 }
 
+/**
+ * A copy's model as it is kept: without `values`. Those are the original's
+ * numbers and what follows from them; a copy is changed like paper, where
+ * nothing follows, so they would be a second, older set of numbers next to
+ * the ones on the page (a reader of the API, such as a later MCP server,
+ * would get two).
+ */
+function kept<M extends object>(model: M): M {
+  return { ...model, values: [] };
+}
+
 /** The copy with its model; the model's origin always says which copy it is. */
 export function copyView(c: SheetCopyRow) {
   const model = {
-    ...c.model,
+    ...kept(c.model),
     origin: {
       kind: "copy",
       name: c.name,
@@ -122,7 +133,7 @@ export async function loadCopy(
 }
 
 /** "Meine Fassung vom 6. Oktober 2026", in the sheet's (the account's) language. */
-function defaultName(language: string, now: Date): string {
+export function defaultName(language: string, now: Date): string {
   const date = new Intl.DateTimeFormat(language, { dateStyle: "long" }).format(now);
   return MESSAGES[language]!.copyName(date);
 }
@@ -190,7 +201,7 @@ export const sheetCopyRoutes: Route[] = [
         changedAt: original.origin.changedAt!,
         packageVersion: original.origin.packageVersion,
       };
-      let model: SheetModel = original;
+      let model: SheetModel = kept(original);
       if (body.model) {
         const seen = body.model.origin;
         if (
@@ -201,7 +212,7 @@ export const sheetCopyRoutes: Route[] = [
         ) {
           throw new HttpError(409, "originalChanged", { original: originalStamp(ctx.app, row) });
         }
-        model = body.model;
+        model = kept(body.model);
       }
       checkSize(model);
       const now = ctx.app.now();
@@ -257,7 +268,7 @@ export const sheetCopyRoutes: Route[] = [
       if (body.model) checkSize(body.model);
       const updated = await ctx.app.store.updateSheetCopy(row.id, copy.id, body.version, {
         ...(body.name !== undefined ? { name: body.name } : {}),
-        ...(body.model ? { model: body.model } : {}),
+        ...(body.model ? { model: kept(body.model) } : {}),
         now: ctx.app.now(),
       });
       if (!updated) {

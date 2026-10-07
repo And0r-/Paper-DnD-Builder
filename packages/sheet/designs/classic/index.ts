@@ -193,6 +193,11 @@ export function classicPlan(sections: readonly Pick<SheetSection, "kind" | "apar
     parts[part].push(i);
   });
   const apartPage = parts.apart.some((i) => sections[i]!.kind === "statBoxes");
+  // On a page of their own the box rows come first, across the page; the rest after them.
+  if (apartPage) {
+    const boxRow = (i: number) => sections[i]!.kind === "statBoxes";
+    parts.apart = [...parts.apart.filter(boxRow), ...parts.apart.filter((i) => !boxRow(i))];
+  }
   const p = parts;
   const order = [
     ...p.header,

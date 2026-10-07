@@ -5,6 +5,8 @@
  * No layout and no PDF here, and nothing about any game.
  */
 export { cardCount, isCard } from "./cards.ts";
+export { copyWhen, isTimeZone, type CopyWhen } from "./copy-name.ts";
+export { footerWords } from "./footer.ts";
 export {
   hasRows,
   pencilValue,
@@ -25,6 +27,7 @@ export { MESSAGES, PRINT_LANGUAGES, type Messages } from "./messages.ts";
 export {
   buildSheetModel,
   firstSentence,
+  steps,
   MAX_SQUARES,
   MAX_USE_BOXES,
   sheetFields,
@@ -57,5 +60,5 @@ export {
   type PrintPart,
   type SheetDesign,
 } from "./printouts.ts";
-export { type PlayState, type PlayValue } from "./play.ts";
+export { withCardsAsSheet, type PlayState, type PlayValue } from "./play.ts";
 export { sheetModelSchema } from "./schema.ts";

@@ -111,6 +111,20 @@ describe("sheet model", () => {
     expect(value("guard").text).not.toBe("");
   });
 
+  it("names as depending only values the sheet shows: not those of a weapon the character does not hold", () => {
+    const ev = evaluateDraft(pkg, level20);
+    const model = buildSheetModel(pkg, level20, { language: "de", createdAt }, ev);
+    const all = dependentValues(pkg, ev);
+    const named = (id: string) => model.values.find((v) => v.id === id)!.dependents.map((d) => d.id);
+    // The formulas make a sling hit from grace; this character holds no sling, so the sheet has no place for it.
+    expect(ev.things.some((t) => t.id === "item.sling")).toBe(false);
+    expect(all["grace"]).toContain("slingHit");
+    expect(named("grace")).not.toContain("slingHit");
+    // A held weapon's hit (a cell) and harm (a text filled with it) stay.
+    expect(named("might")).toEqual(expect.arrayContaining(["lanternStaffHit", "lanternStaffHarm"]));
+    for (const v of model.values) for (const d of v.dependents) expect(all[v.id]).toContain(d.id);
+  });
+
   it("ticks a talent every character has without a pick (flow.grants, format 0.17)", () => {
     const talents = sheet(level3).sections.find((s) => s.id === "talents")!;
     const item =
