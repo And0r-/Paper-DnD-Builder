@@ -171,11 +171,14 @@
   gap: var(--space-2);
 }
 
+/* The circle's column as wide as the circle, so the circles stand one under the other
+   however long the label above them (a German compound of 28 letters). */
 .vsheet__score {
+  --score-circle: 3.25rem;
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: minmax(0, 1fr) var(--score-circle);
   grid-template-areas:
-    "label derived-label"
+    "head head"
     "value derived"
     "extra derived";
   align-items: center;
@@ -185,13 +188,30 @@
   border-radius: var(--radius-sm);
 }
 
+/* Label left, derived label right; where both do not fit, the derived label goes above. */
+.vsheet__score-head {
+  grid-area: head;
+  display: flex;
+  flex-wrap: wrap-reverse;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0 var(--space-2);
+  min-width: 0;
+}
+
 .vsheet__score-label {
-  grid-area: label;
   font-weight: var(--weight-bold);
 }
 
+.vsheet__score-label,
 .vsheet__score-derived-label {
-  grid-area: derived-label;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  hyphens: auto;
+}
+
+.vsheet__score-derived-label {
+  margin-left: auto;
   color: var(--color-ink-muted);
   font-size: var(--text-xs);
   text-align: right;
@@ -223,8 +243,9 @@
   grid-area: derived;
   display: grid;
   place-items: center;
-  width: 3.25rem;
-  height: 3.25rem;
+  box-sizing: border-box;
+  width: var(--score-circle);
+  height: var(--score-circle);
   border: 2px solid var(--color-ink);
   border-radius: 50%;
   font-size: var(--text-lg);
@@ -237,9 +258,11 @@
   display: grid;
 }
 
+/* The name's column gives way, not the row: a long word in where the number comes from
+   (a German compound) breaks rather than push the box into the next column. */
 .vsheet__check {
   display: grid;
-  grid-template-columns: auto 1fr auto auto;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
   align-items: center;
   gap: var(--space-2);
   min-height: var(--sheet-touch);
@@ -248,6 +271,9 @@
 
 .vsheet__check-name {
   display: grid;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  hyphens: auto;
 }
 
 .vsheet__check-note {
@@ -806,12 +832,14 @@
     font-size: var(--vs-circlesValue);
   }
 
+  /* As wide as the section, never wider: a long word must not push the boxes into the next one. */
   .vsheet__scores {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
     gap: 3mm;
   }
 
   .vsheet__score {
+    --score-circle: var(--vs-score-circle);
     min-height: var(--vs-score-h);
     padding: 1.5mm 3mm;
     border-width: 0.25mm;
@@ -827,8 +855,6 @@
   }
 
   .vsheet__score-derived {
-    width: var(--vs-score-circle);
-    height: var(--vs-score-circle);
     border-width: 0.25mm;
     font-size: 12pt;
   }

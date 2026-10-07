@@ -427,18 +427,21 @@ function Scores({ s, i, ui }: Props<"scoreColumn">) {
     <div className="vsheet__scores">
       {s.scores.map((sc, j) => (
         <div key={`${sc.valueId}-${j}`} className="vsheet__score">
-          <p className="vsheet__score-label">
-            <ui.Text path={at(i, "scores", j, "label")} value={sc.label} label={sc.label} />
-          </p>
-          {sc.derived !== null && (
-            <p className="vsheet__score-derived-label">
-              <ui.Text
-                path={at(i, "scores", j, "derivedLabel")}
-                value={sc.derivedLabel}
-                label={sc.derivedLabel}
-              />
+          {/* One line for both where they fit; else the derived label above, as in the PDF. */}
+          <div className="vsheet__score-head">
+            <p className="vsheet__score-label">
+              <ui.Text path={at(i, "scores", j, "label")} value={sc.label} label={sc.label} />
             </p>
-          )}
+            {sc.derived !== null && (
+              <p className="vsheet__score-derived-label">
+                <ui.Text
+                  path={at(i, "scores", j, "derivedLabel")}
+                  value={sc.derivedLabel}
+                  label={sc.derivedLabel}
+                />
+              </p>
+            )}
+          </div>
           <p className="vsheet__score-value">
             <ui.Text path={at(i, "scores", j, "value")} value={sc.value} label={sc.label} />
           </p>
