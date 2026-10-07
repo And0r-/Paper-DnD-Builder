@@ -1147,6 +1147,25 @@ textarea.field__input {
   justify-content: space-between;
 }
 
+.access-keys__text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+/* The owner's own words: may be long and without spaces. */
+.access-keys__name {
+  font-weight: var(--weight-semibold);
+  overflow-wrap: anywhere;
+}
+
+.access-keys__new {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  max-width: 28rem;
+}
+
 .access-keys__hint,
 .access-keys__secret {
   font-family: var(--font-mono, ui-monospace, monospace);
