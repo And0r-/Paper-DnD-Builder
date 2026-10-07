@@ -626,6 +626,7 @@
     "value.witHold.explain": "Diese Zahl zählst du dazu, wenn du mit Klugheit gegen etwas standhältst.",
     "value.heartHold.explain": "Diese Zahl zählst du dazu, wenn du mit Herz gegen etwas standhältst.",
     "sheet.scores.hold": "Standhalten",
+    "sheet.scores.bonus": "Bonus",
     "value.restDice.name": "Rastwürfel",
     "value.restDice.explain": "Bei einer Rast würfelst du welche und bekommst so viel Ausdauer zurück.",
     "value.restDie.name": "Größe der Rastwürfel",

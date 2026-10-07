@@ -448,9 +448,12 @@ const levelUp = defineTool({
         data: {
           ...outcome,
           raised: { from: up.from, to: up.to },
-          newChoices: up.newChoices
-            .filter((id) => ev.open.includes(id))
-            .map((id) => titled(words, ev.choices[id], id)),
+          // Everything open: the character was finished, so all of it comes from the raise,
+          // also choices asked before that now take more picks.
+          toAnswer: ev.open.map((id) => ({
+            ...titled(words, ev.choices[id], id),
+            ...(up.newChoices.includes(id) ? { new: true } : { morePlaces: true }),
+          })),
         },
       };
     } catch (e) {

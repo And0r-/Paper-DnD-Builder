@@ -129,7 +129,7 @@ describe("cross-file rules", () => {
     [
       "format version",
       (f) => (f.get("manifest.json").formatVersion = "0.3"),
-      "manifest.json formatVersion: package is written for format 0.3, this builder understands 0.18",
+      "manifest.json formatVersion: package is written for format 0.3, this builder understands 0.19",
     ],
     [
       "duplicate thing",
@@ -884,6 +884,11 @@ describe("counts and what the sheet needs at the table (format 0.13)", () => {
       "further number of an unknown value",
       (f) => (section(f, "scores").scores[0].extra = "mightStand"),
       'sheet.json sections[3].scores[0].extra: unknown value "mightStand"',
+    ],
+    [
+      "label of a derived number that is not there",
+      (f) => delete section(f, "scores").scores[0].derived,
+      'sheet.json sections[3].scores[0].derivedLabel: "derivedLabel" only goes with "derived"',
     ],
     [
       "label of a further number that is not there",

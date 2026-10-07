@@ -187,7 +187,7 @@ function drawSection(c: Grid, s: Laid, x: number, top: number, w: number): numbe
           pen.field(item.field, cx + cw - 7.5, cy - 4.2, 7, 5.5, { text: byHand });
           const total = item.total.text === "" ? byHand : item.total.text;
           pen.text(total, cx + cw - 4, cy, pen.fit(total, st.boxValue, 6.4), "center");
-          const partsTop = cy + (name.lines.length - 1) * lh + 0.9;
+          const partsTop = cy + (name.lines.length - 1) * lh + 0.9 + PARTS_DROP;
           parts.forEach((l, j) => pen.text(l, cx + 5.5, partsTop + (j + 0.8) * partsLh, st.hint));
         }
         rowTop += 7 + Math.max(...row.map((l) => l.extra));
@@ -404,6 +404,11 @@ function drawHeader(
 
 const SQUARE = 3.2;
 const SQUARE_GAP = 1.4;
+/**
+ * How much lower (mm) where a check's number comes from starts, so it runs under its
+ * box, not into it; out of the room to the next row, so rows stay as tall.
+ */
+const PARTS_DROP = 0.7;
 
 /** Squares per row in a box `bw` wide, and how many rows `n` of them take. */
 function squareRows(n: number, bw: number): { perRow: number; rows: number } {
