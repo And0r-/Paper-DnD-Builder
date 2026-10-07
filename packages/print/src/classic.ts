@@ -455,11 +455,16 @@ function statTableBlocks(c: Ctx, s: Section<"statTable">): Block[] {
   );
   const sum = (a: number[]) => a.reduce((t, n, j) => t + (wraps(j) ? 0 : n), 0);
   const wrapRoom = wrapMin.reduce((a, b) => a + b, 0);
-  // The name column gives way first (down to 16 mm), so the numbers keep one line.
+  // The name column gives way first, so the numbers keep one line; never below its longest
+  // word in small type, so a long name of one row does not break the others' in mid-word.
+  const nameLeast = Math.max(
+    16,
+    ...s.rows.flatMap((r) => r.name.split(/\s+/u)).map((w) => pen.width(w, st.small) + 4),
+  );
   const nameW = (w: number) => {
     const wide = Math.min(w * 0.28, names);
     const short = w - wide - wrapRoom - sum(least);
-    return short >= 0 ? wide : Math.max(16, wide + short);
+    return short >= 0 ? wide : Math.max(Math.min(nameLeast, wide), wide + short);
   };
   const widths = (w: number): number[] => {
     const rest = w - nameW(w);
@@ -478,8 +483,9 @@ function statTableBlocks(c: Ctx, s: Section<"statTable">): Block[] {
   };
   /** A cell's lines: one line at the largest size that fits, else wrapped small. */
   const cellLines = (text: string, cw: number, wrap: boolean) => {
-    const one = pen.fit(text, st.value, cw - 1);
-    if (!wrap && pen.width(text, one) <= cw - 0.6) return { lines: [text], style: one, wrapped: false };
+    // A millimetre of room to the cell's edges on either side.
+    const one = pen.fit(text, st.value, cw - 2);
+    if (!wrap && pen.width(text, one) <= cw - 2) return { lines: [text], style: one, wrapped: false };
     return { lines: pen.wrap(text, st.small, cw - 2), style: st.small, wrapped: true };
   };
   const lefts = (x: number, w: number) => {
@@ -516,8 +522,10 @@ function statTableBlocks(c: Ctx, s: Section<"statTable">): Block[] {
     measured(c, s, (x, y, w) => {
       const ws = widths(w);
       const nw = nameW(w) - 3;
-      const nameLines =
-        pen.width(name, pen.fit(name, st.rowName, nw)) <= nw ? null : pen.wrap(name, st.small, nw);
+      // Too long for a line: wrapped between words, never inside one.
+      const wrapped =
+        pen.width(name, pen.fit(name, st.rowName, nw)) <= nw ? null : pen.wrapWords(name, st.small, nw);
+      const nameLines = wrapped?.lines ?? null;
       const shown = s.columns.map((_, i) => cellLines(cells[i] ?? "", ws[i]! - 1.5, wraps(i)));
       // A wrapped cell or name makes the whole row taller.
       const rh = Math.max(
@@ -526,7 +534,7 @@ function statTableBlocks(c: Ctx, s: Section<"statTable">): Block[] {
         ...shown.map((sh) => (sh.wrapped ? sh.lines.length * lead + 1.4 : 0)),
       );
       pen.rect(x, y + 0.4, nameW(w) - 1, rh, { width: 0.4, stroke: RULE });
-      if (nameLines) pen.lines(nameLines, x + 1, y + 1.1, st.small, 1.1);
+      if (wrapped) pen.lines(wrapped.lines, x + 1, y + 1.1, wrapped.style, 1.1);
       else pen.text(name, x + 1, y + 3.8, pen.fit(name, st.rowName, nw));
       lefts(x, w).forEach((cx, i) => {
         const cw = ws[i]! - 1.5;

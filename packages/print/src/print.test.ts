@@ -2049,6 +2049,37 @@ describe("the classic design: original and copy, empty and filled", () => {
     expect(page.map((p) => p.str)).toContain(longest);
   });
 
+  it("keeps a table's names whole beside a long row of the player's own, and the harm off its cell's edge", async () => {
+    const original = buildSheetModel(pkg, lantern20(), { language: "de", createdAt });
+    const table = original.sections.find((s) => s.kind === "statTable");
+    if (table?.kind !== "statTable") throw new Error("no table");
+    // Long cells too, as written by hand: the columns take all the room they can get.
+    const name = "Sehr langer Name einer eigenen Waffe";
+    const own = { name, cells: table.columns.map(() => name) };
+    const model: SheetModel = {
+      ...original,
+      sections: original.sections.map((s) => (s === table ? { ...table, rows: [...table.rows, own] } : s)),
+    };
+    const page = (await positions(await renderPdf(model, sheetOnly)))[0]!;
+    const strings = page.map((p) => p.str);
+    // Every name of the package's rows whole on its line, not "Laternens- / tab".
+    for (const r of table.rows) expect(strings, r.name).toContain(r.name);
+    expect(strings.filter((t) => /\p{L}-$/u.test(t))).toEqual([]);
+    // The long name breaks between its words only.
+    for (const word of own.name.split(" ")) expect(strings.join(" ").split(/\s+/u), word).toContain(word);
+    // The harm on one line with room to the next cell's text (the cell's own edge is no text to measure).
+    const harm = table.rows[0]!.cells.filter((_, i) => !table.wrap?.[i]).reduce((a, b) =>
+      b.length > a.length ? b : a,
+    );
+    const plain = (await positions(await renderPdf(original, sheetOnly)))[0]!;
+    const at = plain.find((p) => p.str === harm)!;
+    const next = plain
+      .filter((p) => Math.abs(p.y - at.y) < 0.5 && p.x > at.x + at.w)
+      .sort((a, b) => a.x - b.x)[0];
+    expect(next).toBeDefined();
+    expect(next!.x - (at.x + at.w)).toBeGreaterThanOrEqual(3.4);
+  });
+
   it("goes on with a list in the next column only with entries, not with empty lines", async () => {
     for (const doc of [river3(), lantern20()])
       for (const [language] of languages) {
