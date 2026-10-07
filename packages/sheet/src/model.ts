@@ -255,6 +255,11 @@ export function buildSheetModel(
     return ev.things.filter((h) => selected.has(h.id)).map((h) => things.get(h.id)!);
   };
   const heldById = new Map(ev.things.map((h) => [h.id, h]));
+  /** Values the sheet shows somewhere: only these are named as depending on another. The level is in the header. */
+  const placed = new Set<string>(["level"]);
+  const place = (v: StatValue | undefined): void => {
+    if (typeof v === "object" && "value" in v) placed.add(v.value);
+  };
   /** The things behind a held thing: the one that granted it, or those that granted the choice it was picked in. */
   const origins = (h: HeldThing): string[] =>
     h.grantedBy !== undefined
@@ -306,11 +311,13 @@ export function buildSheetModel(
     }
   };
   /** Text of a box or stat filled with the character's values; a variant may replace the text. */
-  const filled = (v: FilledText): string =>
-    text(
+  const filled = (v: FilledText): string => {
+    for (const id of Object.values(v.vars ?? {})) placed.add(id);
+    return text(
       filledTextKey(v, scope),
       Object.fromEntries(Object.entries(v.vars ?? {}).map(([n, id]) => [n, valueOf(id)])),
     );
+  };
 
   const summary = summarize(pkg, doc, ev);
   const name = summary.name || messages.unnamed;
@@ -370,6 +377,7 @@ export function buildSheetModel(
           ...base,
           kind: "statBoxes",
           boxes: s.boxes.filter(shown).map((b): StatBox => {
+            placed.add(b.value);
             const n = Math.max(0, Math.round(valueOf(b.value)));
             const squares = b.style === "boxes" && n <= MAX_SQUARES ? n : 0;
             return {
@@ -395,20 +403,23 @@ export function buildSheetModel(
         return {
           ...base,
           kind: "scoreColumn",
-          scores: s.scores.map((sc) => ({
-            valueId: sc.value,
-            label: valueLabel(sc.value),
-            value: valueText(sc.value),
-            ...(sc.derived ? { derivedId: sc.derived } : {}),
-            derivedLabel: sc.derived ? valueLabel(sc.derived) : "",
-            derived: sc.derived ? signed.format(valueOf(sc.derived)) : null,
-            extra: sc.extra
-              ? {
-                  label: sc.extraLabel !== undefined ? text(sc.extraLabel) : valueLabel(sc.extra),
-                  value: signed.format(valueOf(sc.extra)),
-                }
-              : null,
-          })),
+          scores: s.scores.map((sc) => {
+            for (const id of [sc.value, sc.derived, sc.extra]) if (id !== undefined) placed.add(id);
+            return {
+              valueId: sc.value,
+              label: valueLabel(sc.value),
+              value: valueText(sc.value),
+              ...(sc.derived ? { derivedId: sc.derived } : {}),
+              derivedLabel: sc.derived ? valueLabel(sc.derived) : "",
+              derived: sc.derived ? signed.format(valueOf(sc.derived)) : null,
+              extra: sc.extra
+                ? {
+                    label: sc.extraLabel !== undefined ? text(sc.extraLabel) : valueLabel(sc.extra),
+                    value: signed.format(valueOf(sc.extra)),
+                  }
+                : null,
+            };
+          }),
         };
       case "checkList": {
         const strong = new Set(
@@ -418,6 +429,7 @@ export function buildSheetModel(
           const note = s.note === undefined ? undefined : t.stats?.[s.note];
           const total = s.total === undefined ? undefined : t.stats?.[s.total];
           const byHand = !(typeof total === "object" && "value" in total);
+          place(total);
           if (!byHand && !shownAs.has(total.value)) shownAs.set(total.value, thingName(t.id));
           return {
             id: t.id,
@@ -452,6 +464,7 @@ export function buildSheetModel(
             // Numbers only: a table row is one line, so a few weapons still fit beside other boxes.
             cells: s.columns.map((c) => {
               const v = t.stats?.[c.stat];
+              place(v);
               const n = typeof v === "object" && "value" in v ? valueOf(v.value) : v;
               return c.signed && typeof n === "number" ? signed.format(n) : statText(v);
             }),
@@ -495,6 +508,8 @@ export function buildSheetModel(
           const from = originOf.get(t.id);
           const note = s.note === undefined ? undefined : t.stats?.[s.note];
           const rowUses = uses(t, s.uses);
+          place(note);
+          if (s.uses !== undefined) place(t.stats?.[s.uses]);
           return {
             id: t.id,
             name: thingName(t.id),
@@ -602,6 +617,8 @@ export function buildSheetModel(
     .map(({ t, name: cardName }): Card => {
       const layout = pkg.sheet.cards[t.kind]!;
       const cardUses = uses(t, layout.uses);
+      if (layout.uses !== undefined) place(t.stats?.[layout.uses]);
+      for (const f of layout.fields) place(t.stats?.[f]);
       // The first entry whose condition the thing matches, in the package's order.
       const line = layout.origins?.find((o) => markCondition(o)(t) && !(o.not && markCondition(o.not)(t)));
       return {
@@ -640,7 +657,8 @@ export function buildSheetModel(
       (s) => (s.kind !== "statBoxes" || s.boxes.length > 0) && (s.kind !== "answers" || s.rows.length > 0),
     );
 
-  // "These depend on it": only values with a name, or on the sheet under one, can be told to a player.
+  // "These depend on it": only values with a name, or on the sheet under one, can be told to a player,
+  // and only those the sheet shows: a weapon the character does not hold has nothing that changes.
   const dependents = dependentValues(pkg, ev);
   const nameOf = (id: string): string => valueLabel(id) || (shownAs.get(id) ?? "");
   const values: SheetValue[] = ["level", ...pkg.values.map((v) => v.id)]
@@ -650,7 +668,7 @@ export function buildSheetModel(
       label: nameOf(id),
       text: valueText(id),
       dependents: (dependents[id] ?? [])
-        .filter((d) => nameOf(d) !== "")
+        .filter((d) => placed.has(d) && nameOf(d) !== "")
         .map((d) => ({ id: d, label: nameOf(d) })),
     }));
 
