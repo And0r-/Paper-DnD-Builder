@@ -1909,7 +1909,7 @@ describe("the classic design: original and copy, empty and filled", () => {
         const pdf = await renderPdf(model, sheetOnly);
         const { text, pageTexts, minFontSize } = await extract(pdf);
         const what = `level ${model.level} ${language}`;
-        expect(pdf.pages, what).toBeLessThanOrEqual(pages);
+        expect(pdf.pages, what).toBe(pages);
         expect(minFontSize, what).toBeGreaterThanOrEqual(6.99);
         for (const page of pageTexts) expect(page, what).toContain(unitsLine);
         const foreign = foreignWords(language, other);
@@ -1934,6 +1934,25 @@ describe("the classic design: original and copy, empty and filled", () => {
           ...words([JSON.stringify(model)]),
         ]);
         expect([...words([text])].filter((w) => !known.has(w))).toEqual([]);
+      }
+    }
+  });
+
+  it("gives the package's apart sections a page of their own when one is a box row, else runs them on", async () => {
+    for (const doc of [river3(), lantern20()]) {
+      const model = buildSheetModel(pkg, doc, { language: "de", createdAt });
+      const pdf = await renderPdf(model, sheetOnly);
+      const plan = classicPlan(model.sections);
+      const apart = new Set(plan.parts.apart.map((i) => model.sections[i]!.id));
+      expect(apart.size).toBeGreaterThan(0);
+      const last = new Set(pdf.sheetLayout.at(-1)!.map((p) => p.section.id));
+      if (plan.apartPage) {
+        expect(last).toEqual(apart);
+        for (const page of pdf.sheetLayout.slice(0, -1)) {
+          for (const p of page) expect(apart.has(p.section.id), p.section.id).toBe(false);
+        }
+      } else {
+        expect([...last].some((id) => !apart.has(id))).toBe(true);
       }
     }
   });

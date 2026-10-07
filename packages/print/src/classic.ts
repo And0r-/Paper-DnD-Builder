@@ -788,18 +788,16 @@ export interface ClassicSheet {
 
 /**
  * Lays out the sheet in the classic design. `bottomOf(n)` is the lowest a
- * block on page `n` (from 0) may reach; `apart` says which sections form a
- * part of their own.
+ * block on page `n` (from 0) may reach.
  */
 export function layClassic(
   pen: Pen,
   g: ClassicGeometry,
   sections: readonly SheetSection[],
   bottomOf: (page: number) => number,
-  apart?: (index: number) => boolean,
 ): ClassicSheet {
   const c: Ctx = { pen, g, st: classicStyles(g), m: pen.messages };
-  const plan: ClassicPlan = classicPlan(sections, apart);
+  const plan: ClassicPlan = classicPlan(sections);
   const part = (p: keyof ClassicPlan["parts"]) => plan.parts[p].map((i) => sections[i]!);
   const bottom = (page: number) => bottomOf(page - 1);
   const cols = firstColumns(g);

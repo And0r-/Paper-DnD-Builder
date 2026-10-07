@@ -76,6 +76,22 @@ describe("classic on screen", () => {
     }
   });
 
+  it("sets the package's apart sections apart, last and on a part of their own when one is a box row", () => {
+    for (const model of models) {
+      const html = renderToStaticMarkup(<ClassicSheet model={model} ui={ui} />);
+      const plan = classicPlan(model.sections);
+      const apart = model.sections.flatMap((s, i) => (s.apart ? [i] : []));
+      expect(apart.length).toBeGreaterThan(0);
+      expect(plan.parts.apart).toEqual(apart);
+      expect(plan.apartPage).toBe(apart.some((i) => model.sections[i]!.kind === "statBoxes"));
+      const own = html.split('class="csheet__apart"')[1] ?? "";
+      expect(all(own, "data-section")).toEqual(plan.apartPage ? apart.map((i) => model.sections[i]!.id) : []);
+      if (plan.apartPage) expect(plan.order.slice(-apart.length)).toEqual(apart);
+    }
+    // At level 20 the slots are there: the part has a page of its own.
+    expect(models.some((m) => classicPlan(m.sections).apartPage)).toBe(true);
+  });
+
   it("has every place to write or tick of the model, once, of its kind", () => {
     for (const model of models) {
       const html = renderToStaticMarkup(<ClassicSheet model={model} ui={ui} />);

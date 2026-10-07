@@ -151,13 +151,10 @@ export interface ClassicPlan {
 
 /**
  * The plan of a sheet in the classic design, from the kinds of its sections
- * and their order only. `apart` says which sections form a part of their own;
- * nothing in a section's kind says so.
+ * and their order only; the package's `apart` says which sections form a part
+ * of their own, as nothing in a section's kind says so.
  */
-export function classicPlan(
-  sections: readonly Pick<SheetSection, "kind">[],
-  apart: (index: number) => boolean = () => false,
-): ClassicPlan {
+export function classicPlan(sections: readonly Pick<SheetSection, "kind" | "apart">[]): ClassicPlan {
   const parts: Record<ClassicPart, number[]> = {
     header: [],
     cluster: [],
@@ -175,7 +172,7 @@ export function classicPlan(
     const part = ((): ClassicPart => {
       if (s.kind === "helpBox") return "hidden";
       if (s.kind === "header") return parts.header.length === 0 ? "header" : "right";
-      if (apart(i)) return "apart";
+      if (s.apart) return "apart";
       switch (s.kind) {
         case "scoreColumn":
           return i === scoresAt ? "scores" : "right";
