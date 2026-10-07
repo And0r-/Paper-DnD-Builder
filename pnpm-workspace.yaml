@@ -1,3 +1,8 @@
 packages:
   - apps/*
   - packages/*
+
+# esbuild (bundling packages/mcp) ships its binary as an optional package;
+# its install script only re-checks it, so it does not run.
+allowBuilds:
+  esbuild: false

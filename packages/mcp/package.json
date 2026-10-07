@@ -1,0 +1,24 @@
+{
+  "name": "@builder/mcp",
+  "version": "0.0.0",
+  "private": true,
+  "description": "MCP server over stdio for a language model on the player's computer, and the tool list a later in-app assistant shares. Talks to the builder over its public HTTP API only.",
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./tools": "./src/tools/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p .",
+    "build": "node scripts/build.ts"
+  },
+  "dependencies": {
+    "@builder/format": "workspace:*",
+    "@modelcontextprotocol/sdk": "^1.32.1",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2"
+  }
+}
