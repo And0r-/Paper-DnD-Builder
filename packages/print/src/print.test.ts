@@ -1556,6 +1556,28 @@ describe("what a game master would otherwise write on the sheet by hand (demo pa
     const en = buildSheetModel(pkg, doc, { language: "en" });
     expect(section(en, "gear", "list").items).toContain("5 × Provisions");
   });
+
+  it("adds up the same item from the calling and the upbringing, but not a talent", async () => {
+    // Like a staff and a robe from a class kit and a background kit: no grant has a count.
+    const both: ContentPackage = {
+      ...pkg,
+      things: pkg.things.map((t) =>
+        t.id === "calling.lantern-bearer"
+          ? { ...t, grants: [...(t.grants ?? []), { thing: "item.rope" }, { thing: "talent.haggling" }] }
+          : t,
+      ),
+    };
+    const ev = evaluateDraft(both, doc);
+    expect(ev.things.find((h) => h.id === "item.rope")?.count).toBe(2);
+    expect(ev.things.filter((h) => h.id === "talent.haggling")).toHaveLength(1);
+    expect(ev.things.find((h) => h.id === "talent.haggling")?.count).toBeUndefined();
+    const { model, extracted } = await print("de", { length: "m" }, both);
+    expect(section(model, "gear", "list").items).toContain("2 × Seil");
+    expect(extracted.text).toContain("2 × Seil");
+    expect(section(buildSheetModel(both, doc, { language: "en" }), "gear", "list").items).toContain(
+      "2 × Rope",
+    );
+  });
 });
 
 /** How many continuation cards a card page text has ("(2/3)" and the like). */

@@ -200,8 +200,22 @@ interface Indexes {
   things: Map<string, Thing>;
   choices: Map<string, Choice>;
   values: Map<string, ContentPackage["values"][number]>;
-  /** Things some grant gives with a `count`: only these are counted. */
+  /** Things of a kind some grant gives with a `count`: only these are counted. */
   counted: Set<string>;
+}
+
+/**
+ * A kind is counted once the package gives any thing of it with a `count`
+ * (arrows by the score make all gear counted): a staff from two kits is two
+ * staffs. Kinds never given with a count (skills, languages) stay once.
+ */
+function countedThings(pkg: ContentPackage, things: Map<string, Thing>): Set<string> {
+  const kinds = new Set(
+    pkg.things.flatMap((t) =>
+      (t.grants ?? []).flatMap((g) => (g.count !== undefined ? [things.get(g.thing!)?.kind] : [])),
+    ),
+  );
+  return new Set(pkg.things.filter((t) => kinds.has(t.kind)).map((t) => t.id));
 }
 
 const indexCache = new WeakMap<ContentPackage, Indexes>();
@@ -209,13 +223,12 @@ const indexCache = new WeakMap<ContentPackage, Indexes>();
 function indexes(pkg: ContentPackage): Indexes {
   let ix = indexCache.get(pkg);
   if (!ix) {
+    const things = new Map(pkg.things.map((t) => [t.id, t]));
     ix = {
-      things: new Map(pkg.things.map((t) => [t.id, t])),
+      things,
       choices: new Map(pkg.flow.choices.map((c) => [c.id, c])),
       values: new Map(pkg.values.map((v) => [v.id, v])),
-      counted: new Set(
-        pkg.things.flatMap((t) => (t.grants ?? []).flatMap((g) => (g.count !== undefined ? [g.thing!] : []))),
-      ),
+      counted: countedThings(pkg, things),
     };
     indexCache.set(pkg, ix);
   }
