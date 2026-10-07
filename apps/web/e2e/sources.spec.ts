@@ -8,7 +8,16 @@
 import type { Locator, Page } from "@playwright/test";
 import de from "../src/i18n/messages/de.json" with { type: "json" };
 import en from "../src/i18n/messages/en.json" with { type: "json" };
-import { expect, expectOneLanguage, login, makeCharacter, shot, test, uniqueEmail } from "./helpers.ts";
+import {
+  chooseLanguage,
+  expect,
+  expectOneLanguage,
+  login,
+  makeCharacter,
+  shot,
+  test,
+  uniqueEmail,
+} from "./helpers.ts";
 
 const MESSAGES = { de, en };
 
@@ -46,7 +55,7 @@ test.describe("phone", () => {
       void foreign;
       const m = MESSAGES[lang];
       await page.goto("/login");
-      if (lang === "en") await page.getByText("English", { exact: true }).click();
+      if (lang === "en") await chooseLanguage(page, "en");
       await expect(page.getByRole("heading", { name: m["login.title"] })).toBeVisible();
       const brand = page.locator(".auth__brand");
       await expect(brand).toContainText(m["app.name"]);

@@ -5,11 +5,15 @@
  * browser; after login the account setting wins.
  */
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
-import { isUiLanguage, translator, type Translator, type UiLanguage } from "../i18n/index.ts";
+import {
+  isUiLanguage,
+  LANGUAGE_COOKIE,
+  translator,
+  type Translator,
+  type UiLanguage,
+} from "../i18n/index.ts";
 import { api, ApiError, type Account } from "./api.ts";
-
-/** Remembers the language chosen before login. Functional only; nothing else is stored. */
-export const LANGUAGE_COOKIE = "lang";
+import { preloadLanguage } from "./packages.ts";
 
 function rememberLanguage(lang: UiLanguage) {
   document.cookie = `${LANGUAGE_COOKIE}=${lang}; path=/; max-age=31536000; samesite=lax`;
@@ -79,6 +83,9 @@ export function AppStateProvider({
 
   const setLanguage = useCallback(
     async (next: UiLanguage) => {
+      // Texts first, then the switch: the open screen keeps its place, choices and typing.
+      // If they cannot be loaded, the screens load them themselves (with their own retry).
+      await preloadLanguage(next).catch(() => {});
       if (!account) {
         setGuestLanguage(next);
         return;

@@ -1,9 +1,9 @@
 import type { Metadata, Viewport } from "next";
 import { cookies, headers } from "next/headers";
 import type { ReactNode } from "react";
-import { MESSAGES } from "../src/i18n/index.ts";
+import { LANGUAGE_COOKIE, MESSAGES } from "../src/i18n/index.ts";
 import { firstPaint } from "../src/server/screen-language.ts";
-import { AppStateProvider, LANGUAGE_COOKIE } from "../src/ui/app-state.tsx";
+import { AppStateProvider } from "../src/ui/app-state.tsx";
 import { GlossaryProvider } from "../src/ui/components/RichText.tsx";
 import "../src/ui/styles/tokens.css";
 import "../src/ui/styles/base.css";

@@ -2,7 +2,6 @@
 import { useRouter } from "next/navigation";
 import { useApp } from "../../src/ui/app-state.tsx";
 import { Button } from "../../src/ui/components/Button.tsx";
-import { LanguageSelect } from "../../src/ui/components/LanguageSelect.tsx";
 import { GuestShell } from "../../src/ui/components/Shell.tsx";
 import { usePageTitle } from "../../src/ui/flow/frame.tsx";
 
@@ -12,7 +11,7 @@ export default function PrivacyPage() {
   const router = useRouter();
   usePageTitle([t("privacy.title")]);
   return (
-    <GuestShell corner={<LanguageSelect compact />}>
+    <GuestShell>
       <div className="auth auth--wide">
         <article className="auth__card prose">
           <h1 className="auth__title">{t("privacy.title")}</h1>

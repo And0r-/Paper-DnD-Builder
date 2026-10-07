@@ -7,7 +7,16 @@ import de from "../src/i18n/messages/de.json" with { type: "json" };
 import en from "../src/i18n/messages/en.json" with { type: "json" };
 import pde from "../../../packages/demo-package/texts/de/core.json" with { type: "json" };
 import pen from "../../../packages/demo-package/texts/en/core.json" with { type: "json" };
-import { expect, expectOneLanguage, login, makeCharacter, shot, test, uniqueEmail } from "./helpers.ts";
+import {
+  chooseLanguage,
+  expect,
+  expectOneLanguage,
+  login,
+  makeCharacter,
+  shot,
+  test,
+  uniqueEmail,
+} from "./helpers.ts";
 
 type Lang = "de" | "en";
 
@@ -56,19 +65,20 @@ test("every screen shows exactly one language, and switching swaps all texts", a
   // Before login: the browser says German; the switch at the top changes everything.
   await page.goto("/login");
   await expectOneLanguage(page, "de");
-  await page.getByText("English", { exact: true }).click();
+  await chooseLanguage(page, "en");
   await expect(page.getByRole("heading", { name: en["login.title"] })).toBeVisible();
   await expectOneLanguage(page, "en");
   await shot(page, "21-login-en");
-  await page.getByText("Deutsch", { exact: true }).click();
+  await chooseLanguage(page, "de");
   await expectOneLanguage(page, "de");
 
   await login(page, uniqueEmail("lang"));
   const id = await makeCharacter(page);
   await visitAll(page, id, "de");
 
+  // The settings keep their own switch for the same value.
   await page.goto("/settings");
-  await page.getByText("English", { exact: true }).click();
+  await page.getByRole("main").getByText("English", { exact: true }).click();
   await expect(page.getByRole("heading", { level: 1, name: en["settings.title"] })).toBeVisible();
   await expectOneLanguage(page, "en");
   await shot(page, "22-einstellungen-en");

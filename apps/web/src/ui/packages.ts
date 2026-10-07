@@ -60,15 +60,59 @@ export function packageLanguage(structure: PackageStructure, lang: string): stri
   return structure.manifest.languages.includes(lang) ? lang : structure.manifest.languages[0]!;
 }
 
+/** Packages already loaded, by id and screen language: a screen can show them without waiting a render. */
+const ready = new Map<string, LoadedPackage>();
+
 export async function loadPackage(id: string, lang: string): Promise<LoadedPackage> {
+  const known = ready.get(`${id}\n${lang}`);
+  if (known) return known;
   const structure = await loadPackageStructure(id);
   const shown = packageLanguage(structure, lang);
   const t = await loadPackageTexts(id, shown);
-  return {
+  const lp: LoadedPackage = {
     pkg: { ...structure, texts: { [shown]: t }, textOrigins: {} },
     lang: shown,
     texts: t,
   };
+  ready.set(`${id}\n${lang}`, lp);
+  return lp;
+}
+
+/**
+ * Loads every package seen so far in another language, before the screen
+ * switches to it. The switch then happens in one render: no screen falls
+ * back to "loading" and loses what is open or typed on it.
+ */
+export async function preloadLanguage(lang: string): Promise<void> {
+  await Promise.all([loadPackageList(lang), ...[...structures.keys()].map((id) => loadPackage(id, lang))]);
+}
+
+/**
+ * The languages offered to switch to: those the builder has screen texts
+ * for and every installed package has, too. The packages decide; the
+ * builder's own list only rules out languages it cannot show.
+ */
+export function offeredLanguages<L extends string>(
+  builder: readonly L[],
+  packages: readonly PackageListEntry[],
+): L[] {
+  return builder.filter((l) => packages.every((p) => p.languages.includes(l)));
+}
+
+/** {@link offeredLanguages} for the installed packages; the builder's list until they are known. */
+export function useOfferedLanguages<L extends string>(builder: readonly L[], lang: string): readonly L[] {
+  const [packages, setPackages] = useState<readonly PackageListEntry[] | null>(null);
+  useEffect(() => {
+    let live = true;
+    loadPackageList(lang).then(
+      (list) => live && setPackages(list),
+      () => {},
+    );
+    return () => {
+      live = false;
+    };
+  }, [lang]);
+  return packages ? offeredLanguages(builder, packages) : builder;
 }
 
 export type Loadable<T> =
@@ -79,9 +123,10 @@ export function usePackage(id: string | undefined, lang: string): Loadable<Loade
   const [attempt, setAttempt] = useState(0);
   const [result, setResult] = useState<{ key: string; value: Loadable<LoadedPackage> } | null>(null);
   const key = `${id}\n${lang}\n${attempt}`;
+  const known = id ? ready.get(`${id}\n${lang}`) : undefined;
 
   useEffect(() => {
-    if (!id) return;
+    if (!id || known) return;
     let live = true;
     loadPackage(id, lang).then(
       (value) => live && setResult({ key, value: { state: "ready", value } }),
@@ -91,8 +136,9 @@ export function usePackage(id: string | undefined, lang: string): Loadable<Loade
     return () => {
       live = false;
     };
-  }, [id, lang, key]);
+  }, [id, lang, key, known]);
 
+  if (known) return { state: "ready", value: known };
   if (result && result.key === key) return result.value;
   // While the other language loads, keep showing nothing rather than mixing languages.
   return { state: "loading" };

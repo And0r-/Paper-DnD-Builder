@@ -7,7 +7,7 @@
  */
 import type { Page } from "@playwright/test";
 import en from "../src/i18n/messages/en.json" with { type: "json" };
-import { expect, expectOneLanguage, login, shot, test, uniqueEmail } from "./helpers.ts";
+import { chooseLanguage, expect, expectOneLanguage, login, shot, test, uniqueEmail } from "./helpers.ts";
 
 /** A level-1 river runner of the given folk, made through the API. */
 async function riverRunner(page: Page, folk: string): Promise<string> {
@@ -46,7 +46,7 @@ test("the talents step counts one more talent for hillfolk", async ({ page, fore
   await intro(page, moor, "de", /^Du wählst 2: /, "32-talente-moorvolk");
 
   await page.goto("/settings");
-  await page.getByText("English", { exact: true }).click();
+  await chooseLanguage(page, "en");
   await expect(page.getByRole("heading", { level: 1, name: en["settings.title"] })).toBeVisible();
 
   await intro(page, hill, "en", /^You choose 3: /, "33-talents-hillfolk-en");

@@ -9,7 +9,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import type { Page } from "@playwright/test";
 import { join } from "node:path";
-import { expect, login, shot, SHOTS, test, uniqueEmail } from "./helpers.ts";
+import { chooseLanguage, expect, login, shot, SHOTS, test, uniqueEmail } from "./helpers.ts";
 
 async function axe(page: Page) {
   const r = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"]).analyze();
@@ -141,7 +141,7 @@ test("in English the same rows, only English", async ({ page }) => {
   await login(page, uniqueEmail("scores-en"));
   const id = await bellTowerDraft(page);
   await page.goto("/settings");
-  await page.getByText("English", { exact: true }).click();
+  await chooseLanguage(page, "en");
   await expect(page.getByRole("heading", { level: 1, name: "Settings" })).toBeVisible();
   await page.goto(`/c/${id}/step/scores`);
   await expect(

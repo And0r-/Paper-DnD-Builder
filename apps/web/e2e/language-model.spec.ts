@@ -10,7 +10,7 @@ import { unzipSync, strFromU8 } from "fflate";
 import { readFile } from "node:fs/promises";
 import de from "../src/i18n/messages/de.json" with { type: "json" };
 import en from "../src/i18n/messages/en.json" with { type: "json" };
-import { expect, expectOneLanguage, login, shot, test, uniqueEmail } from "./helpers.ts";
+import { chooseLanguage, expect, expectOneLanguage, login, shot, test, uniqueEmail } from "./helpers.ts";
 
 const ZIP = "/downloads/builder-mcp.zip";
 
@@ -26,7 +26,7 @@ for (const lang of ["de", "en"] as const) {
     void foreign;
     await context.grantPermissions(["clipboard-read", "clipboard-write"]);
     await page.goto("/mcp/setup");
-    if (lang === "en") await page.getByText("English", { exact: true }).click();
+    if (lang === "en") await chooseLanguage(page, "en");
     await expect(page.getByRole("heading", { name: m["mcp.title"], level: 1 })).toBeVisible();
     const origin = new URL(baseURL!).origin;
 
