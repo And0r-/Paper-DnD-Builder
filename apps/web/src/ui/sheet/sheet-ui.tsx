@@ -10,7 +10,6 @@ import {
   tickAt,
   ticksOf,
   withRowAdded,
-  withRowRemoved,
   withText,
   writtenOf,
   type PlayValue,
@@ -18,6 +17,7 @@ import {
 import type { SheetFieldProps, SheetRowProps, SheetTextProps, SheetUi } from "@builder/sheet/designs/screens";
 import {
   createContext,
+  useCallback,
   useContext,
   useEffect,
   useRef,
@@ -148,32 +148,76 @@ function SheetField({ field, label, shape = "square", lines }: SheetFieldProps) 
   return <WrittenField field={field} label={label} lines={lines} value={writtenOf(stored)} />;
 }
 
-/** A box or lines to write on; kept when left, like the texts. */
+/** A pause in typing this long saves what is written so far. */
+const WRITE_PAUSE_MS = 600;
+
+/**
+ * A box or lines to write on. Saved while writing (after a short pause),
+ * when left, and when the page is left or hidden: a note typed just before
+ * a reload or closing the tab is not lost.
+ */
 function WrittenField({
   field,
   label,
   lines,
   value,
 }: Pick<SheetFieldProps, "field" | "label"> & { lines: number | undefined; value: string }) {
-  const sheet = useSheetCtx();
+  const { setField } = useSheetCtx();
   const [text, setText] = useState(value);
   // What another device or a reload brings, unless it is being written in.
   const focused = useRef(false);
   useEffect(() => {
     if (!focused.current) setText(value);
   }, [value]);
-  const keep = () => {
-    focused.current = false;
-    const next = field.kind === "pencil" ? pencilValue(text) : text.trim() === "" ? undefined : text;
-    if (writtenOf(next) !== value) sheet.setField(field.id, next);
-  };
+  // The latest text and stored value, for a save from a timer or a page event.
+  const latest = useRef({ text, value });
+  useEffect(() => {
+    latest.current = { text, value };
+  }, [text, value]);
+  const pause = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const keep = useCallback(() => {
+    clearTimeout(pause.current);
+    pause.current = undefined;
+    const { text: now, value: stored } = latest.current;
+    const next = field.kind === "pencil" ? pencilValue(now) : now.trim() === "" ? undefined : now;
+    if (writtenOf(next) !== stored) {
+      setField(field.id, next);
+      // Saved: the stored value is this now, even before the next render.
+      latest.current = { text: now, value: writtenOf(next) };
+    }
+  }, [field.id, field.kind, setField]);
+  useEffect(() => {
+    const leave = () => {
+      if (pause.current !== undefined) keep();
+    };
+    const hidden = () => {
+      if (document.visibilityState === "hidden") leave();
+    };
+    window.addEventListener("pagehide", leave);
+    document.addEventListener("visibilitychange", hidden);
+    return () => {
+      window.removeEventListener("pagehide", leave);
+      document.removeEventListener("visibilitychange", hidden);
+      // Gone from the screen (another version, another page) with something unsaved.
+      leave();
+    };
+  }, [keep]);
   const common = {
     value: text,
     "aria-label": label,
     "data-field": field.id,
-    onChange: (e: { currentTarget: { value: string } }) => setText(e.currentTarget.value),
+    onChange: (e: { currentTarget: { value: string } }) => {
+      const next = e.currentTarget.value;
+      setText(next);
+      latest.current = { ...latest.current, text: next };
+      clearTimeout(pause.current);
+      pause.current = setTimeout(keep, WRITE_PAUSE_MS);
+    },
     onFocus: () => (focused.current = true),
-    onBlur: keep,
+    onBlur: () => {
+      focused.current = false;
+      keep();
+    },
   };
   if (field.kind === "text" && lines !== undefined && lines > 0) {
     return (
@@ -224,7 +268,7 @@ function RemoveRow({ section, row, label }: SheetRowProps & { row: number }) {
       type="button"
       className="sheet-row-remove"
       aria-label={t("sheet.removeRow", { section: label, n: row + 1 })}
-      onClick={() => sheet.changeModel((m) => withRowRemoved(m, section, row))}
+      onClick={() => sheet.removeRow(section, row)}
     >
       <Icon name="close" size={16} />
     </button>

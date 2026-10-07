@@ -8,7 +8,6 @@
  */
 import { cardCount } from "@builder/sheet/cards";
 import { useSearchParams } from "next/navigation";
-import Link from "next/link";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { api } from "../../../../src/ui/api.ts";
 import { useApp } from "../../../../src/ui/app-state.tsx";
@@ -144,9 +143,19 @@ export default function DonePage() {
         {from !== undefined ? t("done.reprint") : t(hasCards ? "done.text" : "done.textSheetOnly")}
       </p>
       <div className="done__pdf">
+        {/* The sheet is what a player wants once the character is built: first, and on the screen. */}
+        <ButtonLink href={`/c/${draft.id}/bogen`} icon="arrowRight" block>
+          {t("done.toSheet")}
+        </ButtonLink>
         <Explained hint={t("done.pdfHint")} block>
           {/* A dialog picks what goes into the PDF: the sheet, the cards, the rules texts. */}
-          <Button icon="printer" block aria-haspopup="dialog" onClick={() => setPrinting(true)}>
+          <Button
+            icon="printer"
+            variant="secondary"
+            block
+            aria-haspopup="dialog"
+            onClick={() => setPrinting(true)}
+          >
             {t("done.download")}
           </Button>
         </Explained>
@@ -159,11 +168,7 @@ export default function DonePage() {
         />
         <p className="done__tip">{t(hasCards ? "done.tip" : "done.tipSheetOnly")}</p>
       </div>
-      {copies > 0 && (
-        <p className="done__copies">
-          {tc("done.copies", copies)} <Link href={`/c/${draft.id}/bogen`}>{t("done.toSheet")}</Link>
-        </p>
-      )}
+      {copies > 0 && <p className="done__copies">{tc("done.copies", copies)}</p>}
       <Origins />
       <p className="note">{t("done.editHint")}</p>
       <div className="done__next">

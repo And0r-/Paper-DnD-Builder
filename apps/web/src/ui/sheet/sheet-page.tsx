@@ -26,12 +26,26 @@ import { copyName } from "./copy-name.ts";
 import { ORIGINAL, useSheet, type SaveState, type SheetController } from "./sheet-state.ts";
 import { SHEET_UI, SheetUiProvider } from "./sheet-ui.tsx";
 
-function SaveLine({ save }: { save: SaveState }) {
+/** "Saved", and for a short while after clearing all ticks or crossing out a row, "Undo" beside it. */
+function SaveLine({ sheet }: { sheet: SheetController }) {
   const { t } = useApp();
+  const save: SaveState = sheet.save;
   return (
-    <p className={`save-status save-status--${save}`} aria-live="polite">
-      {save === "idle" ? "" : t(`save.${save}`)}
-    </p>
+    <div className="sheet-save">
+      <p className={`save-status save-status--${save}`} aria-live="polite">
+        {save === "idle" ? "" : t(`save.${save}`)}
+      </p>
+      {sheet.undo && (
+        <button
+          type="button"
+          className="sheet-undo"
+          aria-label={t(sheet.undo === "checks" ? "sheet.undoChecks" : "sheet.undoRow")}
+          onClick={sheet.runUndo}
+        >
+          {t("sheet.undo")}
+        </button>
+      )}
+    </div>
   );
 }
 
@@ -80,7 +94,7 @@ export function SheetPage() {
   return (
     <AppShell
       title={<span className="sheet-topbar__name">{name ?? t("common.unnamed")}</span>}
-      status={<SaveLine save={sheet.save} />}
+      status={<SaveLine sheet={sheet} />}
       menuExtra={<SheetTools {...tools} variant="menu" />}
       wide
     >
