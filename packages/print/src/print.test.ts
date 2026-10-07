@@ -16,7 +16,7 @@ import {
   type SheetSection,
 } from "@builder/sheet";
 import { demoCharacter, loadDemoPackage, raisedCharacter } from "@builder/sheet/testing";
-import { classicPlan } from "@builder/sheet/designs/classic";
+import { CLASSIC_GEOMETRY, classicPlan, firstColumns } from "@builder/sheet/designs/classic";
 import { renderPdf, type RenderedPdf } from "./render.ts";
 
 let pkg: ContentPackage;
@@ -2007,6 +2007,59 @@ describe("the classic design: original and copy, empty and filled", () => {
         expect([...words([text])].filter((w) => !known.has(w))).toEqual([]);
       }
     }
+  });
+
+  it("keeps long entries in their column, a long name off the box beside it, the harm on one line", async () => {
+    const original = buildSheetModel(pkg, lantern20(), { language: "de", createdAt });
+    const name = "Mirabella Fennwick-Ottersteg von Hollernd";
+    expect(name).toHaveLength(41);
+    const long = (n: number) =>
+      `Eigene Zeile ${n}: ein ziemlich langer Eintrag, der in keine halbe Spalte passt`;
+    const model: SheetModel = {
+      ...original,
+      sections: original.sections.map((s) =>
+        s.kind === "header"
+          ? { ...s, name }
+          : s.kind === "list"
+            ? { ...s, items: [...s.items, long(1), long(2), long(3)] }
+            : s,
+      ),
+    };
+    const pdf = await renderPdf(model, sheetOnly);
+    const { text } = await extract(pdf);
+    const page = (await positions(pdf))[0]!;
+    const g = CLASSIC_GEOMETRY;
+    const cols = firstColumns(g);
+    // Every word of the long entries is printed; nothing left of column C runs into it.
+    expect(text.match(/passt/gu)).toHaveLength(3);
+    const head = g.margin + g.first.head;
+    for (const p of page.filter((q) => q.y > head && q.x < cols.c.x))
+      expect(p.x + p.w, p.str).toBeLessThanOrEqual(cols.c.x - 1);
+    // The name: all of it, ending before the box beside it.
+    const nameEnd = g.margin + g.first.nameWidth;
+    const named = page.filter((p) => p.y < head && p.x < nameEnd);
+    expect(named.map((p) => p.str).join(" ")).toContain("Hollernd");
+    for (const p of named) expect(p.x + p.w, p.str).toBeLessThanOrEqual(nameEnd);
+    // The longest number of the attack table on one line.
+    const table = model.sections.find((s) => s.kind === "statTable");
+    if (table?.kind !== "statTable") throw new Error("no table");
+    const cells = table.rows[0]!.cells.filter((_, i) => !table.wrap?.[i]);
+    const longest = cells.reduce((a, b) => (b.length > a.length ? b : a));
+    expect(longest.length).toBeGreaterThan(15);
+    expect(page.map((p) => p.str)).toContain(longest);
+  });
+
+  it("goes on with a list in the next column only with entries, not with empty lines", async () => {
+    for (const doc of [river3(), lantern20()])
+      for (const [language] of languages) {
+        const model = buildSheetModel(pkg, doc, { language, createdAt });
+        const { text } = await extract(await renderPdf(model, sheetOnly));
+        const m = MESSAGES[language]!;
+        for (const s of model.sections.filter((x) => x.kind === "list"))
+          expect(text.toLowerCase(), `${language} ${s.title}`).not.toContain(
+            `${s.title} · ${m.continued}`.toLowerCase(),
+          );
+      }
   });
 
   it("gives the package's apart sections a page of their own when one is a box row, else runs them on", async () => {
