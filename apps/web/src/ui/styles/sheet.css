@@ -113,9 +113,21 @@
   flex-direction: column;
 }
 
+/* Everything keeps inside the drawer: a field and a button as wide as it, no wider. */
+.sheet-tools--menu > *,
+.sheet-tools--menu .sheet-tools__field {
+  min-width: 0;
+}
+
+.sheet-tools--menu .btn,
+.sheet-tools--menu .sheet-tools__select {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+}
+
 .sheet-tools--menu .btn {
   justify-content: flex-start;
-  width: 100%;
 }
 
 @media (min-width: 900px) {
@@ -296,6 +308,44 @@
   );
   line-height: var(--sheet-pitch);
   resize: none;
+}
+
+/* − and + beside a pencil value, on a phone only: at a desk the page is paper, written on. */
+.sheet-stepper {
+  display: flex;
+  align-items: stretch;
+  gap: var(--space-2);
+}
+
+.sheet-stepper > .sheet-pencil {
+  flex: 1;
+  min-width: 0;
+}
+
+.sheet-step {
+  flex: none;
+  width: var(--target-min);
+  min-height: var(--target-min);
+  padding: 0;
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-ink);
+  font: inherit;
+  font-size: var(--text-xl);
+  font-weight: var(--weight-bold);
+  cursor: pointer;
+}
+
+.sheet-step:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
+@media (min-width: 900px) {
+  .sheet-step {
+    display: none;
+  }
 }
 
 .sheet-pencil:focus-visible,

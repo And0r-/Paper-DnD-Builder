@@ -138,7 +138,7 @@ function SheetText({ path, value, label, multiline, shown: display }: SheetTextP
   );
 }
 
-function SheetField({ field, label, shape = "square", lines }: SheetFieldProps) {
+function SheetField({ field, label, shape = "square", lines, start }: SheetFieldProps) {
   const { t } = useApp();
   const sheet = useSheetCtx();
   const stored: PlayValue | undefined = sheet.state[field.id];
@@ -168,7 +168,7 @@ function SheetField({ field, label, shape = "square", lines }: SheetFieldProps) 
       </span>
     );
   }
-  return <WrittenField field={field} label={label} lines={lines} value={writtenOf(stored)} />;
+  return <WrittenField field={field} label={label} lines={lines} start={start} value={writtenOf(stored)} />;
 }
 
 /** A pause in typing this long saves what is written so far. */
@@ -183,8 +183,14 @@ function WrittenField({
   field,
   label,
   lines,
+  start,
   value,
-}: Pick<SheetFieldProps, "field" | "label"> & { lines: number | undefined; value: string }) {
+}: Pick<SheetFieldProps, "field" | "label"> & {
+  lines: number | undefined;
+  start: string | undefined;
+  value: string;
+}) {
+  const { t } = useApp();
   const { setField } = useSheetCtx();
   const [text, setText] = useState(value);
   // What another device or a reload brings, unless it is being written in.
@@ -252,7 +258,7 @@ function WrittenField({
       />
     );
   }
-  return (
+  const input = (
     <input
       {...common}
       type="text"
@@ -262,6 +268,36 @@ function WrittenField({
         if (e.key === "Enter") e.currentTarget.blur();
       }}
     />
+  );
+  if (field.kind !== "pencil" || start === undefined) return input;
+  // − and +: one less or more than what is written, or than the start value while nothing is.
+  const step = (by: number) => {
+    const from = [text, start].map((s) => pencilValue(s)).find((v) => typeof v === "number");
+    const next = String((from ?? 0) + by);
+    setText(next);
+    latest.current = { ...latest.current, text: next };
+    keep();
+  };
+  return (
+    <span className="sheet-stepper">
+      <button
+        type="button"
+        className="sheet-step"
+        aria-label={t("sheet.less", { label })}
+        onClick={() => step(-1)}
+      >
+        −
+      </button>
+      {input}
+      <button
+        type="button"
+        className="sheet-step"
+        aria-label={t("sheet.more", { label })}
+        onClick={() => step(1)}
+      >
+        +
+      </button>
+    </span>
   );
 }
 

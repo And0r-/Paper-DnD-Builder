@@ -29,6 +29,11 @@ export interface SheetFieldProps {
   shape?: "circle" | "square";
   /** Lines to write on, for a text field. */
   lines?: number;
+  /**
+   * For a pencil field: the value to count from while nothing is written
+   * ("18"). Given, the field has − and + beside it on a phone.
+   */
+  start?: string;
 }
 
 export interface SheetRowProps {

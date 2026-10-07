@@ -458,6 +458,8 @@
   "sheet.addRow": "Zeile dazu",
   "sheet.addRowLabel": "Zeile dazu bei {section}",
   "sheet.removeRow": "Zeile {n} bei {section} löschen",
+  "sheet.less": "{label}: eins weniger",
+  "sheet.more": "{label}: eins mehr",
   "sheet.tick": "{label}: Haken {n} von {max}",
   "sheet.undo": "Rückgängig",
   "sheet.undoChecks": "Rückgängig: Haken wieder setzen",

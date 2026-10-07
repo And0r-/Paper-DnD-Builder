@@ -349,7 +349,7 @@ function BoxBody({
       <div className="vsheet__pencil">
         <span className="vsheet__pencil-what">{pencil}</span>
         {b.field ? (
-          <ui.Field field={{ id: b.field, kind: "pencil" }} label={b.label} />
+          <ui.Field field={{ id: b.field, kind: "pencil" }} label={b.label} start={b.text} />
         ) : (
           <span className="vsheet__pencil-empty" />
         )}

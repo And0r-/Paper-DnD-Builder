@@ -201,6 +201,26 @@ function SheetTools({
       </select>
     </div>
   );
+  const clear = (
+    <Button variant="secondary" onClick={sheet.clearChecks} disabled={sheet.load !== "ready"}>
+      {t("sheet.clearChecks")}
+    </Button>
+  );
+  const raise = canRaise && (
+    <ButtonLink href={`/c/${draftId}/raise`} variant="secondary">
+      {t("raise.button")}
+    </ButtonLink>
+  );
+  const toBuilder = (
+    <ButtonLink href={`/c/${draftId}/overview`} variant="secondary">
+      {t("sheet.toBuilder")}
+    </ButtonLink>
+  );
+  const download = (
+    <Button icon="printer" onClick={onDownload} aria-haspopup="dialog" disabled={sheet.load !== "ready"}>
+      {t("sheet.download")}
+    </Button>
+  );
   const body = (
     <>
       {select(
@@ -228,20 +248,22 @@ function SheetTools({
         setLanguage,
       )}
       <div className="sheet-tools__actions">
-        <Button variant="secondary" onClick={sheet.clearChecks} disabled={sheet.load !== "ready"}>
-          {t("sheet.clearChecks")}
-        </Button>
-        {canRaise && (
-          <ButtonLink href={`/c/${draftId}/raise`} variant="secondary">
-            {t("raise.button")}
-          </ButtonLink>
+        {variant === "bar" ? (
+          <>
+            {clear}
+            {raise}
+            {toBuilder}
+            {download}
+          </>
+        ) : (
+          // In the menu as in the sketch: what one comes for first, leaving the sheet last.
+          <>
+            {raise}
+            {download}
+            {clear}
+            {toBuilder}
+          </>
         )}
-        <ButtonLink href={`/c/${draftId}/overview`} variant="secondary">
-          {t("sheet.toBuilder")}
-        </ButtonLink>
-        <Button icon="printer" onClick={onDownload} aria-haspopup="dialog" disabled={sheet.load !== "ready"}>
-          {t("sheet.download")}
-        </Button>
       </div>
     </>
   );
