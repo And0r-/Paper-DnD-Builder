@@ -56,8 +56,11 @@ test("one list for the talents of three sources", async ({ page, foreign }) => {
   // Three sources, each named by the package's words.
   const sources = "2 aus deinem Beruf, 1 aus Stufe 2 und 1 aus deiner Herkunft";
   await expect(page.locator("[data-pool-total]")).toHaveText(`Du wählst 4: ${sources}.`);
-  // What the upbringing gave is on top, not in the list.
-  await expect(page.locator("[data-pool-held]")).toHaveText("Wetterkunde und Feilschen (von Fährkind)");
+  // What the upbringing gave is on top, not in the list; so is what every character has (flow.grants).
+  await expect(page.locator("[data-pool-held] li")).toHaveText([
+    "Nebelzeichen (alle)",
+    "Wetterkunde und Feilschen (von Fährkind)",
+  ]);
   await expect(option(page, "talent.weather-sense")).toHaveCount(0);
   await expect(option(page, "talent.haggling")).toHaveCount(0);
   await expectOneLanguage(page, "de");
