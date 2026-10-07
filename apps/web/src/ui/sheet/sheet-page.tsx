@@ -4,10 +4,12 @@
  * approved in round 2 of the sketches): the sheet in the account's design,
  * the original or one of the player's own versions, changed in place.
  *
- * At a desk the tools are a bar above the page: version, look, language,
- * clear all ticks, level up, to the builder, download. On a phone the top
- * bar has only the menu, the name and "saved"; the tools are the group
- * "Sheet" at the top of the app's menu.
+ * At a desk the version and the look are lists in the top bar, beside the
+ * language (AND-227), and the rest of the tools a bar above the page: clear
+ * all ticks, level up, to the builder, download. On a phone the top bar has
+ * only the menu, the name, "saved" and the language; the tools are the
+ * group "Sheet" at the top of the app's menu. The language is the top
+ * bar's, as on every screen: the sheet follows it from the app state.
  */
 import type { SheetModel } from "@builder/sheet";
 import { cardCount } from "@builder/sheet/cards";
@@ -15,11 +17,11 @@ import { screenDesign } from "@builder/sheet/designs/screens";
 import type { PrintPlaces } from "@builder/sheet/designs/screens";
 import { SHEET_DESIGNS, type PrintChoice } from "@builder/sheet/printouts";
 import { useEffect, useId, useMemo, useState, type ReactNode } from "react";
-import { LANGUAGE_NAMES, UI_LANGUAGES, isUiLanguage } from "../../i18n/index.ts";
 import { api, type Account, type SheetDesignInfo } from "../api.ts";
 import { useApp } from "../app-state.tsx";
 import { Button, ButtonLink } from "../components/Button.tsx";
 import { Callout, EmptyState, ErrorState, Loading } from "../components/Feedback.tsx";
+import { CompactSelect, type CompactOption } from "../components/Fields.tsx";
 import { AppShell } from "../components/Shell.tsx";
 import { useDraft } from "../flow/draft-state.tsx";
 import { usePageTitle } from "../flow/frame.tsx";
@@ -53,7 +55,7 @@ function SaveLine({ sheet }: { sheet: SheetController }) {
 }
 
 export function SheetPage() {
-  const { t, account, setAccount, setLanguage } = useApp();
+  const { t, account, setAccount } = useApp();
   const { lp, ev, draft } = useDraft();
   const sheet = useSheet(draft.id);
   const [printing, setPrinting] = useState(false);
@@ -88,9 +90,6 @@ export function SheetPage() {
         .then((r) => setAccount(r.account))
         .catch(() => {});
     },
-    setLanguage: (next: string) => {
-      if (isUiLanguage(next)) setLanguage(next).catch(() => {});
-    },
     canRaise,
     draftId: draft.id,
     onDownload: () => setPrinting(true),
@@ -105,6 +104,7 @@ export function SheetPage() {
         </span>
       }
       status={<SaveLine sheet={sheet} />}
+      tools={<SheetLists {...tools} />}
       menuExtra={<SheetTools {...tools} variant="menu" />}
       wide
     >
@@ -204,38 +204,73 @@ function SheetBody({
   return <>{children}</>;
 }
 
+interface ToolProps {
+  sheet: SheetController;
+  designs: SheetDesignInfo[];
+  design: string;
+  setDesign: (id: string) => void;
+  canRaise: boolean;
+  draftId: string;
+  onDownload: () => void;
+}
+
+/** The versions to choose from, newest first after the original, as in the download dialog; and the looks. */
+function useListOptions(sheet: SheetController, designs: SheetDesignInfo[]) {
+  const { t, lang } = useApp();
+  const { lp } = useDraft();
+  const levelName = ptext(lp, "level.name") ?? "";
+  const versions: CompactOption[] = [
+    { value: ORIGINAL, label: t("sheet.original") },
+    ...newestFirst(sheet.copies).map((c) => ({ value: c.id, label: copyChoice(t, lang, levelName, c) })),
+  ];
+  const looks: CompactOption[] = designs.map((d) => ({ value: d.id, label: d.name[lang] ?? d.id }));
+  return { versions, looks };
+}
+
+/** Version and look in the top bar at a desk: an icon each for its name, a fixed width, a long name cut with "…". */
+function SheetLists({ sheet, designs, design, setDesign }: ToolProps) {
+  const { t } = useApp();
+  const { versions, looks } = useListOptions(sheet, designs);
+  return (
+    <>
+      <CompactSelect
+        className="compact-select--version"
+        label={t("sheet.version")}
+        icon="copies"
+        value={sheet.version}
+        options={versions}
+        onChange={sheet.select}
+      />
+      <CompactSelect
+        className="compact-select--design"
+        label={t("sheet.design")}
+        icon="palette"
+        value={design}
+        options={looks}
+        onChange={setDesign}
+      />
+    </>
+  );
+}
+
 function SheetTools({
   variant,
   sheet,
   designs,
   design,
   setDesign,
-  setLanguage,
   canRaise,
   draftId,
   onDownload,
-}: {
-  variant: "bar" | "menu";
-  sheet: SheetController;
-  designs: SheetDesignInfo[];
-  design: string;
-  setDesign: (id: string) => void;
-  setLanguage: (lang: string) => void;
-  canRaise: boolean;
-  draftId: string;
-  onDownload: () => void;
-}) {
-  const { t, lang } = useApp();
-  const { lp } = useDraft();
+}: ToolProps & { variant: "bar" | "menu" }) {
+  const { t } = useApp();
   const id = useId();
-  // Newest first, after the original, as in the download dialog.
-  const copies = newestFirst(sheet.copies);
-  const levelName = ptext(lp, "level.name") ?? "";
+  const { versions, looks } = useListOptions(sheet, designs);
   const select = (
     key: string,
     label: string,
     value: string,
-    options: ReactOption[],
+    options: CompactOption[],
     onChange: (v: string) => void,
   ) => (
     <div className="sheet-tools__field">
@@ -282,29 +317,12 @@ function SheetTools({
   );
   const body = (
     <>
-      {select(
-        "version",
-        t("sheet.version"),
-        sheet.version,
-        [
-          { value: ORIGINAL, label: t("sheet.original") },
-          ...copies.map((c) => ({ value: c.id, label: copyChoice(t, lang, levelName, c) })),
-        ],
-        sheet.select,
-      )}
-      {select(
-        "design",
-        t("sheet.design"),
-        design,
-        designs.map((d) => ({ value: d.id, label: d.name[lang] ?? d.id })),
-        setDesign,
-      )}
-      {select(
-        "language",
-        t("sheet.language"),
-        lang,
-        UI_LANGUAGES.map((l) => ({ value: l, label: LANGUAGE_NAMES[l], lang: l })),
-        setLanguage,
+      {/* At a desk the lists are in the top bar. */}
+      {variant === "menu" && (
+        <>
+          {select("version", t("sheet.version"), sheet.version, versions, sheet.select)}
+          {select("design", t("sheet.design"), design, looks, setDesign)}
+        </>
       )}
       <div className="sheet-tools__actions">
         {variant === "bar" ? (
@@ -338,10 +356,4 @@ function SheetTools({
       {body}
     </section>
   );
-}
-
-interface ReactOption {
-  value: string;
-  label: string;
-  lang?: string;
 }

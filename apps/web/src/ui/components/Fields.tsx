@@ -9,7 +9,7 @@ import {
   type ReactNode,
   type TextareaHTMLAttributes,
 } from "react";
-import { Icon } from "./Icon.tsx";
+import { Icon, type IconName } from "./Icon.tsx";
 
 /** Label above, field, help, error. The label is never only a placeholder. */
 export const TextField = forwardRef<
@@ -157,6 +157,67 @@ export function Disclosure({
       <div id={id} className="disclosure__panel" hidden={!open}>
         {open && children}
       </div>
+    </div>
+  );
+}
+
+export interface CompactOption {
+  value: string;
+  label: string;
+  lang?: string;
+}
+
+/**
+ * A list to choose from in a top bar (AND-227): an icon for its name, which
+ * screen readers get from a hidden label, and a fixed width whatever is
+ * chosen. A native select cannot cut its own text with "…" in every
+ * browser, so the chosen entry is drawn in a span of our own that can, and
+ * the select lies on it unseen: it still takes the clicks, the keys and the
+ * screen reader, and opened it shows every entry whole.
+ */
+export function CompactSelect({
+  label,
+  icon,
+  value,
+  options,
+  onChange,
+  className,
+  busy,
+}: {
+  label: string;
+  icon: IconName;
+  value: string;
+  options: readonly CompactOption[];
+  onChange: (value: string) => void;
+  className?: string;
+  busy?: boolean;
+}) {
+  const id = useId();
+  const chosen = options.find((o) => o.value === value);
+  return (
+    <div className={`compact-select${className ? ` ${className}` : ""}`}>
+      <label className="visually-hidden" htmlFor={id}>
+        {label}
+      </label>
+      <Icon name={icon} size={20} className="compact-select__icon" />
+      <span className="compact-select__shown" aria-hidden="true" lang={chosen?.lang}>
+        {chosen?.label}
+      </span>
+      <Icon name="chevronDown" size={16} className="compact-select__chevron" />
+      <select
+        id={id}
+        className="compact-select__select"
+        value={value}
+        title={chosen ? `${label}: ${chosen.label}` : label}
+        aria-busy={busy}
+        onChange={(e) => onChange(e.currentTarget.value)}
+      >
+        {options.map((o) => (
+          <option key={o.value} value={o.value} lang={o.lang}>
+            {o.label}
+          </option>
+        ))}
+      </select>
     </div>
   );
 }

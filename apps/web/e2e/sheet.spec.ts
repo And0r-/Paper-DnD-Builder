@@ -1,11 +1,19 @@
 /**
  * The online sheet on a phone (AND-181); the same at a desk in
  * `sheet-desk.spec.ts`. Cases in `sheet-tests.ts`. Plus a character that is
- * not finished, and the sheet in English with its language from the menu.
+ * not finished, and the sheet in English with its language from the top bar.
  */
 import de from "../src/i18n/messages/de.json" with { type: "json" };
 import en from "../src/i18n/messages/en.json" with { type: "json" };
-import { expect, expectOneLanguage, login, makeCharacter, test, uniqueEmail } from "./helpers.ts";
+import {
+  chooseLanguage,
+  expect,
+  expectOneLanguage,
+  login,
+  makeCharacter,
+  test,
+  uniqueEmail,
+} from "./helpers.ts";
 import { sheetTests } from "./sheet-tests.ts";
 
 const m = de;
@@ -22,7 +30,7 @@ test("a character that is not finished has no original yet", async ({ page, fore
   await expect(page).toHaveURL(new RegExp(`/c/${id}/overview$`));
 });
 
-test("the sheet in English, and its language from the menu", async ({ page, foreign }) => {
+test("the sheet in English, and its language from the top bar", async ({ page, foreign }) => {
   void foreign;
   await login(page, uniqueEmail("sheet-en"), "en");
   const id = await makeCharacter(page);
@@ -30,10 +38,15 @@ test("the sheet in English, and its language from the menu", async ({ page, fore
   await expect(page.getByRole("heading", { level: 1, name: "Mira" })).toBeVisible();
   await expect(page.getByRole("button", { name: /^Might: \d+\. Change$/ })).toBeVisible();
   await expectOneLanguage(page, "en");
+  // One language switch on the sheet, the top bar's as on every screen (AND-227); none in the menu.
   await page.getByRole("button", { name: en["menu.open"] }).click();
   const menu = page.getByRole("dialog", { name: en["menu.title"] });
-  // The character is loaded again in the new language; the menu closes with it.
-  await menu.getByLabel(en["sheet.language"]).selectOption("de");
+  await expect(menu.getByRole("heading", { name: en["sheet.group"] })).toBeVisible();
+  await expect(menu.getByRole("combobox", { name: en["language.label"] })).toHaveCount(0);
+  await menu.getByRole("button", { name: en["common.close"] }).click();
+  await expect(page.getByRole("combobox", { name: en["language.label"] })).toHaveCount(1);
+  // The character is loaded again in the new language, without a reload.
+  await chooseLanguage(page, "de");
   await expect(page.getByRole("button", { name: /^Kraft: \d+\. Ändern$/ })).toBeVisible();
   await expectOneLanguage(page, "de");
 });

@@ -84,7 +84,9 @@ for (const width of [1280, 1440]) {
       });
     }
 
-    test("a copy's whole name in the bar", async ({ page }) => {
+    test("version and style in the top bar: a fixed width, a long name cut with …, whole when opened", async ({
+      page,
+    }) => {
       await login(page, uniqueEmail("sheet-bar-name"));
       const id = await finished(page, 3);
       const made = (await (
@@ -93,20 +95,44 @@ for (const width of [1280, 1440]) {
         copy: { id: string };
       };
       await openSheet(page, id, "classic", made.copy.id);
-      const select = page
-        .getByRole("group", { name: m["sheet.tools"] })
-        .getByLabel(m["sheet.version"], { exact: true });
-      const [text, room] = await select.evaluate((e) => {
-        const s = e as HTMLSelectElement;
-        const c = document.createElement("canvas").getContext("2d")!;
-        const st = getComputedStyle(s);
-        c.font = `${st.fontWeight} ${st.fontSize} ${st.fontFamily}`;
-        return [
-          c.measureText(s.selectedOptions[0]!.text).width,
-          s.clientWidth - parseFloat(st.paddingLeft) - parseFloat(st.paddingRight),
-        ];
-      });
-      expect(text).toBeLessThanOrEqual(room + 1);
+      const banner = page.getByRole("banner");
+      const version = banner.getByRole("combobox", { name: m["sheet.version"], exact: true });
+      const style = banner.getByRole("combobox", { name: m["sheet.design"], exact: true });
+      await expect(version).toBeVisible();
+      await expect(style).toHaveValue("classic");
+      // No title shown: an icon, the name for screen readers.
+      await expect(banner.getByText(m["sheet.version"], { exact: true })).toHaveClass("visually-hidden");
+      // The copy's name is longer than the list: cut at its end, the list no wider.
+      const shown = page.locator(".compact-select--version .compact-select__shown");
+      const cut = () =>
+        shown.evaluate((e) => [e.scrollWidth > e.clientWidth, getComputedStyle(e).textOverflow] as const);
+      expect(await cut()).toEqual([true, "ellipsis"]);
+      const long = await box(version);
+      const style1 = await box(style);
+      // Opened, every entry reads whole: the options carry the whole name.
+      const whole = (await version.locator("option:checked").textContent())!;
+      expect(whole).toMatch(/\d{1,2}:\d{2}/u);
+      expect(await shown.textContent()).toBe(whole);
+      // The original: the bar does not move.
+      await version.selectOption("original");
+      await expect(shown).toHaveText(m["sheet.original"]);
+      expect(await box(version)).toEqual(long);
+      expect(await box(style)).toEqual(style1);
+      // Keyboard: Tab reaches the lists, arrows change them.
+      await version.focus();
+      await page.keyboard.press("ArrowDown");
+      await expect(version).toHaveValue(made.copy.id);
+      expect(await box(version)).toEqual(long);
+      await page.keyboard.press("Tab");
+      await expect(style).toBeFocused();
+      await page.keyboard.press("Tab");
+      await expect(banner.getByRole("combobox", { name: m["language.label"] })).toBeFocused();
+      // Only the sheet has them: elsewhere the top bar has the language alone.
+      for (const url of ["/characters", `/c/${id}/overview`, "/settings", "/campaigns"]) {
+        await page.goto(url);
+        await expect(page.getByRole("main").getByRole("heading", { level: 1 }).first()).toBeVisible();
+        await expect(banner.getByRole("combobox")).toHaveCount(1);
+      }
     });
   });
 }

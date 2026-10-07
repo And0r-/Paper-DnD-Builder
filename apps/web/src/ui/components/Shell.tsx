@@ -24,6 +24,7 @@ export function SkipLink() {
 export function AppShell({
   title,
   status,
+  tools,
   menuExtra,
   menuMark,
   sidebar,
@@ -35,6 +36,8 @@ export function AppShell({
   title?: ReactNode;
   /** Right side of the top bar (save status). */
   status?: ReactNode;
+  /** Lists of the screen's own beside the language, on large screens only (the sheet's version and style). */
+  tools?: ReactNode;
   /** Extra content at the top of the menu (the step list). */
   menuExtra?: ReactNode;
   /** A short mark on the menu button (steps that came or went while the menu is shut). */
@@ -72,6 +75,7 @@ export function AppShell({
           )}
         </div>
         <div className="topbar__status">{status}</div>
+        {tools && <div className="topbar__tools">{tools}</div>}
         <LanguageMenu />
       </header>
       <MenuDrawer open={menuOpen} onClose={() => setMenuOpen(false)}>
