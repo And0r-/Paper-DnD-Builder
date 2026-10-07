@@ -169,14 +169,16 @@ test("raising values: old value, points, new value, and why a row is full", asyn
 
 /**
  * Opens the menu on the phone. A level-20 step screen is drawn on the server
- * first; a tap before the page is live is lost, so the tap is repeated until
- * the button reports the menu as open.
+ * first; a tap before the page is live is lost, and one while the character
+ * still loads opens the loading screen's menu, which goes with that screen.
+ * So the tap is repeated until the menu shows the step list.
  */
 async function openMenu(page: Page) {
   const button = page.getByRole("button", { name: m["menu.open"] });
+  const list = page.getByRole("dialog", { name: m["menu.title"] }).locator(".steplist");
   await expect(async () => {
-    await button.click();
-    await expect(button).toHaveAttribute("aria-expanded", "true", { timeout: 1000 });
+    if ((await button.getAttribute("aria-expanded")) !== "true") await button.click();
+    await expect(list).toBeVisible({ timeout: 1000 });
   }).toPass();
 }
 

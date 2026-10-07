@@ -281,13 +281,14 @@ A grant gives exactly one of three things, from `atLevel` on (default 1):
 | `{ "value": "stamina", "add": 5 }`   | Adds a number, an expression result or a table by level to a value (see [7](#7-values)).        |
 
 A thing grant may say **how many** with `count` (a whole number ≥ 1,
-default 1): `{ "thing": "item.arrow", "count": 20 }`. A thing that some
-grant in the package gives with a `count` is counted: every grant that
-gives it adds its count (a kit with 20 arrows and another with 8 give 28),
-and the sheet prints "28 × Arrow". A thing no grant gives with a `count`
-is had once, however many grants give it (a skill from two sources is one
-skill). The count changes nothing else: `has()`, `count()` and the
-thing's own grants stay as for one.
+default 1): `{ "thing": "item.arrow", "count": 20 }`. A thing of a kind
+that some grant in the package gives with a `count` is counted: every
+grant that gives it adds its count (a kit with 20 arrows and another with
+8 give 28; a staff from two kits, neither with a count, is two staffs),
+and the sheet prints "28 × Arrow". A thing of a kind no grant gives with
+a `count` is had once, however many grants give it (a skill from two
+sources is one skill). The count changes nothing else: `has()`, `count()`
+and the thing's own grants stay as for one.
 
 A value grant's `add` may be a **table by level** instead of a number:
 `{ "value": "lanternSlots1", "add": { "byLevel": [1, 2, 2, 3, ...] } }`
