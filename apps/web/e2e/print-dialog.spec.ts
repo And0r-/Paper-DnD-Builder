@@ -1,7 +1,8 @@
 /**
- * The download dialog of the done screen (AND-179): only the sheet is
- * ticked at first, each part comes as the file it says, and the account
- * keeps the choice for next time. Both languages, one at a time.
+ * The download dialog of the done screen (AND-179): sheet, cards and the
+ * play state are ticked at first (AND-217), each part comes as the file it
+ * says, and the account keeps the choice for next time. Both languages,
+ * one at a time.
  */
 import AxeBuilder from "@axe-core/playwright";
 import type { Page } from "@playwright/test";
@@ -39,7 +40,7 @@ async function axe(page: Page) {
 const pages = (pdf: Buffer) => (pdf.toString("latin1").match(/\/Type \/Page\b/g) ?? []).length;
 
 for (const lang of ["de", "en"] as const) {
-  test(`the download dialog offers the sheet alone first and keeps the choice (${lang})`, async ({
+  test(`the download dialog offers sheet, cards and play state first and keeps the choice (${lang})`, async ({
     page,
     foreign,
   }) => {
@@ -68,12 +69,12 @@ for (const lang of ["de", "en"] as const) {
       return readFile((await done.path())!);
     };
 
-    // Only the sheet, nothing else ticked; the first design; no copy, so the original; empty.
+    // Sheet and cards, no rules texts; the first design; no copy, so the original; the play state in.
     await expect(part("print.sheet")).toBeChecked();
-    await expect(part("print.cards")).not.toBeChecked();
+    await expect(part("print.cards")).toBeChecked();
     await expect(part("print.texts")).not.toBeChecked();
     await expect(dialog.getByText(m["sheet.original"])).toBeVisible();
-    await expect(dialog.getByRole("checkbox", { name: m["print.state"] })).not.toBeChecked();
+    await expect(dialog.getByRole("checkbox", { name: m["print.state"] })).toBeChecked();
     await expect(dialog.getByRole("combobox", { name: m["print.version"] })).toHaveCount(0);
     const design = (name: string) => dialog.getByRole("radio", { name, exact: true });
     await expect(design(lang === "de" ? "Ausführlich" : "Detailed")).toBeChecked();
@@ -83,6 +84,8 @@ for (const lang of ["de", "en"] as const) {
     await shot(page, `95-download-dialog-${lang}`);
 
     // The sheet alone: fewer pages than sheet and cards together.
+    await part("print.cards").click();
+    await expect(part("print.cards")).not.toBeChecked();
     // The design in the name, so a sheet in the other design does not overwrite it.
     const sheet = await download(`Mira - ${words.design} - ${words.sheet}.pdf`);
     expect(sheet.subarray(0, 5).toString("latin1")).toBe("%PDF-");

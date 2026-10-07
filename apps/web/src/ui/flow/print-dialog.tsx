@@ -2,13 +2,19 @@
 /**
  * The download dialog of the done screen (sheet plan, sections 2 and 6):
  * which parts go into the PDF (sheet, cards, rules texts), in which design,
- * which version and whether the play state is filled in. Only the sheet
- * is ticked until the player picks otherwise; the choice is kept on the
- * account and offered again next time. The version is the original unless
+ * which version and whether the play state is filled in. Sheet, cards and
+ * the play state are ticked until the player picks otherwise (the owner's
+ * answer on the sheet plan); the choice is kept on the account and offered
+ * again next time. The version is the original unless
  * the character has kept copies; then the player picks one (the sheet
  * screen opens the dialog on the copy it shows).
  */
-import { PRINT_PARTS, type PrintChoice, type PrintPart } from "@builder/sheet/printouts";
+import {
+  DEFAULT_PRINT_CHOICE,
+  PRINT_PARTS,
+  type PrintChoice,
+  type PrintPart,
+} from "@builder/sheet/printouts";
 import { useEffect, useId, useState } from "react";
 import { copyName } from "../sheet/copy-name.ts";
 import { useApp } from "../app-state.tsx";
@@ -77,10 +83,10 @@ export function PrintDialog({
   // Every time it opens, it starts from what the account picked last.
   useEffect(() => {
     if (!open) return;
-    const stored = account?.print;
-    setParts(new Set(stored?.parts ?? ["sheet"]));
-    if (stored) setDesign(stored.design);
-    setFilled(stored?.state === "filled");
+    const stored = account?.print ?? DEFAULT_PRINT_CHOICE;
+    setParts(new Set(stored.parts));
+    setDesign(stored.design);
+    setFilled(stored.state === "filled");
     setVersion(startVersion);
     setPdf("idle");
     setNoPart(false);

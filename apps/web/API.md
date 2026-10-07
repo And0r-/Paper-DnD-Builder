@@ -401,7 +401,9 @@ Query parameters of the PDF, all optional:
 
 The screen keeps the player's choice of parts and design on the account
 (`print` in `GET /api/account`, changed with `PATCH /api/account/settings`);
-until one is made it is `{ parts: ["sheet"], design: "verbose", state: "empty" }`.
+until one is made it is `{ parts: ["sheet", "cards"], design: "verbose", state: "filled" }`.
+That is only where the dialog starts; the PDF itself, without `parts` and
+`state`, stays the sheet and the cards, empty.
 
 The sheet model (`components/schemas/SheetModel` in
 [`openapi.json`](openapi.json), the Zod schema `sheetModelSchema` in
