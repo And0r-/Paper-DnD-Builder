@@ -1,11 +1,13 @@
 "use client";
 /**
- * Access keys in the settings, after the language model package that can
- * make one too: make one with a name saying what it is for
- * (shown once, to copy), see the list with names and dates, withdraw one. A key lets a program the player trusts work in
- * their account over the API (see API.md).
+ * Access keys in the settings: make one with a name saying what it is for
+ * (shown once, to copy), see the list with names and dates, withdraw one. A
+ * key lets a program the player trusts work in their account over the API
+ * (see API.md). The page /mcp/setup says how a language model uses one and
+ * links to `#new-key`, which focuses the name field.
  */
-import { useEffect, useState } from "react";
+import Link from "next/link";
+import { useEffect, useRef, useState } from "react";
 import { useApp } from "../app-state.tsx";
 import { api, ApiError } from "../api.ts";
 import { Button } from "./Button.tsx";
@@ -13,7 +15,7 @@ import { ConfirmDialog } from "./Dialog.tsx";
 import { Callout, ErrorState, Loading } from "./Feedback.tsx";
 import { TextField, Toast } from "./Fields.tsx";
 import { FreshKey } from "./FreshKey.tsx";
-import { LanguageModelHelp } from "./LanguageModelHelp.tsx";
+import { NEW_KEY_ANCHOR } from "./McpSetup.tsx";
 
 /** The server's limit for a name (see API.md). */
 const MAX_NAME = 80;
@@ -37,6 +39,14 @@ export function AccessKeys() {
   const [toast, setToast] = useState<string>();
   const [name, setName] = useState("");
   const [nameMissing, setNameMissing] = useState(false);
+  const form = useRef<HTMLFormElement>(null);
+
+  // Come from the MCP page to make a key: straight into the name field.
+  useEffect(() => {
+    if (window.location.hash !== `#${NEW_KEY_ANCHOR}`) return;
+    form.current?.querySelector("input")?.focus();
+    form.current?.scrollIntoView({ block: "center" });
+  }, []);
 
   useEffect(() => {
     let live = true;
@@ -78,119 +88,121 @@ export function AccessKeys() {
   }
 
   return (
-    <>
-      <LanguageModelHelp />
-      <section className="settings__section" aria-labelledby="s-keys">
-        <h2 className="section-title" id="s-keys">
-          {t("settings.keys")}
-        </h2>
-        <p>{t("settings.keysText")}</p>
-        <div aria-live="polite">
-          {error && (
-            <Callout tone="danger" role="alert">
-              {error}
-            </Callout>
-          )}
-        </div>
-
-        {fresh && (
-          <FreshKey
-            key={fresh}
-            secret={fresh}
-            title={t("settings.keyNewTitle")}
-            label={t("settings.keyNewText")}
-            onDone={() => setFresh(undefined)}
-          />
+    <section className="settings__section" aria-labelledby="s-keys">
+      <h2 className="section-title" id="s-keys">
+        {t("settings.keys")}
+      </h2>
+      <p>{t("settings.keysText")}</p>
+      <p>
+        {t("settings.keysMcp")} <Link href="/mcp/setup">{t("menu.mcp")}</Link>.
+      </p>
+      <div aria-live="polite">
+        {error && (
+          <Callout tone="danger" role="alert">
+            {error}
+          </Callout>
         )}
+      </div>
 
-        {failed && <ErrorState onRetry={() => setAttempt((n) => n + 1)} />}
-        {!failed && !keys && <Loading count={1} />}
-        {keys && keys.length === 0 && <p className="note">{t("settings.keysNone")}</p>}
-        {keys && keys.length > 0 && (
-          <ul className="access-keys" aria-label={t("settings.keysListLabel")}>
-            {keys.map((k) => (
-              <li className="access-keys__item" key={k.id}>
-                <span className="access-keys__text">
-                  <span className="access-keys__name">{k.name}</span>
-                  <span className="note">
-                    <span className="access-keys__hint">{t("settings.keyItem", { hint: k.hint })}</span>{" "}
-                    {t("settings.keyCreated", { date: date.format(new Date(k.createdAt)) })}
-                  </span>
+      {fresh && (
+        <FreshKey
+          key={fresh}
+          secret={fresh}
+          title={t("settings.keyNewTitle")}
+          label={t("settings.keyNewText")}
+          onDone={() => setFresh(undefined)}
+        />
+      )}
+
+      {failed && <ErrorState onRetry={() => setAttempt((n) => n + 1)} />}
+      {!failed && !keys && <Loading count={1} />}
+      {keys && keys.length === 0 && <p className="note">{t("settings.keysNone")}</p>}
+      {keys && keys.length > 0 && (
+        <ul className="access-keys" aria-label={t("settings.keysListLabel")}>
+          {keys.map((k) => (
+            <li className="access-keys__item" key={k.id}>
+              <span className="access-keys__text">
+                <span className="access-keys__name">{k.name}</span>
+                <span className="note">
+                  <span className="access-keys__hint">{t("settings.keyItem", { hint: k.hint })}</span>{" "}
+                  {t("settings.keyCreated", { date: date.format(new Date(k.createdAt)) })}
                 </span>
-                <Button
-                  variant="ghost"
-                  aria-label={t("settings.keyRevokeLabel", { name: k.name })}
-                  onClick={() => setWithdraw(k)}
-                >
-                  {t("settings.keyRevoke")}
-                </Button>
-              </li>
-            ))}
-          </ul>
-        )}
+              </span>
+              <Button
+                variant="ghost"
+                aria-label={t("settings.keyRevokeLabel", { name: k.name })}
+                onClick={() => setWithdraw(k)}
+              >
+                {t("settings.keyRevoke")}
+              </Button>
+            </li>
+          ))}
+        </ul>
+      )}
 
-        <form
-          className="access-keys__new"
-          noValidate
-          onSubmit={(e) => {
-            e.preventDefault();
-            void create();
+      <form
+        ref={form}
+        id={NEW_KEY_ANCHOR}
+        className="access-keys__new"
+        noValidate
+        onSubmit={(e) => {
+          e.preventDefault();
+          void create();
+        }}
+      >
+        <TextField
+          label={t("settings.keyName")}
+          help={t("settings.keyNameHelp")}
+          error={nameMissing ? t("settings.keyNameMissing") : undefined}
+          value={name}
+          maxLength={MAX_NAME}
+          autoComplete="off"
+          onChange={(e) => {
+            setName(e.currentTarget.value);
+            setNameMissing(false);
           }}
-        >
-          <TextField
-            label={t("settings.keyName")}
-            help={t("settings.keyNameHelp")}
-            error={nameMissing ? t("settings.keyNameMissing") : undefined}
-            value={name}
-            maxLength={MAX_NAME}
-            autoComplete="off"
-            onChange={(e) => {
-              setName(e.currentTarget.value);
-              setNameMissing(false);
-            }}
-          />
-          <Button
-            type="submit"
-            variant="secondary"
-            icon="plus"
-            busy={busy}
-            busyLabel={t("settings.keyCreating")}
-          >
-            {t("settings.keyCreate")}
-          </Button>
-        </form>
-
-        <ConfirmDialog
-          open={withdraw !== undefined}
-          title={t("settings.keyRevokeTitle")}
-          confirmLabel={t("settings.keyRevokeConfirm")}
-          danger
+        />
+        <Button
+          type="submit"
+          variant="secondary"
+          icon="plus"
           busy={busy}
-          onCancel={() => setWithdraw(undefined)}
-          onConfirm={async () => {
-            const k = withdraw!;
-            setBusy(true);
-            setError(undefined);
-            try {
-              await api("DELETE", `/api/account/keys/${encodeURIComponent(k.id)}`);
-              setKeys((all) => all?.filter((x) => x.id !== k.id) ?? null);
-              setToast(t("settings.keyRevoked"));
-            } catch (e) {
-              // Already gone (another tab): the list is right without it.
-              if (e instanceof ApiError && e.code === "keyNotFound") {
-                setKeys((all) => all?.filter((x) => x.id !== k.id) ?? null);
-              } else setError(t("settings.saveError"));
-            } finally {
-              setBusy(false);
-              setWithdraw(undefined);
-            }
-          }}
+          busyLabel={t("settings.keyCreating")}
         >
-          <p>{t("settings.keyRevokeText", { name: withdraw?.name ?? "", hint: withdraw?.hint ?? "" })}</p>
-        </ConfirmDialog>
+          {t("settings.keyCreate")}
+        </Button>
+      </form>
 
-        {toast && <Toast message={toast} duration={6000} onDone={() => setToast(undefined)} />}
-      </section>
-    </>
+      <ConfirmDialog
+        open={withdraw !== undefined}
+        title={t("settings.keyRevokeTitle")}
+        confirmLabel={t("settings.keyRevokeConfirm")}
+        danger
+        busy={busy}
+        onCancel={() => setWithdraw(undefined)}
+        onConfirm={async () => {
+          const k = withdraw!;
+          setBusy(true);
+          setError(undefined);
+          try {
+            await api("DELETE", `/api/account/keys/${encodeURIComponent(k.id)}`);
+            setKeys((all) => all?.filter((x) => x.id !== k.id) ?? null);
+            setToast(t("settings.keyRevoked"));
+          } catch (e) {
+            // Already gone (another tab): the list is right without it.
+            if (e instanceof ApiError && e.code === "keyNotFound") {
+              setKeys((all) => all?.filter((x) => x.id !== k.id) ?? null);
+            } else setError(t("settings.saveError"));
+          } finally {
+            setBusy(false);
+            setWithdraw(undefined);
+          }
+        }}
+      >
+        <p>{t("settings.keyRevokeText", { name: withdraw?.name ?? "", hint: withdraw?.hint ?? "" })}</p>
+      </ConfirmDialog>
+
+      {toast && <Toast message={toast} duration={6000} onDone={() => setToast(undefined)} />}
+    </section>
   );
 }

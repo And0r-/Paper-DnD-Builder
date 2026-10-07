@@ -30,6 +30,7 @@ async function visitAll(page: Page, id: string, lang: Lang) {
     ["/new", m["level.question"].replace("{levelName}", p["level.name"]!)],
     ["/settings", m["settings.title"]],
     ["/privacy", m["privacy.title"]],
+    ["/mcp/setup", m["mcp.title"]],
   ];
   for (const [url, heading] of screens) {
     await page.goto(url);
