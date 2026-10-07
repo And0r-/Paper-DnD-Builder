@@ -442,7 +442,7 @@
   "sheet.group": "Sheet",
   "sheet.tools": "Sheet tools",
   "sheet.version": "Version",
-  "sheet.original": "Original (builder)",
+  "sheet.original": "Original from the builder",
   "sheet.copyName": "My version of {date}, {time}",
   "sheet.design": "Look",
   "sheet.language": "Language",
