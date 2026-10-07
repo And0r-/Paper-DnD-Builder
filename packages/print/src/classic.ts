@@ -74,6 +74,8 @@ interface Block {
   keep?: boolean;
   /** Notes: the lines grow to the bottom of the column if they come last. */
   fill?: (lines: number) => Block;
+  /** Notes: fewer lines, taken when they come last and would otherwise start a column of their own. */
+  shrink?: Block;
 }
 
 function measured(
@@ -596,7 +598,14 @@ function answerBlocks(c: Ctx, s: Section<"answers">): Block[] {
   ];
 }
 
-/** Notes: lines to write on, as many as the play state's text needs; the last section's grow to the column's end. */
+/** Lines notes keep at least when they come last and shrink to the room left. */
+const LEAST_NOTE_LINES = 2;
+
+/**
+ * Notes: lines to write on, as many as the play state's text needs; the last
+ * section's grow to the column's end, or shrink to the room left rather than
+ * start a column (often a page) of their own.
+ */
 function notesBlocks(c: Ctx, s: Section<"notes">): Block[] {
   const { pen, g, st } = c;
   const lines = (n: number): Block =>
@@ -617,7 +626,9 @@ function notesBlocks(c: Ctx, s: Section<"notes">): Block[] {
       },
       { fill: (more) => lines(Math.max(n, more)) },
     );
-  return [...titled(c, s), lines(s.lines)];
+  const block = lines(s.lines);
+  if (s.lines > LEAST_NOTE_LINES) block.shrink = lines(LEAST_NOTE_LINES);
+  return [...titled(c, s), block];
 }
 
 /** Sections that have no place of their own in this design but may still come in a column. */
@@ -714,8 +725,12 @@ class Flow {
 
   /** Places blocks; with `limit` columns, returns those that would have gone beyond the last one. */
   place(blocks: Block[], limit = Infinity): Block[] {
+    // The last block may shrink to the room left (notes), so it is measured at its least.
+    const least = (j: number) => (j === blocks.length - 1 ? (blocks[j]!.shrink ?? blocks[j]!) : blocks[j]!);
     for (let k = 0; k < blocks.length; k++) {
-      const b = blocks[k]!;
+      let b = blocks[k]!;
+      const full = b.h(this.frame.w);
+      if (b !== least(k) && !this.fresh && this.at + full > this.frame.bottom) b = least(k);
       const last = this.placed.at(-1)?.block.section ?? null;
       if (b.title !== undefined) this.title = b.section && { section: b.section, text: b.title };
       if (b.section !== last && !this.fresh) this.at += this.c.g.rowGap;
@@ -723,7 +738,7 @@ class Flow {
       // A title or heading stays with what follows it, as far as that is kept with more.
       let need = h;
       for (let j = k; (blocks[j]!.title !== undefined || blocks[j]!.keep) && j + 1 < blocks.length; j++)
-        need += blocks[j + 1]!.h(this.frame.w);
+        need += least(j + 1).h(this.frame.w);
       if (this.at + need > this.frame.bottom && !this.fresh) {
         if (this.i + 1 >= limit) return blocks.slice(k);
         this.nextColumn();

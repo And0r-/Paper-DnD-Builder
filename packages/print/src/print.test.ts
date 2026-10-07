@@ -2005,6 +2005,47 @@ describe("the classic design: original and copy, empty and filled", () => {
     }
   });
 
+  it("lets notes that end the sheet shrink to the room left rather than take a page alone", async () => {
+    const base = buildSheetModel(pkg, river3(), { language: "de", createdAt });
+    const notes = base.sections.find((s) => s.kind === "notes");
+    if (notes?.kind !== "notes") throw new Error("no notes");
+    expect(notes.lines).toBeGreaterThan(2);
+    // More rows in the features push the notes down, through the end of page 2 (at about 70 rows).
+    const grown = (rows: number, noteLines: number): SheetModel => ({
+      ...base,
+      sections: base.sections.map((s): SheetSection => {
+        if (s.kind === "notes") return { ...s, lines: noteLines };
+        if (s.kind === "featureTable" && s.id === "traits")
+          return {
+            ...s,
+            rows: [
+              ...s.rows,
+              ...Array.from({ length: rows }, (_, i) => ({
+                id: `own-${i}`,
+                name: `Trick ${i}`,
+                marks: "",
+                text: "Twice a day the lantern hums a tune.",
+                uses: { boxes: 2 },
+                usesField: `sheet/traits/own-${i}/uses`,
+                group: null,
+              })),
+            ],
+          };
+        return s;
+      }),
+    });
+    const pageCounts = new Set<number>();
+    for (let rows = 60; rows <= 84; rows++) {
+      const full = await renderPdf(grown(rows, notes.lines), sheetOnly);
+      const least = await renderPdf(grown(rows, 2), sheetOnly);
+      // Notes with all their lines never need a page more than notes with two.
+      expect(full.pages, `${rows} rows`).toBe(least.pages);
+      pageCounts.add(least.pages);
+    }
+    // The rows went past the end of a page, where full notes would not have fit.
+    expect(pageCounts.size).toBeGreaterThan(1);
+  });
+
   it("prints a kept copy as the player left it: own rows and numbers, its name and the original's level in the footer", async () => {
     for (const [language, name, asOf] of [
       ["de", "Meine Fassung vom 6. Oktober 2026", "Stand Stufe 20"],
