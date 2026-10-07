@@ -235,7 +235,7 @@ export function PrintDialog({
       {copies.length === 0 ? (
         <div className="print-line">
           <span className="print-line__label">{t("print.version")}</span>
-          <span>{t("print.versionOriginal")}</span>
+          <span>{t("sheet.original")}</span>
         </div>
       ) : (
         <div className="print-version">
@@ -248,7 +248,7 @@ export function PrintDialog({
             value={copies.some((c) => c.id === version) ? version : "original"}
             onChange={(e) => setVersion(e.target.value)}
           >
-            <option value="original">{t("print.versionOriginal")}</option>
+            <option value="original">{t("sheet.original")}</option>
             {copies.map((c) => (
               <option key={c.id} value={c.id}>
                 {copyName(t, lang, c)}

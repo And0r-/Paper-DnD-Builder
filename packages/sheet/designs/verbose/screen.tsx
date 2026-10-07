@@ -12,7 +12,7 @@ import { steps } from "../../src/model.ts";
 import type { FeatureRow, SheetModel, SheetSection, StatBox } from "../../src/model.ts";
 import { columnLeft, contentBottom, spanWidth } from "../geometry.ts";
 import { PageFooter, PageHead } from "../page-parts.tsx";
-import type { SheetScreenProps, SheetUi } from "../types.ts";
+import type { PrintPlaces, SheetScreenProps, SheetUi } from "../types.ts";
 import { VERBOSE_GEOMETRY as G, packSections, type PackedSection } from "./index.ts";
 
 /**
@@ -73,13 +73,20 @@ interface Pages {
 
 /**
  * From desk width on, the sections are measured as the screen draws them
- * and placed on A4 pages by the PDF's rule (`packSections`): the same
- * order, the same columns, a page break where a section no longer fits.
- * The sections stay in the model's order in the document; only their
- * place on the page is set. Narrower, and before the first measuring, they
- * flow one under the other.
+ * and placed on A4 pages. With the PDF's places (`places`), each section
+ * goes on the page and into the column where the PDF starts it, so the
+ * pages break where the paper's do and "page 1 of 2" is the printout's;
+ * a page is drawn longer where the screen's taller sections need it. Until
+ * they are known, by the PDF's rule (`packSections`) for the screen's
+ * heights. The sections stay in the model's order in the document; only
+ * their place on the page is set. Narrower, and before the first
+ * measuring, they flow one under the other.
  */
-function usePages(box: RefObject<HTMLDivElement | null>, model: SheetModel): Pages | null {
+function usePages(
+  box: RefObject<HTMLDivElement | null>,
+  model: SheetModel,
+  places: PrintPlaces | null | undefined,
+): Pages | null {
   const [pages, setPages] = useState<Pages | null>(null);
   useLayoutEffect(() => {
     const el = box.current;
@@ -93,18 +100,15 @@ function usePages(box: RefObject<HTMLDivElement | null>, model: SheetModel): Pag
         const mm = (el.querySelector<HTMLElement>(".vsheet__mm")?.getBoundingClientRect().height ?? 0) / 100;
         const sections = [...el.querySelectorAll<HTMLElement>(":scope > .vsheet__section")];
         if (mm <= 0 || sections.length !== model.sections.length) return;
-        const at = packSections(
-          model.sections.map((s, i) => ({
-            span: s.span,
-            height: sections[i]!.getBoundingClientRect().height / mm,
-          })),
-          G,
-          undefined,
-          SCREEN_SLACK,
-        );
-        const heights: number[] = [];
+        const sized = model.sections.map((s, i) => ({
+          span: s.span,
+          height: sections[i]!.getBoundingClientRect().height / mm,
+        }));
+        const known = places && places.sections.length === sized.length ? places : null;
+        const at = known ? onPrintedPages(sized, known) : packSections(sized, G, undefined, SCREEN_SLACK);
+        const heights: number[] = known ? new Array<number>(known.pages).fill(G.page.height) : [];
         at.forEach((p, i) => {
-          const bottom = p.y + sections[i]!.getBoundingClientRect().height / mm;
+          const bottom = p.y + sized[i]!.height;
           heights[p.page] = Math.max(
             heights[p.page] ?? G.page.height,
             bottom + (G.page.height - contentBottom(G)),
@@ -123,14 +127,43 @@ function usePages(box: RefObject<HTMLDivElement | null>, model: SheetModel): Pag
       seen.disconnect();
       desk.removeEventListener("change", measure);
     };
-  }, [box, model]);
+  }, [box, model, places]);
   return pages;
 }
 
-export function VerboseSheet({ model, ui }: SheetScreenProps) {
+/**
+ * The sections on the PDF's pages, each in the PDF's column, top to bottom
+ * as the PDF's rule has it (never above the one before, under what is
+ * above in its columns), with the screen's heights.
+ */
+function onPrintedPages(
+  sections: readonly { span: number; height: number }[],
+  places: PrintPlaces,
+): PackedSection[] {
+  const pageTop = (n: number) => G.margin + (n > 0 ? G.continuationHead : 0);
+  let page = -1;
+  let floor: number[] = [];
+  let previousY = 0;
+  return sections.map((s, i) => {
+    const place = places.sections[i] ?? { page: Math.max(0, page), col: 0 };
+    if (place.page !== page) {
+      page = place.page;
+      floor = new Array<number>(G.columns).fill(pageTop(page));
+      previousY = pageTop(page);
+    }
+    const span = Math.min(G.columns, Math.max(1, s.span));
+    const col = Math.min(place.col, G.columns - span);
+    const y = Math.max(previousY, ...floor.slice(col, col + span));
+    for (let c = col; c < col + span; c++) floor[c] = y + s.height + G.rowGap;
+    previousY = y;
+    return { page, col, y };
+  });
+}
+
+export function VerboseSheet({ model, ui, places }: SheetScreenProps) {
   const m = MESSAGES[model.language];
   const box = useRef<HTMLDivElement>(null);
-  const pages = usePages(box, model);
+  const pages = usePages(box, model, places);
   const tops: number[] = [];
   pages?.heights.forEach((h, p) => tops.push(p === 0 ? 0 : tops[p - 1]! + pages.heights[p - 1]! + PAGE_GAP));
   const height = pages ? tops.at(-1)! + pages.heights.at(-1)! : 0;
@@ -316,7 +349,11 @@ function StatBoxes({ s, i, ui, pencil }: Props<"statBoxes"> & { pencil: string }
   return (
     <div className="vsheet__boxes" style={{ "--vs-boxes": String(s.boxes.length) } as CSSProperties}>
       {s.boxes.map((b, j) => (
-        <div key={`${b.valueId}-${j}`} className={`vsheet__box vsheet__box--${b.style}`}>
+        <div
+          key={`${b.valueId}-${j}`}
+          className={`vsheet__box vsheet__box--${b.style}`}
+          style={{ "--sheet-per-row": perRow(b) } as CSSProperties}
+        >
           <p className="vsheet__box-label">
             <ui.Text path={at(i, "boxes", j, "label")} value={b.label} label={b.label} />
           </p>
@@ -330,6 +367,12 @@ function StatBoxes({ s, i, ui, pencil }: Props<"statBoxes"> & { pencil: string }
       ))}
     </div>
   );
+}
+
+/** Marks to tick in at most two rows at a desk: up to four in one, more in two halves. */
+function perRow(b: StatBox): number {
+  const n = b.style === "circles" ? b.circles : b.style === "boxes" ? b.squares : 0;
+  return n <= 4 ? Math.max(1, n) : Math.ceil(n / 2);
 }
 
 function BoxBody({
@@ -610,13 +653,14 @@ function List({ s, i, ui }: Props<"list">) {
           </li>
         ))}
       </ul>
-      <ui.AddRow section={i} label={s.title} />
+      {/* The lines right under the entries, as on paper; the button for a new entry after them. */}
       {s.blankLines > 0 &&
         (s.field ? (
           <ui.Field field={{ id: s.field, kind: "text" }} label={s.title} lines={s.blankLines} />
         ) : (
           <Lines n={s.blankLines} />
         ))}
+      <ui.AddRow section={i} label={s.title} />
     </div>
   );
 }

@@ -88,13 +88,16 @@ test.describe("at a desk", () => {
     }
   });
 
-  test("classic: the boxes at the table in one row, box rows first on their own page", async ({ page }) => {
+  test("classic: the boxes at the table in two rows at most, box rows first on their own page", async ({
+    page,
+  }) => {
     const sheet = await openSheet(page, await level20(page), "classic");
-    // 6: the boxes to tick side by side, a row of three never broken into two and one.
+    // 6: the boxes to tick side by side, in two rows at most (the rest dice take half of them a
+    // row, 24 px apart); a row of three never broken into two and one.
     const ticking = sheet.locator(".csheet__cluster :is(.csheet__box--boxes, .csheet__box--circles)");
     expect(await ticking.count()).toBeGreaterThan(1);
     const tops = await ticking.evaluateAll((els) => els.map((e) => e.getBoundingClientRect().top));
-    expect(new Set(tops.map(Math.round)).size).toBe(1);
+    expect(new Set(tops.map(Math.round)).size).toBeLessThanOrEqual(2);
     for (const b of await ticking.all()) {
       const marks = b.locator(".sheet-tick");
       if ((await marks.count()) > 4) continue;
@@ -115,6 +118,18 @@ test.describe("at a desk", () => {
         await box(row.locator(".csheet__check-name")),
       ];
       expect(Math.abs(num.y + num.height - (name.y + name.height))).toBeLessThan(3);
+    }
+  });
+
+  test("rest dice in two rows at most, in both designs (20 at level 20)", async ({ page }) => {
+    const id = await level20(page);
+    for (const design of DESIGNS) {
+      const sheet = await openSheet(page, id, design);
+      const many = sheet.locator(".sheet-ticks:has(.sheet-tick:nth-child(20))").first();
+      const rows = await many
+        .locator(".sheet-tick")
+        .evaluateAll((els) => new Set(els.map((e) => Math.round(e.getBoundingClientRect().top))).size);
+      expect(rows, design).toBe(2);
     }
   });
 
@@ -180,6 +195,25 @@ test.describe("on a phone", () => {
       }
     }
   });
+
+  for (const lang of ["de", "en"] as const) {
+    test(`a kept copy's footer wraps: no page wider than the phone (${lang})`, async ({ page }) => {
+      await login(page, uniqueEmail("sheet-copy-phone"), lang);
+      const id = await makeCharacter(page);
+      expect((await page.request.post(`/api/drafts/${id}/sheet-copies`, { data: {} })).status()).toBe(201);
+      for (const design of DESIGNS) {
+        const sheet = await openSheet(page, id, design);
+        const prefix = design === "classic" ? "csheet" : "vsheet";
+        await expect(sheet.locator(`.${prefix}__footer`).last()).toBeVisible();
+        expect(
+          await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth),
+          `${design} ${lang}`,
+        ).toBeLessThanOrEqual(0);
+        const footer = await box(sheet.locator(`.${prefix}__footer`).last());
+        expect(footer.x + footer.width, `${design} ${lang}`).toBeLessThanOrEqual(390);
+      }
+    });
+  }
 
   test("the menu: inside the drawer, in the sketch's order; stamina with − and +", async ({ page }) => {
     await login(page, uniqueEmail("sheet-menu"));

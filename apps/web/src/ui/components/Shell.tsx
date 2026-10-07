@@ -128,8 +128,8 @@ function MenuDrawer({
       aria-label={t("menu.title")}
       onClick={(e) => {
         if (e.target === ref.current) onClose();
-        // Following any link inside closes the menu.
-        if ((e.target as HTMLElement).closest("a")) onClose();
+        // Following any link inside closes the menu, as does a button marked to: what it did shows.
+        if ((e.target as HTMLElement).closest("a, [data-closes-menu]")) onClose();
       }}
     >
       {open && (

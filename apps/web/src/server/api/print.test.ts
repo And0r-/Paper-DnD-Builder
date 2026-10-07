@@ -2,6 +2,7 @@ import { renderPdf } from "@builder/print";
 import { sheetFields, sheetModelSchema, type PrintPart, type SheetModel } from "@builder/sheet";
 import { beforeEach, describe, expect, it } from "vitest";
 import { Client, signIn, startTestServer, type TestServer } from "../testing.ts";
+import { fileNames } from "./routes/print.ts";
 
 let server: TestServer;
 let client: Client;
@@ -63,6 +64,20 @@ async function character(finish = true, level = 3): Promise<string> {
 
 const latin1 = async (res: Response) => Buffer.from(await res.arrayBuffer()).toString("latin1");
 
+describe("file names", () => {
+  it("say the design, and the fallback shortens only the character's name, at a word's end", () => {
+    expect(fileNames(["Mira", "Klassisch", "Bogen, Karten"])).toBe(
+      `attachment; filename="Mira-Klassisch-Bogen-Karten.pdf"; filename*=UTF-8''${encodeURIComponent("Mira - Klassisch - Bogen, Karten.pdf")}`,
+    );
+    const long = "Hesper Laternenträgerin vom Nebelmoor-Ufer";
+    const header = fileNames([long, "Fassung 7. Oktober 13-15", "Classic", "Sheet"]);
+    expect(header).toContain(
+      'filename="Hesper-Laternentragerin-vom-Nebelmoor-Fassung-7-Oktober-13-15-Classic-Sheet.pdf"',
+    );
+    expect(header).toContain(encodeURIComponent(`${long} - Fassung 7. Oktober 13-15 - Classic - Sheet.pdf`));
+  });
+});
+
 describe("printing a character", () => {
   it("gives a finished character as PDF, in the account's language", async () => {
     const id = await character();
@@ -109,6 +124,30 @@ describe("printing a character", () => {
   });
 });
 
+describe("where the PDF breaks the sheet's pages", () => {
+  it("names each section's page and column for the screen, as the PDF of the sheet has them", async () => {
+    const id = await character(true, 20);
+    const model = (await client.call("GET", `/api/drafts/${id}/sheet`)).json as SheetModel;
+    const res = await client.call("POST", `/api/drafts/${id}/sheet-places`, { model, design: "verbose" });
+    expect(res.status).toBe(200);
+    const pdf = await renderPdf(model, { parts: ["sheet"], design: "verbose" });
+    expect(res.json.pages).toBe(pdf.sheetPages);
+    expect(res.json.sections).toHaveLength(model.sections.length);
+    expect(res.json.sections[0]).toEqual({ page: 0, col: 0, cols: [0] });
+
+    expect((await client.call("POST", `/api/drafts/${id}/sheet-places`, { model, design: "x" })).status).toBe(
+      400,
+    );
+    expect(
+      (await client.call("POST", `/api/drafts/${id}/sheet-places`, { model: {}, design: "verbose" })).status,
+    ).toBe(400);
+    expect(
+      (await new Client(server).call("POST", `/api/drafts/${id}/sheet-places`, { model, design: "verbose" }))
+        .status,
+    ).toBe(401);
+  });
+});
+
 describe("the parts of a printout", () => {
   const bytes = async (res: Response) => Buffer.from(await res.arrayBuffer());
 
@@ -129,8 +168,10 @@ describe("the parts of a printout", () => {
     ] as const) {
       const res = await client.request("GET", `/api/drafts/${id}/pdf?parts=${part}`);
       expect(res.status, part).toBe(200);
+      // The design is named where the sheet is in the file.
+      const named = part === "sheet" ? ["Ausführlich", word] : [word];
       expect(res.headers.get("content-disposition")).toBe(
-        `attachment; filename="Mira-Fennwick-${word}.pdf"; filename*=UTF-8''${encodeURIComponent(`Mira Fennwick - ${word}.pdf`)}`,
+        `attachment; filename="${["Mira-Fennwick", ...named].join("-").replace("ü", "u")}.pdf"; filename*=UTF-8''${encodeURIComponent(["Mira Fennwick", ...named].join(" - ") + ".pdf")}`,
       );
       files[part] = await bytes(res);
       expect(files[part].equals(await local([part])), part).toBe(true);
@@ -151,7 +192,7 @@ describe("the parts of a printout", () => {
     );
     expect(all.status).toBe(200);
     expect(all.headers.get("content-disposition")).toContain(
-      "Mira%20Fennwick%20-%20Bogen%2C%20Karten%2C%20Regeltexte.pdf",
+      "Mira%20Fennwick%20-%20Ausf%C3%BChrlich%20-%20Bogen%2C%20Karten%2C%20Regeltexte.pdf",
     );
     expect((await bytes(all)).equals(await local(["sheet", "cards", "texts"]))).toBe(true);
 
@@ -245,7 +286,7 @@ describe("printing a kept copy and the play state", () => {
     );
     expect(sheet.status).toBe(200);
     expect(sheet.headers.get("content-disposition")).toBe(
-      `attachment; filename="Mira-Fennwick-Fassung-4-Oktober-12-00-Bogen.pdf"; filename*=UTF-8''${encodeURIComponent("Mira Fennwick - Fassung 4. Oktober 12-00 - Bogen.pdf")}`,
+      `attachment; filename="Mira-Fennwick-Fassung-4-Oktober-12-00-Ausfuhrlich-Bogen.pdf"; filename*=UTF-8''${encodeURIComponent("Mira Fennwick - Fassung 4. Oktober 12-00 - Ausführlich - Bogen.pdf")}`,
     );
     const stored = made.model as SheetModel;
     if (stored.origin.kind !== "copy") throw new Error("not a copy");

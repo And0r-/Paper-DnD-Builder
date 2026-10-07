@@ -348,12 +348,22 @@
 
 /* Lists, answers, lines */
 
+/* An entry a line; what the play state writes goes on lines of the same height right under it. */
+.csheet__list {
+  --list-pitch: calc(var(--sheet-touch) + 1px);
+}
+
 .csheet__list li {
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  min-height: var(--sheet-touch);
+  box-sizing: border-box;
+  min-height: var(--list-pitch);
   border-bottom: 1px solid var(--color-line);
+}
+
+.csheet__list .sheet-lines {
+  --sheet-pitch: var(--list-pitch);
 }
 
 .csheet__list li > :first-child {
@@ -412,6 +422,34 @@
 .csheet__footer-date {
   flex: none;
   white-space: pre;
+}
+
+/* On a phone the line is short: a copy's footer wraps rather than widen the page. */
+@media (max-width: 899.98px) {
+  .csheet__footer {
+    flex-wrap: wrap;
+    gap: 0 var(--space-4);
+  }
+
+  .csheet__footer-line {
+    flex-wrap: wrap;
+    white-space: normal;
+  }
+
+  .csheet__footer-rest {
+    flex: 0 1 auto;
+    min-width: 0;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+}
+
+/* Measures a millimetre of the screen, for breaking the pages as the PDF does. */
+.csheet__mm {
+  position: absolute;
+  width: 0;
+  height: 100mm;
+  visibility: hidden;
 }
 
 /* On a phone there are no pages: one footer at the end, no page heads. */
@@ -609,22 +647,56 @@
     font-weight: var(--weight-bold);
   }
 
+  /* Two columns of about equal length; the footer at the page's foot. A short apart part may
+     come under page 2's columns, as in the PDF. */
   .csheet__page > .csheet__more,
   .csheet__page > .csheet__apart {
     display: block;
-    flex: 1;
     columns: 2;
     column-gap: var(--cs-column-gap);
+    padding-bottom: 4mm;
+  }
+
+  .csheet__more + .csheet__apart {
+    padding-top: calc(2 * var(--cs-row-gap));
   }
 
   .csheet__page--more > .csheet__footer,
   .csheet__page--apart > .csheet__footer {
     align-self: stretch;
-    margin-top: 4mm;
+    margin-top: auto;
+  }
+
+  /* A short rest of the apart part in one column, the left one. */
+  .csheet__apart--one {
+    columns: 1;
+  }
+
+  .csheet__apart--one > :not(.csheet__section--statBoxes) {
+    width: calc((100% - var(--cs-column-gap)) / 2);
+  }
+
+  /* A section that goes on in the second column says so at its top, as in the PDF. */
+  .csheet__colbreak {
+    break-before: column;
+  }
+
+  li.csheet__colbreak {
+    display: block;
+    min-height: 0;
   }
 
   .csheet__apart > .csheet__section--statBoxes {
     column-span: all;
+  }
+
+  /* On their own page a row of boxes shares the page's width, as in the PDF. */
+  .csheet__apart .csheet__box-row {
+    grid-template-columns: repeat(auto-fit, minmax(20mm, 1fr));
+  }
+
+  .csheet__apart .csheet__box {
+    max-width: calc(2 * var(--cs-row-box-w));
   }
 
   .csheet__more > .csheet__section,
@@ -800,13 +872,18 @@
     flex: 1 1 100%;
   }
 
-  /* Each box as wide as its marks in one row, up to four a row, so three never break
+  /* Each box as wide as its marks in one row (more than four in two rows), so three never break
      into two and one; the marks 6 px apart, which keeps the 24 px a pointer needs (WCAG 2.5.8). */
   .csheet__cluster .csheet__box--circles,
   .csheet__cluster .csheet__box--boxes {
     order: 3;
-    flex: 1 1 max(15mm, calc(min(var(--cs-marks, 0), 4) * (var(--sheet-tick) + 6px) - 6px + 1.5mm));
+    flex: 1 1 max(15mm, calc(var(--sheet-per-row, 1) * (var(--sheet-tick) + 6px) - 6px + 1.5mm));
     padding-inline: 0.5mm;
+  }
+
+  /* Many marks (rest dice) in two rows at most, half of them a row. */
+  .csheet__cluster .csheet__box .sheet-ticks {
+    max-width: calc(var(--sheet-per-row, 1) * (var(--sheet-tick) + 6px) - 6px);
   }
 
   .csheet__cluster .sheet-ticks {
@@ -969,7 +1046,7 @@
 
   .csheet__table {
     border-collapse: separate;
-    border-spacing: 1mm 0.6mm;
+    border-spacing: 0.6mm;
     font-size: var(--cs-value);
   }
 
@@ -984,6 +1061,13 @@
   .csheet__table .csheet__row-tools {
     border: 0;
     padding: 0;
+  }
+
+  /* A column's name over its cells, from where their text starts: "Treffer  Schaden". In small
+     letters, as the PDF sets a heading that would not fit in capitals, so the harm keeps one line. */
+  .csheet__table thead th {
+    padding: 0 0 0 1mm;
+    text-transform: none;
   }
 
   .csheet__table tbody th {
@@ -1026,7 +1110,8 @@
     white-space: nowrap;
   }
 
-  .csheet__table td.csheet__wrap {
+  .csheet__table td.csheet__wrap,
+  .csheet__table td.csheet__small {
     font-size: var(--cs-min);
   }
 
@@ -1059,14 +1144,12 @@
 
   /* Lists and answers on lines */
 
-  .csheet__list ul {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    column-gap: 3mm;
+  /* One column, an entry a line, as in the PDF; at least 24 px to tap. */
+  .csheet__list {
+    --list-pitch: max(var(--cs-list-line), 25px);
   }
 
   .csheet__list li {
-    min-height: var(--cs-list-line);
     border-bottom: 0.15mm solid #9a9a9a;
   }
 

@@ -23,8 +23,12 @@ import {
   type TextStyle,
 } from "./pen.ts";
 
-/** A section as laid out: notes and lists may carry the play state's lines to write on them. */
-export type Laid = SheetSection & { written?: string[] | undefined };
+/**
+ * A section as laid out: notes and lists may carry the play state's lines
+ * to write on them; `from` is its index in the model (both parts of a split
+ * section have it).
+ */
+export type Laid = SheetSection & { written?: string[] | undefined; from?: number };
 
 /** What the painter draws with: the pen, the design's grid and its type. */
 export interface Grid {
@@ -60,13 +64,13 @@ export function gridStyles(g: GridGeometry): Styles {
  */
 export function withWriting(c: Grid, sections: readonly SheetSection[]): Laid[] {
   const { pen, g, st } = c;
-  return sections.map((s) => {
-    if (s.kind !== "notes" && s.kind !== "list") return s;
+  return sections.map((s, from) => {
+    if (s.kind !== "notes" && s.kind !== "list") return { ...s, from };
     const text = pen.written(s.field);
-    if (text === "") return s;
+    if (text === "") return { ...s, from };
     const written = pen.wrap(text, st.written, spanWidth(g, s.span) - 2).filter((l) => l.trim() !== "");
-    if (s.kind === "notes") return { ...s, lines: Math.max(s.lines, written.length), written };
-    return { ...s, blankLines: Math.max(s.blankLines, written.length), written };
+    if (s.kind === "notes") return { ...s, lines: Math.max(s.lines, written.length), written, from };
+    return { ...s, blankLines: Math.max(s.blankLines, written.length), written, from };
   });
 }
 

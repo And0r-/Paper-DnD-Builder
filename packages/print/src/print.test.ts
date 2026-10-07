@@ -17,6 +17,9 @@ import {
 } from "@builder/sheet";
 import { demoCharacter, loadDemoPackage, raisedCharacter } from "@builder/sheet/testing";
 import { CLASSIC_GEOMETRY, classicPlan, firstColumns } from "@builder/sheet/designs/classic";
+import { columnWidth } from "@builder/sheet/designs";
+import { VERBOSE_GEOMETRY } from "@builder/sheet/designs/verbose";
+import { sheetPlaces } from "./places.ts";
 import { renderPdf, type RenderedPdf } from "./render.ts";
 
 let pkg: ContentPackage;
@@ -1858,6 +1861,32 @@ describe("the verbose design: original and copy, empty and filled", () => {
     }
   });
 
+  it("tells the screen where each section starts: page and column, as many pages as the PDF", async () => {
+    for (const doc of [river3(), lantern20()]) {
+      const model = buildSheetModel(pkg, doc, { language: "de", createdAt });
+      const pdf = await renderPdf(model, { parts: ["sheet"], design: "verbose" });
+      const places = await sheetPlaces(model, { design: "verbose" });
+      expect(places.pages).toBe(pdf.sheetPages);
+      expect(places.sections).toHaveLength(model.sections.length);
+      const pages = places.sections.map((p) => p!.page);
+      // In the model's order, page after page; every page has a section that starts on it.
+      expect(pages).toEqual([...pages].sort((a, b) => a - b));
+      expect(new Set(pages).size).toBe(pdf.sheetPages);
+      pdf.sheetLayout.forEach((placed, page) => {
+        for (const p of placed) {
+          const i = model.sections.findIndex((s) => s.id === p.section.id);
+          if (places.sections[i]!.page === page)
+            expect(places.sections[i]!.col).toBe(
+              Math.round(
+                (p.x - VERBOSE_GEOMETRY.margin) /
+                  (columnWidth(VERBOSE_GEOMETRY) + VERBOSE_GEOMETRY.columnGap),
+              ),
+            );
+        }
+      });
+    }
+  });
+
   it("draws the sections and fields in the model's order, every field once, as the screen does", async () => {
     for (const doc of [river3(), lantern20(), demoCharacter(pkg, 20)]) {
       const original = buildSheetModel(pkg, doc, { language: "de", createdAt });
@@ -2099,6 +2128,37 @@ describe("the classic design: original and copy, empty and filled", () => {
     expect(page.map((p) => p.str)).toContain(longest);
   });
 
+  it("keeps a table's names whole beside a long row of the player's own, and the harm off its cell's edge", async () => {
+    const original = buildSheetModel(pkg, lantern20(), { language: "de", createdAt });
+    const table = original.sections.find((s) => s.kind === "statTable");
+    if (table?.kind !== "statTable") throw new Error("no table");
+    // Long cells too, as written by hand: the columns take all the room they can get.
+    const name = "Sehr langer Name einer eigenen Waffe";
+    const own = { name, cells: table.columns.map(() => name) };
+    const model: SheetModel = {
+      ...original,
+      sections: original.sections.map((s) => (s === table ? { ...table, rows: [...table.rows, own] } : s)),
+    };
+    const page = (await positions(await renderPdf(model, sheetOnly)))[0]!;
+    const strings = page.map((p) => p.str);
+    // Every name of the package's rows whole on its line, not "Laternens- / tab".
+    for (const r of table.rows) expect(strings, r.name).toContain(r.name);
+    expect(strings.filter((t) => /\p{L}-$/u.test(t))).toEqual([]);
+    // The long name breaks between its words only.
+    for (const word of own.name.split(" ")) expect(strings.join(" ").split(/\s+/u), word).toContain(word);
+    // The harm on one line with room to the next cell's text (the cell's own edge is no text to measure).
+    const harm = table.rows[0]!.cells.filter((_, i) => !table.wrap?.[i]).reduce((a, b) =>
+      b.length > a.length ? b : a,
+    );
+    const plain = (await positions(await renderPdf(original, sheetOnly)))[0]!;
+    const at = plain.find((p) => p.str === harm)!;
+    const next = plain
+      .filter((p) => Math.abs(p.y - at.y) < 0.5 && p.x > at.x + at.w)
+      .sort((a, b) => a.x - b.x)[0];
+    expect(next).toBeDefined();
+    expect(next!.x - (at.x + at.w)).toBeGreaterThanOrEqual(3.4);
+  });
+
   it("goes on with a list in the next column only with entries, not with empty lines", async () => {
     for (const doc of [river3(), lantern20()])
       for (const [language] of languages) {
@@ -2128,6 +2188,41 @@ describe("the classic design: original and copy, empty and filled", () => {
       } else {
         expect([...last].some((id) => !apart.has(id))).toBe(true);
       }
+    }
+  });
+
+  it("lets a row of boxes on the page of their own fill the page's width, as in the sketch", async () => {
+    const model = buildSheetModel(pkg, lantern20(), { language: "de", createdAt });
+    const pdf = await renderPdf(model, sheetOnly);
+    const page = (await positions(pdf))[pdf.sheetPages - 1]!;
+    const plan = classicPlan(model.sections);
+    const boxes = plan.parts.apart.map((i) => model.sections[i]!).find((s) => s.kind === "statBoxes");
+    if (boxes?.kind !== "statBoxes") throw new Error("no box row apart");
+    const labels = page.filter((p) => boxes.boxes.some((b) => b.label.toUpperCase() === p.str.toUpperCase()));
+    expect(labels.length).toBeGreaterThan(1);
+    // The last box's label is centred in a box that ends at the right margin.
+    const last = labels.reduce((a, b) => (b.x > a.x ? b : a));
+    expect(last.x + last.w / 2).toBeGreaterThan(CLASSIC_GEOMETRY.page.width - CLASSIC_GEOMETRY.margin - 30);
+  });
+
+  it("keeps a short apart part off a page of its own, its short list in one column", async () => {
+    const lantern3 = demoCharacter(pkg, 3, "Mira Fennwick", "calling.lantern-bearer");
+    for (const [language] of languages) {
+      const model = buildSheetModel(pkg, lantern3, { language, createdAt });
+      const plan = classicPlan(model.sections);
+      expect(plan.apartPage).toBe(true);
+      const pdf = await renderPdf(model, sheetOnly);
+      // Under the notes on page 2, not on an almost empty page 3.
+      expect(pdf.sheetPages, language).toBe(2);
+      const apart = new Set(plan.parts.apart.map((i) => model.sections[i]!.id));
+      const last = pdf.sheetLayout.at(-1)!;
+      expect(last.filter((p) => apart.has(p.section.id)).length, language).toBeGreaterThan(0);
+      // The rest under the box rows in one column: every block of it at the left margin.
+      const rest = last.filter((p) => apart.has(p.section.id) && p.section.kind !== "statBoxes");
+      expect(rest.length).toBeGreaterThan(0);
+      expect(new Set(rest.map((p) => Math.round(p.x)))).toEqual(new Set([CLASSIC_GEOMETRY.margin]));
+      const { text } = await extract(pdf);
+      expect(text).not.toContain(MESSAGES[language]!.continued);
     }
   });
 

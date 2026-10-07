@@ -10,6 +10,13 @@
   max-width: none;
 }
 
+/* The sheet's bar right under the top bar, as in the sketch: no screen's worth of white above it. */
+@media (min-width: 900px) {
+  .shell--wide .shell__main {
+    padding-top: var(--space-4);
+  }
+}
+
 .sheet-screen {
   display: grid;
   /* As wide as the screen: a wide table scrolls in its section instead. */
@@ -126,8 +133,24 @@
   max-width: 100%;
 }
 
+/* In the drawer every button starts its word at the same left edge, with an icon or without. */
 .sheet-tools--menu .btn {
   justify-content: flex-start;
+  text-align: left;
+}
+
+/* With the sheet's tools the drawer takes a little more of a phone, so a version's name fits. */
+.drawer:has(.sheet-tools--menu) {
+  width: min(22rem, 92vw);
+}
+
+/* The drawer is narrow: its lists in a smaller type, so a version's name shows whole
+   ("Meine Fassung vom 7. Oktober, 13:15"). */
+.sheet-tools--menu .sheet-tools__select {
+  padding-left: var(--space-2);
+  padding-right: calc(var(--space-2) + 1.25rem);
+  background-position: right var(--space-2) center;
+  font-size: var(--text-sm);
 }
 
 @media (min-width: 900px) {
@@ -160,13 +183,18 @@
       white-space: nowrap;
     }
 
-    /* The version's name is the one thing that gives way, cut at its end. */
+    /* The version's name is the one thing that gives way, cut at its end; style and language
+       keep their whole word ("Ausführlich", "Deutsch"). */
+    .sheet-tools--bar .sheet-tools__field {
+      flex: none;
+    }
+
     .sheet-tools--bar .sheet-tools__field:first-child {
       flex: 0 1 auto;
       min-width: 9rem;
     }
 
-    .sheet-tools--bar .sheet-tools__select {
+    .sheet-tools--bar .sheet-tools__field:first-child .sheet-tools__select {
       width: 100%;
       max-width: 16rem;
       text-overflow: ellipsis;

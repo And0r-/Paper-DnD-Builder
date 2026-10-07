@@ -22,8 +22,8 @@ import {
 const MESSAGES = { de, en };
 /** The part words in file names, as the server's print words have them. */
 const FILE_WORDS = {
-  de: { sheet: "Bogen", cards: "Karten", texts: "Regeltexte" },
-  en: { sheet: "Sheet", cards: "Cards", texts: "Rules texts" },
+  de: { sheet: "Bogen", cards: "Karten", texts: "Regeltexte", design: "Ausführlich" },
+  en: { sheet: "Sheet", cards: "Cards", texts: "Rules texts", design: "Detailed" },
 };
 
 async function axe(page: Page) {
@@ -72,7 +72,7 @@ for (const lang of ["de", "en"] as const) {
     await expect(part("print.sheet")).toBeChecked();
     await expect(part("print.cards")).not.toBeChecked();
     await expect(part("print.texts")).not.toBeChecked();
-    await expect(dialog.getByText(m["print.versionOriginal"])).toBeVisible();
+    await expect(dialog.getByText(m["sheet.original"])).toBeVisible();
     await expect(dialog.getByRole("checkbox", { name: m["print.state"] })).not.toBeChecked();
     await expect(dialog.getByRole("combobox", { name: m["print.version"] })).toHaveCount(0);
     const design = (name: string) => dialog.getByRole("radio", { name, exact: true });
@@ -83,7 +83,8 @@ for (const lang of ["de", "en"] as const) {
     await shot(page, `95-download-dialog-${lang}`);
 
     // The sheet alone: fewer pages than sheet and cards together.
-    const sheet = await download(`Mira - ${words.sheet}.pdf`);
+    // The design in the name, so a sheet in the other design does not overwrite it.
+    const sheet = await download(`Mira - ${words.design} - ${words.sheet}.pdf`);
     expect(sheet.subarray(0, 5).toString("latin1")).toBe("%PDF-");
     const both = await page.request.get(`/api/drafts/${id}/pdf`);
     expect(pages(sheet)).toBeLessThan(pages(await both.body()));
@@ -195,7 +196,7 @@ test("a character without cards cannot tick them, and keeps the wish for the nex
   await shot(page, "96-download-dialog-ohne-karten-de");
   const file = page.waitForEvent("download");
   await dialog.getByRole("button", { name: m["print.download"], exact: true }).click();
-  expect((await file).suggestedFilename()).toBe("Mira - Bogen.pdf");
+  expect((await file).suggestedFilename()).toBe("Mira - Ausführlich - Bogen.pdf");
   await expect
     .poll(
       async () =>
