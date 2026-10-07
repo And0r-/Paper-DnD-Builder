@@ -336,7 +336,12 @@ function nextFlow(el: HTMLElement, model: SheetModel, plan: ClassicPlan, now: Fl
       // What comes back with it: the title above a section's first row, the button and legend after its last.
       const head = back.r !== back.sec && back.r === rows[0]?.r ? rect(back.r).top - rect(back.sec).top : 0;
       const tail = back.r !== back.sec && end ? rect(back.sec).bottom - rect(back.r).bottom : 0;
-      if (head + rect(back.r).height + tail + 2 <= limit - bottom) {
+      // A section that comes back whole starts after the gap below the one before it.
+      const between =
+        head > 0 || back.r === back.sec
+          ? (container && parseFloat(getComputedStyle(container).rowGap)) || 0
+          : 0;
+      if (between + head + rect(back.r).height + tail + 2 <= limit - bottom) {
         const after = list[list.indexOf(i) + 1];
         next[key] = end ? (after === undefined ? null : { section: after, row: 0 }) : { section: i, row };
       }

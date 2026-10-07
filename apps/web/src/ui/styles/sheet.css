@@ -167,12 +167,9 @@
     margin-left: auto;
   }
 
-  /* From 1200 px everything in one line, as in the sketch: the buttons a little narrower. */
+  /* From 1200 px everything in one line, as in the sketch: the buttons a little narrower. Only
+     where a copy's whole name does not leave room for them, they go on under the lists. */
   @media (min-width: 1200px) {
-    .sheet-tools--bar {
-      flex-wrap: nowrap;
-    }
-
     .sheet-tools--bar .sheet-tools__actions {
       flex-wrap: nowrap;
     }
@@ -183,20 +180,16 @@
       white-space: nowrap;
     }
 
-    /* The version's name is the one thing that gives way, cut at its end; style and language
-       keep their whole word ("Ausführlich", "Deutsch"). */
+    /* The version's name shows whole ("Meine Fassung vom 7. Oktober, 14:51"), so two copies of a
+       day tell apart; only a name longer than that is cut at its end. Style and language keep
+       their whole word. */
     .sheet-tools--bar .sheet-tools__field {
       flex: none;
     }
 
-    .sheet-tools--bar .sheet-tools__field:first-child {
-      flex: 0 1 auto;
-      min-width: 9rem;
-    }
-
     .sheet-tools--bar .sheet-tools__field:first-child .sheet-tools__select {
       width: 100%;
-      max-width: 16rem;
+      max-width: 24rem;
       text-overflow: ellipsis;
     }
   }

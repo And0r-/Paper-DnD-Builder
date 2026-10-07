@@ -419,6 +419,7 @@
 }
 
 .csheet__footer-rest,
+.csheet__footer-sep,
 .csheet__footer-date {
   flex: none;
   white-space: pre;
@@ -668,7 +669,7 @@
   }
 
   /* A short rest of the apart part in one column, the left one. */
-  .csheet__apart--one {
+  .csheet__page > .csheet__apart--one {
     columns: 1;
   }
 
