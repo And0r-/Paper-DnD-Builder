@@ -1,6 +1,6 @@
 # Content package format — specification
 
-Format version **0.16**. This document describes everything a content
+Format version **0.17**. This document describes everything a content
 package contains and every rule a valid package follows. After reading it
 you should be able to write your own package. The demo package in
 [`packages/demo-package`](../demo-package) uses every feature and is the
@@ -122,7 +122,7 @@ people who distribute packages.
 
 ```json
 {
-  "formatVersion": "0.16",
+  "formatVersion": "0.17",
   "id": "demo",
   "version": "0.1.0",
   "languages": ["de", "en"],
@@ -338,11 +338,14 @@ A character **has** a thing if
 
 1. the player picked it in a `pickOne` or `pickMany` choice that is currently
    asked, or
-2. a thing the character has grants it with `atLevel` ≤ the character's level.
+2. a thing the character has grants it with `atLevel` ≤ the character's level, or
+3. it is listed in `flow.grants`: every character of the package has it
+   (see [9.6](#96-things-every-character-has)).
 
 The character has it **from a level** on (`atLevel` in the evaluation): a
 picked thing from the level of the step it was picked in, a granted one
-from the higher of its granter's level and the grant's `atLevel`.
+from the higher of its granter's level and the grant's `atLevel`, a thing
+of `flow.grants` from `flow.level.min`.
 
 This is evaluated after every change. If a pick stops being valid (its
 choice is no longer asked, or the picked thing's `requires` became false),
@@ -462,6 +465,7 @@ carries is a warning.
     { "id": "identity", "choices": ["name", "age", "looks"] }
   ],
   "choices": [ ... ],
+  "grants": ["talent.mist-signs"],
   "characterName": "name",
   "summary": {
     "fields": ["stamina", "guard", "pace", "luck"],
@@ -796,7 +800,10 @@ the character's name.
 
 ### 9.4 Building the list of steps
 
-1. Take `steps` in order. Drop each step whose `when` is false.
+1. Take `steps` in order. Drop each step whose `when` is false. The
+   choices granted by the things of `flow.grants` (see
+   [9.6](#96-things-every-character-has)) come before the first step, by
+   rules 2 to 4.
 2. After a step, insert one step per choice granted (with `atLevel` ≤
    level) by things the character has because of an answer in that step,
    directly or through further grants. Insert in grant order. A granted
@@ -837,6 +844,30 @@ core re-evaluates and marks later answers that no longer fit.
 - `summary.line`: arguments for the text `summary.line` (shown in the list
   of characters). Each argument is `{ "choice": id }` (the name of the
   picked thing) or `{ "value": id }` (a number; `level` allowed).
+
+### 9.6 Things every character has
+
+`grants` (optional, at least one id): things every character of the
+package has without picking anything, for example a language everyone
+speaks. Each counts like a thing a picked thing grants: for `has()`,
+`count()`, values, the sheet and the cards, with everything it grants
+itself (thing, value and choice grants; its choices are asked before the
+first step, see [9.4](#94-building-the-list-of-steps)). A pick choice does
+not offer it, since the character already has it.
+
+Such a thing has no step and no granter; the evaluation marks it with
+`"everyone": true`. Where the builder says where a thing came from ("you
+already have: … (from Folk)"), it says "everyone" instead. In a mark or a
+card line ([13](#13-print-sheet-and-cards)) it is neither `picked` nor
+`granted`, and `from` does not match it; the things it grants are
+`granted`, `from` the thing itself.
+
+Nothing about it is stored with a character: it is worked out from the
+package each time, like any grant. Saved characters keep it, and lose it
+if the package drops it.
+
+Use it only for what really every character has. What comes with a folk,
+a calling or another pick belongs to that thing's `grants`.
 
 ## 10. Texts
 
@@ -1415,6 +1446,7 @@ well-formed does the second stage check the rules between files:
   `points` and `maxPerTarget`; every table by level has one entry per level;
   a `count` table asks for no more than there are options;
 - each choice is asked exactly one way; `characterName` is a text choice;
+  `grants` names existing things, each once;
   each gather group has at most one gather step; a `list` gather step
   gathers only `pickOne` and `pickMany` choices, and none with `owned`
   options; `answers` sections show text and number choices and choices
@@ -1489,6 +1521,7 @@ are removed (saved characters may lose picks). Keys are never renamed.
 | 0.14    | 2026-10-06 | Sheet: a header field may name `things` instead of a `choice` (the names of the selected things the character has, e.g. a size; label by default `kind.<kind>.name`). Optional `strongLegend` on `checkList` sections: what ◉ means, printed after the section hint only if a row is marked twice. Copies of a choice with `options.owned` (asked again by a repeatable thing) mark different things: a copy leaves out what another copy marked, its recommendation moves on to the first free thing, and a repeatable thing is no longer offered when its copy would have nothing left to mark. Header fields and `answers` rows print the answers of every copy of the named choice in one row; an `answers` row of a choice not asked is left out, a section without rows is not printed. `options.ownedFrom`: an `owned` choice offers only what was picked in these choices. Marks on `featureTable` rows: new fields `pickedIn`, `marked` and `unmarked` (picked in, marked or left unmarked by these choices) and `not` (rows that also match it get no sign); marks with the same sign and legend are one mark. | Set `formatVersion` to `"0.14"`. Nothing else has to change: both are optional, so every valid 0.13 package is a valid 0.14 package. To print the ◉ explanation only where it applies, move it from `sheet.<id>.hint` into a text of its own and name that in `strongLegend`. The new fields are optional. A package that let two copies mark the same thing loses that; put the steps that give the marked things before the step that offers the repeatable thing. A package with two marks of the same sign and legend now prints that sign once. |
 | 0.15    | 2026-10-07 | Optional `variants` on `{text}` stats and on the `text` of `statBoxes` boxes: `[{ "when": …, "text": … }]`; the first variant whose condition holds for the character replaces the text, `vars` fill it the same way. The sheet, the cards and the "learn more" panel show the variant.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | Set `formatVersion` to `"0.15"`. Nothing else has to change: `variants` is optional, so every valid 0.14 package is a valid 0.15 package.                                                                                                                                                                                                                                                                                                                                                                                                            |
 | 0.16    | 2026-10-07 | Optional `origins` on card layouts: a line under the four stats whose words depend on where the character got the thing (the fields of a mark, then a filled `text` and an optional `label`). The first entry the thing matches gives the line; the sheet model and `GET /api/drafts/:id/sheet` carry it as `origin` on the card.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | Set `formatVersion` to `"0.16"`. Nothing else has to change: `origins` is optional, so every valid 0.15 package is a valid 0.16 package.                                                                                                                                                                                                                                                                                                                                                                                                             |
+| 0.17    | 2026-10-07 | Optional `flow.grants`: things every character of the package has without a pick (with everything they grant; their choices come before the first step). The evaluation marks them `everyone: true` and gives them no `step`; the builder names their origin "everyone".                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | Set `formatVersion` to `"0.17"`. Nothing else has to change: `grants` is optional, so every valid 0.16 package is a valid 0.17 package. A package that gave such a thing through every option of a choice (a language through every folk) can list it in `flow.grants` and drop those grants.                                                                                                                                                                                                                                                        |
 | 0.8     | 2026-10-04 | Gather steps (`gather`, optional `together`: `sections` or one shared `list`) in `flow.steps`, optional `gather` on choices, optional text `choice.<id>.from`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           | Set `formatVersion` to `"0.8"`. Nothing else changes: a package without gather steps builds the same steps as before, so every valid 0.7 package is a valid 0.8 package.                                                                                                                                                                                                                                                                                                                                                                             |
 
 ## 16. A minimal package
@@ -1500,7 +1533,7 @@ language. The validator accepts it as is.
 
 ```json
 {
-  "formatVersion": "0.16",
+  "formatVersion": "0.17",
   "id": "tiny",
   "version": "1.0.0",
   "languages": ["en"],

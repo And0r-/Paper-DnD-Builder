@@ -319,6 +319,9 @@ describe("printed character (demo package)", () => {
     ]);
     const early = {
       ...pkg,
+      // Without the talent every character has, so its row does not move the gear either.
+      things: pkg.things.filter((t) => !pkg.flow.grants?.includes(t.id)),
+      flow: { ...pkg.flow, grants: undefined },
       sheet: {
         ...pkg.sheet,
         sections: pkg.sheet.sections
@@ -1574,8 +1577,8 @@ describe("the PDF made from the sheet model", () => {
   // or the demo package changes these: then check the sample PDFs and
   // update them.
   const before = {
-    de: { pages: 4, sha256: "03d55a5af06eb8fada912a448f9324519eb820a8339049d788090359bea8cb7a" },
-    en: { pages: 4, sha256: "b9a1fb0fd38655f22d494188954dbf2c6eb29879b23988a55303721192f717b9" },
+    de: { pages: 4, sha256: "5a96b8c96f57eb0bd69f870450648863025b5335a2e1fdbd98cadf6acf9d9731" },
+    en: { pages: 4, sha256: "274cc7a03aecbb58cde8a42989b0acf2d1b7d501332e0f369be5166a0a69906f" },
   };
 
   it("is unchanged for the level 20 demo character with cards", async () => {

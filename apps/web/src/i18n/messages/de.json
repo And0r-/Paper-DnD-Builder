@@ -156,6 +156,7 @@
   "pool.countName": "{name}: {count}",
   "pool.held": "Das hast du schon:",
   "pool.heldBy": "von {name}",
+  "pool.heldEveryone": "alle",
   "pool.heldPicked": "gewählt bei {step}",
   "pool.open": "Noch offen: {sources}",
   "pool.done": "Fertig: alle {count} gewählt.",

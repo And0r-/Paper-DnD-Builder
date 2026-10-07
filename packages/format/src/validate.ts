@@ -611,6 +611,11 @@ export function validatePackageFiles(files: PackageFiles): ValidationResult {
     }
   });
 
+  flow.grants?.forEach((tid, i) => {
+    if (!thingById.has(tid)) err(F, `grants[${i}]`, `unknown thing ${lit(tid)}`);
+  });
+  duplicates(flow.grants ?? []).forEach((t) => err(F, "grants", `thing ${lit(t)} is granted twice`));
+
   const inStep = new Map<string, string>();
   duplicates(flow.steps.map((s) => s.id)).forEach((s) => err(F, "steps", `step ${lit(s)} is declared twice`));
   const gatherSteps = new Map<string, GatherStep>(); // group → its gather step

@@ -49,6 +49,7 @@ Every feature of format 0.10 is used at least once (see
 | Levels out of order           | `paths` ("Your way"): the herbalist's `path` (level 3) comes before `herb-craft` (level 1), in grant order                                                                                                                                                    |
 | One shared list               | `talents`: calling, folk (coastfolk, overlapping list) and level 2; upbringing talents held                                                                                                                                                                   |
 | Granted later, picked earlier | `coastfolk-flair` (own step after the folk) offers `flair.listening`, which the bell tower upbringing grants: picked first, the pick becomes a `duplicate` and is asked again                                                                                 |
+| Everyone has it               | `flow.json` `grants`: `talent.mist-signs`; the talents list shows it under "you already have" as "(everyone)"                                                                                                                                                 |
 
 ## Layout
 

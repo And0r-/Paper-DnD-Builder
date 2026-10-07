@@ -102,15 +102,26 @@ function heldGroups(
   lp: LoadedPackage,
   ev: Evaluation,
   held: HeldThing[],
-): { key: string; things: string[]; by?: string; step?: string }[] {
-  const groups = new Map<string, { key: string; things: string[]; by?: string; step?: string }>();
+): { key: string; things: string[]; by?: string; step?: string; everyone?: true }[] {
+  const groups = new Map<
+    string,
+    { key: string; things: string[]; by?: string; step?: string; everyone?: true }
+  >();
   for (const h of held) {
-    const key = h.grantedBy ? `g:${h.grantedBy}` : h.pickedIn ? `p:${h.pickedIn}` : `s:${h.step}`;
+    const key = h.grantedBy
+      ? `g:${h.grantedBy}`
+      : h.pickedIn
+        ? `p:${h.pickedIn}`
+        : h.step !== undefined
+          ? `s:${h.step}`
+          : "everyone";
     let g = groups.get(key);
     if (!g) {
       g = h.grantedBy
         ? { key, things: [], by: h.grantedBy }
-        : { key, things: [], step: stepTitle(lp, ev, h.step) };
+        : h.step !== undefined
+          ? { key, things: [], step: stepTitle(lp, ev, h.step) }
+          : { key, things: [], everyone: true };
       groups.set(key, g);
     }
     if (thingName(lp, h.id)) g.things.push(h.id);
@@ -199,7 +210,9 @@ export function PoolList({
                   (
                   {g.by
                     ? fillNodes((m) => t("pool.heldBy", m), { name: <ThingName lp={lp} id={g.by} /> })
-                    : t("pool.heldPicked", { step: g.step ?? "" })}
+                    : g.everyone
+                      ? t("pool.heldEveryone")
+                      : t("pool.heldPicked", { step: g.step ?? "" })}
                   )
                 </span>
               </li>

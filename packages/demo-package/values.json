@@ -178,6 +178,11 @@
     "formula": "witBonus + if(has('talent.weather-sense'), practice, 0)"
   },
   {
+    "id": "mistSignsRoll",
+    "source": "mistland",
+    "formula": "witBonus + if(has('talent.mist-signs'), practice, 0)"
+  },
+  {
     "id": "lanternStaffHit",
     "source": "mistland",
     "formula": "mightBonus + if(has('calling.lantern-bearer'), practice, 0)"

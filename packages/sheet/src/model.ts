@@ -587,12 +587,16 @@ export function buildSheetModel(
   }
 
   // SPEC 13 / print layout 3.4: one card per held thing with `card: true`;
-  // in step order, then by rank, then by name.
+  // in step order (things every character has first), then by rank, then by name.
   const stepIndex = new Map(ev.steps.map((s, i) => [s.id, i]));
   const cards: Card[] = ev.things
     .map((h) => ({ h, t: things.get(h.id)! }))
     .filter(({ t }) => isCard(pkg, t))
-    .map(({ h, t }) => ({ t, step: stepIndex.get(h.step) ?? 0, name: thingName(t.id) }))
+    .map(({ h, t }) => ({
+      t,
+      step: h.step === undefined ? -1 : (stepIndex.get(h.step) ?? 0),
+      name: thingName(t.id),
+    }))
     .sort((a, b) => a.step - b.step || (a.t.rank ?? 0) - (b.t.rank ?? 0) || collator.compare(a.name, b.name))
     .map(({ t, name: cardName }): Card => {
       const layout = pkg.sheet.cards[t.kind]!;

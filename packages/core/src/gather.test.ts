@@ -222,6 +222,8 @@ describe("one list for the gathered choices", () => {
       remaining: 1,
       blocked: [],
       held: [
+        // Every character has it (flow.grants): no step, before everything else.
+        { id: "talent.mist-signs", kind: "talent", everyone: true, atLevel: 1 },
         {
           id: "talent.weather-sense",
           kind: "talent",
