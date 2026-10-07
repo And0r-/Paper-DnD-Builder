@@ -103,6 +103,11 @@ test.describe("at a desk", () => {
           const what = `${design} ${version ? "copy" : "original"}`;
           await expect.poll(() => sheet.locator(`.${prefix}__footer`).count(), what).toBe(pages);
           await expect(sheet.locator(`.${prefix}__footer`).first()).toContainText(`Seite 1 von ${pages}`);
+          // Classic: page 1 stays A4, what does not fit goes on on page 2.
+          if (design === "classic")
+            await expect
+              .poll(async () => (await box(sheet.locator(".csheet__page").first())).height, what)
+              .toBeLessThanOrEqual(A4 + 2);
         }
       }
     });

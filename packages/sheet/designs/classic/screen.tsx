@@ -286,8 +286,13 @@ function nextFlow(el: HTMLElement, model: SheetModel, plan: ClassicPlan, now: Fl
     ["band", plan.parts.band],
   ] as const) {
     const spill = now[key];
-    const here = units(first.querySelector(`.csheet__${key === "right" ? "c" : "band"}`));
-    const out = here.find(({ r }) => rect(r).bottom > limit + 0.5);
+    const container = first.querySelector(`.csheet__${key === "right" ? "c" : "band"}`);
+    const here = units(container);
+    // Where its content ends, with what follows the last row (the button for a new row, a legend).
+    const contentEnd = Math.max(0, ...[...(container?.children ?? [])].map((c) => rect(c).bottom));
+    const tail = [...here].reverse().find(({ r }) => r.dataset["lines"] === undefined);
+    const out =
+      here.find(({ r }) => rect(r).bottom > limit + 0.5) ?? (contentEnd > limit + 0.5 ? tail : undefined);
     if (out) {
       const i = Number(out.sec.dataset["index"]);
       if (out.r.dataset["lines"] !== undefined) {
@@ -304,7 +309,7 @@ function nextFlow(el: HTMLElement, model: SheetModel, plan: ClassicPlan, now: Fl
       continue;
     }
     // Room left: lines taken away come back one by one, then what went on to page 2.
-    const end = (c: Element | null) => Math.max(c ? rect(c).top : 0, ...here.map(({ r }) => rect(r).bottom));
+    const end = (c: Element | null) => Math.max(c ? rect(c).top : 0, contentEnd);
     const fewer = list.find((i) => next.lines[i] !== undefined);
     if (fewer !== undefined) {
       const n = next.lines[fewer]!;
@@ -319,20 +324,22 @@ function nextFlow(el: HTMLElement, model: SheetModel, plan: ClassicPlan, now: Fl
     }
     if (!spill) continue;
     // The next unit that went on comes back if it fits.
-    const bottom = Math.max(
-      rect(first.querySelector(`.csheet__${key === "right" ? "c" : "band"}`)!).top,
-      ...here.map(({ r }) => rect(r).bottom),
-    );
+    const bottom = Math.max(container ? rect(container).top : 0, contentEnd);
     const back = later(list, spill)[0];
-    if (back && rect(back.r).height + 2 <= limit - bottom) {
+    if (back) {
       const i = Number(back.sec.dataset["index"]);
       const rows = units(second!.querySelector(".csheet__more")).filter(
         (u) => u.sec === back.sec && !u.r.dataset["lines"],
       );
       const row = back.r.dataset["row"] === undefined ? Infinity : Number(back.r.dataset["row"]) + 1;
       const end = rows.length === 0 || row > Number(rows.at(-1)!.r.dataset["row"] ?? -1);
-      const after = list[list.indexOf(i) + 1];
-      next[key] = end ? (after === undefined ? null : { section: after, row: 0 }) : { section: i, row };
+      // What comes back with it: the title above a section's first row, the button and legend after its last.
+      const head = back.r !== back.sec && back.r === rows[0]?.r ? rect(back.r).top - rect(back.sec).top : 0;
+      const tail = back.r !== back.sec && end ? rect(back.sec).bottom - rect(back.r).bottom : 0;
+      if (head + rect(back.r).height + tail + 2 <= limit - bottom) {
+        const after = list[list.indexOf(i) + 1];
+        next[key] = end ? (after === undefined ? null : { section: after, row: 0 }) : { section: i, row };
+      }
     }
   }
 
