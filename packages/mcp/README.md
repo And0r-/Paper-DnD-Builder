@@ -20,7 +20,8 @@ the unit conversion, to write package texts for the reader.
 | `src/tools/`            | The shared tool list `TOOLS`: per tool a name, a description (`descriptions.ts`), a Zod input shape and `run(client, input)`. Depends on nothing but an `ApiClient`.                                                                                                                       |
 | `src/server.ts`         | `createMcpServer(client)`: registers the list on an MCP server.                                                                                                                                                                                                                            |
 | `src/stdio.ts`          | Entry point of `server.mjs`: reads `config.json` next to the file (`{ "baseUrl", "key" }`), overridable by `BUILDER_BASE_URL` and `BUILDER_KEY`, and serves over stdio.                                                                                                                    |
-| `templates/README.*.md` | The guide that goes into the download zip, in German and English. `{{BASE_URL}}` and `{{KEY_NAME}}` are filled in by the download route.                                                                                                                                                   |
+| `src/download.ts`       | The text files of the download zip (`renderGuide`, `configFile`, `desktopConfigFile`); `POST /api/account/mcp-package` zips them with `server.mjs`.                                                                                                                                        |
+| `templates/README.*.md` | The guide that goes into the download zip, in German and English. `{{BASE_URL}}`, `{{KEY_NAME}}` and the sections `{{#KEY}}`/`{{^KEY}}` (with or without a key) are filled in by `renderGuide`.                                                                                            |
 
 ## Tools
 
@@ -42,6 +43,10 @@ keys.
 pnpm --filter @builder/mcp build   # dist/server.mjs, one file, Node 20 or newer, no node_modules
 ```
 
+The web app's `build` and `dev` run this first; the unit tests run it once
+as Vitest global setup (`scripts/test-setup.ts`). The Docker image copies
+`dist/` and `templates/` next to the web server.
+
 ## Tests
 
 - [`apps/web/src/server/api/mcp.test.ts`](../../apps/web/src/server/api/mcp.test.ts):
@@ -52,4 +57,8 @@ pnpm --filter @builder/mcp build   # dist/server.mjs, one file, Node 20 or newer
 - `src/stdio.test.ts`: the stdio server as a child process registers exactly
   `TOOLS`; configuration.
 - `src/no-rulebook-words.test.ts`: none of the 75 rulebook terms in this
-  package.
+  package (the terms: `src/rulebook-terms.ts`).
+- [`apps/web/src/server/api/mcp-package.test.ts`](../../apps/web/src/server/api/mcp-package.test.ts):
+  the download zip: four files, address and key, the key works, no key
+  without a session, the guide in the account's language, no rulebook term
+  in any file of it.

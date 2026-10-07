@@ -5,8 +5,20 @@ character builder. You write to it, for example, "Build a new level 3
 character with me" or "Why does my character have an 8 here?". The language
 model then reads your characters, explains values and enters your answers.
 
+{{#KEY}}
 The package belongs to your account on **{{BASE_URL}}**. The access key in
 it is called **"{{KEY_NAME}}"** in your settings.
+{{/KEY}}
+{{^KEY}}
+The package belongs to the character builder on **{{BASE_URL}}**. It holds
+no access key yet. This is how you add one:
+
+1. Log in on {{BASE_URL}} and open **Settings → Access keys**.
+2. Make a new key and copy it. It starts with `cbk_`.
+3. Open the file `config.json` from this package in a text editor. Put the
+   key between the quotes after `"key"`, like this: `"key": "cbk_..."`.
+   Save.
+{{/KEY}}
 
 > **Privacy**
 >
@@ -33,7 +45,8 @@ Unpack the zip into a folder that stays, for example
 `Documents/character-builder`. Do not leave it in "Downloads"; that folder
 tends to get cleaned up.
 
-The folder holds `server.mjs`, `config.json` and this guide. Note the full
+The folder holds `server.mjs`, `config.json`,
+`claude_desktop_config.json` and this guide. Note the full
 path to `server.mjs`, for example
 `C:\Users\you\Documents\character-builder\server.mjs` or
 `/Users/you/Documents/character-builder/server.mjs`. Below it is written as
@@ -134,7 +147,7 @@ If you no longer need the package, or the key got into the wrong hands:
 
 1. Log in on {{BASE_URL}}.
 2. Open **Settings → Access keys**.
-3. Withdraw the key **"{{KEY_NAME}}"**.
+3. Withdraw the key {{#KEY}}**"{{KEY_NAME}}"**{{/KEY}}{{^KEY}}you put into `config.json`{{/KEY}}.
 
 From then on the builder refuses the key at once. The language model then
 reports that the key is no longer valid. Afterwards, delete the folder with
