@@ -564,6 +564,8 @@ export const sectionSchema = z.discriminatedUnion("kind", [
         z.strictObject({
           value: valueId,
           derived: valueId.optional(),
+          /** Label of `derived` (text key); default `value.<derived>.name`. */
+          derivedLabel: textKey.optional(),
           /** A further number made with this score, printed small with its sign next to it. */
           extra: valueId.optional(),
           /** Label of `extra` (text key); default `value.<extra>.name`. */

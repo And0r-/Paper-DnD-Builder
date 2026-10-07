@@ -809,6 +809,9 @@ export function validatePackageFiles(files: PackageFiles): ValidationResult {
           if (sc.extra !== undefined && !valueIds.has(sc.extra)) {
             err(S, `${p}.scores[${j}].extra`, `unknown value ${lit(sc.extra)}`);
           }
+          if (sc.derivedLabel !== undefined && sc.derived === undefined) {
+            err(S, `${p}.scores[${j}].derivedLabel`, '"derivedLabel" only goes with "derived"');
+          }
           if (sc.extraLabel !== undefined && sc.extra === undefined) {
             err(S, `${p}.scores[${j}].extraLabel`, '"extraLabel" only goes with "extra"');
           }
@@ -998,9 +1001,12 @@ export function validatePackageFiles(files: PackageFiles): ValidationResult {
     if (s.kind === "checkList" && s.strongLegend !== undefined)
       need(s.strongLegend, `legend of the double mark in sheet section ${lit(s.id)}`);
     if (s.kind === "scoreColumn")
-      for (const sc of s.scores)
+      for (const sc of s.scores) {
+        if (sc.derivedLabel !== undefined)
+          need(sc.derivedLabel, `label of ${lit(sc.derived ?? "")} in sheet section ${lit(s.id)}`);
         if (sc.extraLabel !== undefined)
           need(sc.extraLabel, `label of ${lit(sc.extra ?? "")} in sheet section ${lit(s.id)}`);
+      }
     optional.add(`sheet.${s.id}.hint`);
   }
   for (const [kind, layout] of Object.entries(sheet.cards)) {

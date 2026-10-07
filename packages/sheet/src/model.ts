@@ -415,7 +415,11 @@ export function buildSheetModel(
               label: valueLabel(sc.value),
               value: valueText(sc.value),
               ...(sc.derived ? { derivedId: sc.derived } : {}),
-              derivedLabel: sc.derived ? valueLabel(sc.derived) : "",
+              derivedLabel: !sc.derived
+                ? ""
+                : sc.derivedLabel !== undefined
+                  ? text(sc.derivedLabel)
+                  : valueLabel(sc.derived),
               derived: sc.derived ? signed.format(valueOf(sc.derived)) : null,
               extra: sc.extra
                 ? {

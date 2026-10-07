@@ -1681,8 +1681,8 @@ describe("the PDF made from the sheet model", () => {
   // or the demo package changes these: then check the sample PDFs and
   // update them.
   const before = {
-    de: { pages: 4, sha256: "5a96b8c96f57eb0bd69f870450648863025b5335a2e1fdbd98cadf6acf9d9731" },
-    en: { pages: 4, sha256: "274cc7a03aecbb58cde8a42989b0acf2d1b7d501332e0f369be5166a0a69906f" },
+    de: { pages: 4, sha256: "1f39ee7295bce7d59ff6c7345c175ac484694aaf2db40fabe9ed6066c51e5cbb" },
+    en: { pages: 4, sha256: "375fa95cdf51ab528edda05b2d53aefdec8a67836aa4b114cbd6a41364f79bf3" },
   };
 
   it("is unchanged for the level 20 demo character with cards", async () => {
