@@ -865,6 +865,29 @@ function continued(c: Ctx, blocks: Block[]): Block[] {
   return title === "" ? blocks : [titleBlock(c, first.section, `${title} · ${c.m.continued}`), ...blocks];
 }
 
+/**
+ * Where `blocks` that all fit in the fresh left column of `flow` split into
+ * two columns of about equal length, as the screen's columns show them: at
+ * the start of a section, so none goes on in the other column. 0: they stay
+ * as they come (they need both columns anyway, or are one section).
+ */
+function balance(c: Ctx, flow: Flow, blocks: Block[]): number {
+  const frame = flow.frame;
+  if (!frame.left || flow.at > frame.y + 0.1) return 0;
+  const height = (part: Block[]) => {
+    const f = new Flow(c, () => frame);
+    return f.place(part, 1).length === 0 ? f.at - frame.y : Infinity;
+  };
+  if (height(blocks) === Infinity) return 0;
+  let best = { at: 0, h: Infinity };
+  blocks.forEach((b, k) => {
+    if (k === 0 || b.section === blocks[k - 1]!.section) return;
+    const h = Math.max(height(blocks.slice(0, k)), height(blocks.slice(k)));
+    if (h < best.h) best = { at: k, h };
+  });
+  return best.at;
+}
+
 // ------------------------------------------------------------------ the sheet
 
 /** The classic sheet laid out: what is where on each page, and how to draw a page. */
@@ -974,7 +997,12 @@ export function layClassic(
     main.fillColumn(right.at(-1) ?? null);
     if (after.length > 0) main.nextColumn();
   }
-  main.place(after);
+  const split = balance(c, main, after);
+  if (split > 0) {
+    main.place(after.slice(0, split));
+    main.nextColumn();
+    main.place(after.slice(split));
+  } else main.place(after);
 
   /**
    * The apart part (box rows across the page, the rest in two columns of

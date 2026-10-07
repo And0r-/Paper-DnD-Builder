@@ -2226,6 +2226,29 @@ describe("the classic design: original and copy, empty and filled", () => {
     }
   });
 
+  it("uses both columns of page 2 when what is on it would fit in one, as the screen does", async () => {
+    const lantern3 = demoCharacter(pkg, 3, "Mira Fennwick", "calling.lantern-bearer");
+    const right = CLASSIC_GEOMETRY.margin + 50;
+    for (const doc of [lantern3, river3()]) {
+      for (const [language] of languages) {
+        const model = buildSheetModel(pkg, doc, { language, createdAt });
+        const pdf = await renderPdf(model, sheetOnly);
+        expect(pdf.sheetPages).toBe(2);
+        const page = pdf.sheetLayout[1]!;
+        const what = `level ${model.level} ${model.sections.length} ${language}`;
+        // The notes in the right column, the first section in the left one; no section in both.
+        const notes = page.filter((p) => p.section.kind === "notes");
+        expect(notes.length, what).toBeGreaterThan(0);
+        expect(Math.min(...notes.map((p) => p.x)), what).toBeGreaterThan(right);
+        expect(page[0]!.x, what).toBe(CLASSIC_GEOMETRY.margin);
+        const plan = classicPlan(model.sections);
+        const apart = new Set(plan.apartPage ? plan.parts.apart.map((i) => model.sections[i]!.id) : []);
+        for (const s of new Set(page.filter((p) => !apart.has(p.section.id)).map((p) => p.section)))
+          expect(new Set(page.filter((p) => p.section === s).map((p) => p.x > right)).size, s.id).toBe(1);
+      }
+    }
+  });
+
   it("shows titles and short lines: no hints, no help box", async () => {
     for (const [language] of languages) {
       const model = buildSheetModel(pkg, lantern20(), { language, createdAt });
