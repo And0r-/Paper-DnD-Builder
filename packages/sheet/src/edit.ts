@@ -102,7 +102,8 @@ export function withRowAdded(model: SheetModel, index: number): SheetModel {
             marks: "",
             text: "",
             uses: null,
-            group: s.rows.at(-1)?.group ?? null,
+            // The player's own: under no heading of the package, after all of them.
+            group: null,
           },
         ],
       });

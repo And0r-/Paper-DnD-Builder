@@ -13,6 +13,7 @@ import {
   withText,
   writtenOf,
   type PlayValue,
+  type SheetModel,
 } from "@builder/sheet";
 import type { SheetFieldProps, SheetRowProps, SheetTextProps, SheetUi } from "@builder/sheet/designs/screens";
 import {
@@ -42,6 +43,22 @@ function useSheetCtx(): SheetController {
   return ctx;
 }
 
+/**
+ * The text a row just added starts with, as its path: it opens for typing
+ * as soon as it is on the screen. Outside React state, so it outlives the
+ * sheet being drawn anew (the first change to the original makes a copy).
+ */
+let openNext: string | null = null;
+
+/** The first text of the last row of section `index`. */
+function lastRowStart(model: SheetModel, index: number): (string | number)[] | null {
+  const s = model.sections[index];
+  if (s?.kind === "list") return ["sections", index, "items", s.items.length - 1];
+  if (s?.kind === "statTable" || s?.kind === "featureTable")
+    return ["sections", index, "rows", s.rows.length - 1, "name"];
+  return null;
+}
+
 /** A plain number ("12", "+2") brings up the number pad on a phone. */
 const NUMBER = /^[+-−]?\d+$/u;
 
@@ -52,6 +69,12 @@ function SheetText({ path, value, label, multiline }: SheetTextProps) {
   const shown = useRef<HTMLSpanElement>(null);
   const width = useRef(0);
   const refocus = useRef(false);
+  const key = JSON.stringify(path);
+  useEffect(() => {
+    if (openNext !== key) return;
+    openNext = null;
+    if (sheet.editable) setEditing(true);
+  }, [key, sheet.editable]);
 
   if (!sheet.editable) return <>{value}</>;
 
@@ -251,7 +274,14 @@ function AddRow({ section, label }: SheetRowProps) {
       type="button"
       className="sheet-row-add"
       aria-label={t("sheet.addRowLabel", { section: label })}
-      onClick={() => sheet.changeModel((m) => withRowAdded(m, section))}
+      onClick={() =>
+        sheet.changeModel((m) => {
+          const next = withRowAdded(m, section);
+          const start = next === m ? null : lastRowStart(next, section);
+          openNext = start && JSON.stringify(start);
+          return next;
+        })
+      }
     >
       <Icon name="plus" size={18} />
       <span>{t("sheet.addRow")}</span>

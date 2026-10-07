@@ -523,6 +523,9 @@ function featureBlocks(c: Ctx, s: Section<"featureTable">): Block[] {
           keep: true,
         }),
       );
+    } else if (r.group === null && group !== null) {
+      // The player's own rows after the package's groups: a gap, under no group's heading.
+      out.push(measured(c, s, () => 2.4, { keep: true }));
     }
     group = r.group?.key ?? null;
     out.push(measured(c, s, (x, y, w) => featureRow(c, r, x, y, w)));

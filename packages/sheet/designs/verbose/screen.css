@@ -693,3 +693,9 @@
     border-top: 0.1mm solid #999;
   }
 }
+
+/* The player's own rows after the package's groups: set off, under no group's heading. */
+.vsheet__feature-wrap--own {
+  margin-top: var(--space-3);
+  border-top: 2px solid var(--color-line);
+}

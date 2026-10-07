@@ -204,6 +204,11 @@ function drawSection(c: Grid, s: Laid, x: number, top: number, w: number): numbe
       for (const row of s.rows) {
         if (row.group !== null && row.group.key !== group)
           y = drawRowGroup(c, row.group, x, y, w, row === s.rows[0]);
+        // The player's own rows after the package's groups: the line of a group, no heading.
+        else if (row.group === null && group !== null) {
+          pen.line(x, y - 0.6, x + w, y - 0.6, 0.6, "#555");
+          y += 0.6;
+        }
         group = row.group?.key ?? null;
         const name = pen.wrapWords(row.name, st.fieldName, nameW - 2 - markRoom);
         const textLines = pen.wrap(row.text, st.small, textW);

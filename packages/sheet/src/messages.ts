@@ -7,6 +7,8 @@
 
 export interface Messages {
   playedBy: string;
+  /** What the first place of a row holds, for a screen reader: the row's name. */
+  rowName: string;
   /** Small in the corner of a field the player fills in by hand: what goes there and with what. */
   pencil: string;
   /** Hint under a pencil box: the value to start with. */
@@ -47,6 +49,7 @@ export interface Messages {
 export const MESSAGES: Readonly<Record<string, Messages>> = {
   de: {
     playedBy: "Gespielt von",
+    rowName: "Name",
     pencil: "Aktuell, mit Bleistift:",
     startValue: (n) => `Startwert ${n}`,
     unnamed: "Ohne Namen",
@@ -73,6 +76,7 @@ export const MESSAGES: Readonly<Record<string, Messages>> = {
   },
   en: {
     playedBy: "Played by",
+    rowName: "Name",
     pencil: "Current, in pencil:",
     startValue: (n) => `Start at ${n}`,
     unnamed: "No name yet",

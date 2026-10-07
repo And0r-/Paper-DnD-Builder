@@ -74,6 +74,15 @@ describe("changing a sheet like paper", () => {
     expect(new Set(ids).size).toBe(ids.length);
     expect(s.rows.at(-1)).toMatchObject({ name: "", text: "", uses: null });
   });
+
+  it("puts a feature row written in by hand under no group's heading, after the package's rows", () => {
+    const i = level20.sections.findIndex((s) => s.kind === "featureTable" && s.rows.at(-1)?.group);
+    expect(i).toBeGreaterThanOrEqual(0);
+    const s = withRowAdded(level20, i).sections[i]!;
+    if (s.kind !== "featureTable") throw new Error("not a feature table");
+    expect(s.rows.at(-2)!.group).not.toBeNull();
+    expect(s.rows.at(-1)!.group).toBeNull();
+  });
 });
 
 describe("the play state on the shown sheet", () => {

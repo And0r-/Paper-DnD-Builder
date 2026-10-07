@@ -74,7 +74,14 @@ export function VerboseSheet({ model, ui }: SheetScreenProps) {
                 <ui.Text path={at(i, "title")} value={s.title} label={s.title} />
               </h2>
             )}
-            <Section s={s} i={i} ui={ui} playedBy={m?.playedBy ?? ""} pencil={m?.pencil ?? ""} />
+            <Section
+              s={s}
+              i={i}
+              ui={ui}
+              playedBy={m?.playedBy ?? ""}
+              pencil={m?.pencil ?? ""}
+              rowName={m?.rowName ?? ""}
+            />
             {s.kind !== "header" && s.hint !== "" && (
               <p className="vsheet__hint">
                 <ui.Text path={at(i, "hint")} value={s.hint} label={s.title} multiline />
@@ -100,12 +107,14 @@ function Section({
   ui,
   playedBy,
   pencil,
+  rowName,
 }: {
   s: SheetSection;
   i: number;
   ui: SheetUi;
   playedBy: string;
   pencil: string;
+  rowName: string;
 }): ReactNode {
   switch (s.kind) {
     case "header":
@@ -117,9 +126,9 @@ function Section({
     case "checkList":
       return <CheckList s={s} i={i} ui={ui} />;
     case "statTable":
-      return <StatTable s={s} i={i} ui={ui} />;
+      return <StatTable s={s} i={i} ui={ui} rowName={rowName} />;
     case "featureTable":
-      return <FeatureTable s={s} i={i} ui={ui} />;
+      return <FeatureTable s={s} i={i} ui={ui} rowName={rowName} />;
     case "list":
       return <List s={s} i={i} ui={ui} />;
     case "answers":
@@ -353,7 +362,7 @@ function CheckList({ s, i, ui }: Props<"checkList">) {
   );
 }
 
-function StatTable({ s, i, ui }: Props<"statTable">) {
+function StatTable({ s, i, ui, rowName }: Props<"statTable"> & { rowName: string }) {
   return (
     <div className="vsheet__table-wrap">
       <table className="vsheet__table">
@@ -372,7 +381,7 @@ function StatTable({ s, i, ui }: Props<"statTable">) {
           {s.rows.map((r, j) => (
             <tr key={j}>
               <th scope="row">
-                <ui.Text path={at(i, "rows", j, "name")} value={r.name} label={s.title} />
+                <ui.Text path={at(i, "rows", j, "name")} value={r.name} label={rowName} />
               </th>
               {r.cells.map((c, k) => (
                 <td key={k} className={s.wrap?.[k] ? "vsheet__wrap" : undefined}>
@@ -391,7 +400,7 @@ function StatTable({ s, i, ui }: Props<"statTable">) {
   );
 }
 
-function FeatureTable({ s, i, ui }: Props<"featureTable">) {
+function FeatureTable({ s, i, ui, rowName }: Props<"featureTable"> & { rowName: string }) {
   let group: string | null = null;
   return (
     <div className="vsheet__features">
@@ -402,16 +411,21 @@ function FeatureTable({ s, i, ui }: Props<"featureTable">) {
       ))}
       {s.rows.map((r, j) => {
         const head = r.group !== null && r.group.key !== group ? r.group : null;
+        // The player's own rows after the package's groups: under no group's heading.
+        const own = r.group === null && group !== null;
         group = r.group?.key ?? null;
         return (
-          <div key={`${r.id}-${j}`} className="vsheet__feature-wrap">
+          <div
+            key={`${r.id}-${j}`}
+            className={`vsheet__feature-wrap${own ? " vsheet__feature-wrap--own" : ""}`}
+          >
             {head && (
               <p className="vsheet__group">
                 <span>{head.title}</span>
                 {head.hint !== "" && <span className="vsheet__group-hint"> · {head.hint}</span>}
               </p>
             )}
-            <Feature r={r} path={at(i, "rows", j)} ui={ui} />
+            <Feature r={r} path={at(i, "rows", j)} ui={ui} rowName={rowName} label={r.name || s.title} />
             <ui.RemoveRow section={i} row={j} label={s.title} />
           </div>
         );
@@ -422,22 +436,35 @@ function FeatureTable({ s, i, ui }: Props<"featureTable">) {
   );
 }
 
-function Feature({ r, path, ui }: { r: FeatureRow; path: (string | number)[]; ui: SheetUi }) {
+/** `label` names the row's other places: its name, or the section's title while it has none. */
+function Feature({
+  r,
+  path,
+  ui,
+  rowName,
+  label,
+}: {
+  r: FeatureRow;
+  path: (string | number)[];
+  ui: SheetUi;
+  rowName: string;
+  label: string;
+}) {
   return (
     <div className="vsheet__feature">
       <div className="vsheet__feature-name">
         <span className="vsheet__feature-title">
-          <ui.Text path={[...path, "name"]} value={r.name} label={r.name} />
+          <ui.Text path={[...path, "name"]} value={r.name} label={rowName} />
         </span>
         {r.marks !== "" && <span className="vsheet__marks">{r.marks}</span>}
         {r.note !== undefined && r.note !== "" && (
           <span className="vsheet__feature-note">
-            <ui.Text path={[...path, "note"]} value={r.note} label={r.name} />
+            <ui.Text path={[...path, "note"]} value={r.note} label={label} />
           </span>
         )}
       </div>
       <div className="vsheet__feature-text">
-        <ui.Text path={[...path, "text"]} value={r.text} label={r.name} multiline />
+        <ui.Text path={[...path, "text"]} value={r.text} label={label} multiline />
       </div>
       {r.uses !== null && (
         <div className="vsheet__uses">
@@ -447,14 +474,14 @@ function Feature({ r, path, ui }: { r: FeatureRow; path: (string | number)[]; ui
             r.usesField && (
               <ui.Field
                 field={{ id: r.usesField, kind: "ticks", max: r.uses.boxes }}
-                label={r.name}
+                label={label}
                 shape="square"
               />
             )
           ) : (
             <>
               <span className="vsheet__uses-count">{r.uses.count}</span>
-              {r.usesField && <ui.Field field={{ id: r.usesField, kind: "pencil" }} label={r.name} />}
+              {r.usesField && <ui.Field field={{ id: r.usesField, kind: "pencil" }} label={label} />}
             </>
           )}
         </div>

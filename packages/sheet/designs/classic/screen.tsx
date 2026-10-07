@@ -59,7 +59,7 @@ const at = (i: number, ...rest: (string | number)[]) => ["sections", i, ...rest]
 export function ClassicSheet({ model, ui }: SheetScreenProps) {
   const m = MESSAGES[model.language];
   const plan = classicPlan(model.sections);
-  const words = { playedBy: m?.playedBy ?? "", pencil: m?.pencil ?? "" };
+  const words = { playedBy: m?.playedBy ?? "", pencil: m?.pencil ?? "", rowName: m?.rowName ?? "" };
   const sections = (part: keyof typeof plan.parts) =>
     plan.parts[part].map((i) => (
       <Section key={`${model.sections[i]!.id}-${i}`} s={model.sections[i]!} i={i} ui={ui} words={words} />
@@ -96,6 +96,7 @@ export function ClassicSheet({ model, ui }: SheetScreenProps) {
 interface Words {
   playedBy: string;
   pencil: string;
+  rowName: string;
 }
 
 function Section({ s, i, ui, words }: { s: SheetSection; i: number; ui: SheetUi; words: Words }) {
@@ -126,9 +127,9 @@ function Body({ s, i, ui, words }: { s: SheetSection; i: number; ui: SheetUi; wo
     case "checkList":
       return <CheckList s={s} i={i} ui={ui} />;
     case "statTable":
-      return <StatTable s={s} i={i} ui={ui} />;
+      return <StatTable s={s} i={i} ui={ui} rowName={words.rowName} />;
     case "featureTable":
-      return <FeatureTable s={s} i={i} ui={ui} />;
+      return <FeatureTable s={s} i={i} ui={ui} rowName={words.rowName} />;
     case "list":
       return <List s={s} i={i} ui={ui} />;
     case "answers":
@@ -363,7 +364,7 @@ function CheckList({ s, i, ui }: Props<"checkList">) {
   );
 }
 
-function StatTable({ s, i, ui }: Props<"statTable">) {
+function StatTable({ s, i, ui, rowName }: Props<"statTable"> & { rowName: string }) {
   return (
     <div className="csheet__table-wrap">
       <table className="csheet__table">
@@ -382,7 +383,7 @@ function StatTable({ s, i, ui }: Props<"statTable">) {
           {s.rows.map((r, j) => (
             <tr key={j}>
               <th scope="row">
-                <ui.Text path={at(i, "rows", j, "name")} value={r.name} label={s.title} />
+                <ui.Text path={at(i, "rows", j, "name")} value={r.name} label={rowName} />
               </th>
               {r.cells.map((c, k) => (
                 <td key={k} className={s.wrap?.[k] ? "csheet__wrap" : undefined}>
@@ -401,7 +402,7 @@ function StatTable({ s, i, ui }: Props<"statTable">) {
   );
 }
 
-function FeatureTable({ s, i, ui }: Props<"featureTable">) {
+function FeatureTable({ s, i, ui, rowName }: Props<"featureTable"> & { rowName: string }) {
   let group: string | null = null;
   return (
     <div className="csheet__features">
@@ -412,11 +413,16 @@ function FeatureTable({ s, i, ui }: Props<"featureTable">) {
       ))}
       {s.rows.map((r, j) => {
         const head = r.group !== null && r.group.key !== group ? r.group : null;
+        // The player's own rows after the package's groups: under no group's heading.
+        const own = r.group === null && group !== null;
         group = r.group?.key ?? null;
         return (
-          <div key={`${r.id}-${j}`} className="csheet__feature-wrap">
+          <div
+            key={`${r.id}-${j}`}
+            className={`csheet__feature-wrap${own ? " csheet__feature-wrap--own" : ""}`}
+          >
             {head && <p className="csheet__group">{head.title}</p>}
-            <Feature r={r} path={at(i, "rows", j)} ui={ui} />
+            <Feature r={r} path={at(i, "rows", j)} ui={ui} rowName={rowName} label={r.name || s.title} />
             <ui.RemoveRow section={i} row={j} label={s.title} />
           </div>
         );
@@ -433,22 +439,35 @@ function FeatureTable({ s, i, ui }: Props<"featureTable">) {
   );
 }
 
-function Feature({ r, path, ui }: { r: FeatureRow; path: (string | number)[]; ui: SheetUi }) {
+/** `label` names the row's other places: its name, or the section's title while it has none. */
+function Feature({
+  r,
+  path,
+  ui,
+  rowName,
+  label,
+}: {
+  r: FeatureRow;
+  path: (string | number)[];
+  ui: SheetUi;
+  rowName: string;
+  label: string;
+}) {
   return (
     <div className="csheet__feature">
       <div className="csheet__feature-name">
         <span className="csheet__feature-title">
-          <ui.Text path={[...path, "name"]} value={r.name} label={r.name} />
+          <ui.Text path={[...path, "name"]} value={r.name} label={rowName} />
         </span>
         {r.note !== undefined && r.note !== "" && (
           <span className="csheet__feature-note">
-            <ui.Text path={[...path, "note"]} value={r.note} label={r.name} />
+            <ui.Text path={[...path, "note"]} value={r.note} label={label} />
           </span>
         )}
       </div>
       {r.marks !== "" && <span className="csheet__marks">{r.marks}</span>}
       <div className="csheet__feature-text">
-        <ui.Text path={[...path, "text"]} value={r.text} label={r.name} multiline />
+        <ui.Text path={[...path, "text"]} value={r.text} label={label} multiline />
       </div>
       {r.uses !== null && (
         <div className="csheet__uses">
@@ -458,14 +477,14 @@ function Feature({ r, path, ui }: { r: FeatureRow; path: (string | number)[]; ui
             r.usesField && (
               <ui.Field
                 field={{ id: r.usesField, kind: "ticks", max: r.uses.boxes }}
-                label={r.name}
+                label={label}
                 shape="square"
               />
             )
           ) : (
             <>
               <span>{r.uses.count}</span>
-              {r.usesField && <ui.Field field={{ id: r.usesField, kind: "pencil" }} label={r.name} />}
+              {r.usesField && <ui.Field field={{ id: r.usesField, kind: "pencil" }} label={label} />}
             </>
           )}
         </div>
