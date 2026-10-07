@@ -169,6 +169,15 @@ test.describe("on a phone", () => {
         await table.locator("[class*=table-wrap]").evaluate((e) => e.scrollWidth - e.clientWidth),
         design,
       ).toBeLessThanOrEqual(1);
+      // Verbose: a score's circle and its name stay inside the score's box.
+      for (const score of await sheet.locator(".vsheet__score").all()) {
+        const outer = await box(score);
+        for (const part of await score.locator(":scope > *").all()) {
+          const b = await box(part);
+          expect(b.x, design).toBeGreaterThanOrEqual(outer.x - 1);
+          expect(b.x + b.width, design).toBeLessThanOrEqual(outer.x + outer.width + 1);
+        }
+      }
     }
   });
 
