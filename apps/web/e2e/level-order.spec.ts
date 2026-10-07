@@ -54,12 +54,18 @@ async function herbalist(page: Page, answers: Record<string, unknown> = {}): Pro
   return id;
 }
 
-/** Opens the menu with the step list on the phone; taps again if the page was not live yet. */
+/**
+ * Opens the menu with the step list on the phone; taps again if the page was
+ * not live yet. A tap while the character still loads opens the loading
+ * screen's menu, which goes with that screen: only the step list in the menu
+ * says it is open.
+ */
 async function openMenu(page: Page, m: typeof de) {
   const button = page.getByRole("button", { name: m["menu.open"] });
+  const list = page.getByRole("dialog", { name: m["menu.title"] }).locator(".steplist");
   await expect(async () => {
-    await button.click();
-    await expect(button).toHaveAttribute("aria-expanded", "true", { timeout: 1000 });
+    if ((await button.getAttribute("aria-expanded")) !== "true") await button.click();
+    await expect(list).toBeVisible({ timeout: 1000 });
   }).toPass();
 }
 

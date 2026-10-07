@@ -19,6 +19,8 @@ interface Screen {
   total: number;
   part: number;
   parts: number;
+  /** Whether "Part x of y" is shown; an open step whose parts only the plan has shows none (AND-189). */
+  counted: boolean;
   bar: number;
   /** The sentence for screen readers about added or removed steps, if there is one. */
   note: string;
@@ -51,6 +53,7 @@ async function read(page: Page, m: Messages): Promise<Screen> {
     total: Number(step[2]),
     part: part ? Number(part[1]) : 1,
     parts: part ? Number(part[2]) : 1,
+    counted: part !== null,
     bar,
     note,
   };
@@ -92,7 +95,11 @@ async function walk(
   return out;
 }
 
-/** The total and the parts never change without a note on the same screen (up or down, AND-90); the bar never goes back. */
+/**
+ * The total and the parts never change without a note on the same screen
+ * (up or down, AND-90); the bar never goes back. A part count that comes
+ * with the answer to a step that showed none is no change (AND-189).
+ */
 function expectHonest(screens: { before: Screen; after: Screen }[]) {
   let last: Screen | undefined;
   for (const { before, after } of screens) {
@@ -102,7 +109,8 @@ function expectHonest(screens: { before: Screen; after: Screen }[]) {
       expect(before.bar, `${last.text} → ${before.text}`).toBeGreaterThan(last.bar);
       if (before.current === last.current) expect(before.parts).toBe(last.parts);
     }
-    if (after.total !== before.total || after.parts !== before.parts)
+    const partsChanged = before.counted && (!after.counted || after.parts !== before.parts);
+    if (after.total !== before.total || partsChanged)
       expect(after.note, `${before.text} → ${after.text} without a note`).not.toBe("");
     last = after;
   }
@@ -124,6 +132,11 @@ for (const level of [1, 5, 20]) {
     // With the suggestions the total is the same on every screen, without a single note.
     expect(new Set(screens.map((s) => s.after.total)).size).toBe(1);
     expect(screens.filter((s) => s.after.note !== "").map((s) => s.after.text)).toEqual([]);
+    if (level === 5) {
+      // The boons are one part until the boon at level 4 brings its raise: the count comes with the answer.
+      const came = screens.filter((s) => !s.before.counted && s.after.counted);
+      expect(came.map((s) => `${s.after.part}/${s.after.parts}`)).toEqual(["1/2"]);
+    }
     if (level === 20) {
       // The boons with their raises: the parts known from the first one on.
       const parts = screens.filter((s) => s.before.parts === 10).map((s) => s.before.part);

@@ -136,9 +136,13 @@ export function sheetTests(device: "phone" | "desk"): void {
     /** The tools: in the bar at a desk, in the app's menu on a phone. */
     const tools = async (page: Page) => {
       if (device === "desk") return page.getByRole("group", { name: m["sheet.tools"] });
-      await page.getByRole("button", { name: m["menu.open"] }).click();
+      // A tap while the sheet still loads opens the loading screen's menu, which goes with it: tap again.
+      const button = page.getByRole("button", { name: m["menu.open"] });
       const menu = page.getByRole("dialog", { name: m["menu.title"] });
-      await expect(menu.getByRole("heading", { name: m["sheet.group"] })).toBeVisible();
+      await expect(async () => {
+        if ((await button.getAttribute("aria-expanded")) !== "true") await button.click();
+        await expect(menu.getByRole("heading", { name: m["sheet.group"] })).toBeVisible({ timeout: 1000 });
+      }).toPass();
       return menu;
     };
     const closeTools = async (page: Page) => {
