@@ -306,6 +306,32 @@ describe("kept copies of the sheet", () => {
     expect((await list(gm)).opened).toBe(null);
   });
 
+  it("opens the original instead of an older copy once the original changed", async () => {
+    const list = async () => (await player.call("GET", `${base()}/sheet-copies`)).json;
+    const made = await newCopy();
+    server.advance(60_000);
+    // Level 3 to 4 after the copy was made: the sheet opens the original at level 4.
+    await finishRaise(await raise(4));
+    const now = await list();
+    expect(now.original.level).toBe(4);
+    expect(now.copies).toHaveLength(1);
+    expect(now.opened).toBe(null);
+    expect((await player.call("GET", `${base()}/sheet`)).json.origin.level).toBe(4);
+
+    // Picked again on purpose, the copy opens again; until the original changes once more.
+    server.advance(60_000);
+    await player.call("PUT", `${base()}/sheet-view`, { copyId: made.copy.id });
+    expect((await list()).opened).toBe(made.copy.id);
+    server.advance(60_000);
+    await finishRaise(await raise(5));
+    expect((await list()).opened).toBe(null);
+
+    // A copy of the original as it is now stays the one opened.
+    server.advance(60_000);
+    const fresh = await newCopy();
+    expect((await list()).opened).toBe(fresh.copy.id);
+  });
+
   it("refuses a copy of a character that is not finished", async () => {
     const draft = (await player.call("POST", "/api/drafts", { packageId: "demo" })).json.draft;
     const res = await player.call("POST", `/api/drafts/${draft.id}/sheet-copies`, {});

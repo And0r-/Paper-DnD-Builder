@@ -73,11 +73,15 @@ export const printChoiceSchema = z.strictObject({
 });
 export type PrintChoice = z.infer<typeof printChoiceSchema>;
 
-/** For an account that never downloaded: only the sheet, in the first design, empty to write on. */
+/**
+ * For an account that never downloaded: the sheet and the cards, in the
+ * first design, with the play state filled in. Only what the dialog starts
+ * from; the PDF without `parts` or `state` stays the sheet and the cards, empty.
+ */
 export const DEFAULT_PRINT_CHOICE: PrintChoice = {
-  parts: ["sheet"],
+  parts: ["sheet", "cards"],
   design: SHEET_DESIGNS[0]!.id as PrintChoice["design"],
-  state: "empty",
+  state: "filled",
 };
 
 /** A stored choice as far as it is still valid; the rest from the default. */

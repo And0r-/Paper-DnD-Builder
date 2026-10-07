@@ -351,20 +351,29 @@ export function sheetTests(device: "phone" | "desk"): void {
       await pickVersion(page, /^Meine Fassung/);
       await expect(page.getByRole("button", { name: "Klugheit: 19. Ändern" })).toBeVisible();
 
-      // Finished at level 4: the original says so, the copy stays at 3, the play state stays on both.
+      // Finished at level 4: "To the sheet" opens the original, newer than the copy opened last
+      // (AND-217), with no word about it; the copy stays at 3; the play state stays on both.
       await finishRaise(page, id);
-      await page.reload();
-      await expect(page.getByRole("button", { name: /Stufe 3\. Ändern$/ })).toBeVisible();
-      await expect(
-        page.getByRole("button", { name: new RegExp(`^${squares.label}: Haken 1 von \\d+$`) }),
-      ).toHaveAttribute("aria-pressed", "true");
-      await pickVersion(page, m["sheet.original"]);
+      await page.goto(`/c/${id}/done`);
+      await page.getByRole("link", { name: m["done.toSheet"] }).click();
+      await expect(page).toHaveURL(new RegExp(`/c/${id}/bogen$`));
       await expect(page.getByRole("button", { name: /Stufe 4\. Ändern$/ })).toBeVisible();
+      expect(await versionShown(page)).toBe(m["sheet.original"]);
+      await expect(page.locator(".sheet-screen .callout")).toHaveCount(0);
       await expect(
         page.getByRole("button", { name: new RegExp(`^${squares.label}: Haken 1 von \\d+$`) }),
       ).toHaveAttribute("aria-pressed", "true");
       await expect(page.getByRole("textbox", { name: pencil.label })).toHaveValue("7");
       await shot(page, `98-sheet-play-${device}`);
+      // The copy is still in the list; picked again, it opens again after a reload.
+      await pickVersion(page, /^Meine Fassung/);
+      await expect(page.getByRole("button", { name: /Stufe 3\. Ändern$/ })).toBeVisible();
+      await expect(
+        page.getByRole("button", { name: new RegExp(`^${squares.label}: Haken 1 von \\d+$`) }),
+      ).toHaveAttribute("aria-pressed", "true");
+      await expect.poll(async () => (await copies(page, id)).opened).not.toBeNull();
+      await page.reload();
+      await expect(page.getByRole("button", { name: /Stufe 3\. Ändern$/ })).toBeVisible();
     });
 
     test(`the look changes to classic and the account keeps it; changed in place there too (${device})`, async ({

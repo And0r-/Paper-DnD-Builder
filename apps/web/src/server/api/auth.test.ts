@@ -226,15 +226,26 @@ describe("settings", () => {
     expect((await client.call("PATCH", "/api/account/settings", { language: "xx" })).status).toBe(400);
   });
 
-  it("keeps the last download's choice: only the sheet until something else is picked", async () => {
+  it("keeps the last download's choice: sheet, cards and play state until something else is picked", async () => {
     await signIn(client, server, EMAIL);
     const fresh = await client.call("GET", "/api/account");
-    expect(fresh.json.account.print).toEqual({ parts: ["sheet"], design: "verbose", state: "empty" });
+    expect(fresh.json.account.print).toEqual({
+      parts: ["sheet", "cards"],
+      design: "verbose",
+      state: "filled",
+    });
 
     // Parts are kept in file order; what is left out stays as it was.
     const set = await client.call("PATCH", "/api/account/settings", { print: { parts: ["texts", "sheet"] } });
     expect(set.status).toBe(200);
-    expect(set.json.account.print).toEqual({ parts: ["sheet", "texts"], design: "verbose", state: "empty" });
+    expect(set.json.account.print).toEqual({ parts: ["sheet", "texts"], design: "verbose", state: "filled" });
+    // A choice kept with the sheet alone, empty, stays so.
+    const kept = await client.call("PATCH", "/api/account/settings", {
+      print: { parts: ["sheet"], state: "empty" },
+    });
+    expect(kept.json.account.print).toEqual({ parts: ["sheet"], design: "verbose", state: "empty" });
+    expect((await client.call("GET", "/api/account")).json.account.print).toEqual(kept.json.account.print);
+    await client.call("PATCH", "/api/account/settings", { print: { parts: ["texts", "sheet"] } });
     const language = await client.call("PATCH", "/api/account/settings", { language: "en" });
     expect(language.json.account.print.parts).toEqual(["sheet", "texts"]);
     expect((await client.call("GET", "/api/account")).json.account.print.parts).toEqual(["sheet", "texts"]);
@@ -255,10 +266,12 @@ describe("settings", () => {
       `UPDATE accounts SET print_choice = '{"parts":["cards","nope"],"design":"gone","state":"filled"}'`,
     );
     expect((await client.call("GET", "/api/account")).json.account.print).toEqual({
-      parts: ["sheet"],
+      parts: ["sheet", "cards"],
       design: "verbose",
       state: "filled",
     });
+    await server.db.query(`UPDATE accounts SET print_choice = '{"state":"empty"}'`);
+    expect((await client.call("GET", "/api/account")).json.account.print.state).toBe("empty");
   });
 });
 
