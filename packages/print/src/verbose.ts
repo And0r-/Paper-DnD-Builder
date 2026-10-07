@@ -11,7 +11,17 @@
  */
 import { columnLeft, contentWidth, spanWidth, type GridGeometry } from "@builder/sheet/designs";
 import type { Messages, RowGroup, SheetSection, StatBox } from "@builder/sheet";
-import { drawUses, hint, MM_PER_PT, S, sectionTitle, usesWidth, type Pen, type TextStyle } from "./pen.ts";
+import {
+  drawUses,
+  hint,
+  INK,
+  MM_PER_PT,
+  S,
+  sectionTitle,
+  usesWidth,
+  type Pen,
+  type TextStyle,
+} from "./pen.ts";
 
 /** A section as laid out: notes and lists may carry the play state's lines to write on them. */
 export type Laid = SheetSection & { written?: string[] | undefined };
@@ -28,7 +38,6 @@ type Styles = typeof S & { written: TextStyle; pencil: TextStyle };
 /** The shared styles at the sizes of the geometry; play state in ink blue, as written by hand. */
 export function gridStyles(g: GridGeometry): Styles {
   const t = g.type;
-  const ink = "#1F3B7A";
   return {
     ...S,
     name: { ...S.name, size: t.name },
@@ -38,8 +47,8 @@ export function gridStyles(g: GridGeometry): Styles {
     body: { ...S.body, size: t.body },
     hint: { ...S.hint, size: t.hint },
     footer: { ...S.footer, size: t.footer },
-    written: { font: "semibold", size: t.body, color: ink },
-    pencil: { font: "bold", size: 14, color: ink },
+    written: { font: "semibold", size: t.body, color: INK },
+    pencil: { font: "bold", size: 14, color: INK },
   };
 }
 

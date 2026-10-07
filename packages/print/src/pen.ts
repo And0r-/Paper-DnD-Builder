@@ -382,6 +382,9 @@ export class Pen {
 
 // ------------------------------------------------------------------ styles
 
+/** What the play state writes into the fields: ink blue, as written by hand. */
+export const INK = "#1F3B7A";
+
 export const S = {
   name: { font: "bold", size: 22 },
   summary: { size: 11 },

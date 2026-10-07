@@ -11,6 +11,7 @@ import "../src/ui/styles/components.css";
 import "../src/ui/styles/flow.css";
 import "../src/ui/styles/sheet.css";
 import "@builder/sheet/designs/verbose/screen.css";
+import "@builder/sheet/designs/classic/screen.css";
 
 export const viewport: Viewport = {
   width: "device-width",

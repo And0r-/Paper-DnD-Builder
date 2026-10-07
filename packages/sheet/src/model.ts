@@ -334,6 +334,7 @@ export function buildSheetModel(
     const base = {
       id: s.id,
       span: s.span,
+      ...(s.apart ? { apart: true } : {}),
       title: text(`sheet.${s.id}.title`),
       hint: text(`sheet.${s.id}.hint`),
     };

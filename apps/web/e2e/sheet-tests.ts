@@ -4,7 +4,8 @@
  * change makes a copy silently and the account opens it next time, rows
  * written in and crossed out, the play state the same on the original and
  * every copy and through a level up, "clear all ticks", another device
- * that was first (409), and a character that is not finished.
+ * that was first (409), a character that is not finished, and another look
+ * (AND-183) that the account keeps.
  */
 import AxeBuilder from "@axe-core/playwright";
 import type { APIResponse, Page } from "@playwright/test";
@@ -362,6 +363,80 @@ export function sheetTests(device: "phone" | "desk"): void {
       ).toHaveAttribute("aria-pressed", "true");
       await expect(page.getByRole("textbox", { name: pencil.label })).toHaveValue("7");
       await shot(page, `98-sheet-play-${device}`);
+    });
+
+    test(`the look changes to classic and the account keeps it; changed in place there too (${device})`, async ({
+      page,
+      foreign,
+    }) => {
+      void foreign;
+      await login(page, uniqueEmail(`sheet-look-${device}`));
+      const id = await makeCharacter(page);
+      const model = await original(page, id);
+      await page.goto(`/c/${id}/bogen`);
+      await expect(page.locator(".vsheet")).toBeVisible();
+
+      // Another look from the list: the same model, the design's own order and no help box.
+      let t = await tools(page);
+      await t.getByLabel(m["sheet.design"]).selectOption("classic");
+      await closeTools(page);
+      await expect(page.locator(".csheet")).toBeVisible();
+      await expect(page.locator(".vsheet")).toHaveCount(0);
+      const shown = await page
+        .locator("[data-section]")
+        .evaluateAll((n) => n.map((e) => e.getAttribute("data-section")!));
+      expect(shown[0]).toBe(model.sections[0]!.id);
+      expect([...shown].sort()).toEqual(
+        model.sections
+          .filter((s) => s.kind !== "helpBox")
+          .map((s) => s.id)
+          .sort(),
+      );
+      const fields = await page
+        .locator(".csheet [data-field]")
+        .evaluateAll((n) => n.map((e) => e.getAttribute("data-field")!));
+      expect([...fields].sort()).toEqual(fieldIds(model).sort());
+      await expectOneLanguage(page, "de");
+      await axe(page);
+      await shot(page, `99-sheet-classic-${device}`);
+
+      // The account keeps it: after a reload, and in the download dialog.
+      await expect
+        .poll(async () => {
+          const r = (await (await page.request.get("/api/account")).json()) as {
+            account: { print: { design: string } };
+          };
+          return r.account.print.design;
+        })
+        .toBe("classic");
+      await page.reload();
+      await expect(page.locator(".csheet")).toBeVisible();
+      t = await tools(page);
+      await expect(t.getByLabel(m["sheet.design"])).toHaveValue("classic");
+      await t.getByRole("button", { name: m["sheet.download"] }).click();
+      const dialog = page.getByRole("dialog", { name: m["print.title"] });
+      await expect(dialog.getByRole("radio", { name: "Klassisch" })).toBeChecked();
+      await page.keyboard.press("Escape");
+      await expect(dialog).toBeHidden();
+      if (device === "phone" && (await page.getByRole("dialog", { name: m["menu.title"] }).isVisible()))
+        await closeTools(page);
+
+      // Changed in place as in every design: the first change makes the copy.
+      const wit = model.sections.flatMap((s) => s.scores ?? []).find((sc) => sc.label === "Klugheit")!;
+      await page.getByRole("button", { name: `Klugheit: ${wit.value}. Ändern` }).click();
+      await page.getByRole("textbox", { name: "Klugheit" }).fill("19");
+      await page.getByRole("textbox", { name: "Klugheit" }).press("Enter");
+      await expect(page.getByRole("button", { name: "Klugheit: 19. Ändern" })).toBeVisible();
+      await expect(page.locator(".save-status")).toHaveText(m["save.saved"]);
+      expect((await copies(page, id)).copies).toHaveLength(1);
+      await expect(page.locator(".csheet")).toBeVisible();
+
+      // And back.
+      t = await tools(page);
+      await t.getByLabel(m["sheet.design"]).selectOption("verbose");
+      await closeTools(page);
+      await expect(page.locator(".vsheet")).toBeVisible();
+      await expect(page.getByRole("button", { name: "Klugheit: 19. Ändern" })).toBeVisible();
     });
   }
 }

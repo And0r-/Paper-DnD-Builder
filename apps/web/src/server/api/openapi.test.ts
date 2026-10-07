@@ -387,7 +387,7 @@ async function walk(server: TestServer): Promise<void> {
     k,
   );
   await call("GET", `/api/drafts/${id}/pdf?parts=poster`, undefined, k);
-  await call("GET", `/api/drafts/${id}/pdf?design=classic`, undefined, k);
+  await c.request("GET", `/api/drafts/${id}/pdf?parts=sheet&design=classic`, undefined, k);
   await c.request("GET", `/api/drafts/${id}/pdf?parts=sheet&state=filled`, undefined, k);
   await call("GET", `/api/drafts/${id}/pdf?version=elsewhere`, undefined, k);
   const sheet = (await call("GET", `/api/drafts/${id}/sheet`, undefined, k)).json;

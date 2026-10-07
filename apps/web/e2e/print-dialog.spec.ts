@@ -68,14 +68,16 @@ for (const lang of ["de", "en"] as const) {
       return readFile((await done.path())!);
     };
 
-    // Only the sheet, nothing else ticked; one design, so no choice of it; no copy, so the original; empty.
+    // Only the sheet, nothing else ticked; the first design; no copy, so the original; empty.
     await expect(part("print.sheet")).toBeChecked();
     await expect(part("print.cards")).not.toBeChecked();
     await expect(part("print.texts")).not.toBeChecked();
     await expect(dialog.getByText(m["print.versionOriginal"])).toBeVisible();
     await expect(dialog.getByRole("checkbox", { name: m["print.state"] })).not.toBeChecked();
     await expect(dialog.getByRole("combobox", { name: m["print.version"] })).toHaveCount(0);
-    await expect(dialog.getByText(m["print.design"])).toHaveCount(0);
+    const design = (name: string) => dialog.getByRole("radio", { name, exact: true });
+    await expect(design(lang === "de" ? "Ausführlich" : "Detailed")).toBeChecked();
+    await expect(design(lang === "de" ? "Klassisch" : "Classic")).not.toBeChecked();
     await expectOneLanguage(page, lang);
     await axe(page);
     await shot(page, `95-download-dialog-${lang}`);

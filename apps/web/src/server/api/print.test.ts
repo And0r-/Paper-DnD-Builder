@@ -154,9 +154,18 @@ describe("the parts of a printout", () => {
       "Mira%20Fennwick%20-%20Bogen%2C%20Karten%2C%20Regeltexte.pdf",
     );
     expect((await bytes(all)).equals(await local(["sheet", "cards", "texts"]))).toBe(true);
+
+    // Another design: a folder in the sheet package, nothing else changed here.
+    const classic = await client.request("GET", `/api/drafts/${id}/pdf?parts=sheet&design=classic`);
+    expect(classic.status).toBe(200);
+    expect(
+      (await bytes(classic)).equals(
+        Buffer.from((await renderPdf(model, { parts: ["sheet"], design: "classic" })).bytes),
+      ),
+    ).toBe(true);
   });
 
-  it("refuses parts, designs and states it does not know or does not draw yet, and copies it does not have", async () => {
+  it("refuses parts, designs and states it does not know, and copies it does not have", async () => {
     const id = await character();
     const code = async (query: string) => {
       const res = await client.call("GET", `/api/drafts/${id}/pdf?${query}`);
@@ -165,8 +174,6 @@ describe("the parts of a printout", () => {
     expect(await code("parts=")).toEqual([400, "badQuery"]);
     expect(await code("parts=sheet,poster")).toEqual([400, "badQuery"]);
     expect(await code("design=fancy")).toEqual([400, "badQuery"]);
-    // Planned: the classic design comes with a later part of the sheet work.
-    expect(await code("design=classic")).toEqual([400, "designNotAvailable"]);
     expect(await code("state=half")).toEqual([400, "badQuery"]);
     expect(await code("version=0b0f0c3e-1d5a-4a8e-9f00-000000000000")).toEqual([404, "versionNotFound"]);
     expect(await code("version=copy-1")).toEqual([404, "versionNotFound"]);
@@ -184,6 +191,11 @@ describe("the parts of a printout", () => {
         {
           id: "verbose",
           name: { de: "Ausführlich", en: "Detailed" },
+          description: { de: expect.any(String), en: expect.any(String) },
+        },
+        {
+          id: "classic",
+          name: { de: "Klassisch", en: "Classic" },
           description: { de: expect.any(String), en: expect.any(String) },
         },
       ],

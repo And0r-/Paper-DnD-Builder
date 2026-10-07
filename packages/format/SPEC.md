@@ -1,6 +1,6 @@
 # Content package format — specification
 
-Format version **0.17**. This document describes everything a content
+Format version **0.18**. This document describes everything a content
 package contains and every rule a valid package follows. After reading it
 you should be able to write your own package. The demo package in
 [`packages/demo-package`](../demo-package) uses every feature and is the
@@ -122,7 +122,7 @@ people who distribute packages.
 
 ```json
 {
-  "formatVersion": "0.17",
+  "formatVersion": "0.18",
   "id": "demo",
   "version": "0.1.0",
   "languages": ["de", "en"],
@@ -1133,6 +1133,16 @@ when a value is above zero (`"when": "glow > 0"`). The validator checks
 that the expression parses and names existing values and things, as for
 `requires`.
 
+**Parts of their own** (`apart`, optional on every section, default
+`false`). `true` says: this section belongs to a part of the sheet of its
+own, apart from the rest. The builder knows nothing about what such a part
+is; a design decides how to show it. The "classic" design puts all `apart`
+sections together after the rest: on a page of their own if one of them is
+a `statBoxes` section, otherwise after the tables. The "verbose" design
+ignores the field and keeps the grid. Typical use: the sections a character
+only needs for one kind of ability, for example
+`{ "id": "knacks", "kind": "featureTable", "apart": true, … }`.
+
 **Box labels** (`label`, on each box of a `statBoxes` section). A box is
 labeled with the name of its value (`value.<id>.name`). Six boxes in a row
 are narrow, so a long name is printed small and may wrap. If the section
@@ -1523,6 +1533,7 @@ are removed (saved characters may lose picks). Keys are never renamed.
 | 0.15    | 2026-10-07 | Optional `variants` on `{text}` stats and on the `text` of `statBoxes` boxes: `[{ "when": …, "text": … }]`; the first variant whose condition holds for the character replaces the text, `vars` fill it the same way. The sheet, the cards and the "learn more" panel show the variant.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | Set `formatVersion` to `"0.15"`. Nothing else has to change: `variants` is optional, so every valid 0.14 package is a valid 0.15 package.                                                                                                                                                                                                                                                                                                                                                                                                            |
 | 0.16    | 2026-10-07 | Optional `origins` on card layouts: a line under the four stats whose words depend on where the character got the thing (the fields of a mark, then a filled `text` and an optional `label`). The first entry the thing matches gives the line; the sheet model and `GET /api/drafts/:id/sheet` carry it as `origin` on the card.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | Set `formatVersion` to `"0.16"`. Nothing else has to change: `origins` is optional, so every valid 0.15 package is a valid 0.16 package.                                                                                                                                                                                                                                                                                                                                                                                                             |
 | 0.17    | 2026-10-07 | Optional `flow.grants`: things every character of the package has without a pick (with everything they grant; their choices come before the first step). The evaluation marks them `everyone: true` and gives them no `step`; the builder names their origin "everyone".                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | Set `formatVersion` to `"0.17"`. Nothing else has to change: `grants` is optional, so every valid 0.16 package is a valid 0.17 package. A package that gave such a thing through every option of a choice (a language through every folk) can list it in `flow.grants` and drop those grants.                                                                                                                                                                                                                                                        |
+| 0.18    | 2026-10-07 | Optional `apart` on every sheet section: the section belongs to a part of the sheet of its own. A design may set such parts apart (the "classic" design gives them a page of their own if one of them is a `statBoxes` section); the sheet model and `GET /api/drafts/:id/sheet` carry it as `apart` on the section.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | Set `formatVersion` to `"0.18"`. Nothing else has to change: `apart` is optional, so every valid 0.17 package is a valid 0.18 package.                                                                                                                                                                                                                                                                                                                                                                                                               |
 | 0.8     | 2026-10-04 | Gather steps (`gather`, optional `together`: `sections` or one shared `list`) in `flow.steps`, optional `gather` on choices, optional text `choice.<id>.from`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           | Set `formatVersion` to `"0.8"`. Nothing else changes: a package without gather steps builds the same steps as before, so every valid 0.7 package is a valid 0.8 package.                                                                                                                                                                                                                                                                                                                                                                             |
 
 ## 16. A minimal package
@@ -1534,7 +1545,7 @@ language. The validator accepts it as is.
 
 ```json
 {
-  "formatVersion": "0.17",
+  "formatVersion": "0.18",
   "id": "tiny",
   "version": "1.0.0",
   "languages": ["en"],

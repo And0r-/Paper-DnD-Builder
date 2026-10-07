@@ -1,6 +1,6 @@
 /**
  * Lays out a {@link SheetModel} on A4 and writes the PDF: the sheet in its
- * design (see `verbose.ts`), the cards and the rules texts.
+ * design (see `verbose.ts`, `classic.ts`), the cards and the rules texts.
  *
  * All measures are in millimetres. Cards are 63 × 88 mm in a 3 × 3 grid with
  * cut lines and crop marks; the rules texts run in two columns. Both look
@@ -25,7 +25,9 @@ import {
   type Uses,
 } from "@builder/sheet";
 import { contentBottom, contentWidth, footerLine, type GridGeometry } from "@builder/sheet/designs";
+import { CLASSIC_GEOMETRY } from "@builder/sheet/designs/classic";
 import { VERBOSE_GEOMETRY } from "@builder/sheet/designs/verbose";
+import { layClassic } from "./classic.ts";
 import {
   drawUses,
   FONTS,
@@ -495,8 +497,32 @@ export interface RenderOptions {
   play?: PlayState;
 }
 
+/** A sheet laid out by a design: what is where on each page, and how to draw page `n` (from 0). */
+interface LaidSheet {
+  pages: Placed[][];
+  draw: (n: number) => void;
+}
+
+/** How a design lays out and draws the sheet; `bottomOf(n)` is the lowest anything on page `n` may reach. */
+interface SheetPainter {
+  geometry: GridGeometry;
+  lay: (grid: Grid, model: SheetModel, bottomOf: (page: number) => number) => LaidSheet;
+}
+
 /** The painters of sheet designs by design id. Cards and rules texts look the same in every design. */
-const PAINTERS: Readonly<Record<string, GridGeometry>> = { verbose: VERBOSE_GEOMETRY };
+const PAINTERS: Readonly<Record<string, SheetPainter>> = {
+  verbose: {
+    geometry: VERBOSE_GEOMETRY,
+    lay: (grid, model, bottomOf) => {
+      const pages = placeSections(grid, withWriting(grid, model.sections), bottomOf);
+      return { pages, draw: (n) => pages[n]!.forEach((p) => drawPlaced(grid, p)) };
+    },
+  },
+  classic: {
+    geometry: CLASSIC_GEOMETRY,
+    lay: (grid, model, bottomOf) => layClassic(grid.pen, CLASSIC_GEOMETRY, model.sections, bottomOf),
+  },
+};
 
 /** Every place drawn on the sheet and the cards where a player writes or ticks, in drawing order. */
 export type { DrawnField };
@@ -508,8 +534,9 @@ export async function renderPdf(model: SheetModel, options: RenderOptions = {}):
   const parts = new Set(inFileOrder(options.parts ?? DEFAULT_API_PARTS));
   if (parts.size === 0) throw new Error("nothing to print");
   const design = options.design ?? SHEET_DESIGNS[0]!.id;
-  const geometry = PAINTERS[design];
-  if (!geometry) throw new Error(`no painter for the design "${design}"`);
+  const painter = PAINTERS[design];
+  if (!painter) throw new Error(`no painter for the design "${design}"`);
+  const geometry = painter.geometry;
   // The PDF is dated like the sheet: the original when it was made, a copy when it was kept.
   const createdAt = new Date(
     model.origin.kind === "original" ? model.origin.builtAt : model.origin.createdAt,
@@ -567,16 +594,16 @@ export async function renderPdf(model: SheetModel, options: RenderOptions = {}):
   // Only the last page gives up that room, and which page is last shows
   // after placing: the pages before it keep their full height (a page 1
   // that holds its boxes without cards must hold them with cards too).
-  let sheetPages: Placed[][] = [];
+  let sheet: LaidSheet = { pages: [], draw: () => {} };
   if (parts.has("sheet")) {
-    const sections = withWriting(grid, model.sections);
-    const full = placeSections(grid, sections, () => sheetBottom);
-    const lastFull = full.length - 1;
-    sheetPages =
+    const full = painter.lay(grid, model, () => sheetBottom);
+    const lastFull = full.pages.length - 1;
+    sheet =
       reserve === 0
         ? full
-        : placeSections(grid, sections, (page) => sheetBottom - (page >= lastFull ? reserve : 0));
+        : painter.lay(grid, model, (page) => sheetBottom - (page >= lastFull ? reserve : 0));
   }
+  const sheetPages = sheet.pages;
   const faces = cards.flatMap((c) => cardFaces(pen, c, m));
   const cardPages = Math.ceil(faces.length / CARDS_PER_PAGE);
   // Rules texts come last: every one of their pages keeps the source line's room, few lines.
@@ -584,12 +611,12 @@ export async function renderPdf(model: SheetModel, options: RenderOptions = {}):
   const total = sheetPages.length + cardPages + textFlow.length;
   const isLast = (page: number) => page === total;
 
-  sheetPages.forEach((placed, i) => {
+  sheetPages.forEach((_, i) => {
     const page = i + 1;
     pen.page = page;
     doc.addPage({ size: "A4", margin: 0 });
     if (i > 0) continuationHead(pen, geometry, model);
-    for (const p of placed) drawPlaced(grid, p);
+    sheet.draw(i);
     if (isLast(page))
       pen.lines(
         designAttribution,

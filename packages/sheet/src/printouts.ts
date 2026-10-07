@@ -31,9 +31,10 @@ export interface SheetDesign {
 }
 
 /**
- * The designs the server can print, the first one being the default. Design
- * ids that exist in the plan but are not drawn yet (`classic`) are known to
- * the API, which says so instead of "unknown".
+ * The designs the server can print, the first one being the default. A design
+ * is a folder in `designs/` (geometry, screen, PDF painter) and an entry
+ * here. A design id that is planned but not drawn yet goes into DESIGN_IDS
+ * only: the API knows it and says so instead of "unknown".
  */
 export const SHEET_DESIGNS: readonly SheetDesign[] = [
   {
@@ -42,6 +43,14 @@ export const SHEET_DESIGNS: readonly SheetDesign[] = [
     description: {
       de: "Mit Hinweisen und Erklärungen in einfachen Worten. Gut für den Anfang.",
       en: "With hints and explanations in plain words. Good to start with.",
+    },
+  },
+  {
+    id: "classic",
+    name: { de: "Klassisch", en: "Classic" },
+    description: {
+      de: "Alles am gewohnten Platz, wenig Text. Für alle, die das Spiel kennen.",
+      en: "Everything in its usual place, little text. For those who know the game.",
     },
   },
 ];
