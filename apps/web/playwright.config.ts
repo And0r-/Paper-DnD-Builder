@@ -40,6 +40,8 @@ export default defineConfig({
       // E2E_PACKAGES_DIR runs the same tests against another package locally.
       PACKAGES_DIR: process.env["E2E_PACKAGES_DIR"] ?? DEMO,
       MAIL_OUTBOX_DIR: OUTBOX,
+      // The language model package names the address its program talks to.
+      BASE_URL: `http://localhost:${PORT}`,
       NEXT_TELEMETRY_DISABLED: "1",
     },
   },
