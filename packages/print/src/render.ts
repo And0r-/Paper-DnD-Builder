@@ -67,10 +67,13 @@ const CARD_LEAD = 1.25;
 
 // ------------------------------------------------------------------ cards
 
+/** A card field; `wide` takes a row of its own across the card. */
+type CardField = Card["fields"][number] & { wide?: boolean };
+
 interface CardFace {
   typeLine: string;
   name: string;
-  fields: Card["fields"];
+  fields: CardField[];
   table: string;
   rules: string[];
   rulesSize: number;
@@ -86,6 +89,8 @@ interface CardFace {
 const CARD_INNER_W = CARD_W - 2 * CARD_PAD;
 const CARD_HEAD_BOTTOM = 16;
 const FIELD_ROW_H = 8.5;
+/** A wide field whose label and value fit on one line takes this much. */
+const INLINE_ROW_H = 5.5;
 const CARD_RULES_BOTTOM = CARD_H - CARD_PAD - 6;
 /** A card hint longer than this many lines is cut with "…": it must never crowd out the rules. */
 const CARD_HINT_LINES = 2;
@@ -98,6 +103,8 @@ interface FieldLayout {
   top: number;
   /** Left edge, relative to the card's inner left edge. */
   left: number;
+  /** Label and value on one line: the value's left edge after the label. */
+  inline?: number;
 }
 
 /** Lines a value may take in half the card before it gets the whole width. */
@@ -111,12 +118,21 @@ const HALF_FIELD_LINES = 2;
  * into half the width grew the card's head so much that "at the table" ran
  * into the footer.
  */
-function cardFields(pen: Pen, fields: Card["fields"]): { fields: FieldLayout[]; height: number } {
+function cardFields(pen: Pen, fields: CardField[]): { fields: FieldLayout[]; height: number } {
   const half = CARD_INNER_W / 2;
   const cw = half - 1;
   const laid = fields.map((f) => {
+    // A wide field that fits on one line, label then value, keeps the card's head short.
+    const labelW = pen.width(f.label, S.cardLabel) + 2;
+    if (f.wide === true && labelW + pen.width(f.value, S.cardValue) <= CARD_INNER_W)
+      return {
+        label: { style: S.cardLabel, lines: [f.label] },
+        value: { style: S.cardValue, lines: [f.value] },
+        wide: true,
+        inline: labelW,
+      };
     const narrow = pen.label(f.value, S.cardValue, cw, 8);
-    const wide = narrow.lines.length > HALF_FIELD_LINES;
+    const wide = f.wide === true || narrow.lines.length > HALF_FIELD_LINES;
     const w = wide ? CARD_INNER_W : cw;
     return {
       label: pen.label(f.label, S.cardLabel, w),
@@ -137,7 +153,7 @@ function cardFields(pen: Pen, fields: Card["fields"]): { fields: FieldLayout[]; 
   let top = 0;
   for (const row of rows) {
     row.forEach(({ wide: _, ...l }, i) => out.push({ ...l, top, left: i * half }));
-    top += FIELD_ROW_H + Math.max(...row.map(extra));
+    top += row[0]!.inline !== undefined ? INLINE_ROW_H : FIELD_ROW_H + Math.max(...row.map(extra));
   }
   return { fields: out, height: fields.length === 0 ? 0 : top + 4 };
 }
@@ -175,51 +191,71 @@ function cardHintHeight(pen: Pen, hint: string[]): number {
  * One card per thing, or more if the rules text does not fit even at 7 pt
  * (print layout 3.3): the first card ends with "continues on the next
  * card", continuation cards carry only the rules. "At the table" is never
- * shortened or moved. The kind's hint is on every card, continuations
- * included, and takes its room from the rules.
+ * shortened: where the fields and the origin line leave it too little room
+ * above the hint, it moves whole to the first continuation card, the rules
+ * after it (and the origin line before it, if the fields alone fill the card). The kind's hint is on every card, continuations included, and
+ * takes its room from the rules; nothing is printed over it or the footer.
  */
 function cardFaces(pen: Pen, card: Card, messages: Messages): CardFace[] {
   const hint = cardHint(pen, card.hint);
-  const { rulesTop } = cardBlocks(pen, card);
-  // "At the table" is never cut or moved; where it reaches down to the
-  // hint, the hint gives way on this card (continuation cards still have it).
-  const firstHint = rulesTop - 4.2 > CARD_RULES_BOTTOM - cardHintHeight(pen, hint) ? [] : hint;
-  const base: CardFace = {
-    ...card,
-    hint: firstHint,
-    rules: [],
-    rulesSize: RULES_SIZES[0]!,
-    continues: false,
-  };
+  // The origin line (the numbers the thing is used with, by where it came from) goes under the fields, across the card.
+  const fields: CardField[] = card.origin ? [...card.fields, { ...card.origin, wide: true }] : card.fields;
+  const base: CardFace = { ...card, fields, hint, rules: [], rulesSize: RULES_SIZES[0]!, continues: false };
+  const rulesBottom = CARD_RULES_BOTTOM - cardHintHeight(pen, hint);
   const text = card.rules.join("\n");
-  if (text === "") return [base];
-  const rulesBottom = CARD_RULES_BOTTOM - cardHintHeight(pen, firstHint);
-  const room = rulesBottom - rulesTop;
-  for (const size of RULES_SIZES) {
-    const style = { size };
-    const lines = pen.wrap(text, style, CARD_INNER_W);
-    if (lines.length * pen.lineHeight(style, CARD_LEAD) <= room)
-      return [{ ...base, rules: lines, rulesSize: size }];
+  const { rulesTop } = cardBlocks(pen, { fields, table: card.table });
+  // Everything on one card, the rules at the largest size that fits.
+  if (rulesTop - 4.2 <= rulesBottom) {
+    if (text === "") return [base];
+    for (const size of RULES_SIZES) {
+      const style = { size };
+      const lines = pen.wrap(text, style, CARD_INNER_W);
+      if (lines.length * pen.lineHeight(style, CARD_LEAD) <= rulesBottom - rulesTop)
+        return [{ ...base, rules: lines, rulesSize: size }];
+    }
   }
   const style = { size: 7 };
   const lh = pen.lineHeight(style, CARD_LEAD);
-  const lines = pen.wrap(text, style, CARD_INNER_W);
-  const first = Math.max(0, Math.floor((room - lh) / lh));
+  const lines = text === "" ? [] : pen.wrap(text, style, CARD_INNER_W);
+  // What stays on the first card has to leave a line for "continues on the
+  // next card". "At the table" moves first; if the fields alone leave no
+  // room, the origin line goes with it.
+  const fits = (f: CardField[], table: string) =>
+    cardBlocks(pen, { fields: f, table }).rulesTop - 4.2 + lh <= rulesBottom;
+  const originMoves = card.origin !== undefined && !fits(fields, "");
+  const firstFields = originMoves ? card.fields : fields;
+  const tableStays = fits(firstFields, card.table);
+  // The rules follow "at the table", never come before it.
+  const firstTop = cardBlocks(pen, { fields: firstFields, table: card.table }).rulesTop;
+  const first = tableStays ? Math.max(0, Math.floor((rulesBottom - firstTop - lh) / lh)) : 0;
+  const chunks: { fields: CardField[]; table: string; rules: string[] }[] = [
+    { fields: firstFields, table: tableStays ? card.table : "", rules: lines.slice(0, first) },
+  ];
   // Every card that continues keeps one line free for "continues on the next card".
-  const laterBottom = CARD_RULES_BOTTOM - cardHintHeight(pen, hint);
-  const later = Math.floor((laterBottom - (CARD_HEAD_BOTTOM + 4.2) - lh) / lh);
-  const chunks = [lines.slice(0, first)];
-  for (let i = first; i < lines.length; i += later) chunks.push(lines.slice(i, i + later));
+  let i = first;
+  let carried: CardField[] = originMoves ? fields.slice(card.fields.length) : [];
+  let table = tableStays ? "" : card.table;
+  while (i < lines.length || table !== "" || carried.length > 0) {
+    const room = rulesBottom - cardBlocks(pen, { fields: carried, table }).rulesTop;
+    const all = Math.floor(room / lh);
+    // A card carrying only rules takes at least one line, so the loop always ends.
+    const least = table === "" && carried.length === 0 ? 1 : 0;
+    const take = lines.length - i <= all ? lines.length - i : Math.max(least, Math.floor((room - lh) / lh));
+    chunks.push({ fields: carried, table, rules: lines.slice(i, i + take) });
+    i += take;
+    carried = [];
+    table = "";
+  }
   const n = chunks.length;
   return chunks.map((chunk, i) =>
     i === 0
-      ? { ...base, rules: chunk, rulesSize: 7, continues: true }
+      ? { ...base, ...chunk, rulesSize: 7, continues: true }
       : {
           typeLine: messages.continued,
           name: `${card.name} (${i + 1}/${n})`,
-          fields: [],
-          table: "",
-          rules: chunk,
+          fields: chunk.fields,
+          table: chunk.table,
+          rules: chunk.rules,
           rulesSize: 7,
           continues: i < n - 1,
           uses: null,
@@ -241,6 +277,11 @@ function drawCard(pen: Pen, face: CardFace, model: SheetModel, x: number, y: num
     fields.forEach((f) => {
       const fx = left + f.left;
       const fy = yy + 4 + f.top;
+      if (f.inline !== undefined) {
+        pen.text(f.label.lines[0]!, fx, fy + 0.6, f.label.style);
+        pen.text(f.value.lines[0]!, fx + f.inline, fy + 0.6, f.value.style);
+        return;
+      }
       const labelLh = pen.lineHeight(f.label.style, 1.15);
       const valueLh = pen.lineHeight(f.value.style, 1.15);
       f.label.lines.forEach((l, i) => pen.text(l, fx, fy + i * labelLh, f.label.style));
@@ -257,8 +298,8 @@ function drawCard(pen: Pen, face: CardFace, model: SheetModel, x: number, y: num
   if (face.rules.length > 0) {
     pen.text(m.rulesText, left, yy + 3.2, { ...S.cardHeading, color: "#333" });
     yy = pen.lines(face.rules, left, yy + 4.2, { size: face.rulesSize, color: "#222" }, CARD_LEAD);
-    if (face.continues) pen.text(`→ ${m.continuesOnNextCard}`, left, yy + 2.8, S.hint);
   }
+  if (face.continues) pen.text(`→ ${m.continuesOnNextCard}`, left, yy + 2.8, S.hint);
   const footY = y + CARD_H - CARD_PAD - 5;
   pen.lines(face.hint, left, footY - cardHintHeight(pen, face.hint), S.hint, CARD_HINT_LEAD);
   pen.line(left, footY, x + CARD_W - CARD_PAD, footY, 0.3, "#BBB");

@@ -336,7 +336,25 @@
   "cards": {
     "knack": {
       "fields": ["reach", "duration", "uses", "focus"],
-      "uses": "uses"
+      "uses": "uses",
+      "origins": [
+        {
+          "pickedIn": ["borrowed-knack"],
+          "label": "card.knack.borrowed",
+          "text": {
+            "text": "card.knack.numbers",
+            "vars": { "target": "borrowedKnackTarget", "hit": "borrowedKnackHit" }
+          }
+        },
+        {
+          "from": { "kind": "calling" },
+          "text": { "text": "card.knack.numbers", "vars": { "target": "knackTarget", "hit": "knackHit" } }
+        },
+        {
+          "from": { "kind": "path" },
+          "text": { "text": "card.knack.numbers", "vars": { "target": "knackTarget", "hit": "knackHit" } }
+        }
+      ]
     }
   }
 }
