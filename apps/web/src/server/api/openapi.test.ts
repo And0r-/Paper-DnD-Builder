@@ -243,6 +243,7 @@ describe("openapi.json", () => {
         "cannotAddYourself",
         "ownerOnly",
         "copyNotFound",
+        "valueNotFound",
       ]) {
         expect(codes, code).toContain(code);
       }
@@ -358,6 +359,8 @@ async function walk(server: TestServer): Promise<void> {
   await call("POST", `/api/drafts/${id}/level-up`, { version: view.draft.version, level: 4 }, k);
   await call("GET", `/api/drafts/${id}/pdf`, undefined, k);
   await call("GET", `/api/drafts/${id}/sheet`, undefined, k);
+  await call("GET", `/api/drafts/${id}/explain/might`, undefined, k);
+  await call("GET", `/api/drafts/${id}/explain/nothing`, undefined, k);
 
   for (let guard = 0; view.evaluation.open.length > 0; guard++) {
     if (guard > 80) throw new Error("walk does not end");
