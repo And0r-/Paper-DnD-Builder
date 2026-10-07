@@ -259,9 +259,11 @@ const rect = (e: Element) => e.getBoundingClientRect();
 function nextFlow(el: HTMLElement, model: SheetModel, plan: ClassicPlan, now: Flow): Flow {
   const mm = rect(el.querySelector(".csheet__mm") ?? el).height / 100;
   const [first, second] = [...el.querySelectorAll<HTMLElement>(":scope > .csheet__page")];
-  if (!first || mm <= 0) return now;
-  // The foot of page 1's content on A4, whatever the page grew to.
-  const limit = rect(first).top + (G.page.height - G.margin - G.footerHeight - G.footerGap) * mm;
+  const foot = first?.querySelector(":scope > .csheet__footer");
+  if (!first || !foot || mm <= 0) return now;
+  // The foot of page 1's content on A4, whatever the page grew to: above the footer and the gap before it.
+  const gap = parseFloat(getComputedStyle(first).rowGap) || 0;
+  const limit = rect(first).top + (G.page.height - G.margin) * mm - rect(foot).height - gap;
   const next: Flow = { ...now, lines: { ...now.lines } };
 
   // Page 1: column C and the band end above the footer.

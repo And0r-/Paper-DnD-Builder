@@ -331,7 +331,8 @@ export function sheetTests(device: "phone" | "desk"): void {
       await expect(page.locator(".save-status")).toHaveText(m["save.saved"]);
       const t = await tools(page);
       await t.getByRole("button", { name: m["sheet.clearChecks"] }).click();
-      await closeTools(page);
+      // On a phone the menu closes by itself, so the sheet shows what happened (AND-213).
+      if (device === "phone") await expect(page.getByRole("dialog", { name: m["menu.title"] })).toBeHidden();
       await expect(
         page.getByRole("button", { name: `${squares.label}: Haken 1 von ${squares.squares}` }),
       ).toHaveAttribute("aria-pressed", "false");

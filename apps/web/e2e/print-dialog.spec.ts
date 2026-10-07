@@ -22,8 +22,8 @@ import {
 const MESSAGES = { de, en };
 /** The part words in file names, as the server's print words have them. */
 const FILE_WORDS = {
-  de: { sheet: "Bogen", cards: "Karten", texts: "Regeltexte" },
-  en: { sheet: "Sheet", cards: "Cards", texts: "Rules texts" },
+  de: { sheet: "Bogen", cards: "Karten", texts: "Regeltexte", design: "Ausführlich" },
+  en: { sheet: "Sheet", cards: "Cards", texts: "Rules texts", design: "Detailed" },
 };
 
 async function axe(page: Page) {
@@ -83,7 +83,8 @@ for (const lang of ["de", "en"] as const) {
     await shot(page, `95-download-dialog-${lang}`);
 
     // The sheet alone: fewer pages than sheet and cards together.
-    const sheet = await download(`Mira - ${words.sheet}.pdf`);
+    // The design in the name, so a sheet in the other design does not overwrite it.
+    const sheet = await download(`Mira - ${words.design} - ${words.sheet}.pdf`);
     expect(sheet.subarray(0, 5).toString("latin1")).toBe("%PDF-");
     const both = await page.request.get(`/api/drafts/${id}/pdf`);
     expect(pages(sheet)).toBeLessThan(pages(await both.body()));

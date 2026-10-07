@@ -139,6 +139,11 @@
   text-align: left;
 }
 
+/* With the sheet's tools the drawer takes a little more of a phone, so a version's name fits. */
+.drawer:has(.sheet-tools--menu) {
+  width: min(22rem, 92vw);
+}
+
 /* The drawer is narrow: its lists in a smaller type, so a version's name shows whole
    ("Meine Fassung vom 7. Oktober, 13:15"). */
 .sheet-tools--menu .sheet-tools__select {
