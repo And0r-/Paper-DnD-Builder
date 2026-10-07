@@ -2,7 +2,7 @@
 /**
  * The frame of every logged-in screen: skip link, top bar with menu, the
  * menu drawer (step list while building, characters, campaigns, settings,
- * log out).
+ * MCP, log out).
  */
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -150,6 +150,9 @@ function MenuDrawer({
             </li>
             <li>
               <Link href="/settings">{t("menu.settings")}</Link>
+            </li>
+            <li>
+              <Link href="/mcp/setup">{t("menu.mcp")}</Link>
             </li>
             <li>
               <button
