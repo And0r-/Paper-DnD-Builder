@@ -433,6 +433,12 @@ export const flowSchema = z.strictObject({
     .refine((l) => l.min <= l.default && l.default <= l.max, { message: "need min <= default <= max" }),
   steps: z.array(z.union([fixedStepSchema, gatherStepSchema])).min(1),
   choices: z.array(choiceSchema).min(1),
+  /**
+   * Things every character of the package has without picking them (a
+   * language everyone speaks). They count like things a picked thing
+   * grants, with everything they grant; the builder names them "everyone's".
+   */
+  grants: z.array(id).min(1).optional(),
   /** The text choice whose answer is the character's name. */
   characterName: id,
   summary: z.strictObject({

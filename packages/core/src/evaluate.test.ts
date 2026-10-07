@@ -637,3 +637,32 @@ describe("text variants (format 0.15)", () => {
     expect(keyAt(5)).toBe("stat-value.item.lantern-staff.harm.bright");
   });
 });
+
+describe("things every character has (format 0.17)", () => {
+  it("gives them before the first step, without a step, and counts them in values", () => {
+    const ev = evaluateDraft(pkg, draft(3));
+    const signs = ev.things.find((h) => h.id === "talent.mist-signs");
+    expect(signs).toEqual({ id: "talent.mist-signs", kind: "talent", everyone: true, atLevel: 1 });
+    expect(ev.things[0]).toBe(signs);
+    expect(ev.values["mistSignsRoll"]).toBe(ev.values["witBonus"]! + ev.values["practice"]!);
+  });
+
+  it("asks the choices they grant first, and does not offer them again", () => {
+    // A package where everyone is coastfolk: its flair is asked before every
+    // step, its talent waits at the talents step like any granted choice.
+    const coast: ContentPackage = structuredClone(pkg);
+    coast.flow.grants = ["folk.coastfolk"];
+    const ev = evaluateDraft(coast, draft(1, { "coastfolk-flair": { pick: "flair.listening" } }));
+    expect(ev.steps[0]).toMatchObject({
+      id: "coastfolk-flair",
+      origin: "granted",
+      grantedBy: ["folk.coastfolk"],
+    });
+    expect(ev.things.find((h) => h.id === "flair.listening")).toMatchObject({ pickedIn: "coastfolk-flair" });
+    expect(ev.things.find((h) => h.id === "trait.salt-blood")).toMatchObject({ grantedBy: "folk.coastfolk" });
+    expect(ev.choices["folk"]!.options).not.toContain("folk.coastfolk");
+    const talents = ev.steps.find((s) => s.id === "talents")!;
+    expect(talents.choices).toContain("coastfolk-talent");
+    expect(talents.dependsOn).toEqual([]);
+  });
+});

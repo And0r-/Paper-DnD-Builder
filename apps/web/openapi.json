@@ -5225,8 +5225,14 @@
           "grantedBy": {
             "type": "string"
           },
+          "everyone": {
+            "type": "boolean",
+            "const": true,
+            "description": "Every character of the package has it (`flow.grants`); such a thing has no `step`."
+          },
           "step": {
-            "type": "string"
+            "type": "string",
+            "description": "Step that brought it to the character; absent for things every character has."
           },
           "atLevel": {
             "type": "integer"
@@ -5237,7 +5243,7 @@
             "description": "How many of it, if more than one: the counts of every grant that gives it, added up."
           }
         },
-        "required": ["id", "kind", "step", "atLevel"],
+        "required": ["id", "kind", "atLevel"],
         "additionalProperties": false
       },
       "ChoiceState": {
