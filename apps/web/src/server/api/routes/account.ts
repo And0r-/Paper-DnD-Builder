@@ -10,7 +10,6 @@ import {
 } from "../../auth/access-keys.ts";
 import { publicAccount, renewPassword, UI_LANGUAGES } from "../../auth/accounts.ts";
 import { clearSessionCookie } from "../../auth/session.ts";
-import { mcpDir, mcpPackageZip } from "../../mcp-package.ts";
 import { HttpError, json, readJson } from "../http.ts";
 import type { RequestContext, Route } from "../router.ts";
 import type { AccessKeyRow } from "../../store.ts";
@@ -34,13 +33,6 @@ const newKeySchema = z.strictObject({
     // eslint-disable-next-line no-control-regex -- a name is one line of plain text
     .refine((s) => !/[\u0000-\u001f\u007f]/.test(s), "no control characters"),
 });
-
-/** The key's name in the list, so the owner knows which one the zip holds. */
-function packageKeyName(language: string, now: Date): string {
-  if (language === "de")
-    return `MCP-Paket, ${now.getUTCDate()}.${now.getUTCMonth() + 1}.${now.getUTCFullYear()}`;
-  return `MCP package, ${now.toISOString().slice(0, 10)}`;
-}
 
 /** Makes a key for the account; the plain key is returned here and stored nowhere. */
 async function makeKey(ctx: RequestContext, accountId: string, name: string) {
@@ -139,47 +131,6 @@ export const accountRoutes: Route[] = [
       const { name } = await readJson(ctx.req, newKeySchema);
       const { row, secret } = await makeKey(ctx, session.account.id, name);
       return json(201, { key: { ...publicKey(row), secret } });
-    },
-  },
-  {
-    // The zip for a language model on the player's computer. With `withKey` it holds a new
-    // key, which is also in the X-Builder-Key header for the screen to show once.
-    method: "POST",
-    path: "/api/account/mcp-package",
-    handler: async (ctx) => {
-      const session = await ctx.requireSession();
-      const { withKey } = await readJson(ctx.req, z.strictObject({ withKey: z.boolean() }));
-      // Same rule as POST /api/account/keys: a key makes no keys.
-      if (withKey && session.via === "key") throw new HttpError(403, "keyCannotMakeKeys");
-      // The configured public address, never the Host header: a forged Host must not
-      // end up as the address the player's program sends its key to.
-      const baseUrl = ctx.app.config.baseUrl?.origin;
-      if (!baseUrl) throw new HttpError(503, "baseUrlNotSet");
-      // Checked before a key is made, so a broken build leaves no unused key behind.
-      if (!mcpDir()) throw new HttpError(503, "mcpPackageMissing");
-      const language = session.account.language === "de" ? "de" : "en";
-      const key = withKey
-        ? await makeKey(ctx, session.account.id, packageKeyName(language, ctx.app.now()))
-        : undefined;
-      const zip = await mcpPackageZip({
-        language,
-        baseUrl,
-        ...(key ? { key: { secret: key.secret, name: key.row.name } } : {}),
-      });
-      if (!zip) throw new HttpError(503, "mcpPackageMissing");
-      const headers: Record<string, string> = {
-        "Content-Type": "application/zip",
-        "Content-Disposition": 'attachment; filename="builder-mcp.zip"',
-        "Content-Length": String(zip.byteLength),
-        // Holds a key: never cached, not in the browser and not in a proxy.
-        "Cache-Control": "no-store",
-        "X-Content-Type-Options": "nosniff",
-      };
-      if (key) {
-        headers["X-Builder-Key"] = key.secret;
-        headers["X-Builder-Key-Id"] = key.row.id;
-      }
-      return new Response(zip, { status: 200, headers });
     },
   },
   {
