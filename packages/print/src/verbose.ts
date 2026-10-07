@@ -417,7 +417,7 @@ function drawStatBoxes(c: Grid, boxes: StatBox[], x: number, y: number, w: numbe
   const bw = (w - (n - 1) * 4) / n;
   const hints = boxes.map((b) => pen.wrap(b.hint, st.hint, bw - 3).filter((l) => l !== ""));
   // Labels and hints are never cut: all boxes grow to the longest one.
-  const labels = boxes.map((b) => pen.label(b.label, st.sectionTitle, bw - 3));
+  const labels = boxes.map((b) => pen.label(b.label, st.sectionTitle, bw - 3, 7, true));
   const labelLh = pen.lineHeight(st.sectionTitle, 1.15);
   const extra = (Math.max(1, ...labels.map((l) => l.lines.length)) - 1) * labelLh;
   // More squares than fit a row go on in more rows; the boxes grow for them.

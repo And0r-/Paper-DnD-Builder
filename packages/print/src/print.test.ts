@@ -1247,8 +1247,9 @@ describe("printed character (demo package)", () => {
     // Six boxes in a row whose value names are long compounds, as in a package
     // whose section title already says what the boxes have in common.
     const values = ["might", "grace", "wit", "heart", "mightBonus", "graceBonus"];
-    // "Laternenfertigkeit" is too wide for a sixth of the row even at 7 pt in capitals.
-    const short = ["Kraft", "Flinkfingrigkeit", "Klugheit", "Herz", "Laternenfertigkeit", "Nebelsicht"];
+    // "Laternenfertigkeit" is too wide for a sixth of the row even at 7 pt in
+    // capitals; the package marks where the compound joins.
+    const short = ["Kraft", "Flinkfingrigkeit", "Klugheit", "Herz", "Laternen\u00adfertigkeit", "Nebelsicht"];
     const de: Record<string, TextValue> = { ...pkg.texts["de"]!, "sheet.trials.title": "Widerstandsproben" };
     values.forEach((v, i) => {
       de[`value.${v}.name`] = `${short[i]}widerstandsprobe`;
@@ -1277,20 +1278,69 @@ describe("printed character (demo package)", () => {
     const inRow = (await positions(pdf))[0]!.filter(
       (p) => p.y > placed.y + 5 && p.y < placed.y + 25 && p.x >= placed.x && p.x < placed.x + placed.w,
     );
-    // Each label is one piece of text in its box: the whole word, never split between letters.
+    // Each label is in its box, in capitals like the others: the whole word, or
+    // split where the package marks it, never between letters.
     const boxW = (placed.w - 5 * 4) / 6;
-    const labels = inRow.filter((p) => /^\p{L}+$/u.test(p.str));
+    const labels = inRow.filter((p) => /^\p{Lu}+-?$/u.test(p.str));
     expect(labels.map((p) => p.str)).toEqual([
       ...short.slice(0, 4).map((s) => s.toLocaleUpperCase("de")),
-      "Laternenfertigkeit",
+      "LATERNEN-",
+      "FERTIGKEIT",
       "NEBELSICHT",
     ]);
+    const box = [0, 1, 2, 3, 4, 4, 5];
     labels.forEach((p, i) => {
-      expect(p.x).toBeGreaterThanOrEqual(placed.x + i * (boxW + 4));
-      expect(p.x + p.w).toBeLessThanOrEqual(placed.x + i * (boxW + 4) + boxW);
+      expect(p.x).toBeGreaterThanOrEqual(placed.x + box[i]! * (boxW + 4));
+      expect(p.x + p.w).toBeLessThanOrEqual(placed.x + box[i]! * (boxW + 4) + boxW);
     });
-    expect(inRow.some((p) => p.str.endsWith("-") || /widerstandsprobe/iu.test(p.str))).toBe(false);
+    expect(inRow.some((p) => /\p{Ll}/u.test(p.str) || /widerstandsprobe/iu.test(p.str))).toBe(false);
     expect((await extract(pdf)).minFontSize).toBeGreaterThanOrEqual(7 - 0.01);
+  });
+
+  it("keeps a box heading too wide for its box in capitals, whole, in both designs", async () => {
+    // As a caster's row: two numbers, then a box per rank of slots, so a
+    // higher level brings more boxes and narrower headings. The first heading
+    // is one long word with a hyphen and no soft hyphen, which fits its box at
+    // 7 pt in small letters but not in capitals; the classic boxes are narrower.
+    const heads = { verbose: "Nebelrettungswurf-ZW", classic: "Laternenwurf-ZW" } as const;
+    for (const design of ["verbose", "classic"] as const) {
+      const head = heads[design];
+      const de: Record<string, TextValue> = {
+        ...pkg.texts["de"]!,
+        "sheet.lantern.dc": head,
+        "sheet.lantern.hit": "Treffer",
+      };
+      const sheet = {
+        ...pkg.sheet,
+        sections: pkg.sheet.sections.map((s) =>
+          s.id === "lantern-slots" && s.kind === "statBoxes"
+            ? {
+                ...s,
+                boxes: [
+                  { value: "nerve", style: "number" as const, label: "sheet.lantern.dc" },
+                  { value: "practice", style: "number" as const, label: "sheet.lantern.hit" },
+                  ...s.boxes.slice(0, 4),
+                ],
+              }
+            : s,
+        ),
+      };
+      const p = { ...pkg, sheet, texts: { ...pkg.texts, de } };
+      const caps = head.toLocaleUpperCase("de");
+      // Lines of the heading follow each other; a break adds a hyphen or comes after one.
+      const lines = new RegExp([...caps].map((ch) => (ch === "-" ? "[-]" : ch)).join("(?:-? )?"), "u");
+      for (const level of [7, 20]) {
+        const what = `level ${level}, ${design}`;
+        const model = buildSheetModel(p, demoCharacter(p, level), { language: "de", createdAt });
+        const row = model.sections.find((s) => s.id === "lantern-slots");
+        expect(row?.kind === "statBoxes" && row.boxes.length, what).toBe(6);
+        const pdf = await renderPdf(model, { parts: ["sheet"], design });
+        const { text, minFontSize } = await extract(pdf);
+        expect(text, what).toMatch(lines);
+        expect(text, what).not.toContain(head.slice(1, -3));
+        expect(minFontSize, what).toBeGreaterThanOrEqual(7 - 0.01);
+      }
+    }
   });
 
   it("sets a long name in a table smaller rather than splitting it, and splits at a soft hyphen", async () => {

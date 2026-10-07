@@ -126,9 +126,9 @@ function linesBlock(c: Ctx, n: number, section: SheetSection | null = null): Blo
   });
 }
 
-/** A label at 7 pt, in two lines if one is not enough; returns its lines and style. */
+/** A box heading at 7 pt, in two lines if one is not enough, in capitals like the others; returns its lines and style. */
 function smallLabel(c: Ctx, text: string, w: number) {
-  return c.pen.label(text, c.st.label, w);
+  return c.pen.label(text, c.st.label, w, 7, true);
 }
 
 function smallBoxHeight(c: Ctx, b: StatBox, w: number, min: number): number {
