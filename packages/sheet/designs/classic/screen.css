@@ -66,7 +66,8 @@
   font-size: var(--text-xs);
   letter-spacing: 0.05em;
   text-transform: uppercase;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
+  hyphens: auto;
 }
 
 .csheet__package,
@@ -125,7 +126,7 @@
 
 .csheet__box-row {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(6rem, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(8.5rem, 1fr));
   gap: var(--space-2);
 }
 
@@ -740,6 +741,12 @@
 
   .csheet__table tbody th {
     font-size: var(--cs-rowName);
+  }
+
+  /* On paper a column is as wide as it needs; here the page is as wide as paper, so words wrap. */
+  .csheet__table thead th,
+  .csheet__table td:not(.csheet__wrap) {
+    white-space: normal;
   }
 
   /* Features */
