@@ -17,6 +17,9 @@ import {
 } from "@builder/sheet";
 import { demoCharacter, loadDemoPackage, raisedCharacter } from "@builder/sheet/testing";
 import { CLASSIC_GEOMETRY, classicPlan, firstColumns } from "@builder/sheet/designs/classic";
+import { columnWidth } from "@builder/sheet/designs";
+import { VERBOSE_GEOMETRY } from "@builder/sheet/designs/verbose";
+import { sheetPlaces } from "./places.ts";
 import { renderPdf, type RenderedPdf } from "./render.ts";
 
 let pkg: ContentPackage;
@@ -1805,6 +1808,32 @@ describe("the verbose design: original and copy, empty and filled", () => {
         ).toEqual([]);
         expect(text).not.toMatch(language === "de" ? /\d\s?(ft|Fuss|lb)\b/u : /\d\s?(m|kg)\b/u);
       }
+    }
+  });
+
+  it("tells the screen where each section starts: page and column, as many pages as the PDF", async () => {
+    for (const doc of [river3(), lantern20()]) {
+      const model = buildSheetModel(pkg, doc, { language: "de", createdAt });
+      const pdf = await renderPdf(model, { parts: ["sheet"], design: "verbose" });
+      const places = await sheetPlaces(model, { design: "verbose" });
+      expect(places.pages).toBe(pdf.sheetPages);
+      expect(places.sections).toHaveLength(model.sections.length);
+      const pages = places.sections.map((p) => p!.page);
+      // In the model's order, page after page; every page has a section that starts on it.
+      expect(pages).toEqual([...pages].sort((a, b) => a - b));
+      expect(new Set(pages).size).toBe(pdf.sheetPages);
+      pdf.sheetLayout.forEach((placed, page) => {
+        for (const p of placed) {
+          const i = model.sections.findIndex((s) => s.id === p.section.id);
+          if (places.sections[i]!.page === page)
+            expect(places.sections[i]!.col).toBe(
+              Math.round(
+                (p.x - VERBOSE_GEOMETRY.margin) /
+                  (columnWidth(VERBOSE_GEOMETRY) + VERBOSE_GEOMETRY.columnGap),
+              ),
+            );
+        }
+      });
     }
   });
 

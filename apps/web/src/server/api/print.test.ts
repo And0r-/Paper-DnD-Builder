@@ -124,6 +124,30 @@ describe("printing a character", () => {
   });
 });
 
+describe("where the PDF breaks the sheet's pages", () => {
+  it("names each section's page and column for the screen, as the PDF of the sheet has them", async () => {
+    const id = await character(true, 20);
+    const model = (await client.call("GET", `/api/drafts/${id}/sheet`)).json as SheetModel;
+    const res = await client.call("POST", `/api/drafts/${id}/sheet-places`, { model, design: "verbose" });
+    expect(res.status).toBe(200);
+    const pdf = await renderPdf(model, { parts: ["sheet"], design: "verbose" });
+    expect(res.json.pages).toBe(pdf.sheetPages);
+    expect(res.json.sections).toHaveLength(model.sections.length);
+    expect(res.json.sections[0]).toEqual({ page: 0, col: 0 });
+
+    expect((await client.call("POST", `/api/drafts/${id}/sheet-places`, { model, design: "x" })).status).toBe(
+      400,
+    );
+    expect(
+      (await client.call("POST", `/api/drafts/${id}/sheet-places`, { model: {}, design: "verbose" })).status,
+    ).toBe(400);
+    expect(
+      (await new Client(server).call("POST", `/api/drafts/${id}/sheet-places`, { model, design: "verbose" }))
+        .status,
+    ).toBe(401);
+  });
+});
+
 describe("the parts of a printout", () => {
   const bytes = async (res: Response) => Buffer.from(await res.arrayBuffer());
 

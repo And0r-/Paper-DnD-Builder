@@ -2776,6 +2776,163 @@
         }
       }
     },
+    "/api/drafts/{id}/sheet-places": {
+      "post": {
+        "operationId": "sheetPlaces",
+        "summary": "Where the PDF breaks the sheet's pages",
+        "tags": ["Print"],
+        "description": "For the screen to break its pages where the paper does: the page (from 0) and grid column each section of the given model starts on in the PDF of the sheet alone in this design, with the character's play state written in. A section the PDF splits counts on the page of its first part; `null` for one the design does not show.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Draft id (a UUID).",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "model": {
+                    "$ref": "#/components/schemas/SheetModel"
+                  },
+                  "design": {
+                    "type": "string"
+                  }
+                },
+                "required": ["model", "design"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The places.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "pages": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "sections": {
+                      "type": "array",
+                      "items": {
+                        "type": ["object", "null"],
+                        "properties": {
+                          "page": {
+                            "type": "integer",
+                            "minimum": 0
+                          },
+                          "col": {
+                            "type": "integer",
+                            "minimum": 0
+                          }
+                        },
+                        "required": ["page", "col"],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": ["pages", "sections"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadBody"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "description": "`draftNotFound` (also someone else's character)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "enum": ["draftNotFound"]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "$ref": "#/components/responses/BodyTooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/JsonRequired"
+          },
+          "422": {
+            "description": "`languageNotSupported`: the model's language has no page words",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "enum": ["languageNotSupported"]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "`tooManyRequests`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "enum": ["tooManyRequests"]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds to wait.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
     "/api/drafts/{id}/sheet-view": {
       "put": {
         "operationId": "setSheetView",

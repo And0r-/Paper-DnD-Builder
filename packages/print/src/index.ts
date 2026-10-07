@@ -5,3 +5,4 @@
  * nothing about any game.
  */
 export { renderPdf, type DrawnField, type RenderedPdf, type RenderOptions } from "./render.ts";
+export { sheetPlaces, type SheetPlaces } from "./places.ts";

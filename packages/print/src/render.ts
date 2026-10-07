@@ -529,6 +529,11 @@ const PAINTERS: Readonly<Record<string, SheetPainter>> = {
   },
 };
 
+/** The grid of each design with a painter. */
+export const DESIGN_GEOMETRY: Readonly<Record<string, GridGeometry>> = Object.fromEntries(
+  Object.entries(PAINTERS).map(([id, p]) => [id, p.geometry]),
+);
+
 /** Every place drawn on the sheet and the cards where a player writes or ticks, in drawing order. */
 export type { DrawnField };
 

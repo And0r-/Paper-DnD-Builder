@@ -412,6 +412,8 @@ async function walk(server: TestServer): Promise<void> {
   await call("PUT", `/api/drafts/${id}/sheet-view`, { copyId: null }, k);
   await call("PUT", `/api/drafts/${id}/sheet-view`, { copyId: "00000000-0000-4000-8000-000000000000" }, k);
   await call("PUT", `/api/drafts/${id}/sheet-view`, {}, k);
+  await call("POST", `/api/drafts/${id}/sheet-places`, { model: kept.model, design: "verbose" }, k);
+  await call("POST", `/api/drafts/${id}/sheet-places`, { model: kept.model, design: "none" }, k);
   await call("DELETE", copy, undefined, k);
   await call("GET", `/api/drafts/${id}/state`, undefined, k);
   await call("PUT", `/api/drafts/${id}/state`, { version: 0, state: { a: 3, b: "x", c: { checks: 2 } } }, k);
