@@ -2,9 +2,20 @@
  * The tool list of @builder/mcp against this server with the demo package,
  * over the public API with nothing but an access key: a character built
  * from empty to finished, raised, printed; a withdrawn key; someone else's
- * character; a change made elsewhere in between.
+ * character; a change made elsewhere in between. Then the same tools over
+ * the stateless HTTP server, spoken to by the MCP library's own client.
  */
-import { ApiClient, TOOLS, type ToolName, type ToolResult } from "@builder/mcp";
+import {
+  ApiClient,
+  createHttpHandler,
+  PackageCache,
+  TOOLS,
+  type ToolName,
+  type ToolResult,
+} from "@builder/mcp";
+import { Client as McpClient } from "@modelcontextprotocol/sdk/client/index.js";
+import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import { beforeEach, describe, expect, it } from "vitest";
 import { Client, signIn, startTestServer, type TestServer } from "../testing.ts";
 
@@ -39,6 +50,59 @@ function toolsWith(key: string) {
 }
 
 type Call = ReturnType<typeof toolsWith>;
+
+const MCP_URL = "http://mcp.test/mcp";
+
+/** The public HTTP server in front of this builder; texts shared across requests as in production. */
+function httpServer(fetched: string[] = []) {
+  return createHttpHandler({
+    apiBaseUrl: "http://builder.test",
+    allowedOrigins: ["https://builder.example"],
+    packages: new PackageCache(),
+    fetch: (input, init) => {
+      const req = new Request(input, init);
+      fetched.push(`${req.method} ${new URL(req.url).pathname}`);
+      return server.fetch(req);
+    },
+  });
+}
+
+/** An MCP program that sends `key` as Bearer to the HTTP server, mapping each answer back to a ToolResult. */
+async function httpToolsWith(key: string, handler = httpServer()): Promise<Call> {
+  const transport = new StreamableHTTPClientTransport(new URL(MCP_URL), {
+    fetch: (input, init) => handler(new Request(input, init)),
+    requestInit: { headers: { authorization: `Bearer ${key}` } },
+  });
+  const client = new McpClient({ name: "test", version: "0" });
+  // The library's own `sessionId?: string` does not fit its interface under exactOptionalPropertyTypes.
+  await client.connect(transport as unknown as Transport);
+  return async (name, input = {}) => {
+    const res = await client.callTool({ name, arguments: input });
+    const content = res.content as { type: string; text?: string; resource?: Record<string, string> }[];
+    const resource = content.find((c) => c.type === "resource")?.resource;
+    return {
+      data: JSON.parse(content[0]!.text!),
+      ...(res.isError ? { isError: true } : {}),
+      ...(resource
+        ? { file: { name: resource["uri"]!, mimeType: resource["mimeType"]!, data: resource["blob"]! } }
+        : {}),
+    };
+  };
+}
+
+function postMcp(handler: ReturnType<typeof httpServer>, headers: Record<string, string>, body?: unknown) {
+  return handler(
+    new Request(MCP_URL, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        accept: "application/json, text/event-stream",
+        ...headers,
+      },
+      body: JSON.stringify(body ?? { jsonrpc: "2.0", id: 1, method: "tools/list" }),
+    }),
+  );
+}
 
 /** A model that takes the recommendation, else the first options, using only what list_options says. */
 async function answerAllOpen(call: Call, characterId: string): Promise<string[]> {
@@ -95,77 +159,88 @@ async function firstOpen(call: Call, characterId: string, kind: string): Promise
 }
 
 describe("the shared tools over the API, with nothing but a key", () => {
-  it("build a level-3 character from empty to finished, raise it to 5, and get its sheet", async () => {
-    const call = toolsWith((await makeKey()).secret);
+  it.each([
+    ["directly", async (key: string) => toolsWith(key)],
+    ["over HTTP", httpToolsWith],
+  ])(
+    "build a level-3 character from empty to finished, raise it to 5, and get its sheet (%s)",
+    async (_how, make) => {
+      const call = await make((await makeKey()).secret);
 
-    const packages = await call("list_packages");
-    expect(packages.data.map((p: { packageId: string }) => p.packageId)).toContain("demo");
-    expect(packages.data.find((p: { packageId: string }) => p.packageId === "demo").name).toBeTruthy();
+      const packages = await call("list_packages");
+      expect(packages.data.map((p: { packageId: string }) => p.packageId)).toContain("demo");
+      expect(packages.data.find((p: { packageId: string }) => p.packageId === "demo").name).toBeTruthy();
 
-    const started = await call("start_character", { packageId: "demo", level: 3 });
-    expect(started.isError).toBeFalsy();
-    const characterId: string = started.data.characterId;
-    expect(started.data).toMatchObject({ level: 3, state: "open", canFinish: false });
-    expect(started.data.openChoices.length).toBeGreaterThan(0);
+      const started = await call("start_character", { packageId: "demo", level: 3 });
+      expect(started.isError).toBeFalsy();
+      const characterId: string = started.data.characterId;
+      expect(started.data).toMatchObject({ level: 3, state: "open", canFinish: false });
+      expect(started.data.openChoices.length).toBeGreaterThan(0);
 
-    // Finishing too early names what is open.
-    const early = await call("finish_character", { characterId });
-    expect(early.isError).toBe(true);
-    expect(early.data.openChoices.length).toBeGreaterThan(0);
+      // Finishing too early names what is open.
+      const early = await call("finish_character", { characterId });
+      expect(early.isError).toBe(true);
+      expect(early.data.openChoices.length).toBeGreaterThan(0);
 
-    const answered = await answerAllOpen(call, characterId);
-    expect(answered.length).toBeGreaterThan(5);
+      const answered = await answerAllOpen(call, characterId);
+      expect(answered.length).toBeGreaterThan(5);
 
-    const finished = await call("finish_character", { characterId });
-    expect(finished.isError, JSON.stringify(finished.data)).toBeFalsy();
-    expect(finished.data).toMatchObject({ done: true, state: "finished", level: 3, openChoices: [] });
+      const finished = await call("finish_character", { characterId });
+      expect(finished.isError, JSON.stringify(finished.data)).toBeFalsy();
+      expect(finished.data).toMatchObject({ done: true, state: "finished", level: 3, openChoices: [] });
 
-    const listed = await call("list_characters");
-    expect(listed.data).toEqual([
-      expect.objectContaining({ characterId, name: "Mira Fennwick", level: 3, state: "finished" }),
-    ]);
-    expect(listed.data[0].summary).toEqual(expect.any(String));
+      const listed = await call("list_characters");
+      expect(listed.data).toEqual([
+        expect.objectContaining({ characterId, name: "Mira Fennwick", level: 3, state: "finished" }),
+      ]);
+      expect(listed.data[0].summary).toEqual(expect.any(String));
 
-    // Raise to 5: only what the new levels ask.
-    const raised = await call("level_up", { characterId, level: 5 });
-    expect(raised.isError, JSON.stringify(raised.data)).toBeFalsy();
-    expect(raised.data.raised).toEqual({ from: 3, to: 5 });
-    expect(raised.data.newChoices.length).toBeGreaterThan(0);
-    // Open now: the new choices, and older ones that ask for more at the higher level; nothing else.
-    const openIds = raised.data.openChoices.map((c: { choice: string }) => c.choice);
-    for (const c of raised.data.newChoices) expect(openIds).toContain(c.choice);
-    const answeredAt5 = await answerAllOpen(call, characterId);
-    // A copy (`<choice>@<pick>`) comes once the pick that brings it is answered.
-    expect(answeredAt5.filter((id) => !id.includes("@"))).toEqual(openIds);
-    const done = await call("finish_character", { characterId });
-    expect(done.data).toMatchObject({ done: true, state: "finished", level: 5 });
+      // Raise to 5: only what the new levels ask.
+      const raised = await call("level_up", { characterId, level: 5 });
+      expect(raised.isError, JSON.stringify(raised.data)).toBeFalsy();
+      expect(raised.data.raised).toEqual({ from: 3, to: 5 });
+      expect(raised.data.newChoices.length).toBeGreaterThan(0);
+      // Open now: the new choices, and older ones that ask for more at the higher level; nothing else.
+      const openIds = raised.data.openChoices.map((c: { choice: string }) => c.choice);
+      for (const c of raised.data.newChoices) expect(openIds).toContain(c.choice);
+      const answeredAt5 = await answerAllOpen(call, characterId);
+      // A copy (`<choice>@<pick>`) comes once the pick that brings it is answered.
+      expect(answeredAt5.filter((id) => !id.includes("@"))).toEqual(openIds);
+      const done = await call("finish_character", { characterId });
+      expect(done.data).toMatchObject({ done: true, state: "finished", level: 5 });
 
-    // Reading: values with names, what it has, answers in words.
-    const character = await call("get_character", { characterId });
-    expect(character.data).toMatchObject({ characterId, level: 5, state: "finished", name: "Mira Fennwick" });
-    expect(character.data.values.length).toBeGreaterThan(3);
-    expect(character.data.has.length).toBeGreaterThan(3);
-    for (const t of character.data.has) expect(t.name).not.toBe(t.thing);
-    const value = character.data.values[0];
-    expect(value.name).not.toBe(value.value);
+      // Reading: values with names, what it has, answers in words.
+      const character = await call("get_character", { characterId });
+      expect(character.data).toMatchObject({
+        characterId,
+        level: 5,
+        state: "finished",
+        name: "Mira Fennwick",
+      });
+      expect(character.data.values.length).toBeGreaterThan(3);
+      expect(character.data.has.length).toBeGreaterThan(3);
+      for (const t of character.data.has) expect(t.name).not.toBe(t.thing);
+      const value = character.data.values[0];
+      expect(value.name).not.toBe(value.value);
 
-    const explained = await call("explain_value", { characterId, value: value.value });
-    expect(explained.isError, JSON.stringify(explained.data)).toBeFalsy();
-    expect(explained.data).toMatchObject({ value: value.value, name: value.name, total: value.number });
+      const explained = await call("explain_value", { characterId, value: value.value });
+      expect(explained.isError, JSON.stringify(explained.data)).toBeFalsy();
+      expect(explained.data).toMatchObject({ value: value.value, name: value.name, total: value.number });
 
-    const unknownValue = await call("explain_value", { characterId, value: "no-such-value" });
-    expect(unknownValue.isError).toBe(true);
+      const unknownValue = await call("explain_value", { characterId, value: "no-such-value" });
+      expect(unknownValue.isError).toBe(true);
 
-    // The sheet as data, then as the PDF.
-    const sheet = await call("get_sheet", { characterId });
-    expect(sheet.isError, JSON.stringify(sheet.data).slice(0, 500)).toBeFalsy();
-    expect(sheet.data).toMatchObject({ name: "Mira Fennwick", level: 5, language: "en" });
+      // The sheet as data, then as the PDF.
+      const sheet = await call("get_sheet", { characterId });
+      expect(sheet.isError, JSON.stringify(sheet.data).slice(0, 500)).toBeFalsy();
+      expect(sheet.data).toMatchObject({ name: "Mira Fennwick", level: 5, language: "en" });
 
-    const pdf = await call("get_sheet", { characterId, as: "pdf", parts: ["sheet"] });
-    expect(pdf.isError).toBeFalsy();
-    expect(pdf.file?.mimeType).toBe("application/pdf");
-    expect(Buffer.from(pdf.file!.data, "base64").subarray(0, 5).toString()).toBe("%PDF-");
-  });
+      const pdf = await call("get_sheet", { characterId, as: "pdf", parts: ["sheet"] });
+      expect(pdf.isError).toBeFalsy();
+      expect(pdf.file?.mimeType).toBe("application/pdf");
+      expect(Buffer.from(pdf.file!.data, "base64").subarray(0, 5).toString()).toBe("%PDF-");
+    },
+  );
 
   it("says in words why the rules refuse an answer, and nothing changes", async () => {
     const call = toolsWith((await makeKey()).secret);
@@ -256,5 +331,96 @@ describe("the shared tools over the API, with nothing but a key", () => {
     }
     const still = await other.call("GET", `/api/drafts/${theirId}`);
     expect(still.json.draft).toMatchObject({ level: 1, version: 1 });
+  });
+});
+
+describe("the HTTP server: a key per request, nothing kept between requests", () => {
+  it("answers 401 without a key, with a wrong key and with a withdrawn one", async () => {
+    const handler = httpServer();
+    const none = await postMcp(handler, {});
+    expect(none.status).toBe(401);
+    expect(none.headers.get("www-authenticate")).toMatch(/^Bearer/);
+    expect((await none.json()).error.message).toMatch(/Settings, Access keys/);
+
+    expect((await postMcp(handler, { authorization: "Bearer cbk_not-a-real-key" })).status).toBe(401);
+    expect((await postMcp(handler, { authorization: "Basic dXNlcjpwYXNz" })).status).toBe(401);
+
+    const key = await makeKey();
+    const ok = await postMcp(handler, { authorization: `Bearer ${key.secret}` });
+    expect(ok.status).toBe(200);
+    expect((await ok.json()).result.tools).toHaveLength(TOOLS.length);
+
+    expect((await owner.call("DELETE", `/api/account/keys/${key.id}`)).status).toBe(204);
+    const withdrawn = await postMcp(handler, { authorization: `Bearer ${key.secret}` });
+    expect(withdrawn.status).toBe(401);
+    expect((await withdrawn.json()).error.message).toMatch(/not valid/);
+  });
+
+  it("with key A shows only A's characters, never B's", async () => {
+    const other = new Client(server, "203.0.113.8");
+    await signIn(other, server, "other@example.org");
+    const theirs = await other.call("POST", "/api/drafts", { packageId: "demo" });
+    const theirId: string = theirs.json.draft.id;
+    const keyB = (await other.call("POST", "/api/account/keys", { name: "B" })).json.key.secret as string;
+
+    const handler = httpServer();
+    const callA = await httpToolsWith((await makeKey()).secret, handler);
+    const callB = await httpToolsWith(keyB, handler);
+    const mine = (await callA("start_character", { packageId: "demo", level: 1 })).data.characterId;
+
+    expect((await callA("list_characters")).data.map((c: { characterId: string }) => c.characterId)).toEqual([
+      mine,
+    ]);
+    expect((await callB("list_characters")).data.map((c: { characterId: string }) => c.characterId)).toEqual([
+      theirId,
+    ]);
+    for (const [name, input] of [
+      ["get_character", { characterId: theirId }],
+      ["set_level", { characterId: theirId, level: 2 }],
+      ["get_sheet", { characterId: theirId }],
+    ] as const) {
+      const res = await callA(name, input);
+      expect(res.isError, name).toBe(true);
+      expect(res.data.message, name).toMatch(/no character with this id/);
+    }
+    expect((await callB("get_character", { characterId: mine })).isError).toBe(true);
+    expect((await other.call("GET", `/api/drafts/${theirId}`)).json.draft).toMatchObject({
+      level: 1,
+      version: 1,
+    });
+  });
+
+  it("reads the version afresh before each change, and loads package texts once", async () => {
+    const fetched: string[] = [];
+    const call = await httpToolsWith((await makeKey()).secret, httpServer(fetched));
+    const { characterId } = (await call("start_character", { packageId: "demo", level: 1 })).data;
+
+    // The player changes the level in the browser between two requests: the next change still goes through.
+    const before = await owner.call("GET", `/api/drafts/${characterId}`);
+    await owner.call("PATCH", `/api/drafts/${characterId}`, { version: before.json.draft.version, level: 2 });
+    const raised = await call("set_level", { characterId, level: 3 });
+    expect(raised.isError, JSON.stringify(raised.data)).toBeFalsy();
+    expect((await owner.call("GET", `/api/drafts/${characterId}`)).json.draft.level).toBe(3);
+
+    await call("get_character", { characterId });
+    const texts = fetched.filter((f) => f.startsWith("GET /api/packages/demo/texts/"));
+    expect(texts).toHaveLength(1);
+  });
+
+  it("refuses a browser from another origin, lets programs without one through", async () => {
+    const handler = httpServer();
+    const auth = { authorization: `Bearer ${(await makeKey()).secret}` };
+    const evil = await postMcp(handler, { ...auth, origin: "http://evil.example" });
+    expect(evil.status).toBe(403);
+    expect((await postMcp(handler, { ...auth, origin: "https://builder.example" })).status).toBe(200);
+    expect((await postMcp(handler, auth)).status).toBe(200);
+    // Before the key is even looked at.
+    expect((await postMcp(handler, { origin: "http://evil.example" })).status).toBe(403);
+  });
+
+  it("takes POST only: no sessions, no open stream", async () => {
+    const res = await httpServer()(new Request(MCP_URL, { method: "GET" }));
+    expect(res.status).toBe(405);
+    expect(res.headers.get("allow")).toBe("POST");
   });
 });

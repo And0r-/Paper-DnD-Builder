@@ -32,6 +32,7 @@
     "@axe-core/playwright": "4.13.0",
     "@builder/demo-package": "workspace:*",
     "@electric-sql/pglite": "^0.5.8",
+    "@modelcontextprotocol/sdk": "^1.32.1",
     "@playwright/test": "1.63.0",
     "@types/nodemailer": "^8.0.2",
     "@types/react": "^19.3.0",
