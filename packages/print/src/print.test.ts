@@ -92,6 +92,26 @@ async function positions(pdf: RenderedPdf): Promise<Placed[][]> {
   return pages;
 }
 
+const CARD_GRID = { x: 10.5, y: (297 - 3 * 88) / 2, w: 63, h: 88, pad: 4 };
+
+/** Which card of a card page a piece of text is on, row by row. */
+function cardIndex(p: Placed): number {
+  return Math.floor((p.y - CARD_GRID.y) / CARD_GRID.h) * 3 + Math.floor((p.x - CARD_GRID.x) / CARD_GRID.w);
+}
+
+/** On the given cards, the hint "HINWEIS…" is above the footer line and everything else above the hint. */
+function expectClearFoot(page: Placed[], cards: number[]): void {
+  for (const n of cards) {
+    const items = page.filter((p) => cardIndex(p) === n);
+    const footLine = CARD_GRID.y + (Math.floor(n / 3) + 1) * CARD_GRID.h - CARD_GRID.pad - 5;
+    const hint = items.find((p) => p.str.startsWith("HINWEIS"))!;
+    expect(hint, `card ${n}`).toBeDefined();
+    expect(hint.y).toBeLessThan(footLine);
+    for (const p of items.filter((p) => p.y < footLine && p !== hint))
+      expect(p.y, p.str).toBeLessThan(hint.y - 2);
+  }
+}
+
 async function print(language: string, units: Record<string, string>, p = pkg, d = doc) {
   const model = buildSheetModel(p, d, { language, units, createdAt });
   const pdf = await renderPdf(model);
@@ -1101,16 +1121,63 @@ describe("printed character (demo package)", () => {
       ...model,
       cards: [{ ...card, fields, table, hint: "HINWEIS am Fuss." }, ...model.cards.slice(1)],
     });
-    const grid = { x: 10.5, y: (297 - 3 * 88) / 2, w: 63, pad: 4 };
-    const footLine = grid.y + 88 - grid.pad - 5;
     const page = (await positions(pdf))[pdf.sheetPages]!;
-    const onFirst = page.filter((p) => p.x < grid.x + grid.w && p.y > grid.y && p.y < grid.y + 88);
-    const tableEnd = onFirst.filter((p) => p.str.includes("klar."));
+    // "At the table" is whole on the card or whole on the next one, above the hint either way.
+    const tableEnd = page.filter((p) => p.str.includes("klar."));
     expect(tableEnd).toHaveLength(1);
-    expect(tableEnd[0]!.y).toBeLessThan(footLine);
-    // The hint gives way where it would be printed over "at the table"; if it is there, it is below it.
-    const hint = onFirst.find((p) => p.str.startsWith("HINWEIS"));
-    if (hint) expect(hint.y).toBeGreaterThan(tableEnd[0]!.y + 2);
+    expectClearFoot(page, [0, 1]);
+  });
+
+  it("moves 'at the table' whole to a continuation card when a long origin line leaves it no room", async () => {
+    // A field of five lines and an origin line of three filled the card's
+    // head so far that "at the table" ran over the hint, the footer and the
+    // card below (AND-197).
+    const model = buildSheetModel(pkg, doc, { language: "de", createdAt });
+    const card = model.cards[0]!;
+    const table =
+      "TISCHANFANG Kostet eine Reaktion. Der Nebel weicht drei Schritte zurück, und du siehst wieder klar. Wer im Nebel stand, ist bis zum Ende seines nächsten Zuges geblendet. TISCHENDE";
+    const rules = ["REGELANFANG Die Laterne flammt auf und vertreibt den Nebel. REGELENDE"];
+    const printed = async (sentence: string, originValue: string, cards: number[]) => {
+      const fields = card.fields.map((f, i) => (i === 0 ? { ...f, value: sentence } : f));
+      const origin = { label: "Geliehen vom Nebelvolk", value: originValue };
+      const pdf = await renderPdf({
+        ...model,
+        cards: [{ ...card, fields, origin, table, rules, hint: "HINWEIS am Fuss." }, ...model.cards.slice(1)],
+      });
+      const page = (await positions(pdf))[pdf.sheetPages]!;
+      expectClearFoot(page, cards);
+      return (n: number) =>
+        page
+          .filter((p) => cardIndex(p) === n)
+          .map((p) => p.str)
+          .join(" ");
+    };
+
+    // A field of three lines and an origin of three: the origin line stays, "at the table" moves.
+    const card1 = await printed(
+      "Reaktion, wenn eine Laterne bei dir erlischt",
+      "einmal pro langer Rast ohne Laternenöl, sonst mit Öl aus dem Vorrat · Ziel 12 · Treffer +4",
+      [0, 1],
+    );
+    expect(card1(0)).toContain("Treffer +4");
+    expect(card1(0)).toContain("weiter auf der nächsten Karte");
+    expect(card1(0)).not.toContain("AM TISCH");
+    expect(card1(0)).not.toContain("REGEL");
+    for (const word of ["FORTSETZUNG", "AM TISCH", "TISCHANFANG", "TISCHENDE", "REGELENDE"])
+      expect(card1(1)).toContain(word);
+    expect(card1(1).indexOf("TISCHENDE")).toBeLessThan(card1(1).indexOf("REGELANFANG"));
+
+    // Fields that fill the card alone: the origin line goes on the next card too, before "at the table".
+    const card2 = await printed(
+      "Reaktion, die du ausführst, wenn eine Laterne im Abstand von bis zu zwölf Schritten von dir erlischt, du es sehen kannst und der Nebel schon bis an deine Füsse reicht, ohne dass du es gewollt hast",
+      "einmal pro langer Rast ohne Laternenöl, sonst mit Öl aus dem eigenen Vorrat · Ziel 12 · Treffer +4 · nur bei Nacht und nie zweimal hintereinander",
+      [0, 1, 2],
+    );
+    expect(card2(0)).not.toContain("GELIEHEN");
+    expect(card2(1)).toContain("GELIEHEN VOM NEBELVOLK");
+    expect(card2(1)).toContain("hintereinander");
+    expect(card2(1).indexOf("hintereinander")).toBeLessThan(card2(1).indexOf("TISCHANFANG"));
+    expect(`${card2(1)} ${card2(2)}`).toContain("REGELENDE");
   });
 
   it("wraps labels too long for their box instead of running out of it", async () => {
@@ -1508,8 +1575,8 @@ describe("the PDF made from the sheet model", () => {
   // or the demo package changes these: then check the sample PDFs and
   // update them.
   const before = {
-    de: { pages: 4, sha256: "693f60a090596a89e8e82be2940839fdbaca8c29ca095d36be80021da1c2264a" },
-    en: { pages: 4, sha256: "f8ca7b0d6b6677fdceffb8767031cd9944040a74565e0ef50637389a622b46d1" },
+    de: { pages: 4, sha256: "03d55a5af06eb8fada912a448f9324519eb820a8339049d788090359bea8cb7a" },
+    en: { pages: 4, sha256: "b9a1fb0fd38655f22d494188954dbf2c6eb29879b23988a55303721192f717b9" },
   };
 
   it("is unchanged for the level 20 demo character with cards", async () => {

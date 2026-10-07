@@ -595,7 +595,10 @@ export function buildSheetModel(
     .map(({ h, t }) => ({ t, step: stepIndex.get(h.step) ?? 0, name: thingName(t.id) }))
     .sort((a, b) => a.step - b.step || (a.t.rank ?? 0) - (b.t.rank ?? 0) || collator.compare(a.name, b.name))
     .map(({ t, name: cardName }): Card => {
-      const cardUses = uses(t, pkg.sheet.cards[t.kind]!.uses);
+      const layout = pkg.sheet.cards[t.kind]!;
+      const cardUses = uses(t, layout.uses);
+      // The first entry whose condition the thing matches, in the package's order.
+      const line = layout.origins?.find((o) => markCondition(o)(t) && !(o.not && markCondition(o.not)(t)));
       return {
         id: t.id,
         typeLine: text(`card.${t.kind}.typeLine`, {
@@ -604,10 +607,18 @@ export function buildSheetModel(
           level: ev.level,
         }),
         name: cardName,
-        fields: pkg.sheet.cards[t.kind]!.fields.map((f) => ({
+        fields: layout.fields.map((f) => ({
           label: text(`stat.${f}.name`),
           value: statText(t.stats?.[f]),
         })),
+        ...(line
+          ? {
+              origin: {
+                label: line.label !== undefined ? text(line.label) : thingName(origin(t.id)),
+                value: filled(line.text),
+              },
+            }
+          : {}),
         table: text(`${t.id}.explain.table`) || text(`${t.id}.short`),
         rules: paragraphs(`${t.id}.rules`),
         uses: cardUses,

@@ -1066,6 +1066,10 @@ function leaveToOthers(prepared: Prepared[]): void {
       // A pick count is filled up from what is left, as without the list.
       let rec = state.recommended.filter(free);
       if (state.count !== undefined) rec = [...new Set([...rec, ...state.options])].slice(0, state.count);
+      // A single pick whose recommendation another choice holds: the first
+      // option left takes its place, so "choose for me" still has one.
+      else if (rec.length === 0 && state.recommended.length > 0 && state.options.length > 0)
+        rec = [state.options[0]!];
       if (rec.length > 0) state.recommended = rec;
       else delete state.recommended;
     }

@@ -200,17 +200,24 @@ export type Position = {
 /**
  * Where an entry is: "Step 3 of 9", and "part 2 of 4" inside a step that
  * brought its own parts. Counted by the planned flow when the entry has its
- * count, else by the entries as they are.
+ * count, else by the entries as they are. `parts` is 1 (no part count) on
+ * an open step that has no parts yet, though the plan may give it some.
  */
 export function positionOf(entries: FlowEntry[], entry: FlowEntry): Position {
   const last = entries.at(-1)!;
   const head = entries.find((e) => e.key === entry.sectionKey) ?? entry;
-  const count = entries.find((e) => e.key === entry.key)?.count;
+  const own = entries.find((e) => e.key === entry.key) ?? entry;
+  const count = own.count;
+  // A step that is one part as it stands, its choice still open, counts no
+  // parts: the plan's parts are those of the suggestion, and which parts
+  // come depends on the answer (AND-189). From the second part on the count
+  // is the plan's again.
+  const unsure = own.key === head.key && own.status !== "done" && own.parts === 1;
   return {
     current: count?.current ?? entry.section + 1,
     total: count?.total ?? last.section + 1,
-    part: count?.part ?? entry.part,
-    parts: count?.parts ?? entry.parts,
+    part: unsure ? 1 : (count?.part ?? entry.part),
+    parts: unsure ? 1 : (count?.parts ?? entry.parts),
     sectionTitle: head.sectionTitle ?? head.title,
   };
 }
