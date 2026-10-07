@@ -13,7 +13,6 @@ import { ButtonLink } from "./Button.tsx";
 import { CopyText } from "./CopyText.tsx";
 import { Callout, Loading } from "./Feedback.tsx";
 import { Icon } from "./Icon.tsx";
-import { LanguageSelect } from "./LanguageSelect.tsx";
 import { AppShell, GuestShell } from "./Shell.tsx";
 
 /** The public zip (GET, the same for everyone, no key in it). */
@@ -134,7 +133,7 @@ export function McpSetup({ origin }: { origin: string }) {
     );
   }
   return (
-    <GuestShell corner={<LanguageSelect compact />}>
+    <GuestShell>
       <div className="auth auth--wide">
         <div className="auth__card">{content}</div>
       </div>
