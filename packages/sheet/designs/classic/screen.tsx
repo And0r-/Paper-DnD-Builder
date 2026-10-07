@@ -61,8 +61,8 @@ export function ClassicSheet({ model, ui }: SheetScreenProps) {
   const m = MESSAGES[model.language];
   const plan = classicPlan(model.sections);
   const words = { playedBy: m?.playedBy ?? "", pencil: m?.pencil ?? "", rowName: m?.rowName ?? "" };
-  const sections = (part: keyof typeof plan.parts, order = plan.parts[part]) =>
-    order.map((i) => (
+  const sections = (part: keyof typeof plan.parts) =>
+    plan.parts[part].map((i) => (
       <Section key={`${model.sections[i]!.id}-${i}`} s={model.sections[i]!} i={i} ui={ui} words={words} />
     ));
   const scoresAt = plan.parts.scores[0];
@@ -70,11 +70,6 @@ export function ClassicSheet({ model, ui }: SheetScreenProps) {
   // The pages of the PDF: page 1, then what comes after it in two columns, then the apart part.
   const more = [...(plan.apartPage ? [] : plan.parts.apart), ...plan.parts.later];
   const total = 1 + (more.length > 0 ? 1 : 0) + (plan.apartPage ? 1 : 0);
-  // On their own page the box rows come first, across the page, as in the PDF.
-  const boxRowsFirst = [...plan.parts.apart].sort(
-    (x, y) =>
-      Number(model.sections[y]!.kind === "statBoxes") - Number(model.sections[x]!.kind === "statBoxes"),
-  );
   const footer = (page: number) => <PageFooter model={model} page={page} total={total} prefix="csheet" />;
   return (
     <article className="csheet" lang={model.language} style={pageStyle}>
@@ -104,7 +99,7 @@ export function ClassicSheet({ model, ui }: SheetScreenProps) {
       {plan.apartPage && (
         <div className="csheet__page csheet__page--apart">
           <PageHead model={model} prefix="csheet" />
-          <div className="csheet__apart">{sections("apart", boxRowsFirst)}</div>
+          <div className="csheet__apart">{sections("apart")}</div>
           {footer(total)}
         </div>
       )}

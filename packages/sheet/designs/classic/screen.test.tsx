@@ -84,10 +84,14 @@ describe("classic on screen", () => {
     for (const model of models) {
       const html = renderToStaticMarkup(<ClassicSheet model={model} ui={ui} />);
       const plan = classicPlan(model.sections);
-      const apart = model.sections.flatMap((s, i) => (s.apart ? [i] : []));
-      expect(apart.length).toBeGreaterThan(0);
+      const marked = model.sections.flatMap((s, i) => (s.apart ? [i] : []));
+      expect(marked.length).toBeGreaterThan(0);
+      const page = marked.some((i) => model.sections[i]!.kind === "statBoxes");
+      expect(plan.apartPage).toBe(page);
+      // On a page of their own the box rows come first, as in the PDF; otherwise the package's order.
+      const boxRow = (i: number) => model.sections[i]!.kind === "statBoxes";
+      const apart = page ? [...marked.filter(boxRow), ...marked.filter((i) => !boxRow(i))] : marked;
       expect(plan.parts.apart).toEqual(apart);
-      expect(plan.apartPage).toBe(apart.some((i) => model.sections[i]!.kind === "statBoxes"));
       const own = html.split('class="csheet__apart"')[1] ?? "";
       expect(all(own, "data-section")).toEqual(plan.apartPage ? apart.map((i) => model.sections[i]!.id) : []);
       if (plan.apartPage) expect(plan.order.slice(-apart.length)).toEqual(apart);
