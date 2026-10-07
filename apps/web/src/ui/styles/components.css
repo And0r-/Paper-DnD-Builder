@@ -428,6 +428,7 @@ textarea.field__input {
   padding: 0;
   background: transparent;
   max-width: min(32rem, calc(100vw - 2 * var(--space-4)));
+  max-height: calc(100dvh - 2 * var(--space-4));
   width: 100%;
   color: var(--color-ink);
 }
@@ -440,6 +441,10 @@ textarea.field__input {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
+  box-sizing: border-box;
+  /* A long dialog on a low window scrolls inside, so its buttons can always be reached. */
+  max-height: calc(100dvh - 2 * var(--space-4));
+  overflow: auto;
   padding: var(--space-5);
   background: var(--color-surface);
   border-radius: var(--radius-lg);
