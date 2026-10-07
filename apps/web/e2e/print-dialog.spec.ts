@@ -136,7 +136,11 @@ test("prints a kept copy with the play state filled in, and keeps the play state
   await login(page, uniqueEmail("print-copy"), "de");
   const id = await makeCharacter(page);
   const made = (await (await page.request.post(`/api/drafts/${id}/sheet-copies`, { data: {} })).json()) as {
-    copy: { id: string; createdAt: string };
+    copy: { id: string; createdAt: string; fromLevel: number };
+  };
+  // A second, newer copy: the list starts with it, as the sheet's menu does.
+  const newer = (await (await page.request.post(`/api/drafts/${id}/sheet-copies`, { data: {} })).json()) as {
+    copy: { id: string };
   };
   await page.request.put(`/api/drafts/${id}/state`, {
     data: { version: 0, state: { "sheet/notes/notes": "Zwei Münzen beim Fährmann" } },
@@ -146,12 +150,19 @@ test("prints a kept copy with the play state filled in, and keeps the play state
   const dialog = page.getByRole("dialog", { name: m["print.title"] });
   const version = dialog.getByRole("combobox", { name: m["print.version"] });
   await expect(version).toHaveValue("original");
-  // Named as on the sheet: "Meine Fassung vom 7. Oktober, 14:20".
+  await expect(version.locator("option")).toHaveCount(3);
+  expect(
+    await version.locator("option").evaluateAll((o) => o.map((e) => (e as HTMLOptionElement).value)),
+  ).toEqual(["original", newer.copy.id, made.copy.id]);
+  // Named as on the sheet, with the level it was made at: "Meine Fassung vom 7. Oktober, 14:20 · Stufe 1".
   const at = new Date(made.copy.createdAt);
   const name = m["sheet.copyName"]
     .replace("{date}", new Intl.DateTimeFormat("de", { day: "numeric", month: "long" }).format(at))
-    .replace("{time}", new Intl.DateTimeFormat("de", { hour: "2-digit", minute: "2-digit" }).format(at));
-  await version.selectOption({ label: name });
+    .replace("{time}", new Intl.DateTimeFormat("de", { hour: "2-digit", minute: "2-digit" }).format(at))
+    .concat(` · Stufe ${made.copy.fromLevel}`);
+  // Both copies were made in the same minute at the same level: the same name, picked by its place.
+  await expect(version.locator(`option[value="${made.copy.id}"]`)).toHaveText(name);
+  await version.selectOption(made.copy.id);
   await dialog.getByRole("checkbox", { name: m["print.state"] }).check();
   await expectOneLanguage(page, "de");
   await axe(page);

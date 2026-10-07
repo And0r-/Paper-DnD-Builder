@@ -447,6 +447,7 @@
   "sheet.version": "Fassung",
   "sheet.original": "Original vom Builder",
   "sheet.copyName": "Meine Fassung vom {date}, {time}",
+  "sheet.copyChoice": "{name} · {levelName} {level}",
   "sheet.design": "Stil",
   "sheet.language": "Sprache",
   "sheet.clearChecks": "Alle Haken entfernen",

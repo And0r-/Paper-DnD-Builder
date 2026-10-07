@@ -23,8 +23,9 @@ import { Callout, EmptyState, ErrorState, Loading } from "../components/Feedback
 import { AppShell } from "../components/Shell.tsx";
 import { useDraft } from "../flow/draft-state.tsx";
 import { usePageTitle } from "../flow/frame.tsx";
+import { ptext } from "../package-text.ts";
 import { PrintDialog } from "../flow/print-dialog.tsx";
-import { copyName } from "./copy-name.ts";
+import { copyChoice, newestFirst } from "./copy-name.ts";
 import { ORIGINAL, useSheet, type SaveState, type SheetController } from "./sheet-state.ts";
 import { SHEET_UI, SheetUiProvider } from "./sheet-ui.tsx";
 
@@ -225,9 +226,11 @@ function SheetTools({
   onDownload: () => void;
 }) {
   const { t, lang } = useApp();
+  const { lp } = useDraft();
   const id = useId();
-  // Newest first, after the original.
-  const copies = [...sheet.copies].reverse();
+  // Newest first, after the original, as in the download dialog.
+  const copies = newestFirst(sheet.copies);
+  const levelName = ptext(lp, "level.name") ?? "";
   const select = (
     key: string,
     label: string,
@@ -285,7 +288,7 @@ function SheetTools({
         sheet.version,
         [
           { value: ORIGINAL, label: t("sheet.original") },
-          ...copies.map((c) => ({ value: c.id, label: copyName(t, lang, c) })),
+          ...copies.map((c) => ({ value: c.id, label: copyChoice(t, lang, levelName, c) })),
         ],
         sheet.select,
       )}

@@ -447,6 +447,7 @@
   "sheet.version": "Version",
   "sheet.original": "Original from the builder",
   "sheet.copyName": "My version of {date}, {time}",
+  "sheet.copyChoice": "{name} · {levelName} {level}",
   "sheet.design": "Style",
   "sheet.language": "Language",
   "sheet.clearChecks": "Clear all ticks",

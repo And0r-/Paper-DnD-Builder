@@ -16,7 +16,7 @@ import {
   type PrintPart,
 } from "@builder/sheet/printouts";
 import { useEffect, useId, useState } from "react";
-import { copyName } from "../sheet/copy-name.ts";
+import { copyChoice, newestFirst } from "../sheet/copy-name.ts";
 import { useApp } from "../app-state.tsx";
 import { api, type Account, type SheetDesignInfo } from "../api.ts";
 import { Button } from "../components/Button.tsx";
@@ -24,6 +24,9 @@ import { Dialog } from "../components/Dialog.tsx";
 import { Callout } from "../components/Feedback.tsx";
 import { Segmented } from "../components/Fields.tsx";
 import { Icon } from "../components/Icon.tsx";
+import { ptext } from "../package-text.ts";
+import { useDraft } from "./draft-state.tsx";
+import { fileNameOf } from "./file-name.ts";
 
 type PdfState = "idle" | "preparing" | "error" | "notYet";
 
@@ -31,6 +34,7 @@ type PdfState = "idle" | "preparing" | "error" | "notYet";
 interface CopyEntry {
   id: string;
   createdAt: string;
+  fromLevel: number;
 }
 
 const PART_KEYS = {
@@ -38,18 +42,6 @@ const PART_KEYS = {
   cards: { name: "print.cards", text: "print.cardsText" },
   texts: { name: "print.texts", text: "print.textsText" },
 } as const satisfies Record<PrintPart, { name: string; text: string }>;
-
-/** The file name the server gives in `filename*`, else the fallback. */
-function fileNameOf(res: Response, fallback: string): string {
-  const header = res.headers.get("content-disposition") ?? "";
-  const encoded = /filename\*=UTF-8''([^;]+)/i.exec(header)?.[1];
-  if (!encoded) return fallback;
-  try {
-    return decodeURIComponent(encoded);
-  } catch {
-    return fallback;
-  }
-}
 
 export function PrintDialog({
   open,
@@ -70,6 +62,7 @@ export function PrintDialog({
   version?: string;
 }) {
   const { t, lang, account, setAccount } = useApp();
+  const levelName = ptext(useDraft().lp, "level.name") ?? "";
   const [parts, setParts] = useState<Set<PrintPart>>(new Set());
   const [design, setDesign] = useState<PrintChoice["design"]>("verbose");
   const [filled, setFilled] = useState(false);
@@ -148,7 +141,7 @@ export function PrintDialog({
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = fileNameOf(res, `${name || "character"}.pdf`);
+      a.download = fileNameOf(res.headers.get("content-disposition"), `${name || "character"}.pdf`);
       a.click();
       setTimeout(() => URL.revokeObjectURL(url), 10_000);
       setPdf("idle");
@@ -255,9 +248,9 @@ export function PrintDialog({
             onChange={(e) => setVersion(e.target.value)}
           >
             <option value="original">{t("sheet.original")}</option>
-            {copies.map((c) => (
+            {newestFirst(copies).map((c) => (
               <option key={c.id} value={c.id}>
-                {copyName(t, lang, c)}
+                {copyChoice(t, lang, levelName, c)}
               </option>
             ))}
           </select>

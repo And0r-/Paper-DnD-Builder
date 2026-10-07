@@ -206,7 +206,7 @@ export function sheetTests(device: "phone" | "desk"): void {
       let list = await copies(page, id);
       expect(list.copies).toHaveLength(1);
       expect(list.opened).toBe(list.copies[0]!.id);
-      expect(await versionShown(page)).toMatch(/^Meine Fassung vom \d+\. \w+, \d\d:\d\d$/);
+      expect(await versionShown(page)).toMatch(/^Meine Fassung vom \d+\. \w+, \d\d:\d\d · Stufe \d+$/);
       // The original stays as the builder makes it.
       expect(
         (await original(page, id)).sections
