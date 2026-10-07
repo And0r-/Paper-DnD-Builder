@@ -78,8 +78,9 @@ export function apiErrorMessage(e: ApiError, baseUrl: string): string {
     case "notLoggedIn":
       return (
         "The character builder does not accept the access key: it was withdrawn in the settings, has ended, " +
-        "or is mistyped. The player can make a new key in the builder under Settings and put it into " +
-        "config.json next to server.mjs (or download the package again)."
+        "or is mistyped. The player can make a new key in the builder under Settings, Access keys and put " +
+        "it where the old one was: as BUILDER_KEY in the MCP program's configuration (for example " +
+        "claude_desktop_config.json), which wins, or in config.json next to server.mjs."
       );
     case "draftNotFound":
       return "There is no character with this id in this account. list_characters shows the player's characters.";

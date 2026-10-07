@@ -20,6 +20,9 @@ export function createMcpServer(client: ApiClient, tools: readonly Tool[] = TOOL
       async (input) => toCallToolResult(await tool.run(client, input)),
     );
   }
+  // The library announces a changing tool list; this one never changes, and
+  // over stateless HTTP no change could even be sent.
+  server.server.registerCapabilities({ tools: { listChanged: undefined } });
   return server;
 }
 
