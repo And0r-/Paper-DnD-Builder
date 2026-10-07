@@ -29,6 +29,7 @@
   "devDependencies": {
     "@axe-core/playwright": "4.13.0",
     "@builder/demo-package": "workspace:*",
+    "@builder/mcp": "workspace:*",
     "@electric-sql/pglite": "^0.5.8",
     "@playwright/test": "1.63.0",
     "@types/nodemailer": "^8.0.2",
