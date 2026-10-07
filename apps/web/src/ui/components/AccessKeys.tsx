@@ -79,8 +79,7 @@ export function AccessKeys() {
 
   return (
     <>
-      {/* Above the keys: a package with a key adds one to the list below. */}
-      <LanguageModelHelp onKeyMade={() => setAttempt((n) => n + 1)} />
+      <LanguageModelHelp />
       <section className="settings__section" aria-labelledby="s-keys">
         <h2 className="section-title" id="s-keys">
           {t("settings.keys")}
