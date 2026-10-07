@@ -9,6 +9,8 @@ import { evaluateDraft, type Evaluation } from "@builder/core";
 import { renderPdf } from "@builder/print";
 import {
   buildSheetModel,
+  copyWhen,
+  isTimeZone,
   sheetModelSchema,
   DEFAULT_API_PARTS,
   DESIGN_IDS,
@@ -25,7 +27,7 @@ import { HttpError, json } from "../http.ts";
 import type { ReachableDraftRow } from "../../store.ts";
 import type { RequestContext, Route } from "../router.ts";
 import { loadDraft, packageOf } from "./drafts.ts";
-import { copyView, loadCopy } from "./sheet-copies.ts";
+import { copyView, defaultName, loadCopy } from "./sheet-copies.ts";
 
 /** Making a PDF takes a moment of CPU; this is plenty for printing and stops a loop from hogging the server. */
 const PDF_LIMIT = { max: 20, windowMs: 10 * 60_000 };
@@ -35,13 +37,15 @@ const PDF_LIMIT = { max: 20, windowMs: 10 * 60_000 };
  * `parts` the PDF is the sheet and the cards, as before there were parts.
  * Designs that are planned but not drawn yet say so (`400` with their own
  * code), so a caller can tell them from a typo. `version` is `original` or
- * the id of a kept copy.
+ * the id of a kept copy. `tz` is the reader's time zone, for the time a
+ * copy was made (its name); without it, the server's.
  */
 function printRequest(url: URL): {
   parts: PrintPart[] | undefined;
   design: string;
   version: string;
   filled: boolean;
+  timeZone: string | undefined;
 } {
   const bad = (parameter: string, value: string): never => {
     throw new HttpError(400, "badQuery", { parameter, value });
@@ -60,7 +64,10 @@ function printRequest(url: URL): {
   }
   const state = url.searchParams.get("state") ?? "empty";
   if (state !== "empty" && state !== "filled") bad("state", state);
+  const timeZone = url.searchParams.get("tz") ?? undefined;
+  if (timeZone !== undefined && !isTimeZone(timeZone)) bad("tz", timeZone);
   return {
+    timeZone,
     parts,
     design,
     version: url.searchParams.get("version") ?? "original",
@@ -130,14 +137,18 @@ function buildOriginal(
  * texts (in the copy's language and units, so the file stays in one), and
  * only when they are asked for: the sheet of a copy prints even when the
  * character is no longer finished or its package is gone. A row the player
- * wrote into a copy has no card and no rules text.
+ * wrote into a copy has no card and no rules text. A copy with the name it
+ * was given when made is named as on the screen, by the minute it was made
+ * ("Meine Fassung vom 7. Oktober, 09:40"); `file` says the same for the
+ * file name. The original has no `file`.
  */
 async function printedSheet(
   ctx: RequestContext,
   version: string,
   parts: readonly PrintPart[],
+  timeZone: string | undefined,
   beforeBuild: (accountId: string) => void,
-): Promise<{ model: SheetModel; row: ReachableDraftRow }> {
+): Promise<{ model: SheetModel; row: ReachableDraftRow; file?: string }> {
   if (version === "original") return originalSheet(ctx, beforeBuild);
   const { row, viewer } = await loadDraft(ctx);
   const copy = await loadCopy(ctx, row.id, version).catch((e: unknown) => {
@@ -149,10 +160,17 @@ async function printedSheet(
   const parsed = sheetModelSchema.safeParse(copyView(copy).model);
   if (!parsed.success) throw new HttpError(409, "copyUnreadable", { version });
   beforeBuild(viewer.id);
-  const model = parsed.data;
-  if (!parts.includes("cards") && !parts.includes("texts")) return { model, row };
+  const m = MESSAGES[copy.language]!;
+  const at = copyWhen(copy.language, copy.created_at, { timeZone, now: ctx.app.now() });
+  const named = copy.name !== defaultName(copy.language, copy.created_at);
+  const name = named ? copy.name : m.copyNameAt(at.date, at.time);
+  const { origin } = parsed.data;
+  if (origin.kind !== "copy") throw new Error("a kept copy that is not a copy");
+  const model: SheetModel = { ...parsed.data, origin: { ...origin, name } };
+  const file = named ? copy.name : m.copyFile(at.date, at.time);
+  if (!parts.includes("cards") && !parts.includes("texts")) return { model, row, file };
   const original = buildOriginal(ctx, row, { language: copy.language, units: copy.units });
-  return { model: { ...model, cards: original.cards, rulesTexts: original.rulesTexts }, row };
+  return { model: { ...model, cards: original.cards, rulesTexts: original.rulesTexts }, row, file };
 }
 
 export const printRoutes: Route[] = [
@@ -178,9 +196,9 @@ export const printRoutes: Route[] = [
     method: "GET",
     path: "/api/drafts/:id/pdf",
     handler: async (ctx) => {
-      const { parts, design, version, filled } = printRequest(ctx.url);
+      const { parts, design, version, filled, timeZone } = printRequest(ctx.url);
       const printed = parts ?? DEFAULT_API_PARTS;
-      const { model, row } = await printedSheet(ctx, version, printed, (accountId) => {
+      const { model, row, file } = await printedSheet(ctx, version, printed, timeZone, (accountId) => {
         const limit = ctx.app.limiter.take(`pdf:account:${accountId}`, PDF_LIMIT);
         if (!limit.ok) {
           throw new HttpError(429, "tooManyRequests", {}, { "Retry-After": String(limit.retryAfter) });
@@ -189,10 +207,15 @@ export const printRoutes: Route[] = [
       // The play state is one per character, for the original and every copy alike.
       const play: PlayState = filled ? ((await ctx.app.store.findCharacterState(row.id))?.state ?? {}) : {};
       const pdf = await renderPdf(model, { parts: printed, design, play });
-      // Asked for parts, the file name says which: "Mira - Sheet.pdf".
+      // Asked for parts, the file name says which: "Mira - Sheet.pdf". A copy says which copy,
+      // so it is not taken for the original in a downloads folder: "Mira - Version October 7 09-40 - Sheet.pdf".
       const m = MESSAGES[model.language]!;
       const words: Record<PrintPart, string> = { sheet: m.sheet, cards: m.cards, texts: m.rulesTexts };
-      const fileName = parts ? `${model.name} - ${parts.map((p) => words[p]).join(", ")}` : model.name;
+      const fileName = [
+        model.name,
+        ...(file ? [file] : []),
+        ...(parts ? [parts.map((p) => words[p]).join(", ")] : []),
+      ].join(" - ");
       return new Response(pdf.bytes, {
         status: 200,
         headers: {

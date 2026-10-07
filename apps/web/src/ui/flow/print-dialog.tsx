@@ -124,6 +124,8 @@ export function PrintDialog({
       // A copy deleted meanwhile prints the original rather than nothing.
       version: copies.some((c) => c.id === version) ? version : "original",
       state,
+      // A copy is named by the minute it was made, as on this screen: in this device's time zone.
+      tz: Intl.DateTimeFormat().resolvedOptions().timeZone,
     });
     try {
       const res = await fetch(`/api/drafts/${draftId}/pdf?${query}`, {

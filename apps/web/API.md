@@ -385,6 +385,12 @@ Query parameters of the PDF, all optional:
   even when the character is no longer finished; with cards or rules
   texts it needs the finished original (`409 notFinished`). An id that is
   not a copy of this character answers `404 versionNotFound`.
+- `tz`: the reader's time zone (`Europe/Zurich`), optional. A copy that
+  kept the name it was made with is printed as the screen names it, by the
+  minute it was made in that zone ("Meine Fassung vom 7. Oktober, 09:40");
+  without `tz`, in the server's zone. The file name of a copy says which
+  copy, so it is not taken for the original: "Mira - Fassung 7. Oktober
+  09-40 - Bogen.pdf". An unknown zone answers `400 badQuery`.
 - `state`: `empty` (default), a sheet to write on, or `filled`: the play
   state (`GET /api/drafts/:id/state`) written into the fields of the sheet
   and the cards. Ticks beyond what a field holds are cut; a field the

@@ -83,7 +83,7 @@ function copyEntry(c: SheetCopyEntry) {
  * the ones on the page (a reader of the API, such as a later MCP server,
  * would get two).
  */
-function kept(model: SheetModel): SheetModel {
+function kept<M extends object>(model: M): M {
   return { ...model, values: [] };
 }
 
@@ -133,7 +133,7 @@ export async function loadCopy(
 }
 
 /** "Meine Fassung vom 6. Oktober 2026", in the sheet's (the account's) language. */
-function defaultName(language: string, now: Date): string {
+export function defaultName(language: string, now: Date): string {
   const date = new Intl.DateTimeFormat(language, { dateStyle: "long" }).format(now);
   return MESSAGES[language]!.copyName(date);
 }

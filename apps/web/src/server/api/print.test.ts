@@ -175,6 +175,7 @@ describe("the parts of a printout", () => {
     expect(await code("parts=sheet,poster")).toEqual([400, "badQuery"]);
     expect(await code("design=fancy")).toEqual([400, "badQuery"]);
     expect(await code("state=half")).toEqual([400, "badQuery"]);
+    expect(await code("tz=Mars/Olympus")).toEqual([400, "badQuery"]);
     expect(await code("version=0b0f0c3e-1d5a-4a8e-9f00-000000000000")).toEqual([404, "versionNotFound"]);
     expect(await code("version=copy-1")).toEqual([404, "versionNotFound"]);
     // None of these used up the PDF limit.
@@ -236,9 +237,22 @@ describe("printing a kept copy and the play state", () => {
     // The account switches to English with feet; the copy stays German with meters.
     await client.call("PATCH", "/api/account/settings", { language: "en", units: { length: "ft" } });
 
-    const sheet = await client.request("GET", `/api/drafts/${id}/pdf?parts=sheet&version=${copyId}`);
+    // Named as on the screen, by the minute it was made, in the reader's time zone (10:00 UTC);
+    // the file name says it too, so the copy is not taken for the original.
+    const sheet = await client.request(
+      "GET",
+      `/api/drafts/${id}/pdf?parts=sheet&version=${copyId}&tz=Europe%2FZurich`,
+    );
     expect(sheet.status).toBe(200);
-    const kept = made.model as SheetModel;
+    expect(sheet.headers.get("content-disposition")).toBe(
+      `attachment; filename="Mira-Fennwick-Fassung-4-Oktober-12-00-Bogen.pdf"; filename*=UTF-8''${encodeURIComponent("Mira Fennwick - Fassung 4. Oktober 12-00 - Bogen.pdf")}`,
+    );
+    const stored = made.model as SheetModel;
+    if (stored.origin.kind !== "copy") throw new Error("not a copy");
+    const kept: SheetModel = {
+      ...stored,
+      origin: { ...stored.origin, name: "Meine Fassung vom 4. Oktober, 12:00" },
+    };
     const sheetBytes = await bytes(sheet);
     expect(sheetBytes.equals(Buffer.from((await renderPdf(kept, { parts: ["sheet"] })).bytes))).toBe(true);
     expect(sheetBytes.toString("latin1")).toContain("/Lang (de)");
@@ -246,7 +260,7 @@ describe("printing a kept copy and the play state", () => {
     // Cards and rules texts are the original's, in the copy's language and units.
     const all = await client.request(
       "GET",
-      `/api/drafts/${id}/pdf?parts=sheet,cards,texts&version=${copyId}`,
+      `/api/drafts/${id}/pdf?parts=sheet,cards,texts&version=${copyId}&tz=Europe%2FZurich`,
     );
     expect(all.status).toBe(200);
     expect(all.headers.get("content-disposition")).toContain("Bogen%2C%20Karten%2C%20Regeltexte");
@@ -299,9 +313,12 @@ describe("printing a kept copy and the play state", () => {
     const made = (await client.call("POST", `/api/drafts/${id}/sheet-copies`, {})).json;
     const copy = await client.request(
       "GET",
-      `/api/drafts/${id}/pdf?parts=sheet&state=filled&version=${made.copy.id}`,
+      `/api/drafts/${id}/pdf?parts=sheet&state=filled&version=${made.copy.id}&tz=UTC`,
     );
-    const kept = await renderPdf(made.model as SheetModel, { parts: ["sheet"], play });
+    const stored = made.model as SheetModel;
+    if (stored.origin.kind !== "copy") throw new Error("not a copy");
+    const named = { ...stored, origin: { ...stored.origin, name: "Meine Fassung vom 4. Oktober, 10:00" } };
+    const kept = await renderPdf(named, { parts: ["sheet"], play });
     expect((await bytes(copy)).equals(Buffer.from(kept.bytes))).toBe(true);
   });
 

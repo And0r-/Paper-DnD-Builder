@@ -133,7 +133,18 @@ function words(values: Iterable<TextValue | string>): Set<string> {
 
 function messageWords(language: string): Set<string> {
   const m = MESSAGES[language]!;
-  const { startValue, page, unitsUsed, createdOn, copyName, asOfLevel, count, ...plain } = m;
+  const {
+    startValue,
+    page,
+    unitsUsed,
+    createdOn,
+    copyName,
+    copyNameAt,
+    copyFile,
+    asOfLevel,
+    count,
+    ...plain
+  } = m;
   return words([
     ...Object.values(plain),
     startValue(""),
@@ -141,6 +152,8 @@ function messageWords(language: string): Set<string> {
     unitsUsed([]),
     createdOn(""),
     copyName(""),
+    copyNameAt("", ""),
+    copyFile("", ""),
     asOfLevel(4),
     count("2", ""),
   ]);
@@ -1846,6 +1859,23 @@ describe("the verbose design: original and copy, empty and filled", () => {
       expect(page).toContain("…");
       expect(page).toContain("as of level 3");
       expect(page).toContain("Units: feet");
+    }
+  });
+
+  it("shortens a long character name in a copy's footer first: the copy's date and time stay whole", async () => {
+    for (const design of ["verbose", "classic"] as const) {
+      const original = buildSheetModel(pkg, river3(), { language: "de", createdAt });
+      // The longest name the builder takes (40 letters).
+      const copy = keptCopy(
+        { ...original, name: "Mirabella Fennwick-Ottersteg von Hollern" },
+        "Meine Fassung vom 7. Oktober, 09:40",
+      );
+      const { pageTexts, minFontSize } = await extract(await renderPdf(copy, { ...sheetOnly, design }));
+      expect(minFontSize).toBeGreaterThanOrEqual(6.99);
+      for (const page of pageTexts) {
+        expect(page, design).toContain("Meine Fassung vom 7. Oktober, 09:40 · Stand Stufe 3");
+        expect(page, design).toMatch(/Mirabella[^·]*… · Meine Fassung/u);
+      }
     }
   });
 

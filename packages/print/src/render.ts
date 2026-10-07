@@ -436,8 +436,9 @@ function flowRows(rows: FlowRow[], bottom: number): FlowPlaced[][] {
 /**
  * The footer of a sheet or rules texts page: a line, who and which page,
  * and the date. A kept copy says which copy and the level of the original
- * it was made from ("as of level 4"), its name shortened if the line would
- * not fit at the smallest size.
+ * it was made from ("as of level 4"). If the line would not fit at the
+ * smallest size, the character's name is shortened (to 8 letters at least),
+ * and only then the copy's.
  */
 function pageFooter(pen: Pen, g: GridGeometry, model: SheetModel, page: number, total: number): void {
   const style = { ...S.footer, size: g.type.footer };
@@ -447,16 +448,22 @@ function pageFooter(pen: Pen, g: GridGeometry, model: SheetModel, page: number, 
   pen.line(left, line, right, line, 0.3, "#999");
   const room = right - left - 40;
   const m = pen.messages;
-  const words = (copyName: string) =>
+  const words = (who: string, copyName: string) =>
     (model.origin.kind === "copy"
-      ? [model.name, copyName, m.asOfLevel(model.origin.fromLevel), model.unitsLine, m.page(page, total)]
-      : [model.name, model.levelLabel, model.unitsLine, m.page(page, total)]
+      ? [who, copyName, m.asOfLevel(model.origin.fromLevel), model.unitsLine, m.page(page, total)]
+      : [who, model.levelLabel, model.unitsLine, m.page(page, total)]
     ).join(" · ");
-  let name = model.origin.kind === "copy" ? model.origin.name : "";
-  let footer = words(name);
-  while (name.length > 1 && pen.width(footer, { ...style, size: g.type.min }) > room) {
-    name = name.slice(0, -1);
-    footer = words(`${name.trimEnd()}…`);
+  const fits = (text: string) => pen.width(text, { ...style, size: g.type.min }) <= room;
+  const cut = (text: string, n: number) => (n >= text.length ? text : `${text.slice(0, n).trimEnd()}…`);
+  // The copy's name (its date and time) tells copies apart: the character's name gives way first.
+  const copyName = model.origin.kind === "copy" ? model.origin.name : "";
+  let who = model.name.length;
+  let which = copyName.length;
+  let footer = words(model.name, copyName);
+  while (!fits(footer) && (who > 8 || which > 1)) {
+    if (who > 8) who--;
+    else which--;
+    footer = words(cut(model.name, who), cut(copyName, which));
   }
   pen.text(footer, left, g.page.height - g.margin, pen.fit(footer, style, room, g.type.min));
   pen.text(model.createdOn, right, g.page.height - g.margin, style, "right");

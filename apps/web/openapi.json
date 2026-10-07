@@ -2236,6 +2236,13 @@
               "enum": ["empty", "filled"],
               "default": "empty"
             }
+          },
+          {
+            "name": "tz",
+            "in": "query",
+            "required": false,
+            "description": "The reader's time zone (`Europe/Zurich`). A copy that kept the name it was made with is printed as the screen names it, by the minute it was made in this zone; the file name of a copy names it too. Without it, the server's zone.",
+            "schema": { "type": "string" }
           }
         ],
         "responses": {

@@ -5,6 +5,7 @@
  * No layout and no PDF here, and nothing about any game.
  */
 export { cardCount, isCard } from "./cards.ts";
+export { copyWhen, isTimeZone, type CopyWhen } from "./copy-name.ts";
 export {
   hasRows,
   pencilValue,
