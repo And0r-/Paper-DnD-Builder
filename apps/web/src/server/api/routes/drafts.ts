@@ -7,6 +7,7 @@
 import {
   applyChange,
   evaluateDraft,
+  explainValue,
   levelUp,
   levelUpState,
   newDraft,
@@ -196,6 +197,22 @@ export const draftRoutes: Route[] = [
     handler: async (ctx) => {
       const { row } = await loadDraft(ctx);
       return json(200, draftView(row, ctx.app.packages.get(row.package_id)));
+    },
+  },
+  {
+    // Where one number comes from: the parts the screen explains it with,
+    // as data (ids, not words), so a tool reads the same answer.
+    method: "GET",
+    path: "/api/drafts/:id/explain/:value",
+    handler: async (ctx) => {
+      const { row } = await loadDraft(ctx);
+      const pkg = packageOf(ctx.app, row);
+      const value = ctx.params["value"]!;
+      const ev = evaluateDraft(pkg, row.document);
+      if (!Object.hasOwn(ev.values, value)) throw new HttpError(404, "valueNotFound");
+      // No parts when they do not add up to the number (a minimum or maximum cut it).
+      const parts = explainValue(pkg, ev, value)?.parts ?? null;
+      return json(200, { value, total: ev.values[value], parts });
     },
   },
   {

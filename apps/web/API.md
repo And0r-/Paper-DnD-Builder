@@ -96,17 +96,18 @@ Every change sends the `version` it was made on. If the draft has moved on,
 the answer is `409 versionConflict` with the current state in
 `error.current` (optimistic locking).
 
-| Method & path                            | Body                    | Result                                                                                                      |
-| ---------------------------------------- | ----------------------- | ----------------------------------------------------------------------------------------------------------- |
-| 🔒 `GET /api/drafts`                     | —                       | The account's own drafts with summaries (a game master finds the players' in the campaign).                 |
-| 🔒 `POST /api/drafts`                    | `{ packageId, level? }` | `201`, new draft at version 1.                                                                              |
-| 🔒 `GET /api/drafts/:id`                 | —                       | The draft.                                                                                                  |
-| 🔒 `PATCH /api/drafts/:id`               | `{ version, level }`    | Changes the level.                                                                                          |
-| 🔒 `PUT /api/drafts/:id/pools/:step`     | `{ version, picks }`    | All picks of a step with a shared list (`steps[].pool`); the core spreads them over the step's choices.     |
-| 🔒 `PUT /api/drafts/:id/answers/:choice` | `{ version, answer }`   | Answers one choice; `answer: null` removes it. `422 changeRejected` with the reason if it does not fit now. |
-| 🔒 `POST /api/drafts/:id/level-up`       | `{ version, level }`    | Raises a finished character; see [Raising a character](#raising-a-character).                               |
-| 🔒 `POST /api/drafts/:id/finish`         | `{ version }`           | Marks the character finished; `422 incomplete` with the open choices.                                       |
-| 🔒 `DELETE /api/drafts/:id`              | —                       | `204`.                                                                                                      |
+| Method & path                            | Body                    | Result                                                                                                                        |
+| ---------------------------------------- | ----------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| 🔒 `GET /api/drafts`                     | —                       | The account's own drafts with summaries (a game master finds the players' in the campaign).                                   |
+| 🔒 `POST /api/drafts`                    | `{ packageId, level? }` | `201`, new draft at version 1.                                                                                                |
+| 🔒 `GET /api/drafts/:id`                 | —                       | The draft.                                                                                                                    |
+| 🔒 `GET /api/drafts/:id/explain/:value`  | —                       | Where one number comes from: its parts and their sources; see [Explaining a value](#explaining-a-value). `404 valueNotFound`. |
+| 🔒 `PATCH /api/drafts/:id`               | `{ version, level }`    | Changes the level.                                                                                                            |
+| 🔒 `PUT /api/drafts/:id/pools/:step`     | `{ version, picks }`    | All picks of a step with a shared list (`steps[].pool`); the core spreads them over the step's choices.                       |
+| 🔒 `PUT /api/drafts/:id/answers/:choice` | `{ version, answer }`   | Answers one choice; `answer: null` removes it. `422 changeRejected` with the reason if it does not fit now.                   |
+| 🔒 `POST /api/drafts/:id/level-up`       | `{ version, level }`    | Raises a finished character; see [Raising a character](#raising-a-character).                                                 |
+| 🔒 `POST /api/drafts/:id/finish`         | `{ version }`           | Marks the character finished; `422 incomplete` with the open choices.                                                         |
+| 🔒 `DELETE /api/drafts/:id`              | —                       | `204`.                                                                                                                        |
 
 Answer shapes by choice kind: `pickOne` `{ "pick": "thing.key" }`,
 `pickMany` `{ "picks": [...] }`, `distribute`
@@ -206,6 +207,43 @@ Errors:
 | `422`  | `changeRejected`, `reason: { code: "levelOutOfRange", min, max }` | Above the package's `flow.level.max` (or not a level at all).                                        |
 | `409`  | `versionConflict`                                                 | The draft moved on (see above).                                                                      |
 | `400`  | `badRequest`                                                      | `level` is not a whole number.                                                                       |
+
+### Explaining a value
+
+`GET /api/drafts/:id/explain/:value` answers where a number of the character
+comes from, as the screen explains it ("7 from the scores + 1 from Ferry
+Child = 8"). Data, not sentences: the sources name ids, their words are in
+the package texts, as everywhere in the draft view.
+
+```json
+{
+  "value": "grace",
+  "total": 8,
+  "parts": [
+    { "amount": 7, "source": { "kind": "choice", "choice": "scores" } },
+    { "amount": 1, "source": { "kind": "thing", "thing": "upbringing.ferry-child" } }
+  ]
+}
+```
+
+| `source.kind` | Meaning                                                                                                                                    |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `start`       | The fixed number the value starts at, or a number in its formula.                                                                          |
+| `choice`      | Set or raised by the answer to `choice` (for a copy, the copy's id). A choice a thing brought along has that thing in `steps[].grantedBy`. |
+| `thing`       | Given by `thing`, which the character has.                                                                                                 |
+| `values`      | Worked out from these other `values` (`level` included).                                                                                   |
+| `unclear`     | Two ways gave the same number; no source rather than a wrong one.                                                                          |
+
+Parts from the same source are added up, parts of 0 left out; the amounts
+add up to `total` (a part can be negative). `parts` is `null` if the value
+cannot be told apart as a sum (a minimum or maximum cut it). A value id the
+package does not have answers `404 valueNotFound`.
+
+The screen works the same explanation out in the browser with the same
+function of the rule core (`explainValue`), on the package and draft it
+loaded over the API; it also explains numbers a player is still moving,
+before they are saved. A test holds the route and the screen to the same
+parts for every value of a demo character.
 
 ### Reading `evaluation`: what to answer next
 
@@ -516,6 +554,7 @@ Tests: [`sheet-copies.test.ts`](src/server/api/sheet-copies.test.ts).
 | `404`  | `keyNotFound`          | No access key with this id in this account.                                                        |
 | `404`  | `packageNotFound`      | No loaded package with this id.                                                                    |
 | `404`  | `languageNotFound`     | The package has no texts in this language.                                                         |
+| `404`  | `valueNotFound`        | The draft's package has no value with this id (explaining a value).                                |
 | `404`  | `versionNotFound`      | No such copy of the sheet: not `original` and not a kept copy of this character.                   |
 | `405`  | `methodNotAllowed`     | The path exists, the method does not.                                                              |
 | `409`  | `versionConflict`      | The draft, copy or play state moved on; `current` holds it now.                                    |
