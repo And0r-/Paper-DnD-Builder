@@ -165,8 +165,10 @@ export interface HeldThing {
   pickedIn?: string;
   /** The thing that granted it, if it was granted. */
   grantedBy?: string;
-  /** Step that brought it to the character. */
-  step: string;
+  /** Every character of the package has it (`flow.grants`); then it has no step. */
+  everyone?: true;
+  /** Step that brought it to the character; absent for things every character has. */
+  step?: string;
   /** Character level from which the character has it. */
   atLevel: number;
   /** How many of it, if more than one: the `count` of every grant that gives it, added up. */
@@ -260,8 +262,8 @@ class Character {
    */
   give(
     id: string,
-    via: { pickedIn?: string; grantedBy?: string },
-    step: string,
+    via: { pickedIn?: string; grantedBy?: string; everyone?: true },
+    step: string | undefined,
     atLevel: number,
     choices: Grant[],
     count = 1,
@@ -279,7 +281,14 @@ class Character {
     // A thing counts once; only a repeatable one asks its choices again, once per pick.
     if (held && !thing.repeatable) return;
     if (!held) {
-      this.held.set(id, { id, kind: thing.kind, ...via, step, atLevel, ...(count > 1 ? { count } : {}) });
+      this.held.set(id, {
+        id,
+        kind: thing.kind,
+        ...via,
+        ...(step !== undefined ? { step } : {}),
+        atLevel,
+        ...(count > 1 ? { count } : {}),
+      });
       this.memo.clear();
     }
     const again = held !== undefined;
@@ -532,6 +541,49 @@ function walk(
     return pending;
   });
 
+  /**
+   * SPEC 9.4: one step per newly granted choice at the front of the queue, in
+   * grant order; a choice with a gather group whose step is still ahead waits there.
+   */
+  const insertGranted = (granted: Grant[]): void => {
+    const inserted: PendingStep[] = [];
+    for (const g of granted) {
+      const group = choiceOf(g.choice)?.gather;
+      const gatherStep = group !== undefined ? gatherAhead.get(group) : undefined;
+      const waiting = gatherStep?.gather!.gathered.find((w) => w.choice === g.choice);
+      if (waiting) {
+        if (!waiting.by.includes(g.by)) waiting.by.push(g.by);
+        waiting.atLevel = Math.min(waiting.atLevel, g.atLevel);
+        continue;
+      }
+      const existing = inserted.find((p) => p.id === g.choice);
+      if (existing) {
+        existing.grantedBy.push(g.by);
+        existing.atLevel = Math.min(existing.atLevel, g.atLevel);
+        continue;
+      }
+      if (scheduled.has(g.choice)) continue;
+      scheduled.add(g.choice);
+      if (gatherStep) gatherStep.gather!.gathered.push({ choice: g.choice, by: [g.by], atLevel: g.atLevel });
+      else
+        inserted.push({
+          id: g.choice,
+          choices: [g.choice],
+          origin: "granted",
+          grantedBy: [g.by],
+          atLevel: g.atLevel,
+        });
+    }
+    queue.unshift(...inserted);
+  };
+
+  // Things every character has come before the first step; the choices they
+  // grant are asked first.
+  const fromPackage: Grant[] = [];
+  for (const id of pkg.flow.grants ?? [])
+    character.give(id, { everyone: true }, undefined, pkg.flow.level.min, fromPackage);
+  insertGranted(fromPackage);
+
   while (queue.length > 0) {
     const step = queue.shift()!;
     const shown = step.when === undefined || evaluateCondition(step.when, character.scope);
@@ -616,37 +668,8 @@ function walk(
       atLevel: step.atLevel,
     });
 
-    // SPEC 9.4: one step per newly granted choice, right after this step, in
-    // grant order; a choice with a gather group whose step is still ahead waits there.
-    const inserted: PendingStep[] = [];
-    for (const g of granted) {
-      const group = choiceOf(g.choice)?.gather;
-      const gatherStep = group !== undefined ? gatherAhead.get(group) : undefined;
-      const waiting = gatherStep?.gather!.gathered.find((w) => w.choice === g.choice);
-      if (waiting) {
-        if (!waiting.by.includes(g.by)) waiting.by.push(g.by);
-        waiting.atLevel = Math.min(waiting.atLevel, g.atLevel);
-        continue;
-      }
-      const existing = inserted.find((p) => p.id === g.choice);
-      if (existing) {
-        existing.grantedBy.push(g.by);
-        existing.atLevel = Math.min(existing.atLevel, g.atLevel);
-        continue;
-      }
-      if (scheduled.has(g.choice)) continue;
-      scheduled.add(g.choice);
-      if (gatherStep) gatherStep.gather!.gathered.push({ choice: g.choice, by: [g.by], atLevel: g.atLevel });
-      else
-        inserted.push({
-          id: g.choice,
-          choices: [g.choice],
-          origin: "granted",
-          grantedBy: [g.by],
-          atLevel: g.atLevel,
-        });
-    }
-    queue.unshift(...inserted);
+    // SPEC 9.4: one step per newly granted choice, right after this step.
+    insertGranted(granted);
   }
 
   // An info step shows what the thing gives the finished character: a grant's

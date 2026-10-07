@@ -1,7 +1,7 @@
 {
-  "formatVersion": "0.16",
+  "formatVersion": "0.17",
   "id": "demo",
-  "version": "0.15.0",
+  "version": "0.16.0",
   "languages": ["de", "en"],
   "kinds": [
     "folk",

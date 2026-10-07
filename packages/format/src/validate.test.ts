@@ -129,7 +129,7 @@ describe("cross-file rules", () => {
     [
       "format version",
       (f) => (f.get("manifest.json").formatVersion = "0.3"),
-      "manifest.json formatVersion: package is written for format 0.3, this builder understands 0.16",
+      "manifest.json formatVersion: package is written for format 0.3, this builder understands 0.17",
     ],
     [
       "duplicate thing",
@@ -255,7 +255,7 @@ describe("cross-file rules", () => {
     [
       "use boxes from a quantity",
       (f) => (thing(f, "talents-and-traits", "trait.stone-steady").stats.uses = { amount: 5, unit: "ft" }),
-      'things/talents-and-traits.json [9].stats.uses: sections[7].uses draws use boxes from this stat; it must be a whole number ≥ 0, {"text": …} or {"value": …}',
+      'things/talents-and-traits.json [10].stats.uses: sections[7].uses draws use boxes from this stat; it must be a whole number ≥ 0, {"text": …} or {"value": …}',
     ],
     [
       "use boxes from a fraction",
@@ -1143,5 +1143,32 @@ describe("card lines by origin (format 0.16)", () => {
     const r = mutate(change);
     expect(r.ok).toBe(false);
     expect(messages(r)).toContain(expected);
+  });
+});
+
+describe("things every character has (format 0.17)", () => {
+  it("accepts a package without them", () => {
+    expect(mutate((f) => delete f.get("flow.json").grants).ok).toBe(true);
+  });
+
+  it.each<[string, (f: RawFiles) => void, string]>([
+    [
+      "an unknown thing",
+      (f) => f.get("flow.json").grants.push("talent.mist-sign"),
+      'flow.json grants[1]: unknown thing "talent.mist-sign"',
+    ],
+    [
+      "a thing twice",
+      (f) => f.get("flow.json").grants.push("talent.mist-signs"),
+      'flow.json grants: thing "talent.mist-signs" is granted twice',
+    ],
+  ])("%s", (_name, change, expected) => {
+    const r = mutate(change);
+    expect(r.ok).toBe(false);
+    expect(messages(r)).toContain(expected);
+  });
+
+  it("is a list with at least one thing", () => {
+    expect(mutate((f) => (f.get("flow.json").grants = [])).ok).toBe(false);
   });
 });

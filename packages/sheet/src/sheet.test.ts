@@ -111,6 +111,13 @@ describe("sheet model", () => {
     expect(value("guard").text).not.toBe("");
   });
 
+  it("ticks a talent every character has without a pick (flow.grants, format 0.17)", () => {
+    const talents = sheet(level3).sections.find((s) => s.id === "talents")!;
+    const item =
+      talents.kind === "checkList" ? talents.items.find((i) => i.id === "talent.mist-signs") : undefined;
+    expect(item).toMatchObject({ name: "Nebelzeichen", marked: true });
+  });
+
   it("collects the full texts of every row and card thing, grouped by what brought them", () => {
     const model = sheet(level20);
     const ids = model.rulesTexts.flatMap((g) => g.entries.map((e) => e.id));

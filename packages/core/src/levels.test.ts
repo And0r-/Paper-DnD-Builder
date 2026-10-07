@@ -141,6 +141,7 @@ describe("a level-20 lantern bearer, worked out by hand", () => {
       listeningRoll: 9,
       legendsRoll: 3, // not trained
       weatherSenseRoll: 9,
+      mistSignsRoll: 9, // wit bonus 3 + 6, every character has it
       lanternStaffHit: 6, // might bonus 0 + practice 6 (lantern bearer)
       lanternStaffHarm: 0,
       boatHookHit: 0, // better of might and grace bonus, 0; not a river runner

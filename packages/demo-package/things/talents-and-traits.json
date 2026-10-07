@@ -112,6 +112,19 @@
     }
   },
   {
+    "id": "talent.mist-signs",
+    "kind": "talent",
+    "source": "mistland",
+    "stats": {
+      "score": {
+        "text": "value.wit.name"
+      },
+      "roll": {
+        "value": "mistSignsRoll"
+      }
+    }
+  },
+  {
     "id": "trait.mist-sight",
     "kind": "trait",
     "source": "mistland"

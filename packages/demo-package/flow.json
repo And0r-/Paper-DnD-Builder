@@ -815,6 +815,7 @@
       "gather": "mastery"
     }
   ],
+  "grants": ["talent.mist-signs"],
   "characterName": "name",
   "summary": {
     "fields": ["stamina", "guard", "pace", "luck"],
