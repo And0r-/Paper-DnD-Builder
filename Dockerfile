@@ -30,6 +30,9 @@ WORKDIR /app
 COPY --from=build --chown=node:node /repo/apps/web/.next/standalone ./web
 COPY --from=build --chown=node:node /repo/apps/web/.next/static ./web/apps/web/.next/static
 COPY --from=build --chown=node:node /repo/apps/web/public ./web/apps/web/public
+# The MCP download zips these per request (read from disk, so not traced into standalone).
+COPY --from=build --chown=node:node /repo/packages/mcp/dist ./web/packages/mcp/dist
+COPY --from=build --chown=node:node /repo/packages/mcp/templates ./web/packages/mcp/templates
 # Migration runner with its production dependencies.
 COPY --from=build --chown=node:node /out/db ./db
 COPY --chmod=0755 docker/entrypoint.sh /usr/local/bin/entrypoint

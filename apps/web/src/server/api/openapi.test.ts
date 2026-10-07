@@ -331,6 +331,10 @@ async function walk(server: TestServer): Promise<void> {
   await call("DELETE", "/api/account/keys/00000000-0000-4000-8000-000000000000");
   const second = await call("POST", "/api/account/keys", { name: "Second" });
   await call("DELETE", `/api/account/keys/${second.json.key.id}`);
+  // The MCP zip: with a new key from the session, without one from a key, refused to make one with a key.
+  expect((await c.request("POST", "/api/account/mcp-package", { withKey: true })).status).toBe(200);
+  await c.request("POST", "/api/account/mcp-package", { withKey: false }, { authorization: `Bearer ${key}` });
+  await call("POST", "/api/account/mcp-package", { withKey: true }, { authorization: `Bearer ${key}` });
 
   // Packages.
   await call("GET", "/api/packages?lang=en");

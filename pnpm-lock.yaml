@@ -205,6 +205,9 @@ importers:
       '@builder/format':
         specifier: workspace:*
         version: link:../../packages/format
+      '@builder/mcp':
+        specifier: workspace:*
+        version: link:../../packages/mcp
       '@builder/print':
         specifier: workspace:*
         version: link:../../packages/print
@@ -214,6 +217,9 @@ importers:
       '@node-rs/argon2':
         specifier: ^2.2.1
         version: 2.2.1
+      fflate:
+        specifier: ^0.8.3
+        version: 0.8.3
       next:
         specifier: ^16.3.8
         version: 16.3.8(@playwright/test@1.63.0)(@types/node@24.19.1)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
@@ -239,9 +245,6 @@ importers:
       '@builder/demo-package':
         specifier: workspace:*
         version: link:../../packages/demo-package
-      '@builder/mcp':
-        specifier: workspace:*
-        version: link:../../packages/mcp
       '@electric-sql/pglite':
         specifier: ^0.5.8
         version: 0.5.8
