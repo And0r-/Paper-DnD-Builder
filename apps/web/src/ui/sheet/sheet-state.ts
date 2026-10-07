@@ -18,6 +18,8 @@ import { useApp } from "../app-state.tsx";
 export interface CopyEntry {
   id: string;
   createdAt: string;
+  /** The level of the original the copy was made from. */
+  fromLevel: number;
   version: number;
   language: string;
 }

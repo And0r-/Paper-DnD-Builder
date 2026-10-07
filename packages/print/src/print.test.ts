@@ -178,6 +178,21 @@ beforeAll(async () => {
 });
 
 describe("printed character (demo package)", () => {
+  // poppler's pdftotext reads a line of just "9 m" as "9m" (two words of one letter); the PDF has the space.
+  it.each(["verbose", "classic"])(
+    "%s: a number and its unit with one space, short or long (9 m, 3 m as 18 m)",
+    async (design) => {
+      const model = buildSheetModel(pkg, demoCharacter(pkg, 5), {
+        language: "de",
+        units: { length: "m" },
+        createdAt,
+      });
+      const { text } = await extract(await renderPdf(model, { design }));
+      for (const q of ["9 m", "3 m", "18 m", "30 m"]) expect(text, design).toContain(q);
+      expect(text).not.toMatch(/\d(m|kg)\b/u);
+    },
+  );
+
   it("German with meters: sheet and cards, all text extractable, nothing in English", async () => {
     const { model, pdf, extracted } = await print("de", { length: "m", weight: "kg" });
     const ev = evaluateDraft(pkg, doc);

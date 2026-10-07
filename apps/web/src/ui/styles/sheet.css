@@ -139,18 +139,20 @@
   text-align: left;
 }
 
-/* With the sheet's tools the drawer takes a little more of a phone, so a version's name fits. */
+/* With the sheet's tools the drawer takes a little more of a phone, so a version's name fits.
+   A dialog's own max-width (100% less 2em and 6px) would hold it at 348 px on a phone 390 px wide. */
 .drawer:has(.sheet-tools--menu) {
-  width: min(22rem, 92vw);
+  width: min(24rem, 96vw);
+  max-width: none;
 }
 
-/* The drawer is narrow: its lists in a smaller type, so a version's name shows whole
-   ("Meine Fassung vom 7. Oktober, 13:15"). */
+/* The drawer is narrow: its lists in a smaller type, so a version's name shows whole with its
+   level ("Meine Fassung vom 7. Oktober, 13:15 · Stufe 3") on a phone 390 px wide. */
 .sheet-tools--menu .sheet-tools__select {
   padding-left: var(--space-2);
   padding-right: calc(var(--space-2) + 1.25rem);
   background-position: right var(--space-2) center;
-  font-size: var(--text-sm);
+  font-size: var(--text-xs);
 }
 
 @media (min-width: 900px) {
@@ -180,8 +182,8 @@
       white-space: nowrap;
     }
 
-    /* The version's name shows whole ("Meine Fassung vom 7. Oktober, 14:51"), so two copies of a
-       day tell apart; only a name longer than that is cut at its end. Style and language keep
+    /* The version's name shows whole ("Meine Fassung vom 7. Oktober, 14:51 · Stufe 3"), so two
+       copies of a day tell apart; only a name longer than that is cut at its end. Style and language keep
        their whole word. */
     .sheet-tools--bar .sheet-tools__field {
       flex: none;
@@ -189,7 +191,7 @@
 
     .sheet-tools--bar .sheet-tools__field:first-child .sheet-tools__select {
       width: 100%;
-      max-width: 24rem;
+      max-width: 27rem;
       text-overflow: ellipsis;
     }
   }
