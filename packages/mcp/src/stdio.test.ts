@@ -14,7 +14,7 @@ import { SERVER_NAME, toCallToolResult } from "./server.ts";
 import { TOOLS } from "./tools/index.ts";
 import { TOOL_DESCRIPTIONS } from "./tools/descriptions.ts";
 
-const STDIO = fileURLToPath(new URL("./stdio.ts", import.meta.url));
+const STDIO = fileURLToPath(new URL("./main.ts", import.meta.url));
 
 describe("the stdio server", () => {
   it("registers exactly the shared tool list", async () => {
@@ -25,10 +25,13 @@ describe("the stdio server", () => {
       env: { BUILDER_BASE_URL: "http://127.0.0.1:9", BUILDER_KEY: "cbk_test" },
       stderr: "pipe",
     });
+    let stderr = "";
+    transport.stderr?.on("data", (chunk: Buffer) => (stderr += chunk.toString()));
     const client = new Client({ name: "test", version: "0" });
     await client.connect(transport);
     try {
       expect(client.getServerVersion()?.name).toBe(SERVER_NAME);
+      expect(stderr).toBe("private, stdio\n");
       const { tools } = await client.listTools();
       expect(tools.map((t) => t.name)).toEqual(TOOLS.map((t) => t.name));
       expect(tools.map((t) => t.description)).toEqual(TOOLS.map((t) => t.description));
@@ -70,13 +73,14 @@ describe("configuration", () => {
   it("reads config.json next to the server", () => {
     const d = dir();
     writeFileSync(join(d, "config.json"), JSON.stringify({ baseUrl: "https://b.example", key: "cbk_file" }));
-    expect(loadConfig(d, {})).toEqual({ baseUrl: "https://b.example", key: "cbk_file" });
+    expect(loadConfig(d, {})).toEqual({ mode: "private", baseUrl: "https://b.example", key: "cbk_file" });
   });
 
   it("lets BUILDER_BASE_URL and BUILDER_KEY override the file", () => {
     const d = dir();
     writeFileSync(join(d, "config.json"), JSON.stringify({ baseUrl: "https://b.example", key: "cbk_file" }));
     expect(loadConfig(d, { BUILDER_KEY: "cbk_env" })).toEqual({
+      mode: "private",
       baseUrl: "https://b.example",
       key: "cbk_env",
     });
@@ -88,8 +92,31 @@ describe("configuration", () => {
   it("says what is missing", () => {
     const d = dir();
     expect(() => loadConfig(d, {})).toThrow(ConfigError);
-    expect(() => loadConfig(d, { BUILDER_BASE_URL: "https://b.example" })).toThrow(/No access key/);
+    expect(() => loadConfig(d, { BUILDER_BASE_URL: "https://b.example", BUILDER_KEY: "KEY" })).toThrow(
+      /must start with cbk_/,
+    );
     writeFileSync(join(d, "config.json"), "{ not json");
     expect(() => loadConfig(d, {})).toThrow(/not valid JSON/);
+  });
+
+  it("without a key: public, over HTTP on PORT (8787), with the allowed origins", () => {
+    const d = dir();
+    writeFileSync(join(d, "config.json"), JSON.stringify({ baseUrl: "https://b.example", key: "" }));
+    expect(loadConfig(d, {})).toEqual({
+      mode: "public",
+      baseUrl: "https://b.example",
+      port: 8787,
+      allowedOrigins: [],
+    });
+    expect(
+      loadConfig(d, { PORT: "9000", ALLOWED_ORIGINS: "https://a.example, http://localhost:3000" }),
+    ).toEqual({
+      mode: "public",
+      baseUrl: "https://b.example",
+      port: 9000,
+      allowedOrigins: ["https://a.example", "http://localhost:3000"],
+    });
+    expect(() => loadConfig(d, { PORT: "web" })).toThrow(/PORT/);
+    expect(() => loadConfig(d, { ALLOWED_ORIGINS: "https://a.example/path" })).toThrow(/ALLOWED_ORIGINS/);
   });
 });
