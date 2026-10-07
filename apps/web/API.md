@@ -71,37 +71,64 @@ trust. The key can do everything the screens can, in this account only.
 
 ## MCP
 
-A zip for a language model on the player's own computer (Claude Desktop,
-Claude Code, Cursor, any MCP program over stdio). The server in it,
-[`packages/mcp`](../../packages/mcp), talks to this API with an access key
-and to nothing else.
+Two ways for a language model to use this builder, both through the API
+with an access key and nothing else. The server never calls out and has no
+language model in it; the person chooses the model in their own program.
 
-| Method & path                      | Body          | Result                                                                                                                                              |
-| ---------------------------------- | ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 🔒 `POST /api/account/mcp-package` | `{ withKey }` | `200`, `application/zip`, `builder-mcp.zip`. With `withKey: true` also the headers `X-Builder-Key` (the new key) and `X-Builder-Key-Id` (its `id`). |
+### The public MCP server: `POST /mcp`
 
-| File in the zip              | What                                                                                                                                  |
-| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| `server.mjs`                 | The MCP server, one file, runs with Node 20 or newer. Bundled from `packages/mcp` when the web app is built.                          |
-| `config.json`                | `{ "baseUrl", "key" }`. `baseUrl` is the configured public address (`BASE_URL`), never the `Host` header. `key` is empty without one. |
-| `claude_desktop_config.json` | A ready `mcpServers` entry with a path placeholder (`PATH/server.mjs`, `PFAD/server.mjs`) the guide says to replace.                  |
-| `README.md`                  | The guide in the account's language, address and key name filled in; without a key it says where one goes.                            |
+An MCP server inside the web app (Streamable HTTP without sessions), for
+programs that speak MCP over HTTP with a header (Claude Code, Cursor, Open
+WebUI, ...):
 
-- **A new key needs the browser session**, as for `POST /api/account/keys`.
-  With a key instead, `withKey: true` gets `403 keyCannotMakeKeys` and
-  nothing is made; `withKey: false` gives the zip without a key.
-- The new key is named for the day in the account's language
-  (`MCP package, 2026-10-06`, `MCP-Paket, 6.10.2026`) and counts towards
-  the 20 keys (`422 tooManyKeys`).
-- The key is in this answer only: in `config.json` and in `X-Builder-Key`,
-  for the settings screen to show it once. The server keeps its hash, as
-  for every key. The answer is `Cache-Control: no-store`.
-- Why headers and not a JSON envelope with the zip in base64: the browser
-  saves the body as the file it is, without decoding a third more bytes,
-  and a program that only wants the zip ignores the headers.
-- The zip is made per request in memory; nothing is written to disk.
+```sh
+claude mcp add --transport http character-builder https://builder.example/mcp \
+  --header "Authorization: Bearer cbk_..."
+```
+
+- **Only `Authorization: Bearer cbk_...`**, on every request. No session
+  cookie, no key in the address. Without a valid key (none, unknown,
+  withdrawn, past its end): `401` with `WWW-Authenticate: Bearer` and a
+  message that says where to make a key. A withdrawn key is refused with
+  the very next request.
+- **Stateless:** no session id, every request is answered on its own as
+  plain JSON (`enableJsonResponse`), never as an open event stream. Works
+  behind any proxy. Only the package texts are kept between requests, once
+  per package and language, shared by all keys.
+- **The tools** are the ones of the zip ([`packages/mcp`](../../packages/mcp)).
+  They reach the API **in process**: their requests go straight into the same
+  API handler as `/api`, never through a socket, so nothing leaves the server.
+  They can do exactly what the key can do over the API; they never touch the
+  database.
+- **Refusals**, in this order, as JSON-RPC errors without an id:
+  `429` (more than 120 requests a minute from one address, with or without
+  a key; `Retry-After`), `413` (body over 1 MB), `403` (an `Origin` other
+  than `BASE_URL`; programs send none, a page on another site cannot reach
+  in), `401`.
+- **`GET /mcp`** from a browser (`Accept` with `text/html`) goes to the page
+  `/mcp/setup` (`303`). Anything else gets `405`: POST only.
+- Keys are never logged.
+
+### The zip to run it yourself: `GET /downloads/builder-mcp.zip`
+
+The same for everyone, **without a login**: `curl -O https://builder.example/downloads/builder-mcp.zip`
+works on a server without a screen. No key, nothing personal in it.
+
+| File in the zip              | What                                                                                                                                                                           |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `server.mjs`                 | The MCP server, one file, Node 20 or newer. With a key (in `config.json` or `BUILDER_KEY`): private, over stdio. Without one: public, over HTTP at `/mcp` (port `PORT`, 8787). |
+| `config.json`                | `{ "baseUrl", "key": "" }`. `baseUrl` is the configured public address (`BASE_URL`), never the `Host` header.                                                                  |
+| `claude_desktop_config.json` | A ready `mcpServers` entry with the placeholders `PATH` and `KEY` the guides say to replace.                                                                                   |
+| `README.md`, `ANLEITUNG.md`  | The guide in English and in German, both always: the link knows nobody.                                                                                                        |
+
+- Made **once when the server starts** (`instrumentation.ts`) and then only
+  served. `ETag` and `Cache-Control: no-cache`: a cache asks again and gets
+  `304` while the zip is the same.
 - `503 baseUrlNotSet`: the server has no `BASE_URL`. `503 mcpPackageMissing`:
-  the build has no `server.mjs`. In both cases no key is made.
+  the build has no `server.mjs`.
+- The key goes in by hand, from the settings (`POST /api/account/keys`).
+  Keys from zips of the earlier per-account download (named
+  `MCP package, <date>`) keep working until withdrawn.
 
 ## Packages
 
@@ -577,7 +604,7 @@ Tests: [`sheet-copies.test.ts`](src/server/api/sheet-copies.test.ts).
 | `401`  | `keyNotValid`          | The access key is unknown, withdrawn, past its end or not `Bearer cbk_...`.                        |
 | `401`  | `wrongMailOrPassword`  | Login failed.                                                                                      |
 | `403`  | `crossSite`            | A change sent from another site.                                                                   |
-| `403`  | `keyCannotMakeKeys`    | Making an access key with an access key (also the MCP package with `withKey: true`).               |
+| `403`  | `keyCannotMakeKeys`    | Making an access key with an access key.                                                           |
 | `403`  | `gameMasterOnly`       | A player of the campaign calls a game master's route.                                              |
 | `403`  | `ownerOnly`            | A game master deletes a player's character; only the owner does.                                   |
 | `404`  | `notFound`             | No such API path.                                                                                  |
@@ -615,8 +642,8 @@ Tests: [`sheet-copies.test.ts`](src/server/api/sheet-copies.test.ts).
 | `500`  | `packageRuleError`     | The package's rules could not be worked out (a bug in the package); `message`.                     |
 | `502`  | `mailFailed`           | The mail server refused the mail (password or invitation); nothing changed.                        |
 | `503`  | `mailNotConfigured`    | The server has no mail set up.                                                                     |
-| `503`  | `baseUrlNotSet`        | The server has no public address (`BASE_URL`); the MCP package cannot say where the builder is.    |
-| `503`  | `mcpPackageMissing`    | This build has no `server.mjs` for the MCP package.                                                |
+| `503`  | `baseUrlNotSet`        | The server has no public address (`BASE_URL`); the MCP zip cannot say where the builder is.        |
+| `503`  | `mcpPackageMissing`    | This build has no `server.mjs` for the MCP zip.                                                    |
 
 `changeRejected` reasons (`error.reason.code`): `levelOutOfRange` (`min`,
 `max`), `levelNotHigher` (`level`), `unknownChoice`, `notAsked` (the choice

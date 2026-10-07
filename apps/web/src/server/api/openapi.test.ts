@@ -13,6 +13,8 @@ import { sheetModelSchema } from "@builder/sheet";
 import { z } from "zod";
 import { GET as health } from "../../../app/api/health/route.ts";
 import { healthReport } from "../health.ts";
+import { createMcpRoute } from "../mcp-route.ts";
+import { buildMcpZip, mcpZipResponse } from "../mcp-zip.ts";
 import { loadPackages } from "../packages/loader.ts";
 import { Client, passwordFromMail, signIn, startTestServer, type TestServer } from "../testing.ts";
 import { ROUTES } from "./router.ts";
@@ -84,7 +86,14 @@ describe("openapi.json", () => {
   });
 
   it("describes every route of the server and nothing else", () => {
-    const server = [...ROUTES.map((r) => `${r.method} ${toSpecPath(r.path)}`), "GET /api/health"];
+    const server = [
+      ...ROUTES.map((r) => `${r.method} ${toSpecPath(r.path)}`),
+      "GET /api/health",
+      // Outside the router: app/mcp/route.ts and app/downloads/builder-mcp.zip/route.ts.
+      "GET /mcp",
+      "POST /mcp",
+      "GET /downloads/builder-mcp.zip",
+    ];
     expect(specOperations().sort()).toEqual(server.sort());
   });
 
@@ -257,6 +266,45 @@ describe("openapi.json", () => {
     expect(valid(await (await health()).json())).toBe(true);
     expect(valid(healthReport(await loadPackages(DEMO_PACKAGE_DIR, { info() {}, error() {} })))).toBe(true);
   });
+
+  it("describes the answers of /mcp and of the zip", async () => {
+    const server = await startTestServer();
+    const route = createMcpRoute(server.app, server.fetch);
+    const valid = (path: string, method: string, status: number) =>
+      validator(
+        `${pointer("paths", path, method, "responses", String(status))}/content/application~1json/schema`,
+      );
+
+    const noKey = await route(
+      new Request("http://builder.test/mcp", {
+        method: "POST",
+        headers: { "content-type": "application/json", accept: "application/json, text/event-stream" },
+        body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list" }),
+      }),
+    );
+    expect(noKey.status).toBe(401);
+    expect(valid("/mcp", "post", 401)(await noKey.json())).toBe(true);
+    const browser = await route(new Request("http://builder.test/mcp", { headers: { accept: "text/html" } }));
+    expect(browser.status).toBe(303);
+    expect(spec.paths["/mcp"].get.responses["303"]).toBeDefined();
+    const program = await route(new Request("http://builder.test/mcp"));
+    expect(program.status).toBe(405);
+    expect(valid("/mcp", "get", 405)(await program.json())).toBe(true);
+
+    const req = new Request("http://builder.test/downloads/builder-mcp.zip");
+    for (const missing of ["baseUrlNotSet", "mcpPackageMissing"] as const) {
+      const res = mcpZipResponse(req, { missing });
+      expect(res.status).toBe(503);
+      expect(valid("/downloads/builder-mcp.zip", "get", 503)(await res.json())).toBe(true);
+    }
+    const zip = await buildMcpZip("http://builder.test");
+    expect("missing" in zip).toBe(false);
+    const res = mcpZipResponse(req, zip);
+    expect(res.status).toBe(200);
+    expect(Object.keys(spec.paths["/downloads/builder-mcp.zip"].get.responses["200"].content)).toEqual([
+      res.headers.get("content-type"),
+    ]);
+  });
 });
 
 // ------------------------------------------------------------------ the walk
@@ -331,10 +379,6 @@ async function walk(server: TestServer): Promise<void> {
   await call("DELETE", "/api/account/keys/00000000-0000-4000-8000-000000000000");
   const second = await call("POST", "/api/account/keys", { name: "Second" });
   await call("DELETE", `/api/account/keys/${second.json.key.id}`);
-  // The MCP zip: with a new key from the session, without one from a key, refused to make one with a key.
-  expect((await c.request("POST", "/api/account/mcp-package", { withKey: true })).status).toBe(200);
-  await c.request("POST", "/api/account/mcp-package", { withKey: false }, { authorization: `Bearer ${key}` });
-  await call("POST", "/api/account/mcp-package", { withKey: true }, { authorization: `Bearer ${key}` });
 
   // Packages.
   await call("GET", "/api/packages?lang=en");

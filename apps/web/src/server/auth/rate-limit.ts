@@ -78,4 +78,7 @@ export const LIMITS = {
   // A game master adds a group at a time; a loop cannot turn the builder into a mail cannon.
   invitationsPerAccount: { max: 30, windowMs: 60 * MINUTE },
   invitationMailsPerAddress: { max: 5, windowMs: 60 * MINUTE },
+  // Requests to the public MCP server, with or without a valid key. A language model
+  // building a character makes a few calls a minute; a loop or a key guesser hits this.
+  mcpRequestsPerIp: { max: 120, windowMs: MINUTE },
 } as const satisfies Record<string, Limit>;
