@@ -350,6 +350,7 @@
   "privacy.notStored": "What we never do",
   "privacy.noTracking": "No tracking, no ads, no statistics about you.",
   "privacy.noThirdParty": "Your browser loads nothing from other sites. No outside fonts, no outside scripts.",
+  "privacy.languageModel": "You can download a package with which a language model of your choice, on your computer, reads your characters. Our server sends nothing to anyone else. Your characters go only to the language model you set up yourself.",
   "privacy.delete": "You can delete your account in the settings at any time. Then everything is gone.",
   "privacy.back": "Back",
   "raise.button": "Level up",
