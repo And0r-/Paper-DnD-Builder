@@ -1,10 +1,9 @@
 "use client";
-import { useId, useState } from "react";
+import { useState } from "react";
 import { LANGUAGE_NAMES, UI_LANGUAGES, type UiLanguage } from "../../i18n/index.ts";
 import { useApp } from "../app-state.tsx";
 import { useOfferedLanguages } from "../packages.ts";
-import { Segmented, Toast } from "./Fields.tsx";
-import { Icon } from "./Icon.tsx";
+import { CompactSelect, Segmented, Toast } from "./Fields.tsx";
 
 /**
  * The languages to offer: the ones the installed packages have (and the
@@ -47,47 +46,39 @@ export function LanguageSelect({ onError }: { onError?: () => void }) {
 }
 
 /**
- * The language switch in the top bar of every screen (AND-153): a plain
- * select, so keyboards and screen readers get what they know. It sets the
- * same value as the settings; units are left alone (plan 5.6).
+ * The language switch in the top bar of every screen (AND-153): a native
+ * select under the hood, so keyboards and screen readers get what they
+ * know. It sets the same value as the settings; units are left alone
+ * (plan 5.6). Everything that shows a language's words follows it from the
+ * app state, the sheet too.
  */
 export function LanguageMenu() {
   const { t, lang, setLanguage } = useApp();
   const languages = useLanguages();
-  const id = useId();
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
   return (
-    <div className="language-menu">
-      <label className="visually-hidden" htmlFor={id}>
-        {t("language.label")}
-      </label>
-      <Icon name="globe" size={20} className="language-menu__icon" />
-      <select
-        id={id}
-        className="language-menu__select"
+    <>
+      <CompactSelect
+        className="language-menu"
+        label={t("language.label")}
+        icon="globe"
         value={lang}
-        aria-busy={busy}
-        onChange={async (e) => {
-          const next = e.target.value as UiLanguage;
+        busy={busy}
+        options={languages.map((l) => ({ value: l, label: LANGUAGE_NAMES[l], lang: l }))}
+        onChange={async (next) => {
           setBusy(true);
           setFailed(false);
           try {
-            await setLanguage(next);
+            await setLanguage(next as UiLanguage);
           } catch {
             setFailed(true);
           } finally {
             setBusy(false);
           }
         }}
-      >
-        {languages.map((l) => (
-          <option key={l} value={l} lang={l}>
-            {LANGUAGE_NAMES[l]}
-          </option>
-        ))}
-      </select>
+      />
       {failed && <Toast message={t("settings.saveError")} onDone={() => setFailed(false)} />}
-    </div>
+    </>
   );
 }

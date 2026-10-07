@@ -169,8 +169,7 @@
     margin-left: auto;
   }
 
-  /* From 1200 px everything in one line, as in the sketch: the buttons a little narrower. Only
-     where a copy's whole name does not leave room for them, they go on under the lists. */
+  /* From 1200 px the buttons in one line, as in the sketch, a little narrower. */
   @media (min-width: 1200px) {
     .sheet-tools--bar .sheet-tools__actions {
       flex-wrap: nowrap;
@@ -181,23 +180,39 @@
       font-size: var(--text-md);
       white-space: nowrap;
     }
-
-    /* The version's name shows whole ("Meine Fassung vom 7. Oktober, 14:51 · Stufe 3"), so two
-       copies of a day tell apart; only a name longer than that is cut at its end. Style and language keep
-       their whole word. */
-    .sheet-tools--bar .sheet-tools__field {
-      flex: none;
-    }
-
-    .sheet-tools--bar .sheet-tools__field:first-child .sheet-tools__select {
-      width: 100%;
-      max-width: 27rem;
-      text-overflow: ellipsis;
-    }
   }
 
   .sheet-tools--menu {
     display: none;
+  }
+}
+
+/* Version and style in the top bar at a desk (AND-227); on a phone they are in the menu. A fixed
+   width each, so the bar does not jump when a copy with a long name is chosen. */
+.topbar__tools {
+  display: none;
+}
+
+.compact-select--version {
+  --compact-select-width: 15rem;
+}
+
+.compact-select--design {
+  --compact-select-width: 10rem;
+}
+
+@media (min-width: 900px) {
+  .topbar__tools {
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+  }
+  /* Where there is room, more of a copy's name; still the same width whatever is chosen. */
+  @media (min-width: 1200px) {
+    .compact-select--version {
+      --compact-select-width: 19rem;
+    }
   }
 }
 

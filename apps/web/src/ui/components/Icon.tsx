@@ -27,6 +27,11 @@ const PATHS = {
   dot: "M12 16a4 4 0 110-8 4 4 0 010 8z",
   globe:
     "M12 21a9 9 0 110-18 9 9 0 010 18zM3.5 9h17M3.5 15h17M12 3c2.3 2.4 3.5 5.4 3.5 9s-1.2 6.6-3.5 9c-2.3-2.4-3.5-5.4-3.5-9s1.2-6.6 3.5-9z",
+  /** Two sheets, one over the other: a version of the sheet. */
+  copies: "M9 8h10a1 1 0 011 1v11a1 1 0 01-1 1H9a1 1 0 01-1-1V9a1 1 0 011-1zM4 16V4a1 1 0 011-1h10",
+  /** A painter's palette: a look. */
+  palette:
+    "M12 3a9 9 0 100 18c1.1 0 1.6-.8 1.6-1.6 0-.9-.8-1.3-.8-2.2 0-.9.7-1.6 1.6-1.6H16a5 5 0 005-5c0-4.2-4-7.6-9-7.6zM7.5 11.5h.01M9.5 7.5h.01M14.5 7.5h.01",
 } as const;
 
 export type IconName = keyof typeof PATHS;

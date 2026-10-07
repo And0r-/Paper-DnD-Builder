@@ -63,7 +63,9 @@ export async function passwordFor(email: string): Promise<string> {
 
 /** Switches the language with the switch in the top bar, which every screen has (AND-153). */
 export async function chooseLanguage(page: Page, lang: "de" | "en"): Promise<void> {
-  await page.getByRole("banner").getByRole("combobox").selectOption(lang);
+  // On the sheet at a desk the top bar has the sheet's lists too (AND-227): the language by its name.
+  const name = new RegExp(`^(${de["language.label"]}|${en["language.label"]})$`, "u");
+  await page.getByRole("banner").getByRole("combobox", { name }).selectOption(lang);
   await expect(page.locator("html")).toHaveAttribute("lang", lang);
 }
 

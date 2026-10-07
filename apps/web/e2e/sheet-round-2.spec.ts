@@ -183,7 +183,7 @@ test.describe("at a desk", () => {
     }
   });
 
-  test("the bar right under the top bar, its lists whole, the name once", async ({ page }) => {
+  test("the bar right under the top bar, the style whole in the top bar, the name once", async ({ page }) => {
     await login(page, uniqueEmail("sheet-bar"));
     const id = await finished(page, 3);
     for (const design of DESIGNS) {
@@ -191,21 +191,11 @@ test.describe("at a desk", () => {
       const top = await box(page.locator(".topbar"));
       const bar = await box(page.getByRole("group", { name: m["sheet.tools"] }));
       expect(bar.y - (top.y + top.height), design).toBeLessThan(40);
-      // Style and language show their whole word.
-      for (const label of [m["sheet.design"], m["sheet.language"]]) {
-        const select = page.getByRole("group", { name: m["sheet.tools"] }).getByLabel(label, { exact: true });
-        const [text, room] = await select.evaluate((e) => {
-          const s = e as HTMLSelectElement;
-          const c = document.createElement("canvas").getContext("2d")!;
-          const st = getComputedStyle(s);
-          c.font = `${st.fontWeight} ${st.fontSize} ${st.fontFamily}`;
-          return [
-            c.measureText(s.selectedOptions[0]!.text).width,
-            s.clientWidth - parseFloat(st.paddingLeft) - parseFloat(st.paddingRight),
-          ];
-        });
-        expect(text, `${design} ${label}`).toBeLessThanOrEqual(room + 1);
-      }
+      // The style shows its whole word in the top bar (AND-227); no lists left in the bar.
+      const style = page.locator(".compact-select--design .compact-select__shown");
+      await expect(style).toBeVisible();
+      expect(await style.evaluate((e) => e.scrollWidth - e.clientWidth), design).toBeLessThanOrEqual(0);
+      await expect(page.getByRole("group", { name: m["sheet.tools"] }).getByRole("combobox")).toHaveCount(0);
       // The name in the top bar only once the sheet's own has scrolled away.
       await expect(page.locator(".sheet-topbar__name")).toBeHidden();
       await page.mouse.wheel(0, 1500);
@@ -227,9 +217,15 @@ test.describe("on a phone", () => {
     // A tick to clear later.
     await sheet.locator(".sheet-tick").first().click();
     await expect(page.locator(".save-status--saved")).toBeVisible();
+    // The top bar has the language alone on a phone (AND-227).
+    await expect(page.getByRole("banner").getByRole("combobox")).toHaveCount(1);
+    await expect(page.getByRole("banner").getByRole("combobox")).toHaveAccessibleName(m["language.label"]);
     await page.getByRole("button", { name: m["menu.open"] }).click();
     const menu = page.getByRole("dialog", { name: m["menu.title"] });
     const tools = menu.locator(".sheet-tools--menu");
+    // In the menu version and style with their title, no language.
+    await expect(tools.getByRole("combobox")).toHaveCount(2);
+    await expect(tools.getByText(m["sheet.version"], { exact: true })).toBeVisible();
     expect(m["sheet.design"]).not.toBe("Aussehen");
     await expect(tools.getByLabel(m["sheet.design"], { exact: true })).toBeVisible();
     // A copy's whole name shows in the list.

@@ -134,9 +134,9 @@ async function finishRaise(page: Page, id: string): Promise<void> {
 /** The tests for one screen size; `sheet.spec.ts` runs them on a phone, `sheet-desk.spec.ts` at a desk. */
 export function sheetTests(device: "phone" | "desk"): void {
   {
-    /** The tools: in the bar at a desk, in the app's menu on a phone. */
+    /** The tools: version and style in the top bar at a desk, the buttons in the bar; all in the app's menu on a phone. */
     const tools = async (page: Page) => {
-      if (device === "desk") return page.getByRole("group", { name: m["sheet.tools"] });
+      if (device === "desk") return page.locator(".topbar, .sheet-tools--bar");
       // A tap while the sheet still loads opens the loading screen's menu, which goes with it: tap again.
       const button = page.getByRole("button", { name: m["menu.open"] });
       const menu = page.getByRole("dialog", { name: m["menu.title"] });
