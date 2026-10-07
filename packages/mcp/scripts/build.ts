@@ -9,7 +9,7 @@ const root = fileURLToPath(new URL("..", import.meta.url));
 
 await build({
   absWorkingDir: root,
-  entryPoints: ["src/stdio.ts"],
+  entryPoints: ["src/main.ts"],
   outfile: "dist/server.mjs",
   bundle: true,
   platform: "node",

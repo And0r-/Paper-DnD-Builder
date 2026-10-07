@@ -1,11 +1,13 @@
 export {
   ApiClient,
   ApiError,
+  PackageCache,
   type ApiClientOptions,
   type ChangeResult,
   type DraftChanges,
 } from "./api-client.ts";
 export { createMcpServer, toCallToolResult, SERVER_NAME, SERVER_VERSION } from "./server.ts";
+export { createHttpHandler, type HttpHandler, type HttpHandlerOptions } from "./http.ts";
 export {
   TOOLS,
   INTRO,

@@ -9,8 +9,10 @@
  * - the account (language and units) and each package's texts and
  *   structure, loaded once and kept in memory.
  *
- * The stdio server builds one with Node's `fetch`; a later assistant in the
- * web app can build one with its own.
+ * The stdio server builds one with Node's `fetch` for the whole process.
+ * The HTTP server builds one per request (nothing is kept between requests,
+ * so each change reads the character's version afresh) and hands every one
+ * the same `PackageCache`, so package texts are loaded once per process.
  */
 import type { Units } from "@builder/format/pure";
 import type { Account, DraftView, PackageStructure, Texts } from "./api-types.ts";
@@ -22,6 +24,18 @@ export interface ApiClientOptions {
   /** An access key, `cbk_...`. */
   key: string;
   fetch?: typeof fetch;
+  /** Package structures and texts to share with other clients; a fresh one if absent. */
+  packages?: PackageCache;
+}
+
+/**
+ * Each package's structure and its texts per language, loaded once. Package
+ * data is the same for every account, so clients with different keys can
+ * share one cache.
+ */
+export class PackageCache {
+  readonly structures = new Map<string, Promise<PackageStructure>>();
+  readonly texts = new Map<string, Promise<Texts>>();
 }
 
 /** An answer of the API that is not 2xx, or no answer at all (`status` 0). */
@@ -64,13 +78,13 @@ export class ApiClient {
   /** The last state seen per character; its `draft.version` goes with the next change. */
   private readonly seen = new Map<string, DraftView>();
   private accountPromise: Promise<Account> | undefined;
-  private readonly structures = new Map<string, Promise<PackageStructure>>();
-  private readonly texts = new Map<string, Promise<Texts>>();
+  private readonly packages: PackageCache;
 
   constructor(options: ApiClientOptions) {
     this.baseUrl = options.baseUrl.replace(/\/+$/, "");
     this.key = options.key;
     this.fetchFn = options.fetch ?? globalThis.fetch.bind(globalThis);
+    this.packages = options.packages ?? new PackageCache();
   }
 
   /** A JSON request; throws `ApiError` for anything but 2xx. */
@@ -130,7 +144,7 @@ export class ApiClient {
 
   /** A package's structure (units, flow), loaded once per package. */
   structure(packageId: string): Promise<PackageStructure> {
-    return remember(this.structures, packageId, () =>
+    return remember(this.packages.structures, packageId, () =>
       this.json<{ package: PackageStructure }>("GET", `/api/packages/${enc(packageId)}`).then(
         (r) => r.package,
       ),
@@ -139,7 +153,7 @@ export class ApiClient {
 
   /** All texts of a package in one language, loaded once per package and language. */
   packageTexts(packageId: string, language: string): Promise<Texts> {
-    return remember(this.texts, `${packageId}\n${language}`, () =>
+    return remember(this.packages.texts, `${packageId}\n${language}`, () =>
       this.json<{ texts: Texts }>("GET", `/api/packages/${enc(packageId)}/texts/${enc(language)}`).then(
         (r) => r.texts,
       ),
