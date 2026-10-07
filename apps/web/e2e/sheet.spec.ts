@@ -5,7 +5,15 @@
  */
 import de from "../src/i18n/messages/de.json" with { type: "json" };
 import en from "../src/i18n/messages/en.json" with { type: "json" };
-import { chooseLanguage, expect, expectOneLanguage, login, makeCharacter, test, uniqueEmail } from "./helpers.ts";
+import {
+  chooseLanguage,
+  expect,
+  expectOneLanguage,
+  login,
+  makeCharacter,
+  test,
+  uniqueEmail,
+} from "./helpers.ts";
 import { sheetTests } from "./sheet-tests.ts";
 
 const m = de;
