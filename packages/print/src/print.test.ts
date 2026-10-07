@@ -2112,6 +2112,20 @@ describe("the classic design: original and copy, empty and filled", () => {
     }
   });
 
+  it("lets a row of boxes on the page of their own fill the page's width, as in the sketch", async () => {
+    const model = buildSheetModel(pkg, lantern20(), { language: "de", createdAt });
+    const pdf = await renderPdf(model, sheetOnly);
+    const page = (await positions(pdf))[pdf.sheetPages - 1]!;
+    const plan = classicPlan(model.sections);
+    const boxes = plan.parts.apart.map((i) => model.sections[i]!).find((s) => s.kind === "statBoxes");
+    if (boxes?.kind !== "statBoxes") throw new Error("no box row apart");
+    const labels = page.filter((p) => boxes.boxes.some((b) => b.label.toUpperCase() === p.str.toUpperCase()));
+    expect(labels.length).toBeGreaterThan(1);
+    // The last box's label is centred in a box that ends at the right margin.
+    const last = labels.reduce((a, b) => (b.x > a.x ? b : a));
+    expect(last.x + last.w / 2).toBeGreaterThan(CLASSIC_GEOMETRY.page.width - CLASSIC_GEOMETRY.margin - 30);
+  });
+
   it("shows titles and short lines: no hints, no help box", async () => {
     for (const [language] of languages) {
       const model = buildSheetModel(pkg, lantern20(), { language, createdAt });

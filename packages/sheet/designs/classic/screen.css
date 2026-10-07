@@ -647,6 +647,15 @@
     column-span: all;
   }
 
+  /* On their own page a row of boxes shares the page's width, as in the PDF. */
+  .csheet__apart .csheet__box-row {
+    grid-template-columns: repeat(auto-fit, minmax(20mm, 1fr));
+  }
+
+  .csheet__apart .csheet__box {
+    max-width: calc(2 * var(--cs-row-box-w));
+  }
+
   .csheet__more > .csheet__section,
   .csheet__apart > .csheet__section {
     margin-bottom: var(--cs-row-gap);

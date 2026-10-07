@@ -362,12 +362,17 @@ function sideBlocks(c: Ctx, s: Section<"statBoxes">): Block[] {
   );
 }
 
-/** Boxes in rows as wide as a column allows (slots per rank), under the section's title. */
+/**
+ * Boxes in rows as wide as a column allows (slots per rank), under the
+ * section's title; a row shares the whole width, as in the sketch, a box at
+ * most twice its usual width.
+ */
 function boxRowBlocks(c: Ctx, s: Section<"statBoxes">): Block[] {
   const { g } = c;
   const gap = g.box.gap;
   const rows = (w: number) => {
-    const per = Math.max(1, Math.floor((w + gap) / (g.box.rowBox.width * 0.6 + gap)));
+    const fit = Math.max(1, Math.floor((w + gap) / (g.box.rowBox.width * 0.6 + gap)));
+    const per = Math.max(1, Math.min(fit, s.boxes.length));
     const out: StatBox[][] = [];
     for (let i = 0; i < s.boxes.length; i += per) out.push(s.boxes.slice(i, i + per));
     return { per, out };
@@ -377,7 +382,7 @@ function boxRowBlocks(c: Ctx, s: Section<"statBoxes">): Block[] {
     // One block per row of boxes, so a long row of them can go on in the next column.
     measured(c, s, (x, y, w) => {
       const { per, out } = rows(w);
-      const bw = Math.min(g.box.rowBox.width, (w - (per - 1) * gap) / per);
+      const bw = Math.min(2 * g.box.rowBox.width, (w - (per - 1) * gap) / per);
       let top = y + 0.5;
       for (const row of out) {
         const h = Math.max(...row.map((b) => smallBoxHeight(c, b, bw, g.box.rowBox.height)));
