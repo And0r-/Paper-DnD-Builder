@@ -437,6 +437,32 @@
   font-size: var(--text-xs);
 }
 
+/* Who is cut first where the line is short; which sheet, the units and the page stay whole. */
+.vsheet__footer-line {
+  display: flex;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.vsheet__footer-who {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.vsheet__footer-rest,
+.vsheet__footer-date {
+  flex: none;
+  white-space: pre;
+}
+
+/* Measures a millimetre of the screen, for placing the sections on pages. */
+.vsheet__mm {
+  position: absolute;
+  width: 0;
+  height: 100mm;
+  visibility: hidden;
+}
+
 /* ---------------------------------------------------------- the A4 page */
 
 @media (min-width: 900px) {
@@ -506,6 +532,61 @@
 
   .vsheet__hint {
     margin-top: 1mm;
+  }
+
+  /* "How your turn goes": a step a line, as in the PDF. */
+  .vsheet__help p {
+    white-space: pre-line;
+  }
+
+  /* What a sentence explains is read on screen, not at arm's length: never below 12 px. */
+  .vsheet__hint,
+  .vsheet__box-hint,
+  .vsheet__group-hint {
+    font-size: max(var(--vs-hint), 12px);
+  }
+
+  /* Placed on pages: each section where the PDF's rule puts it, the pages drawn behind. */
+  .vsheet--paged .vsheet__page {
+    display: block;
+    position: relative;
+    isolation: isolate;
+    height: var(--vs-sheet-h);
+    min-height: 0;
+    padding: 0;
+    background: none;
+    box-shadow: none;
+  }
+
+  .vsheet--paged .vsheet__section {
+    position: absolute;
+    box-sizing: border-box;
+  }
+
+  .vsheet__paper {
+    position: absolute;
+    left: 0;
+    z-index: -1;
+    box-sizing: border-box;
+    width: var(--vs-page-w);
+    padding: var(--vs-margin);
+    background: #fff;
+    box-shadow: var(--shadow-2);
+  }
+
+  .vsheet__cont {
+    margin: 0;
+    padding-bottom: 1mm;
+    border-bottom: 0.3mm solid #222;
+    font-size: var(--vs-body);
+    font-weight: var(--weight-bold);
+  }
+
+  .vsheet__paper .vsheet__footer {
+    position: absolute;
+    right: var(--vs-margin);
+    bottom: var(--vs-margin);
+    left: var(--vs-margin);
   }
 
   .vsheet__header {
@@ -595,8 +676,9 @@
     font-size: 12pt;
   }
 
+  /* Two columns from 90 mm on, as in the PDF. */
   .vsheet__checks {
-    grid-template-columns: repeat(auto-fill, minmax(min(100%, 80mm), 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 43mm), 1fr));
     column-gap: 4mm;
   }
 
@@ -644,9 +726,22 @@
     font-size: var(--vs-small);
   }
 
+  /* As in the PDF: the marks at the end of the name's column, before the text; the note under the name. */
   .vsheet__feature-name {
-    flex-direction: column;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: baseline;
+    column-gap: 1.5mm;
     font-size: var(--vs-fieldName);
+  }
+
+  .vsheet__feature-name > .vsheet__marks {
+    grid-row: 1;
+    grid-column: 2;
+  }
+
+  .vsheet__feature-name > .vsheet__feature-note {
+    grid-column: 1 / -1;
   }
 
   .vsheet__group {

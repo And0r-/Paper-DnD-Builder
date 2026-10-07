@@ -6,11 +6,14 @@
  * under the other in the model's order, with room to tap. Styles in
  * `screen.css`; grid, page and type from the design's geometry (`index.ts`), shared with the PDF.
  */
-import type { CSSProperties, ReactNode } from "react";
+import { useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from "react";
 import { MESSAGES } from "../../src/messages.ts";
-import type { FeatureRow, SheetSection, StatBox } from "../../src/model.ts";
+import { steps } from "../../src/model.ts";
+import type { FeatureRow, SheetModel, SheetSection, StatBox } from "../../src/model.ts";
+import { columnLeft, contentBottom, spanWidth } from "../geometry.ts";
+import { PageFooter, PageHead } from "../page-parts.tsx";
 import type { SheetScreenProps, SheetUi } from "../types.ts";
-import { VERBOSE_GEOMETRY as G } from "./index.ts";
+import { VERBOSE_GEOMETRY as G, packSections, type PackedSection } from "./index.ts";
 
 /**
  * Measures of boxes and marks the PDF painter keeps to itself (mm), as it
@@ -56,46 +59,137 @@ type Props<K extends SheetSection["kind"]> = {
 
 const at = (i: number, ...rest: (string | number)[]) => ["sections", i, ...rest];
 
+/** Room between two pages on screen, in mm. */
+const PAGE_GAP = 8;
+const DESK = "(min-width: 900px)";
+
+interface Pages {
+  at: PackedSection[];
+  /** Height of each page in mm: A4, longer only for a section taller than a page. */
+  heights: number[];
+}
+
+/**
+ * From desk width on, the sections are measured as the screen draws them
+ * and placed on A4 pages by the PDF's rule (`packSections`): the same
+ * order, the same columns, a page break where a section no longer fits.
+ * The sections stay in the model's order in the document; only their
+ * place on the page is set. Narrower, and before the first measuring, they
+ * flow one under the other.
+ */
+function usePages(box: RefObject<HTMLDivElement | null>, model: SheetModel): Pages | null {
+  const [pages, setPages] = useState<Pages | null>(null);
+  useLayoutEffect(() => {
+    const el = box.current;
+    if (!el) return;
+    const desk = window.matchMedia(DESK);
+    let frame = 0;
+    const measure = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        if (!desk.matches) return setPages(null);
+        const mm = (el.querySelector<HTMLElement>(".vsheet__mm")?.getBoundingClientRect().height ?? 0) / 100;
+        const sections = [...el.querySelectorAll<HTMLElement>(":scope > .vsheet__section")];
+        if (mm <= 0 || sections.length !== model.sections.length) return;
+        const at = packSections(
+          model.sections.map((s, i) => ({
+            span: s.span,
+            height: sections[i]!.getBoundingClientRect().height / mm,
+          })),
+        );
+        const heights: number[] = [];
+        at.forEach((p, i) => {
+          const bottom = p.y + sections[i]!.getBoundingClientRect().height / mm;
+          heights[p.page] = Math.max(
+            heights[p.page] ?? G.page.height,
+            bottom + (G.page.height - contentBottom(G)),
+          );
+        });
+        const next = { at, heights: [...heights].map((h) => h ?? G.page.height) };
+        setPages((now) => (JSON.stringify(now) === JSON.stringify(next) ? now : next));
+      });
+    };
+    measure();
+    const seen = new ResizeObserver(measure);
+    for (const s of el.querySelectorAll(":scope > .vsheet__section")) seen.observe(s);
+    desk.addEventListener("change", measure);
+    return () => {
+      cancelAnimationFrame(frame);
+      seen.disconnect();
+      desk.removeEventListener("change", measure);
+    };
+  }, [box, model]);
+  return pages;
+}
+
 export function VerboseSheet({ model, ui }: SheetScreenProps) {
   const m = MESSAGES[model.language];
+  const box = useRef<HTMLDivElement>(null);
+  const pages = usePages(box, model);
+  const tops: number[] = [];
+  pages?.heights.forEach((h, p) => tops.push(p === 0 ? 0 : tops[p - 1]! + pages.heights[p - 1]! + PAGE_GAP));
+  const height = pages ? tops.at(-1)! + pages.heights.at(-1)! : 0;
   return (
-    <article className="vsheet" lang={model.language} style={pageStyle}>
-      <div className="vsheet__page">
-        {model.sections.map((s, i) => (
-          <section
-            key={`${s.id}-${i}`}
-            className={`vsheet__section vsheet__section--${s.kind}`}
-            style={{ "--vs-span": String(Math.min(G.columns, s.span)) } as CSSProperties}
-            data-section={s.id}
-            aria-label={s.kind === "header" ? s.name : s.title || undefined}
-          >
-            {s.kind !== "header" && s.title !== "" && (
-              <h2 className="vsheet__title">
-                <ui.Text path={at(i, "title")} value={s.title} label={s.title} />
-              </h2>
-            )}
-            <Section
-              s={s}
-              i={i}
-              ui={ui}
-              playedBy={m?.playedBy ?? ""}
-              pencil={m?.pencil ?? ""}
-              rowName={m?.rowName ?? ""}
-            />
-            {s.kind !== "header" && s.hint !== "" && (
-              <p className="vsheet__hint">
-                <ui.Text path={at(i, "hint")} value={s.hint} label={s.title} multiline />
-              </p>
-            )}
-            {s.kind === "checkList" && s.legend.length > 0 && (
-              <p className="vsheet__hint">{s.legend.join(" ")}</p>
-            )}
-          </section>
-        ))}
-        <footer className="vsheet__footer">
-          <span>{[model.name, model.levelLabel, model.unitsLine].join(" · ")}</span>
-          <span>{model.createdOn}</span>
-        </footer>
+    <article className={`vsheet${pages ? " vsheet--paged" : ""}`} lang={model.language} style={pageStyle}>
+      <div
+        ref={box}
+        className="vsheet__page"
+        style={pages ? ({ "--vs-sheet-h": `${height}mm` } as CSSProperties) : undefined}
+      >
+        <span className="vsheet__mm" aria-hidden="true" />
+        {model.sections.map((s, i) => {
+          const spot = pages?.at[i];
+          const place = spot && {
+            left: `${columnLeft(G, spot.col)}mm`,
+            top: `${tops[spot.page]! + spot.y}mm`,
+            width: `${spanWidth(G, s.span)}mm`,
+          };
+          return (
+            <section
+              key={`${s.id}-${i}`}
+              className={`vsheet__section vsheet__section--${s.kind}`}
+              style={{ "--vs-span": String(Math.min(G.columns, s.span)), ...place } as CSSProperties}
+              data-section={s.id}
+              aria-label={s.kind === "header" ? s.name : s.title || undefined}
+            >
+              {s.kind !== "header" && s.title !== "" && (
+                <h2 className="vsheet__title">
+                  <ui.Text path={at(i, "title")} value={s.title} label={s.title} />
+                </h2>
+              )}
+              <Section
+                s={s}
+                i={i}
+                ui={ui}
+                playedBy={m?.playedBy ?? ""}
+                pencil={m?.pencil ?? ""}
+                rowName={m?.rowName ?? ""}
+              />
+              {s.kind !== "header" && s.hint !== "" && (
+                <p className="vsheet__hint">
+                  <ui.Text path={at(i, "hint")} value={s.hint} label={s.title} multiline />
+                </p>
+              )}
+              {s.kind === "checkList" && s.legend.length > 0 && (
+                <p className="vsheet__hint">{s.legend.join(" ")}</p>
+              )}
+            </section>
+          );
+        })}
+        {pages ? (
+          pages.heights.map((h, p) => (
+            <div
+              key={p}
+              className="vsheet__paper"
+              style={{ top: `${tops[p]}mm`, height: `${h}mm` } as CSSProperties}
+            >
+              {p > 0 && <PageHead model={model} prefix="vsheet" />}
+              <PageFooter model={model} page={p + 1} total={pages.heights.length} prefix="vsheet" />
+            </div>
+          ))
+        ) : (
+          <PageFooter model={model} page={1} total={0} prefix="vsheet" />
+        )}
       </div>
     </article>
   );
@@ -151,7 +245,13 @@ function Section({
         <div className="vsheet__help">
           {s.paragraphs.map((p, j) => (
             <p key={j}>
-              <ui.Text path={at(i, "paragraphs", j)} value={p} label={s.title} multiline />
+              <ui.Text
+                path={at(i, "paragraphs", j)}
+                value={p}
+                shown={steps(p).join("\n")}
+                label={s.title}
+                multiline
+              />
             </p>
           ))}
         </div>
