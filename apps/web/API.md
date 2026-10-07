@@ -355,7 +355,7 @@ Tests: [`campaigns.test.ts`](src/server/api/campaigns.test.ts).
 | ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 🔒 `GET /api/drafts/:id/sheet` | The finished character's sheet as data (see below). Language and units from the settings of whoever asks, like the PDF. `409 notFinished` (with `open`), `422 languageNotSupported` (with the package's printable `languages`).                                                                                                                             |
 | 🔒 `GET /api/drafts/:id/pdf`   | The finished character as one A4 PDF with the parts asked for (below); without `parts`, the sheet and then the cards. Language and units from the settings of whoever asks (a game master prints in theirs). `409 notFinished` (with `open`), `422 languageNotSupported` (with the package's printable `languages`), `429 tooManyRequests` (`Retry-After`). |
-| `GET /api/sheet-designs`       | `{ designs: [{ id, name, description }], default }`: the designs the server draws, `name` and `description` per screen language (`{ de, en }`). Public. For now only `verbose` ("Detailed").                                                                                                                                                                |
+| `GET /api/sheet-designs`       | `{ designs: [{ id, name, description }], default }`: the designs the server draws, `name` and `description` per screen language (`{ de, en }`). Public. Two today: `verbose` ("Detailed") and `classic` ("Classic").                                                                                                                                        |
 
 It is a plain `GET` so the screen can offer it as an ordinary download
 link. The PDF is made on every request and never stored.
@@ -415,7 +415,9 @@ fromPackageVersion, fromChangedAt }` for a copy a player keeps (below).
   or `cards/<thing>/uses`. Made of package keys only, so a place keeps its
   id when the character goes up a level.
 - `values`: for each value with a name on the sheet, its text and the
-  values that change with it (`dependents`), from the package's formulas.
+  values that change with it (`dependents`), from the package's formulas;
+  only values the sheet shows somewhere are named as dependents. A kept
+  copy has none (`[]`): its numbers are what is written on its page.
 - `rulesTexts`: the full texts (`rules`, `explain`) of every row and card,
   grouped by the thing that brought them.
 

@@ -136,9 +136,12 @@ describe("kept copies of the sheet", () => {
       fromPackageVersion: original.origin.packageVersion,
       fromChangedAt: draft.updatedAt,
     });
-    // Apart from its origin, the copy is the original.
-    const { origin: _a, ...copyRest } = made.model;
-    const { origin: _b, ...originalRest } = original;
+    // Apart from its origin, the copy is the original; the original's numbers and what follows
+    // from them (`values`) stay with the original, so a changed number is not told twice.
+    expect(original.values.length).toBeGreaterThan(0);
+    expect(made.model.values).toEqual([]);
+    const { origin: _a, values: _c, ...copyRest } = made.model;
+    const { origin: _b, values: _d, ...originalRest } = original;
     expect(copyRest).toEqual(originalRest);
     expect(sheetModelSchema.safeParse(made.model).success).toBe(true);
 
@@ -165,6 +168,7 @@ describe("kept copies of the sheet", () => {
     const changed = { ...original, name: "Mira die Kühne" };
     const made = await newCopy(player, { model: changed });
     expect(made.model.name).toBe("Mira die Kühne");
+    expect(made.model.values).toEqual([]);
     expect(made.copy.fromLevel).toBe(3);
 
     // The original changed (a raise) since the viewer loaded it: refused, nothing made.
@@ -178,7 +182,9 @@ describe("kept copies of the sheet", () => {
   it("changes name and model with the version it was read at; a stale one is refused", async () => {
     const made = await newCopy();
     const url = `${base()}/sheet-copies/${made.copy.id}`;
-    const model = { ...made.model, name: "Mira die Kühne" };
+    // A model sent with the original's `values` is kept without them.
+    const { values } = (await player.call("GET", `${base()}/sheet`)).json;
+    const model = { ...made.model, name: "Mira die Kühne", values };
 
     const renamed = await player.call("PUT", url, { version: 1, name: "Mit Hausregeln" });
     expect(renamed.status).toBe(200);
@@ -194,6 +200,7 @@ describe("kept copies of the sheet", () => {
     const both = await player.call("PUT", url, { version: 2, model, name: "Neu" });
     expect(both.status).toBe(200);
     expect(both.json.model).toMatchObject({ name: "Mira die Kühne", origin: { kind: "copy", name: "Neu" } });
+    expect(both.json.model.values).toEqual([]);
     expect(both.json.copy.version).toBe(3);
     expect((await player.call("GET", url)).json).toEqual(both.json);
 
