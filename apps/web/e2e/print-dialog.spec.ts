@@ -195,7 +195,7 @@ test("a character without cards cannot tick them, and keeps the wish for the nex
   await shot(page, "96-download-dialog-ohne-karten-de");
   const file = page.waitForEvent("download");
   await dialog.getByRole("button", { name: m["print.download"], exact: true }).click();
-  expect((await file).suggestedFilename()).toBe("Mira - Bogen.pdf");
+  expect((await file).suggestedFilename()).toBe("Mira - Ausführlich - Bogen.pdf");
   await expect
     .poll(
       async () =>

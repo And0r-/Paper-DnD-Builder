@@ -75,17 +75,25 @@ function printRequest(url: URL): {
   };
 }
 
-/** An ASCII file name from the character's name; the exact name goes into `filename*`. */
-function fileNames(name: string): string {
-  const ascii =
-    name
+/**
+ * The file name of a PDF from its parts ("Mira", "Fassung 7. Oktober 13-15",
+ * "Klassisch", "Bogen"), joined by " - " in `filename*`. The ASCII fallback
+ * for old browsers shortens the character's name only, at a word's end, so
+ * which copy, design and part it is stay whole.
+ */
+export function fileNames(parts: readonly string[]): string {
+  const ascii = (t: string) =>
+    t
       .normalize("NFKD")
       .replace(/[^\x20-\x7e]/g, "")
       .replace(/[^A-Za-z0-9-]+/g, "-")
       .replace(/-{2,}/g, "-")
-      .replace(/^-+|-+$/g, "")
-      .slice(0, 60) || "character";
-  return `attachment; filename="${ascii}.pdf"; filename*=UTF-8''${encodeURIComponent(`${name}.pdf`)}`;
+      .replace(/^-+|-+$/g, "");
+  const [first = "", ...rest] = parts;
+  let who = ascii(first);
+  if (who.length > 40) who = who.slice(0, 40).replace(/-[^-]*$/u, "") || who.slice(0, 40);
+  const plain = [who || "character", ...rest.map(ascii).filter((p) => p !== "")].join("-");
+  return `attachment; filename="${plain}.pdf"; filename*=UTF-8''${encodeURIComponent(`${parts.join(" - ")}.pdf`)}`;
 }
 
 /**
@@ -209,13 +217,17 @@ export const printRoutes: Route[] = [
       const pdf = await renderPdf(model, { parts: printed, design, play });
       // Asked for parts, the file name says which: "Mira - Sheet.pdf". A copy says which copy,
       // so it is not taken for the original in a downloads folder: "Mira - Version October 7 09-40 - Sheet.pdf".
+      // The design too, when the sheet is in it: "Mira - Klassisch - Bogen.pdf" and
+      // "Mira - Ausführlich - Bogen.pdf" do not overwrite each other in a downloads folder.
       const m = MESSAGES[model.language]!;
       const words: Record<PrintPart, string> = { sheet: m.sheet, cards: m.cards, texts: m.rulesTexts };
+      const designName = SHEET_DESIGNS.find((d) => d.id === design)!.name;
       const fileName = [
         model.name,
         ...(file ? [file] : []),
+        ...(parts?.includes("sheet") ? [designName[model.language] ?? design] : []),
         ...(parts ? [parts.map((p) => words[p]).join(", ")] : []),
-      ].join(" - ");
+      ];
       return new Response(pdf.bytes, {
         status: 200,
         headers: {
