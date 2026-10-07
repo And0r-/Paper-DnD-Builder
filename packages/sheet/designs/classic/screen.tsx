@@ -295,7 +295,10 @@ function Scores({ s, i, ui }: Props<"scoreColumn">) {
   );
 }
 
-/** Top of column B: the further number of every score that has one. */
+/**
+ * Top of column B: the further number of every score that has one. No circle: the package does
+ * not say which of them are trained, and an empty circle would say "not trained" for all.
+ */
 function Extras({ s, i, ui }: Props<"scoreColumn">) {
   const rows = s.scores.flatMap((sc, j) => (sc.extra ? [{ sc, j, extra: sc.extra }] : []));
   const first = rows[0];
@@ -311,8 +314,7 @@ function Extras({ s, i, ui }: Props<"scoreColumn">) {
       </p>
       <ul className="csheet__checks">
         {rows.map(({ sc, j, extra }) => (
-          <li key={`${sc.valueId}-${j}`} className="csheet__check">
-            <span className="csheet__dot" aria-hidden="true" />
+          <li key={`${sc.valueId}-${j}`} className="csheet__check csheet__check--plain">
             <span className="csheet__check-total">
               <ui.Text path={at(i, "scores", j, "extra", "value")} value={extra.value} label={extra.label} />
             </span>

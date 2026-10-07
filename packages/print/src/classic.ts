@@ -248,7 +248,10 @@ function scoresBlock(c: Ctx, s: Section<"scoreColumn">): Block {
   });
 }
 
-/** Top of column B: the further number of every score that has one, as a list with circles. */
+/**
+ * Top of column B: the further number of every score that has one, as a list. No circle: the
+ * package does not say which of them are trained, and an empty circle would say "not trained".
+ */
 function extrasBlock(c: Ctx, s: Section<"scoreColumn">): Block | null {
   const { pen, g, st } = c;
   const extras = s.scores.filter((sc) => sc.extra);
@@ -261,10 +264,9 @@ function extrasBlock(c: Ctx, s: Section<"scoreColumn">): Block | null {
     pen.text(title, x + w / 2, y + 4, pen.fit(title, st.title, w - 4), "center");
     extras.forEach((sc, i) => {
       const base = y + 9 + i * row;
-      pen.circle(x + 3.5, base - 1.1, g.box.dot / 2);
-      pen.text(sc.extra!.value, x + 12, base, pen.fit(sc.extra!.value, st.value, 6), "right");
-      pen.line(x + 6, base + 0.6, x + 12.5, base + 0.6, 0.4, LINE);
-      pen.text(sc.label, x + 14, base, pen.fit(sc.label, st.body, w - 16));
+      pen.text(sc.extra!.value, x + 9, base, pen.fit(sc.extra!.value, st.value, 6), "right");
+      pen.line(x + 3, base + 0.6, x + 9.5, base + 0.6, 0.4, LINE);
+      pen.text(sc.label, x + 11, base, pen.fit(sc.label, st.body, w - 13));
     });
     return h;
   });

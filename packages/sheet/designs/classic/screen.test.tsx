@@ -134,6 +134,15 @@ describe("classic on screen", () => {
     expect(new Set(kinds)).toEqual(new Set(["list", "statTable", "featureTable"]));
   });
 
+  it("draws no circle before a score's further number: the package does not say which are trained", () => {
+    for (const model of models) {
+      const html = renderToStaticMarkup(<ClassicSheet model={model} ui={ui} />);
+      const extras = html.split('data-part="extras"')[1]!.split("</ul>")[0]!;
+      expect(extras).toContain("csheet__check");
+      expect(extras).not.toContain("csheet__dot");
+    }
+  });
+
   it("is written in the model's language only", () => {
     const html = renderToStaticMarkup(<ClassicSheet model={models[1]!} ui={ui} />);
     expect(html).toContain('lang="en"');
