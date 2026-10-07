@@ -18,6 +18,7 @@
  *
  * Per account, the version opened last (`opened`): the screen opens it
  * again next time. Picking a version sets it, and so does making a copy.
+ * An original that changed since (a level) opens instead of an older copy.
  *
  * The builder never reads either. Access is the character's (owner, game
  * master of the owner's campaign, an access key of either); someone else's
@@ -114,6 +115,24 @@ function originalStamp(app: App, row: ReachableDraftRow) {
   };
 }
 
+/**
+ * The copy opened last, unless the original is newer than it: changed (a
+ * level, an answer) since the copy was made and since the copy was last
+ * picked. Then the original, so the sheet after a level shows that level;
+ * the copy stays in the list, and picking it again opens it again.
+ */
+function openedNext(
+  view: { copy_id: string | null; updated_at: Date } | undefined,
+  copies: SheetCopyEntry[],
+  row: ReachableDraftRow,
+): string | null {
+  const copy = view?.copy_id ? copies.find((c) => c.id === view.copy_id) : undefined;
+  if (!view || !copy) return null;
+  const changed =
+    copy.from_level !== row.document.level || copy.from_changed_at.getTime() !== row.updated_at.getTime();
+  return changed && row.updated_at >= view.updated_at ? null : copy.id;
+}
+
 function modelSize(model: unknown): number {
   return Buffer.byteLength(JSON.stringify(model));
 }
@@ -174,8 +193,8 @@ export const sheetCopyRoutes: Route[] = [
       return json(200, {
         copies: copies.map(copyEntry),
         original: originalStamp(ctx.app, row),
-        /** The copy this account opened last; null for the original. */
-        opened: await ctx.app.store.findSheetView(viewer.id, row.id),
+        /** The version this account opens: a copy's id, null for the original. */
+        opened: openedNext(await ctx.app.store.findSheetView(viewer.id, row.id), copies, row),
         max: MAX_COPIES_PER_CHARACTER,
       });
     },

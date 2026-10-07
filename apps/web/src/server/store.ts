@@ -498,13 +498,19 @@ export class Store {
     return rows.length > 0;
   }
 
-  /** The copy `accountId` opened last on this character; null for the original or nothing stored. */
-  async findSheetView(accountId: string, draftId: string): Promise<string | null> {
-    const rows = await this.db.query<{ copy_id: string | null }>(
-      "SELECT copy_id FROM sheet_views WHERE account_id = $1 AND draft_id = $2",
+  /**
+   * The version `accountId` opened last on this character and when it was
+   * picked; `copy_id` null for the original, undefined when nothing is stored.
+   */
+  async findSheetView(
+    accountId: string,
+    draftId: string,
+  ): Promise<{ copy_id: string | null; updated_at: Date } | undefined> {
+    const rows = await this.db.query<{ copy_id: string | null; updated_at: Date }>(
+      "SELECT copy_id, updated_at FROM sheet_views WHERE account_id = $1 AND draft_id = $2",
       [accountId, draftId],
     );
-    return rows[0]?.copy_id ?? null;
+    return rows[0];
   }
 
   /** Remembers the version opened last; a copy must be one of this character's (checked by the caller). */
