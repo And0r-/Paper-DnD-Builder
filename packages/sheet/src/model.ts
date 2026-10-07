@@ -244,10 +244,11 @@ export function buildSheetModel(
     const exp = explainValue(pkg, ev, id);
     const parts = (exp?.parts ?? []).map((p) => ({ label: partLabel(p.source), amount: p.amount }));
     if (parts.length < 2 || parts.every((p) => p.label === "")) return { text: shown, parts: "" };
+    // A part's name and its number keep together (no-break space): a line ends between parts.
     return {
       text: shown,
       parts: parts
-        .map((p) => (p.label ? `${p.label} ${signed.format(p.amount)}` : signed.format(p.amount)))
+        .map((p) => (p.label ? `${p.label}\u00a0${signed.format(p.amount)}` : signed.format(p.amount)))
         .join(" · "),
     };
   };

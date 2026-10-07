@@ -258,30 +258,51 @@
   display: grid;
 }
 
-/* The name's column gives way, not the row: a long word in where the number comes from
-   (a German compound) breaks rather than push the box into the next column. */
+/* Dot, name, score and number on one line; where the number comes from below them, as wide
+   as the row, so a package's long German compounds fit without breaking. The
+   name's column gives way, not the row: a still longer word breaks rather than push the
+   box into the next column. */
 .vsheet__check {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto auto;
+  grid-template-areas:
+    "dot name note total"
+    ". parts parts parts";
+  align-content: center;
   align-items: center;
-  gap: var(--space-2);
+  column-gap: var(--space-2);
   min-height: var(--sheet-touch);
   border-bottom: 1px solid var(--color-line);
 }
 
+.vsheet__check > .vsheet__dot {
+  grid-area: dot;
+}
+
 .vsheet__check-name {
-  display: grid;
+  grid-area: name;
   min-width: 0;
   overflow-wrap: anywhere;
   hyphens: auto;
 }
 
+/* A line ends between two parts, not inside a word: not even at a soft hyphen of the
+   package's, there for the box titles ("Geschick-Bo-nus"). */
+.vsheet__check-parts {
+  grid-area: parts;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  hyphens: none;
+}
+
 .vsheet__check-note {
+  grid-area: note;
   color: var(--color-ink-muted);
   font-size: var(--text-xs);
 }
 
 .vsheet__check-total {
+  grid-area: total;
   min-width: 2.5rem;
   padding: 0 var(--space-1);
   border: 1px solid var(--color-ink);

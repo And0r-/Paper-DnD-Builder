@@ -624,7 +624,7 @@ describe("printed character (demo package)", () => {
     if (talents.kind !== "checkList") throw new Error("demo sheet changed");
     const talent = (name: string) => talents.items.find((i) => i.name === name)!;
     expect(talent("Schleichen")).toMatchObject({ marked: true, total: { text: "+4" } }); // grace 2 + practice 2
-    expect(talent("Schleichen").total.parts).toBe("Geschick-Bonus +2 · Übung +2");
+    expect(talent("Schleichen").total.parts).toBe("Geschick-Bonus\u00a0+2 · Übung\u00a0+2");
     expect(talent("Sagenkunde")).toMatchObject({ marked: false, total: { text: "+0", parts: "" } });
     expect(talents.hint).not.toContain("2");
 
@@ -1681,8 +1681,8 @@ describe("the PDF made from the sheet model", () => {
   // or the demo package changes these: then check the sample PDFs and
   // update them.
   const before = {
-    de: { pages: 4, sha256: "1f39ee7295bce7d59ff6c7345c175ac484694aaf2db40fabe9ed6066c51e5cbb" },
-    en: { pages: 4, sha256: "375fa95cdf51ab528edda05b2d53aefdec8a67836aa4b114cbd6a41364f79bf3" },
+    de: { pages: 4, sha256: "559ae326dfbacf68d4996b541a39b038145ab0e79670e9bb773e15eaa16aa6d3" },
+    en: { pages: 4, sha256: "31cb3b7dd97a2281b77342cc7170b6069c7bfb2ece26e6c71f63e07549cb90ed" },
   };
 
   it("is unchanged for the level 20 demo character with cards", async () => {

@@ -161,9 +161,20 @@ test.describe("at a desk", () => {
       expect(b.x + b.width).toBeLessThanOrEqual(right + 1);
     }
     // A check's number stays in its row, not over the dot of the column beside it.
+    // Dot, name and number on one line; where the number comes from below them.
+    const middle = (b: { y: number; height: number }) => b.y + b.height / 2;
     for (const row of await sheet.locator(".vsheet__check").all()) {
       const [r, total] = [await box(row), await box(row.locator(".vsheet__check-total"))];
       expect(total.x + total.width).toBeLessThanOrEqual(r.x + r.width + 1);
+      const [dot, name] = [
+        await box(row.locator(".vsheet__dot")),
+        await box(row.locator(".vsheet__check-name")),
+      ];
+      expect(Math.abs(middle(dot) - middle(total))).toBeLessThan(3);
+      expect(Math.abs(middle(name) - middle(total))).toBeLessThan(3);
+      const parts = row.locator(".vsheet__check-parts");
+      if ((await parts.count()) > 0)
+        expect((await box(parts)).y).toBeGreaterThanOrEqual(total.y + total.height - 1);
     }
   });
 

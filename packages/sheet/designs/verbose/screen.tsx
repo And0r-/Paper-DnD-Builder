@@ -485,16 +485,16 @@ function CheckList({ s, i, ui }: Props<"checkList">) {
           />
           <span className="vsheet__check-name">
             <ui.Text path={at(i, "items", j, "name")} value={item.name} label={item.name} />
-            {item.total.parts !== "" && (
-              <span className="vsheet__check-parts">
-                <ui.Text
-                  path={at(i, "items", j, "total", "parts")}
-                  value={item.total.parts}
-                  label={item.name}
-                />
-              </span>
-            )}
           </span>
+          {item.total.parts !== "" && (
+            <span className="vsheet__check-parts">
+              <ui.Text
+                path={at(i, "items", j, "total", "parts")}
+                value={item.total.parts}
+                label={item.name}
+              />
+            </span>
+          )}
           {item.note !== "" && (
             <span className="vsheet__check-note">
               <ui.Text path={at(i, "items", j, "note")} value={item.note} label={item.name} />
