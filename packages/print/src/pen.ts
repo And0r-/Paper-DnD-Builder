@@ -221,10 +221,16 @@ export class Pen {
    * A label at the largest size from `s.size` down to `min` that fits on one
    * line; if it does not fit even at `min`, wrapped as {@link wrapWords} does.
    */
-  label(text: string, s: TextStyle, width: number, min = 7): { style: TextStyle; lines: string[] } {
+  label(
+    text: string,
+    s: TextStyle,
+    width: number,
+    min = 7,
+    keepCaps = false,
+  ): { style: TextStyle; lines: string[] } {
     const style = this.fit(text, s, width, min);
     if (this.width(text, style) <= width) return { style, lines: [text] };
-    return this.wrapWords(text, s, width, min);
+    return this.wrapWords(text, s, width, min, keepCaps);
   }
 
   /**
@@ -232,9 +238,17 @@ export class Pen {
    * every word fits on a line, so lines break only between words, after a
    * hyphen or slash, or at a soft hyphen. Rather a smaller size, tighter
    * letters or no capitals than a word split between letters; that happens
-   * only if a word is too long even at `min`.
+   * only if a word is too long even at `min`. With `keepCaps` the capitals
+   * stay and the word is split instead: a box heading in small letters next
+   * to headings in capitals reads as another kind of thing.
    */
-  wrapWords(text: string, s: TextStyle, width: number, min = 7): { style: TextStyle; lines: string[] } {
+  wrapWords(
+    text: string,
+    s: TextStyle,
+    width: number,
+    min = 7,
+    keepCaps = false,
+  ): { style: TextStyle; lines: string[] } {
     const pieces = text
       .split(BREAKS)
       .flatMap((w) => w.split(/(?<=[-/\u2010-\u2012\u00ad])/u))
@@ -242,11 +256,14 @@ export class Pen {
     const tries: TextStyle[] = [];
     for (let size = s.size; size >= min; size -= 0.5) tries.push({ ...s, size });
     if (s.spacing) tries.push({ ...s, size: min, spacing: 0 });
-    if (s.caps) tries.push({ ...s, size: min, spacing: 0, caps: false });
+    // Capitals are wide; a little tighter still keeps a word like "EIGENSCHAFTEN" whole.
+    if (s.caps) tries.push({ ...s, size: min, spacing: -0.03 });
+    const tightest = tries.at(-1);
+    if (s.caps && !keepCaps) tries.push({ ...s, size: min, spacing: 0, caps: false });
     for (const t of tries)
       if (pieces.every((p) => this.width(p, t) <= width))
         return { style: t, lines: this.wrap(text, t, width) };
-    const style = { ...s, size: Math.min(s.size, min) };
+    const style = (keepCaps && tightest) || { ...s, size: Math.min(s.size, min) };
     return { style, lines: this.wrap(text, style, width) };
   }
 
