@@ -35,7 +35,7 @@ it, so the file and the server cannot drift apart.
 | `POST /api/auth/login`           | `{ email, password }`           | `200 { account }` + session cookie. `401 wrongMailOrPassword`, `429 tooManyAttempts` (`Retry-After`).                                                                                                                                                                                                                    |
 | `POST /api/auth/logout`          | —                               | `204`, cookie cleared.                                                                                                                                                                                                                                                                                                   |
 | 🔒 `GET /api/account`            | —                               | `{ account: { email, language, units, print, createdAt } }`                                                                                                                                                                                                                                                              |
-| 🔒 `PATCH /api/account/settings` | `{ language?, units?, print? }` | `units` is `{ dimension: unit or null }`; null follows the language again. Units must exist in a loaded package (`422 unknownUnit`). `print` is `{ parts?, design?, state? }`, what the download dialog offers next time (see Print); left-out fields stay. `422 designNotAvailable` for a planned design not drawn yet. |
+| 🔒 `PATCH /api/account/settings` | `{ language?, units?, print? }` | `units` is `{ dimension: unit or null }`; null follows the language again. Units must exist in a loaded package (`422 unknownUnit`). `print` is `{ parts?, design?, state? }`, what the download dialog offers next time (see Print); left-out fields stay. `422 designNotAvailable` for a planned design not drawn yet (none at the moment). |
 | 🔒 `POST /api/account/password`  | —                               | `202`. New password by mail; every other session ends.                                                                                                                                                                                                                                                                   |
 | 🔒 `DELETE /api/account`         | `{ confirm: true }`             | `204`. Deletes account, sessions, access keys, every draft, the campaigns it leads (players keep their characters) and its places in other campaigns.                                                                                                                                                                    |
 
@@ -371,9 +371,10 @@ Query parameters of the PDF, all optional:
   ("Mira - Sheet, Cards.pdf"). **Without `parts` the PDF is exactly what it
   was before parts existed: the sheet, then the cards.** The download
   dialog asks for the sheet alone unless the player picks more.
-- `design`: an id from `GET /api/sheet-designs`; default the first one
-  (`verbose`). `classic` is planned and answers `400 designNotAvailable`
-  until it is drawn. Cards and rules texts look the same in every design.
+- `design`: an id from `GET /api/sheet-designs` (`verbose`, `classic`);
+  default the first one (`verbose`). A design that is planned but not drawn
+  yet answers `400 designNotAvailable`. Cards and rules texts look the same
+  in every design.
 - `version`: `original` (default), the sheet as the builder makes it now,
   in the account's language and units; or the id of a kept copy
   (`GET /api/drafts/:id/sheet-copies`), printed as kept, in the copy's

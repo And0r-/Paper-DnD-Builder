@@ -247,12 +247,12 @@ describe("settings", () => {
     expect(await refuse({ design: "fancy" })).toBe(400);
     expect(await refuse({ colour: "red" })).toBe(400);
     const classic = await client.call("PATCH", "/api/account/settings", { print: { design: "classic" } });
-    expect(classic.status).toBe(422);
-    expect(classic.json.error).toEqual({ code: "designNotAvailable", design: "classic" });
+    expect(classic.status).toBe(200);
+    expect(classic.json.account.print.design).toBe("classic");
 
     // Whatever got into the column, the account reads only what is valid now.
     await server.db.query(
-      `UPDATE accounts SET print_choice = '{"parts":["cards","nope"],"design":"classic","state":"filled"}'`,
+      `UPDATE accounts SET print_choice = '{"parts":["cards","nope"],"design":"gone","state":"filled"}'`,
     );
     expect((await client.call("GET", "/api/account")).json.account.print).toEqual({
       parts: ["sheet"],

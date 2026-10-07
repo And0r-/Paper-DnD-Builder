@@ -2212,7 +2212,7 @@
             "name": "design",
             "in": "query",
             "required": false,
-            "description": "How the sheet looks; ids from `GET /api/sheet-designs`. Default: the first design there (`verbose`). `classic` is planned and answers `400 designNotAvailable` until it is drawn.",
+            "description": "How the sheet looks; ids from `GET /api/sheet-designs`. Default: the first design there (`verbose`). A design that is planned but not drawn yet answers `400 designNotAvailable`.",
             "schema": {
               "enum": ["classic", "verbose"]
             }
