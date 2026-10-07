@@ -384,10 +384,42 @@
   );
 }
 
+.csheet {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
 .csheet__footer {
   display: flex;
   justify-content: space-between;
   gap: var(--space-4);
+}
+
+/* Who is cut first where the line is short; which sheet, the units and the page stay whole. */
+.csheet__footer-line {
+  display: flex;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.csheet__footer-who {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.csheet__footer-rest,
+.csheet__footer-date {
+  flex: none;
+  white-space: pre;
+}
+
+/* On a phone there are no pages: one footer at the end, no page heads. */
+@media (max-width: 899.98px) {
+  .csheet__cont,
+  .csheet__page:not(:last-child) > .csheet__footer {
+    display: none;
+  }
 }
 
 /* ---------------------------------------------------------- the A4 page */
@@ -395,7 +427,8 @@
 @media (min-width: 900px) {
   .csheet {
     /* As on paper, but never below what a pointer can hit (24 px, WCAG 2.2). */
-    --sheet-tick: max(var(--cs-square), 24px);
+    /* Ticks of 18 px, 24 px apart: each keeps the 24 px a pointer needs (WCAG 2.2, 2.5.8, spacing). */
+    --sheet-tick: max(var(--cs-square), 18px);
     --sheet-touch: auto;
     --sheet-number: var(--cs-mid);
     font-size: var(--cs-body);
@@ -410,10 +443,8 @@
       "a b cluster"
       "a b c"
       "band band c"
-      "more more more"
-      "apart apart apart"
       "foot foot foot";
-    grid-template-rows: auto auto auto 1fr;
+    grid-template-rows: auto auto auto 1fr auto;
     gap: 4mm var(--cs-gap);
     align-content: start;
     box-sizing: border-box;
@@ -450,29 +481,48 @@
     grid-area: c;
   }
 
+  /* Right under the scores, as in the PDF; no white between them and the gear. */
   .csheet__band {
     grid-area: band;
-    align-self: end;
+    align-self: start;
   }
 
   .csheet__footer {
     grid-area: foot;
   }
 
-  /* After page 1: two columns, as on page 2 of the PDF. */
-  .csheet__page > .csheet__more {
-    grid-area: more;
+  /* The pages after the first: the name and level on top, two columns, as on page 2 of the PDF. */
+  .csheet {
+    gap: 8mm;
+  }
+
+  .csheet__page--more,
+  .csheet__page--apart {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .csheet__cont {
+    margin-bottom: 4mm;
+    padding-bottom: 1mm;
+    border-bottom: 0.3mm solid #222;
+    font-size: var(--cs-body);
+    font-weight: var(--weight-bold);
+  }
+
+  .csheet__page > .csheet__more,
+  .csheet__page > .csheet__apart {
     display: block;
+    flex: 1;
     columns: 2;
     column-gap: var(--cs-column-gap);
   }
 
-  .csheet__page > .csheet__apart {
-    grid-area: apart;
-    display: block;
-    columns: 2;
-    column-gap: var(--cs-column-gap);
-    padding-top: 6mm;
+  .csheet__page--more > .csheet__footer,
+  .csheet__page--apart > .csheet__footer {
+    align-self: stretch;
+    margin-top: 4mm;
   }
 
   .csheet__apart > .csheet__section--statBoxes {
@@ -487,6 +537,19 @@
   .csheet__more .csheet__feature-wrap,
   .csheet__more .csheet__answer,
   .csheet__apart .csheet__feature-wrap {
+    break-inside: avoid;
+  }
+
+  /* A title stays in the column of what it heads; short sections are not split at all. */
+  .csheet__more .csheet__title,
+  .csheet__apart .csheet__title {
+    break-after: avoid;
+  }
+
+  .csheet__more > .csheet__section--answers,
+  .csheet__more > .csheet__section--notes,
+  .csheet__apart > .csheet__section--answers,
+  .csheet__apart > .csheet__section--notes {
     break-inside: avoid;
   }
 
@@ -606,8 +669,49 @@
     min-height: var(--cs-marks-h);
   }
 
+  /* A long word in a box is set smaller rather than broken ("GLÜCKSMARKEN"). */
+  .csheet__box {
+    container-type: inline-size;
+  }
+
   .csheet__box-label {
-    font-size: var(--cs-label);
+    overflow-wrap: normal;
+    hyphens: manual;
+    font-size: min(var(--cs-label), 11cqi);
+  }
+
+  /* The boxes at the table in rows as in the PDF, whatever section they come from: the numbers,
+     a wide box per pencil value, then all boxes to tick in one row. */
+  .csheet__cluster {
+    display: flex;
+    flex-flow: row wrap;
+    gap: var(--cs-box-gap);
+  }
+
+  .csheet__cluster > .csheet__section,
+  .csheet__cluster .csheet__boxes,
+  .csheet__cluster .csheet__box-row {
+    display: contents;
+  }
+
+  .csheet__cluster .csheet__box--number {
+    order: 1;
+    flex: 1 1 15mm;
+  }
+
+  .csheet__cluster .csheet__box--pencil {
+    order: 2;
+    flex: 1 1 100%;
+  }
+
+  .csheet__cluster .csheet__box--circles,
+  .csheet__cluster .csheet__box--boxes {
+    order: 3;
+    flex: 1 1 15mm;
+  }
+
+  .csheet__cluster .csheet__box .sheet-ticks {
+    flex-wrap: wrap;
   }
 
   .csheet__box--boxes .csheet__box-value {
@@ -717,6 +821,32 @@
     font-size: var(--cs-value);
   }
 
+  /* A number sits on its line, as written on paper; the place to tap stays 24 px high. */
+  .csheet__check-total .sheet-text,
+  .csheet__cell dd .sheet-text,
+  .csheet__answer dd .sheet-text {
+    display: inline-flex;
+    align-items: flex-end;
+    justify-content: flex-end;
+  }
+
+  .csheet__score-oval {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .csheet__score-oval .sheet-text {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* "Played by": a line to write on, at least 24 px high. */
+  .csheet__cell .sheet-write {
+    min-height: 24px;
+  }
+
   .csheet__dot {
     width: var(--cs-dot);
     height: var(--cs-dot);
@@ -739,18 +869,53 @@
 
   .csheet__table thead th,
   .csheet__table thead td,
-  .csheet__row-tools {
+  .csheet__table .csheet__row-tools {
     border: 0;
+    padding: 0;
   }
 
   .csheet__table tbody th {
     font-size: var(--cs-rowName);
   }
 
-  /* On paper a column is as wide as it needs; here the page is as wide as paper, so words wrap. */
+  /* The button that takes a row away is no column of the table, as on paper: it shows past the row's end. */
+  .csheet__table-wrap {
+    overflow: visible;
+  }
+
+  .csheet__table tr {
+    position: relative;
+  }
+
+  .csheet__table .csheet__row-tools {
+    position: absolute;
+    top: 50%;
+    right: 0;
+    width: auto;
+    transform: translate(100%, -50%);
+  }
+
+  .csheet__table thead .csheet__row-tools {
+    display: none;
+  }
+
+  /* A column's name keeps to its column: no spacing between its letters, as on paper. */
+  .csheet__table thead th {
+    letter-spacing: 0;
+  }
+
+  /* As on paper: a number keeps one line, the wrapping column and long hand-written cells wrap. */
   .csheet__table thead th,
-  .csheet__table td:not(.csheet__wrap) {
+  .csheet__table td:not(.csheet__wrap, .csheet__short) {
     white-space: normal;
+  }
+
+  .csheet__table td.csheet__short {
+    white-space: nowrap;
+  }
+
+  .csheet__table td.csheet__wrap {
+    font-size: var(--cs-min);
   }
 
   /* Features */

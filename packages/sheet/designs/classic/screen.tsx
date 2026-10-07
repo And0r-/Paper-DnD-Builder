@@ -11,6 +11,7 @@
 import type { CSSProperties, ReactNode } from "react";
 import { MESSAGES } from "../../src/messages.ts";
 import type { FeatureRow, SheetSection, StatBox } from "../../src/model.ts";
+import { PageFooter, PageHead } from "../page-parts.tsx";
 import type { SheetScreenProps, SheetUi } from "../types.ts";
 import { CLASSIC_GEOMETRY as G, classicPlan, clusterRows, firstColumns } from "./index.ts";
 
@@ -60,12 +61,21 @@ export function ClassicSheet({ model, ui }: SheetScreenProps) {
   const m = MESSAGES[model.language];
   const plan = classicPlan(model.sections);
   const words = { playedBy: m?.playedBy ?? "", pencil: m?.pencil ?? "", rowName: m?.rowName ?? "" };
-  const sections = (part: keyof typeof plan.parts) =>
-    plan.parts[part].map((i) => (
+  const sections = (part: keyof typeof plan.parts, order = plan.parts[part]) =>
+    order.map((i) => (
       <Section key={`${model.sections[i]!.id}-${i}`} s={model.sections[i]!} i={i} ui={ui} words={words} />
     ));
   const scoresAt = plan.parts.scores[0];
   const scores = scoresAt === undefined ? undefined : model.sections[scoresAt];
+  // The pages of the PDF: page 1, then what comes after it in two columns, then the apart part.
+  const more = [...(plan.apartPage ? [] : plan.parts.apart), ...plan.parts.later];
+  const total = 1 + (more.length > 0 ? 1 : 0) + (plan.apartPage ? 1 : 0);
+  // On their own page the box rows come first, across the page, as in the PDF.
+  const boxRowsFirst = [...plan.parts.apart].sort(
+    (x, y) =>
+      Number(model.sections[y]!.kind === "statBoxes") - Number(model.sections[x]!.kind === "statBoxes"),
+  );
+  const footer = (page: number) => <PageFooter model={model} page={page} total={total} prefix="csheet" />;
   return (
     <article className="csheet" lang={model.language} style={pageStyle}>
       <div className="csheet__page">
@@ -79,16 +89,25 @@ export function ClassicSheet({ model, ui }: SheetScreenProps) {
         </div>
         <div className="csheet__c">{sections("right")}</div>
         <div className="csheet__band">{sections("band")}</div>
-        <div className="csheet__more">
-          {!plan.apartPage && sections("apart")}
-          {sections("later")}
-        </div>
-        {plan.apartPage && <div className="csheet__apart">{sections("apart")}</div>}
-        <footer className="csheet__footer">
-          <span>{[model.name, model.levelLabel, model.unitsLine].join(" · ")}</span>
-          <span>{model.createdOn}</span>
-        </footer>
+        {footer(1)}
       </div>
+      {more.length > 0 && (
+        <div className="csheet__page csheet__page--more">
+          <PageHead model={model} prefix="csheet" />
+          <div className="csheet__more">
+            {!plan.apartPage && sections("apart")}
+            {sections("later")}
+          </div>
+          {footer(2)}
+        </div>
+      )}
+      {plan.apartPage && (
+        <div className="csheet__page csheet__page--apart">
+          <PageHead model={model} prefix="csheet" />
+          <div className="csheet__apart">{sections("apart", boxRowsFirst)}</div>
+          {footer(total)}
+        </div>
+      )}
     </article>
   );
 }
@@ -364,6 +383,9 @@ function CheckList({ s, i, ui }: Props<"checkList">) {
   );
 }
 
+/** A cell up to this long keeps one line, as a number does on paper; a longer one wraps. */
+const SHORT_CELL = 28;
+
 function StatTable({ s, i, ui, rowName }: Props<"statTable"> & { rowName: string }) {
   return (
     <div className="csheet__table-wrap">
@@ -376,7 +398,7 @@ function StatTable({ s, i, ui, rowName }: Props<"statTable"> & { rowName: string
                 <ui.Text path={at(i, "columns", k)} value={c} label={s.title} />
               </th>
             ))}
-            <td />
+            <td className="csheet__row-tools" />
           </tr>
         </thead>
         <tbody>
@@ -386,7 +408,12 @@ function StatTable({ s, i, ui, rowName }: Props<"statTable"> & { rowName: string
                 <ui.Text path={at(i, "rows", j, "name")} value={r.name} label={rowName} />
               </th>
               {r.cells.map((c, k) => (
-                <td key={k} className={s.wrap?.[k] ? "csheet__wrap" : undefined}>
+                <td
+                  key={k}
+                  className={
+                    s.wrap?.[k] ? "csheet__wrap" : c.length <= SHORT_CELL ? "csheet__short" : undefined
+                  }
+                >
                   <ui.Text path={at(i, "rows", j, "cells", k)} value={c} label={s.columns[k] ?? s.title} />
                 </td>
               ))}
