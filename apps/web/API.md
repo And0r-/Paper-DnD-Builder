@@ -606,6 +606,67 @@ fromPackageVersion, language, units, version }`.
 
 Tests: [`sheet-copies.test.ts`](src/server/api/sheet-copies.test.ts).
 
+## Live channel
+
+Everyone who has a character open hears about every stored change to it at
+once: the owner and the game master of its campaign, in the browser, with a
+key or over MCP. The event is made where the server stores the change, for
+every way in; no client passes anything on to another.
+
+```sh
+curl -N -H "Authorization: Bearer $KEY" https://builder.example/api/drafts/$ID/events
+```
+
+| Method & path                   | Result                                                                                                                                                                                                                                                                                                                                                                                           |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 🔒 `GET /api/drafts/:id/events` | `200 text/event-stream` ([Server-Sent Events](https://html.spec.whatwg.org/multipage/server-sent-events.html)), open until either side ends it. Same access as `GET /api/drafts/:id`, else `404 draftNotFound`. `?clientId=` names the browser window (letters, digits, `-`, `_`, up to 64). `429 tooManyConnections` (5 open per account, `max`), `429 tooManyAttempts` (60 openings a minute). |
+
+Every event is one `data:` line with one JSON object. There is no
+character content in it: read the character (or its play state, its
+copies) again when the event matters.
+
+```json
+{
+  "type": "changed",
+  "draftId": "…",
+  "version": 7,
+  "at": "2026-10-08T18:00:00.000Z",
+  "source": { "via": "mcp", "accountId": "…", "accountName": "Mira", "role": "owner", "clientId": null },
+  "change": { "kind": "answer", "choice": "folk" }
+}
+```
+
+| `type`     | When                                                             | `change`                                                                           |
+| ---------- | ---------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| `changed`  | An answer, a pool, the level of a draft.                         | `{ kind: "answer", choice }`, `{ kind: "pool", step }`, `{ kind: "level", level }` |
+| `levelUp`  | `POST …/level-up`.                                               | `{ kind: "levelUp", level }`                                                       |
+| `finished` | `POST …/finish`.                                                 | none                                                                               |
+| `state`    | `PUT …/state`.                                                   | `{ kind: "state" \| "clearChecks", stateVersion }`                                 |
+| `copies`   | A kept copy made, changed or deleted.                            | `{ kind: "copyCreated" \| "copyChanged" \| "copyDeleted", copyId }`                |
+| `campaign` | The owner put the character into a campaign or out of one.       | none                                                                               |
+| `deleted`  | The character is gone; the server ends the stream after it.      | none                                                                               |
+| `created`  | A new character (told on the server; nobody listens to it yet).  | none                                                                               |
+| `presence` | Someone connected or left; also the first event of every stream. | instead: `present: [{ accountName, role, via, clientId }]`, one per connection     |
+
+- `version` is the character's version after the change; `state`,
+  `copies` and `campaign` leave it as it was.
+- `source.via`: `browser` (session cookie), `api` (access key), `mcp` (an
+  access key from a program that sends `X-Builder-Client: mcp`; both MCP
+  servers do). A label for the screen, not a proof. `source.role`: `owner`
+  or `gameMaster`, their access to the character.
+- `source.clientId`: send `X-Builder-Client-Id: <window id>` with a change
+  and it comes back here, so a window knows its own changes.
+- A comment line `: ping` every 30 seconds keeps proxies from closing a
+  quiet stream. `retry: 5000` at the start: `EventSource` reconnects after 5 s.
+- The server ends a stream on logout (that login's streams only), when the
+  key is withdrawn, the account or the character deleted, and when the
+  reader loses access (the player leaves the campaign or is removed, the
+  campaign is deleted, the character leaves it). Every heartbeat checks
+  the login and the access again.
+- Who is connected is kept in memory only, per server process.
+
+Tests: [`live.test.ts`](src/server/api/live.test.ts).
+
 ## Server
 
 | Method & path           | Result                                                                                                                                                                                                                                                         |
@@ -663,6 +724,7 @@ Tests: [`sheet-copies.test.ts`](src/server/api/sheet-copies.test.ts).
 | `422`  | `lastPassword`           | Deleting the account's last password.                                                                                     |
 | `422`  | `unknownUnit`            | No loaded package offers this unit (`dimension`, `unit`).                                                                 |
 | `429`  | `tooManyAttempts`        | Too many failed logins, new accounts, new or opened invitation links, or links back in; `retryAfter`, also `Retry-After`. |
+| `429`  | `tooManyConnections`     | Five live channels of the account are open already (`max`); close one first.                                              |
 | `429`  | `tooManyRequests`        | Too many PDFs; `Retry-After`.                                                                                             |
 | `500`  | `internal`               | A bug in the builder.                                                                                                     |
 | `500`  | `packageRuleError`       | The package's rules could not be worked out (a bug in the package); `message`.                                            |

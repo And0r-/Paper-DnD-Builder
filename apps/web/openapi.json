@@ -1902,6 +1902,107 @@
         "description": "Only the owner deletes; a game master gets `403 ownerOnly`."
       }
     },
+    "/api/drafts/{id}/events": {
+      "get": {
+        "operationId": "liveEvents",
+        "summary": "The live channel of a character",
+        "tags": ["Characters"],
+        "description": "Server-Sent Events: every stored change to the character, by anyone (owner, game master; browser, API, MCP), and who has the channel open. Same access as reading the character. The stream stays open; a comment line `: ping` comes every 30 seconds. The server ends it on logout (that login only), a withdrawn key, a deleted character, and when the reader loses access (a player leaves the campaign, the character leaves it); checked again on every heartbeat. At most 5 open per account. See API.md, \"Live channel\".",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Draft id (a UUID).",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "clientId",
+            "in": "query",
+            "required": false,
+            "description": "The window's own id (letters, digits, `-`, `_`, up to 64), shown back in `presence`. `EventSource` cannot send headers, so it goes here.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The stream. Every event is one `data:` line holding a `LiveEvent`; the first is `presence`.",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                },
+                "itemSchema": {
+                  "$ref": "#/components/schemas/LiveEvent"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "description": "`draftNotFound` (also someone else's character: it looks exactly like a missing one)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "enum": ["draftNotFound"]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "`tooManyConnections` (5 open per account; with `max`) or `tooManyAttempts` (60 openings a minute; `Retry-After`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "enum": ["tooManyConnections", "tooManyAttempts"]
+                        },
+                        "max": {
+                          "type": "integer"
+                        },
+                        "retryAfter": {
+                          "type": "integer"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds to wait (`tooManyAttempts`).",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
     "/api/drafts/{id}/explain/{value}": {
       "get": {
         "operationId": "explainValue",
@@ -6315,6 +6416,7 @@
           "resetLinkInvalid",
           "tooManyAttempts",
           "tooManyCampaigns",
+          "tooManyConnections",
           "tooManyCopies",
           "tooManyKeys",
           "tooManyPasswords",
@@ -8021,6 +8123,140 @@
         },
         "required": ["parts", "design", "state"],
         "additionalProperties": false
+      },
+      "LiveSource": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["via", "accountId", "accountName", "role", "clientId"],
+        "description": "Who stored a change, and how.",
+        "properties": {
+          "via": {
+            "enum": ["browser", "api", "mcp"],
+            "description": "`browser`: logged in with the session cookie. `api`: an access key. `mcp`: an access key from a program that sends `X-Builder-Client: mcp` (the MCP server in the web app and in the zip do). A label, not a proof."
+          },
+          "accountId": {
+            "type": "string"
+          },
+          "accountName": {
+            "type": "string"
+          },
+          "role": {
+            "enum": ["owner", "gameMaster"],
+            "description": "Their access to the character."
+          },
+          "clientId": {
+            "type": ["string", "null"],
+            "description": "The `X-Builder-Client-Id` the change was sent with: a browser window knows its own changes by it."
+          }
+        }
+      },
+      "LivePresent": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["accountName", "role", "via", "clientId"],
+        "properties": {
+          "accountName": {
+            "type": "string"
+          },
+          "role": {
+            "enum": ["owner", "gameMaster"]
+          },
+          "via": {
+            "enum": ["browser", "api", "mcp"]
+          },
+          "clientId": {
+            "type": ["string", "null"],
+            "description": "The `clientId` the connection was opened with."
+          }
+        }
+      },
+      "LiveEvent": {
+        "description": "One event of the live channel: the JSON of one `data:` line. No character content; read the character (or its play state, its copies) again when it matters.",
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["type", "draftId", "version", "at", "source"],
+            "properties": {
+              "type": {
+                "enum": [
+                  "created",
+                  "changed",
+                  "levelUp",
+                  "finished",
+                  "state",
+                  "copies",
+                  "campaign",
+                  "deleted"
+                ]
+              },
+              "draftId": {
+                "type": "string"
+              },
+              "version": {
+                "type": "integer",
+                "description": "The character's version after the change; the play state, copies and the campaign leave it as it was."
+              },
+              "at": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "source": {
+                "$ref": "#/components/schemas/LiveSource"
+              },
+              "change": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["kind"],
+                "description": "What exactly. `changed`: `level` (with `level`), `answer` (with `choice`), `pool` (with `step`). `levelUp`: with `level`. `state`: `state` or `clearChecks`, with `stateVersion`. `copies`: `copyCreated`, `copyChanged`, `copyDeleted`, with `copyId`.",
+                "properties": {
+                  "kind": {
+                    "type": "string"
+                  },
+                  "choice": {
+                    "type": "string"
+                  },
+                  "step": {
+                    "type": "string"
+                  },
+                  "level": {
+                    "type": "integer"
+                  },
+                  "copyId": {
+                    "type": "string"
+                  },
+                  "stateVersion": {
+                    "type": "integer"
+                  }
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["type", "draftId", "at", "present"],
+            "properties": {
+              "type": {
+                "const": "presence"
+              },
+              "draftId": {
+                "type": "string"
+              },
+              "at": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "present": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/LivePresent"
+                },
+                "description": "Everyone connected to the character now, in the order they came; one entry per connection."
+              }
+            }
+          }
+        ]
       }
     }
   }
