@@ -57,7 +57,8 @@ import { planDiff, plannedDraft } from "./plan.ts";
 import { flowOf, type Raise } from "./raise.ts";
 import { answeredParts } from "./step-changes.ts";
 
-export type SaveState = "saved" | "saving" | "error" | "offline";
+/** "unsaved": all is saved, but a field shows text that is not (someone else changed it meanwhile). */
+export type SaveState = "saved" | "saving" | "error" | "offline" | "unsaved";
 
 type Pending = DraftChange;
 
@@ -148,6 +149,11 @@ export interface DraftApi {
   /** Set while a finished character is being raised and not finished again. */
   raise: Raise | null;
   saveState: SaveState;
+  /**
+   * A field says its text is not the saved one (on) or is again (off), so
+   * "Saved" is never said beside a field that shows something else.
+   */
+  hold(key: string, on: boolean): void;
   /**
    * Set when a change was refused (by the server, or here because the
    * numbers do not fit); the screen shows it once. `problem` is the rule
@@ -310,6 +316,16 @@ function ReadyDraft({
     [onServer],
   );
   const [saveState, setSaveState] = useState<SaveState>("saved");
+  const [held, setHeld] = useState<ReadonlySet<string>>(new Set());
+  const hold = useCallback((key: string, on: boolean) => {
+    setHeld((h) => {
+      if (h.has(key) === on) return h;
+      const next = new Set(h);
+      if (on) next.add(key);
+      else next.delete(key);
+      return next;
+    });
+  }, []);
   const [rejected, setRejected] = useState<{ problem?: string } | null>(null);
   const [notice, setNotice] = useState<StepNotice | null>(null);
 
@@ -661,7 +677,8 @@ function ReadyDraft({
       entries: flow.entries,
       allEntries: flow.all,
       raise: flow.raise,
-      saveState,
+      saveState: saveState === "saved" && held.size > 0 ? "unsaved" : saveState,
+      hold,
       rejected,
       clearRejected: () => setRejected(null),
       notice,
@@ -682,6 +699,8 @@ function ReadyDraft({
       ev,
       flow,
       saveState,
+      held,
+      hold,
       rejected,
       notice,
       change,

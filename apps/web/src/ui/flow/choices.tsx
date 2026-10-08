@@ -26,7 +26,8 @@ import {
   ptext,
   thingName,
 } from "../package-text.ts";
-import { useCanGuide, useOthers } from "../live/live-bar.tsx";
+import { useCanGuide, useOthers, useViewer } from "../live/live-bar.tsx";
+import { fromText } from "../live/words.ts";
 import type { LoadedPackage } from "../packages.ts";
 import { fillNodes, ThingName } from "../components/ThingName.tsx";
 import { useDraft } from "./draft-state.tsx";
@@ -1128,6 +1129,9 @@ export function NumberChoice({
 
 // ------------------------------------------------------------------- text
 
+/** How a text is stored: blank is no answer. */
+const storedText = (v: string) => (v.trim() ? v : "");
+
 export function TextChoice({
   choice,
   state,
@@ -1138,15 +1142,50 @@ export function TextChoice({
   label: string;
 }) {
   const { t } = useApp();
-  const { lp, change } = useDraft();
+  const { lp, change, hold, told } = useDraft();
+  const viewer = useViewer();
   const stored = (state.answer as { text?: string } | undefined)?.text ?? "";
   const [value, setValue] = useState(stored);
   const suggestions = choice.suggestions ? plist(lp, choice.suggestions) : [];
   const length = [...value.trim()].length;
 
+  // The field keeps its own text while you type. A text that comes from
+  // elsewhere (someone else, another window, a program; or yours that gave
+  // way) is shown at once, unless you are in the field: then you are asked,
+  // so neither text is lost without a word (AND-268).
+  const mine = useRef(stored);
+  const focused = useRef(false);
+  const [theirs, setTheirs] = useState<{ text: string; from: string } | null>(null);
+  useEffect(() => {
+    if (stored === mine.current) return;
+    mine.current = stored;
+    if ((focused.current || theirs) && storedText(value) !== stored) {
+      const c = told?.change;
+      const from =
+        told && c?.kind === "answer" && c.choice === choice.id
+          ? fromText(told.source, viewer, t)
+          : t("text.elsewhere");
+      setTheirs({ text: stored, from });
+    } else {
+      setValue(stored);
+      setTheirs(null);
+    }
+  }, [stored]);
+
+  // "Saved" only while the field shows what is saved.
+  const differs = storedText(value) !== stored;
+  useEffect(() => hold(choice.id, differs), [hold, choice.id, differs]);
+  useEffect(() => () => hold(choice.id, false), [hold, choice.id]);
+
+  const save = (v: string) => {
+    mine.current = storedText(v);
+    change({ type: "answer", choice: choice.id, answer: v.trim() ? { text: v } : null });
+  };
   const set = (v: string) => {
     setValue(v);
-    change({ type: "answer", choice: choice.id, answer: v.trim() ? { text: v } : null });
+    // While asked, typing does not overwrite the other text: only "Keep mine" does.
+    if (!theirs) save(v);
+    else if (storedText(v) === stored) setTheirs(null);
   };
 
   const problem =
@@ -1157,33 +1196,69 @@ export function TextChoice({
         : undefined;
 
   return (
-    <TextField
-      id={`choice-${choice.id}`}
-      label={label}
-      labelExtra={choice.optional ? `(${t("text.optional")})` : undefined}
-      multiline={choice.multiline ?? false}
-      value={value}
-      error={problem}
-      maxLength={choice.maxLength + 50}
-      autoComplete="off"
-      help={choice.multiline ? t("text.chars", { count: length, max: choice.maxLength }) : undefined}
-      onChange={(e) => set(e.target.value)}
-      trailing={
-        suggestions.length > 0 ? (
-          <Button
-            variant="secondary"
-            icon="dice"
-            onClick={() => {
-              const others = suggestions.filter((s) => s !== value);
-              const pool = others.length > 0 ? others : suggestions;
-              set(pool[Math.floor(Math.random() * pool.length)]!);
-            }}
-          >
-            {t("text.suggest")}
-          </Button>
-        ) : undefined
-      }
-    />
+    <>
+      <TextField
+        id={`choice-${choice.id}`}
+        label={label}
+        labelExtra={choice.optional ? `(${t("text.optional")})` : undefined}
+        multiline={choice.multiline ?? false}
+        value={value}
+        error={problem}
+        maxLength={choice.maxLength + 50}
+        autoComplete="off"
+        help={choice.multiline ? t("text.chars", { count: length, max: choice.maxLength }) : undefined}
+        onChange={(e) => set(e.target.value)}
+        onFocus={() => (focused.current = true)}
+        onBlur={() => (focused.current = false)}
+        trailing={
+          suggestions.length > 0 ? (
+            <Button
+              variant="secondary"
+              icon="dice"
+              onClick={() => {
+                const others = suggestions.filter((s) => s !== value);
+                const pool = others.length > 0 ? others : suggestions;
+                set(pool[Math.floor(Math.random() * pool.length)]!);
+              }}
+            >
+              {t("text.suggest")}
+            </Button>
+          ) : undefined
+        }
+      />
+      {theirs && (
+        <div className="text-theirs" data-theirs>
+          <Callout tone="warning" role="status">
+            <p>
+              {theirs.text
+                ? t("text.theirs", { from: theirs.from, text: theirs.text })
+                : t("text.theirsEmpty", { from: theirs.from })}{" "}
+              {t("text.keepQuestion")}
+            </p>
+            <div className="callout__actions">
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setTheirs(null);
+                  save(value);
+                }}
+              >
+                {t("text.keepMine")}
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setTheirs(null);
+                  setValue(stored);
+                }}
+              >
+                {t("text.takeTheirs")}
+              </Button>
+            </div>
+          </Callout>
+        </div>
+      )}
+    </>
   );
 }
 

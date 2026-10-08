@@ -45,7 +45,7 @@ export function useCanGuide(): boolean {
 }
 
 /** Whoever looks at this screen, to tell their own account's windows and programs from others. */
-function useViewer(): Viewer {
+export function useViewer(): Viewer {
   const { account } = useApp();
   const { draft } = useDraft();
   return { role: draft.access, name: account?.name ?? "" };
