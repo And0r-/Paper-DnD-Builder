@@ -14,12 +14,11 @@
  * (AND-241).
  */
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useApp } from "../../../src/ui/app-state.tsx";
-import { api, ApiError, type Account, type Invite } from "../../../src/ui/api.ts";
+import { api, ApiError, type Invite } from "../../../src/ui/api.ts";
 import { Button, ButtonLink } from "../../../src/ui/components/Button.tsx";
 import { Callout, Loading } from "../../../src/ui/components/Feedback.tsx";
-import { FreshPassword } from "../../../src/ui/components/FreshPassword.tsx";
 import { Explained } from "../../../src/ui/components/Explained.tsx";
 import { GetStarted } from "../../../src/ui/components/GetStarted.tsx";
 import { GuestShell } from "../../../src/ui/components/Shell.tsx";
@@ -37,13 +36,12 @@ export default function JoinPage() {
   const [attempt, setAttempt] = useState(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
-  // A password just made: shown until the newcomer says they have it, then they join.
-  const [fresh, setFresh] = useState<{ account: Account; secret: string }>();
-  const headingRef = useRef<HTMLHeadingElement>(null);
+  // A password just made: shown in the register form until the newcomer says they have it, then they join.
+  const [registered, setRegistered] = useState(false);
   const path = `/join/${encodeURIComponent(token)}`;
 
   usePageTitle([
-    fresh
+    registered
       ? t("password.title")
       : state.kind === "invite"
         ? state.invite.campaign.name
@@ -85,25 +83,7 @@ export default function JoinPage() {
   }
 
   let content;
-  if (fresh) {
-    content = (
-      <section className="auth__card" aria-labelledby="fresh-title">
-        <h1 className="auth__title" id="fresh-title" tabIndex={-1} ref={headingRef}>
-          {t("password.welcome", { name: fresh.account.name })}
-        </h1>
-        <FreshPassword
-          secret={fresh.secret}
-          username={fresh.account.name}
-          noMail={!fresh.account.email}
-          onDone={() => {
-            app.setAccount(fresh.account);
-            setFresh(undefined);
-            void join();
-          }}
-        />
-      </section>
-    );
-  } else if (state.kind === "notFound") {
+  if (state.kind === "notFound") {
     content = (
       <section className="auth__card" aria-labelledby="join-title">
         <h1 className="auth__title" id="join-title">
@@ -161,23 +141,25 @@ export default function JoinPage() {
     );
     content = (
       <>
-        <section className="auth__card" aria-labelledby="join-title">
-          <h1 className="auth__title" id="join-title">
-            {t("join.title", { gameMaster: invite.gameMaster.name, name: invite.campaign.name })}
-          </h1>
-          <p className="auth__intro">{t("join.text", { gameMaster: invite.gameMaster.name })}</p>
-          {account && (
-            <>
-              {errorBox}
-              <Button block busy={busy} busyLabel={t("join.joining")} onClick={() => void join()}>
-                {t("join.join")}
-              </Button>
-              <ButtonLink href="/characters" variant="ghost">
-                {t("join.notNow")}
-              </ButtonLink>
-            </>
-          )}
-        </section>
+        {!registered && (
+          <section className="auth__card" aria-labelledby="join-title">
+            <h1 className="auth__title" id="join-title">
+              {t("join.title", { gameMaster: invite.gameMaster.name, name: invite.campaign.name })}
+            </h1>
+            <p className="auth__intro">{t("join.text", { gameMaster: invite.gameMaster.name })}</p>
+            {account && (
+              <>
+                {errorBox}
+                <Button block busy={busy} busyLabel={t("join.joining")} onClick={() => void join()}>
+                  {t("join.join")}
+                </Button>
+                <ButtonLink href="/characters" variant="ghost">
+                  {t("join.notNow")}
+                </ButtonLink>
+              </>
+            )}
+          </section>
+        )}
         {!account && (
           <>
             {errorBox}
@@ -185,9 +167,11 @@ export default function JoinPage() {
               title={t("join.startTitle")}
               heading="h2"
               intro={t("join.startIntro")}
-              onStarted={(r) => {
-                setFresh({ account: r.account, secret: r.password.secret });
-                requestAnimationFrame(() => headingRef.current?.focus());
+              onStarted={() => setRegistered(true)}
+              onDone={(r) => {
+                app.setAccount(r.account);
+                setRegistered(false);
+                void join();
               }}
               footer={
                 <p className="auth__switch">
