@@ -132,15 +132,19 @@ async function tellingPieces(lang: Lang): Promise<string[]> {
       .flat()
       .filter((v) => typeof v === "string") as string[],
   );
+  // Split around placeholders and markup; keep the plain runs of words.
+  const runs = (v: string) =>
+    v
+      .split(/\{\{[^}]*\}\}|\[\[[^\]]*\]\]|\{[^}]*\}|[.!?:;,()·"„“”]/)
+      .map((run) => run.trim())
+      .filter((r) => r.length >= 5 && /\p{L}{3}/u.test(r));
+  // A word both languages show, quoted on its own (a program's own label, "Bearer"), tells nothing.
+  const theirRuns = new Set([...theirValues].flatMap(runs));
   const pieces = new Set<string>();
   for (const [key, value] of Object.entries(mine)) {
     for (const v of [value].flat()) {
       if (typeof v !== "string" || v === theirs[key] || theirValues.has(v)) continue;
-      // Split around placeholders and markup; keep the plain runs of words.
-      for (const run of v.split(/\{\{[^}]*\}\}|\[\[[^\]]*\]\]|\{[^}]*\}|[.!?:;,()·"„“]/)) {
-        const s = run.trim();
-        if (s.length >= 5 && /\p{L}{3}/u.test(s)) pieces.add(s);
-      }
+      for (const r of runs(v)) if (!theirRuns.has(r)) pieces.add(r);
     }
   }
   return [...pieces];
