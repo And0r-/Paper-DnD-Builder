@@ -11,6 +11,11 @@ Every route, body, answer and error code is also described in
 router and walks the whole API checking each request and answer against
 it, so the file and the server cannot drift apart.
 
+The running server shows it as a page at `/api/docs` (Scalar, every route
+to read and to try with an access key; the bundle, fonts and requests all
+stay on this server) and serves the file itself at `/api/openapi.json`.
+Both need no login.
+
 **Conventions**
 
 - Bodies are `application/json` (anything else: `415`). Changes from other
@@ -588,9 +593,11 @@ Tests: [`sheet-copies.test.ts`](src/server/api/sheet-copies.test.ts).
 
 ## Server
 
-| Method & path     | Result                                                                                                                                                                                                                                                         |
-| ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `GET /api/health` | `{ "status": "ok", "packages": [{ "id", "version", "formatVersion" }], "warnings": [] }` while the process serves requests, also without packages. `warnings` names rejected package folders, an empty package list or a failed start. Public; used by Docker. |
+| Method & path           | Result                                                                                                                                                                                                                                                         |
+| ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /api/health`       | `{ "status": "ok", "packages": [{ "id", "version", "formatVersion" }], "warnings": [] }` while the process serves requests, also without packages. `warnings` names rejected package folders, an empty package list or a failed start. Public; used by Docker. |
+| `GET /api/openapi.json` | `openapi.json` as it is in the repository. Public.                                                                                                                                                                                                             |
+| `GET /api/docs`         | The API reference (Scalar), an HTML page: every route to read and to try with an access key. Public.                                                                                                                                                           |
 
 ## Error codes
 

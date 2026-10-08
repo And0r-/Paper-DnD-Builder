@@ -6,3 +6,6 @@ packages:
 # its install script only re-checks it, so it does not run.
 allowBuilds:
   esbuild: false
+  # Pulled in by @scalar/api-reference; only its prebuilt browser bundle is
+  # used (copied to public/scalar), so the Vue 2/3 switch script is not needed.
+  vue-demi: false

@@ -11,7 +11,9 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { DEMO_PACKAGE_DIR } from "@builder/demo-package";
 import { sheetModelSchema } from "@builder/sheet";
 import { z } from "zod";
+import { GET as docs } from "../../../app/api/docs/route.ts";
 import { GET as health } from "../../../app/api/health/route.ts";
+import { GET as openapi } from "../../../app/api/openapi.json/route.ts";
 import { healthReport } from "../health.ts";
 import { createMcpRoute } from "../mcp-route.ts";
 import { buildMcpZip, mcpZipResponse } from "../mcp-zip.ts";
@@ -89,7 +91,9 @@ describe("openapi.json", () => {
     const server = [
       ...ROUTES.map((r) => `${r.method} ${toSpecPath(r.path)}`),
       "GET /api/health",
-      // Outside the router: app/mcp/route.ts and app/downloads/builder-mcp.zip/route.ts.
+      // Outside the router: app/api/docs, app/api/openapi.json, app/mcp and app/downloads/builder-mcp.zip.
+      "GET /api/docs",
+      "GET /api/openapi.json",
       "GET /mcp",
       "POST /mcp",
       "GET /downloads/builder-mcp.zip",
@@ -265,6 +269,28 @@ describe("openapi.json", () => {
     );
     expect(valid(await (await health()).json())).toBe(true);
     expect(valid(healthReport(await loadPackages(DEMO_PACKAGE_DIR, { info() {}, error() {} })))).toBe(true);
+  });
+
+  it("serves itself, and the API reference without anything from elsewhere", async () => {
+    const file = await openapi();
+    expect(Object.keys(spec.paths["/api/openapi.json"].get.responses["200"].content)).toEqual([
+      file.headers.get("content-type"),
+    ]);
+    expect(await file.json()).toEqual(spec);
+
+    const page = await docs();
+    expect(page.status).toBe(200);
+    expect(page.headers.get("content-type")).toMatch(/^text\/html/);
+    const html = await page.text();
+    expect(html).toContain("<title>Character builder HTTP API</title>");
+    expect(html).toContain('"url": "/api/openapi.json"');
+    expect(html).toContain('"withDefaultFonts": false');
+    expect(html).toContain('"telemetry": false');
+    expect(html).toContain('"proxyUrl": ""');
+    expect(html).toContain("from '/scalar/standalone.esm.js'");
+    expect(html).toContain("globalThis.__zod_globalConfig = { jitless: true }");
+    // No script, import, stylesheet or font from another address.
+    expect(html).not.toMatch(/(src=|href=|import\b[^;]*from\s*|url\()\s*["'(]?\s*(https?:)?\/\//i);
   });
 
   it("describes the answers of /mcp and of the zip", async () => {

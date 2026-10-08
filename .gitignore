@@ -14,6 +14,9 @@ packages-mount/*
 .claude/
 next-env.d.ts
 
+# Scalar browser bundle, copied at build time (apps/web/scripts/copy-scalar.ts)
+apps/web/public/scalar/
+
 # Browser tests
 apps/web/e2e/.outbox/
 apps/web/e2e/.results/
