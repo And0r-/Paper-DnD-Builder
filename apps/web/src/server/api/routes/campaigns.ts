@@ -39,6 +39,8 @@ const publicCampaign = (c: CampaignRow) => ({
   gameMaster: { email: c.game_master_email },
   playerCount: c.player_count,
   createdAt: c.created_at.toISOString(),
+  /** When the viewer joined as a player; null for the game master. */
+  joinedAt: c.joined_at?.toISOString() ?? null,
 });
 
 const publicPlayer = (p: PlayerRow) => ({ id: p.id, email: p.email, addedAt: p.added_at.toISOString() });
@@ -201,8 +203,8 @@ export const campaignRoutes: Route[] = [
     method: "POST",
     path: "/api/campaigns/:id/players/:playerId/drafts",
     handler: async (ctx) => {
-      const { player } = await loadPlayer(ctx);
-      return createDraft(ctx, player, "gameMaster");
+      const { campaign, player } = await loadPlayer(ctx);
+      return createDraft(ctx, player, "gameMaster", campaign.id);
     },
   },
 ];

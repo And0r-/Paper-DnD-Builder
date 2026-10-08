@@ -1124,7 +1124,7 @@
         "operationId": "createDraft",
         "summary": "Start a character",
         "tags": ["Characters"],
-        "description": "An empty draft at version 1. Without `level`, the package's default level.",
+        "description": "An empty draft at version 1. Without `level`, the package's default level. With `campaignId`, the character belongs to that campaign; it must be one you play in.",
         "requestBody": {
           "required": true,
           "content": {
@@ -1138,6 +1138,10 @@
                   },
                   "level": {
                     "type": "integer"
+                  },
+                  "campaignId": {
+                    "anyOf": [{ "type": "string" }, { "type": "null" }],
+                    "description": "A campaign you play in; left out or null for none."
                   }
                 },
                 "required": ["packageId"],
@@ -1167,7 +1171,7 @@
             "$ref": "#/components/responses/CrossSite"
           },
           "404": {
-            "description": "`packageNotFound`",
+            "description": "`packageNotFound`, `campaignNotFound` (also a campaign you do not play in)",
             "content": {
               "application/json": {
                 "schema": {
@@ -1176,7 +1180,7 @@
                     "error": {
                       "properties": {
                         "code": {
-                          "enum": ["packageNotFound"]
+                          "enum": ["packageNotFound", "campaignNotFound"]
                         }
                       }
                     }
@@ -1975,6 +1979,108 @@
                 }
               }
             }
+          },
+          "default": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/api/drafts/{id}/campaign": {
+      "put": {
+        "operationId": "setDraftCampaign",
+        "summary": "Put a character into a campaign",
+        "tags": ["Characters"],
+        "description": "Only the owner, and only into a campaign they play in; `null` takes it out of every campaign. The character itself does not change: its `version` stays.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Draft id (a UUID).",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "campaignId": {
+                    "anyOf": [{ "type": "string" }, { "type": "null" }],
+                    "description": "A campaign you play in, or null for none."
+                  }
+                },
+                "required": ["campaignId"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The draft with its campaign.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DraftView"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadBody"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "description": "`ownerOnly`, `crossSite`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "enum": ["ownerOnly", "crossSite"]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`draftNotFound`, `campaignNotFound` (also a campaign you do not play in)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "enum": ["draftNotFound", "campaignNotFound"]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "$ref": "#/components/responses/BodyTooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/JsonRequired"
           },
           "default": {
             "$ref": "#/components/responses/ServerError"
@@ -3871,7 +3977,7 @@
         "operationId": "createDraftForPlayer",
         "summary": "Start a character for a player",
         "tags": ["Campaigns"],
-        "description": "Game master only. Like `POST /api/drafts`, but the character is the player's (`owner`); you build it with the draft routes.",
+        "description": "Game master only. Like `POST /api/drafts`, but the character is the player's (`owner`) and belongs to this campaign; you build it with the draft routes.",
         "requestBody": {
           "required": true,
           "content": {
@@ -3885,6 +3991,10 @@
                   },
                   "level": {
                     "type": "integer"
+                  },
+                  "campaignId": {
+                    "anyOf": [{ "type": "string" }, { "type": "null" }],
+                    "description": "Optional; if given, this campaign's id."
                   }
                 },
                 "required": ["packageId"],
@@ -5187,6 +5297,10 @@
             ],
             "description": "The level a raise started from, until the character is finished again."
           },
+          "campaignId": {
+            "anyOf": [{ "type": "string" }, { "type": "null" }],
+            "description": "The campaign the character belongs to (one its owner plays in); null for none."
+          },
           "answers": {
             "type": "object",
             "description": "Stored answers by choice id; see `Answer`."
@@ -5234,6 +5348,7 @@
           "status",
           "level",
           "levelBefore",
+          "campaignId",
           "answers",
           "createdAt",
           "updatedAt",
@@ -5276,6 +5391,10 @@
               }
             ],
             "description": "The level a raise started from, until the character is finished again."
+          },
+          "campaignId": {
+            "anyOf": [{ "type": "string" }, { "type": "null" }],
+            "description": "The campaign the character belongs to (one its owner plays in); null for none."
           },
           "answers": {
             "type": "object",
@@ -5337,6 +5456,7 @@
           "status",
           "level",
           "levelBefore",
+          "campaignId",
           "answers",
           "createdAt",
           "updatedAt",
@@ -6229,9 +6349,13 @@
           "createdAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "joinedAt": {
+            "anyOf": [{ "type": "string", "format": "date-time" }, { "type": "null" }],
+            "description": "When you joined it as a player; null if you lead it."
           }
         },
-        "required": ["id", "name", "role", "gameMaster", "playerCount", "createdAt"],
+        "required": ["id", "name", "role", "gameMaster", "playerCount", "createdAt", "joinedAt"],
         "additionalProperties": false
       },
       "Player": {

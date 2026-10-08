@@ -28,6 +28,8 @@ export type DraftRow = {
   package_version: string;
   version: number;
   document: DraftDocument;
+  /** The campaign the character belongs to; null for none. */
+  campaign_id: string | null;
   finished_at: Date | null;
   created_at: Date;
   updated_at: Date;
@@ -62,6 +64,8 @@ export type CampaignRow = {
   game_master_email: string;
   /** Whether the viewer leads it; else the viewer plays in it. */
   leading: boolean;
+  /** When the viewer joined it as a player; null for the game master. */
+  joined_at: Date | null;
   player_count: number;
 };
 
@@ -103,7 +107,7 @@ export type CharacterStateRow = {
 const ACCESS_KEY_COLUMNS = "id, name, hint, created_at";
 const ACCOUNT_COLUMNS = "id, email, password_hash, language, units, print_choice, created_at";
 const DRAFT_COLUMNS =
-  "id, account_id, package_id, package_version, version, document, finished_at, created_at, updated_at";
+  "id, account_id, package_id, package_version, version, document, campaign_id, finished_at, created_at, updated_at";
 const COPY_ENTRY_COLUMNS =
   "id, draft_id, name, created_at, updated_at, from_level, from_changed_at, from_package_version, language, units, version";
 const COPY_COLUMNS = `${COPY_ENTRY_COLUMNS}, model`;
@@ -123,6 +127,7 @@ const reachable = (viewer: string) => `(d.account_id = ${viewer} OR EXISTS (
 /** A campaign as the viewer `$1` sees it; `c` the campaigns row. */
 const CAMPAIGN_SELECT = `SELECT c.id, c.name, c.created_at, gm.email AS game_master_email,
   c.account_id = $1 AS leading,
+  (SELECT j.added_at FROM campaign_players j WHERE j.campaign_id = c.id AND j.account_id = $1) AS joined_at,
   (SELECT count(*) FROM campaign_players n WHERE n.campaign_id = c.id)::int AS player_count
   FROM campaigns c JOIN accounts gm ON gm.id = c.account_id`;
 const VISIBLE_CAMPAIGN = `(c.account_id = $1 OR EXISTS (
@@ -276,10 +281,19 @@ export class Store {
 
   async createDraft(d: Omit<DraftRow, "finished_at" | "updated_at">): Promise<DraftRow> {
     const rows = await this.db.query<DraftRow>(
-      `INSERT INTO drafts (id, account_id, package_id, package_version, version, document, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $7)
+      `INSERT INTO drafts (id, account_id, package_id, package_version, version, document, campaign_id, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8, $8)
        RETURNING ${DRAFT_COLUMNS}`,
-      [d.id, d.account_id, d.package_id, d.package_version, d.version, d.document, d.created_at],
+      [
+        d.id,
+        d.account_id,
+        d.package_id,
+        d.package_version,
+        d.version,
+        d.document,
+        d.campaign_id,
+        d.created_at,
+      ],
     );
     return rows[0]!;
   }
@@ -321,6 +335,23 @@ export class Store {
       [id, accountId, expectedVersion, next.document, next.finishedAt, next.packageVersion, next.now],
     );
     return rows[0];
+  }
+
+  /**
+   * Puts the owner's character into a campaign they play in, or into none
+   * (`campaignId` null). Returns false if the draft is not theirs or they
+   * do not play in that campaign. Not a change of the character itself:
+   * its version stays.
+   */
+  async setDraftCampaign(id: string, accountId: string, campaignId: string | null): Promise<boolean> {
+    const rows = await this.db.query(
+      `UPDATE drafts SET campaign_id = $3
+       WHERE id = $1 AND account_id = $2 AND ($3::uuid IS NULL OR EXISTS (
+         SELECT 1 FROM campaign_players p WHERE p.campaign_id = $3 AND p.account_id = $2))
+       RETURNING id`,
+      [id, accountId, campaignId],
+    );
+    return rows.length > 0;
   }
 
   async deleteDraft(id: string, accountId: string): Promise<boolean> {

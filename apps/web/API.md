@@ -162,18 +162,19 @@ Every change sends the `version` it was made on. If the draft has moved on,
 the answer is `409 versionConflict` with the current state in
 `error.current` (optimistic locking).
 
-| Method & path                            | Body                    | Result                                                                                                                        |
-| ---------------------------------------- | ----------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| 🔒 `GET /api/drafts`                     | —                       | The account's own drafts with summaries (a game master finds the players' in the campaign).                                   |
-| 🔒 `POST /api/drafts`                    | `{ packageId, level? }` | `201`, new draft at version 1.                                                                                                |
-| 🔒 `GET /api/drafts/:id`                 | —                       | The draft.                                                                                                                    |
-| 🔒 `GET /api/drafts/:id/explain/:value`  | —                       | Where one number comes from: its parts and their sources; see [Explaining a value](#explaining-a-value). `404 valueNotFound`. |
-| 🔒 `PATCH /api/drafts/:id`               | `{ version, level }`    | Changes the level.                                                                                                            |
-| 🔒 `PUT /api/drafts/:id/pools/:step`     | `{ version, picks }`    | All picks of a step with a shared list (`steps[].pool`); the core spreads them over the step's choices.                       |
-| 🔒 `PUT /api/drafts/:id/answers/:choice` | `{ version, answer }`   | Answers one choice; `answer: null` removes it. `422 changeRejected` with the reason if it does not fit now.                   |
-| 🔒 `POST /api/drafts/:id/level-up`       | `{ version, level }`    | Raises a finished character; see [Raising a character](#raising-a-character).                                                 |
-| 🔒 `POST /api/drafts/:id/finish`         | `{ version }`           | Marks the character finished; `422 incomplete` with the open choices.                                                         |
-| 🔒 `DELETE /api/drafts/:id`              | —                       | `204`.                                                                                                                        |
+| Method & path                            | Body                                 | Result                                                                                                                              |
+| ---------------------------------------- | ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------- |
+| 🔒 `GET /api/drafts`                     | —                                    | The account's own drafts with summaries (a game master finds the players' in the campaign).                                         |
+| 🔒 `POST /api/drafts`                    | `{ packageId, level?, campaignId? }` | `201`, new draft at version 1. `campaignId`: a campaign you play in (`joinedAt` in the campaign list); else `404 campaignNotFound`. |
+| 🔒 `GET /api/drafts/:id`                 | —                                    | The draft.                                                                                                                          |
+| 🔒 `GET /api/drafts/:id/explain/:value`  | —                                    | Where one number comes from: its parts and their sources; see [Explaining a value](#explaining-a-value). `404 valueNotFound`.       |
+| 🔒 `PATCH /api/drafts/:id`               | `{ version, level }`                 | Changes the level.                                                                                                                  |
+| 🔒 `PUT /api/drafts/:id/pools/:step`     | `{ version, picks }`                 | All picks of a step with a shared list (`steps[].pool`); the core spreads them over the step's choices.                             |
+| 🔒 `PUT /api/drafts/:id/answers/:choice` | `{ version, answer }`                | Answers one choice; `answer: null` removes it. `422 changeRejected` with the reason if it does not fit now.                         |
+| 🔒 `POST /api/drafts/:id/level-up`       | `{ version, level }`                 | Raises a finished character; see [Raising a character](#raising-a-character).                                                       |
+| 🔒 `POST /api/drafts/:id/finish`         | `{ version }`                        | Marks the character finished; `422 incomplete` with the open choices.                                                               |
+| 🔒 `PUT /api/drafts/:id/campaign`        | `{ campaignId }`                     | Owner only. Puts the character into a campaign you play in, or into none (`null`). The `version` stays.                             |
+| 🔒 `DELETE /api/drafts/:id`              | —                                    | `204`.                                                                                                                              |
 
 Answer shapes by choice kind: `pickOne` `{ "pick": "thing.key" }`,
 `pickMany` `{ "picks": [...] }`, `distribute`
@@ -432,7 +433,7 @@ access keys have the same rights as the screens.
 | 🔒 `DELETE /api/campaigns/:id`                        | —                       | game master               | `204`. Campaign and player list go; the characters stay with the players.                                                                                                                                                                                   |
 | 🔒 `POST /api/campaigns/:id/players`                  | `{ email, language? }`  | game master               | `201 { player: { id, email, addedAt } }`. New address: account made, password mail. Existing account: short mail, password unchanged. Same answer either way. `409 alreadyPlayer`, `422 cannotAddYourself`, `422 tooManyPlayers` (50), `429`, `502`, `503`. |
 | 🔒 `DELETE /api/campaigns/:id/players/:playerId`      | —                       | game master; player: `me` | `204`. The game master removes a player; a player leaves with `me`. The characters stay; the game master's reach ends at once. `404 playerNotFound`.                                                                                                        |
-| 🔒 `POST /api/campaigns/:id/players/:playerId/drafts` | `{ packageId, level? }` | game master               | `201`, a new draft that belongs to the player (`access: "gameMaster"`). Then build it with the draft routes.                                                                                                                                                |
+| 🔒 `POST /api/campaigns/:id/players/:playerId/drafts` | `{ packageId, level? }` | game master               | `201`, a new draft that belongs to the player (`access: "gameMaster"`) and to this campaign. Then build it with the draft routes.                                                                                                                           |
 
 `Campaign` is `{ id, name, role: "gameMaster|player", gameMaster: { email }, playerCount, createdAt }`.
 A player of the campaign gets `403 gameMasterOnly` on the game master's
