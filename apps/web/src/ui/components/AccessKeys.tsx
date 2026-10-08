@@ -15,7 +15,8 @@ import { ConfirmDialog } from "./Dialog.tsx";
 import { Callout, ErrorState, Loading } from "./Feedback.tsx";
 import { TextField, Toast } from "./Fields.tsx";
 import { FreshKey } from "./FreshKey.tsx";
-import { API_DOCS_PATH, NEW_KEY_ANCHOR } from "./McpSetup.tsx";
+import { NEW_KEY_ANCHOR } from "./McpSetup.tsx";
+import { API_DOCS_PATH } from "./Shell.tsx";
 
 /** The server's limit for a name (see API.md). */
 const MAX_NAME = 80;

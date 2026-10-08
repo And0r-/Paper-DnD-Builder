@@ -12,6 +12,9 @@ import { Explained } from "./Explained.tsx";
 import { Icon } from "./Icon.tsx";
 import { LanguageMenu } from "./LanguageSelect.tsx";
 
+/** The API reference (app/api/docs/route.ts): a plain page, not part of the app. */
+export const API_DOCS_PATH = "/api/docs";
+
 export function SkipLink() {
   const { t } = useApp();
   return (
@@ -159,6 +162,10 @@ function MenuDrawer({
             </li>
             <li>
               <Link href="/mcp/setup">{t("menu.mcp")}</Link>
+            </li>
+            <li>
+              {/* A plain link: the reference is its own page, outside the app. */}
+              <a href={API_DOCS_PATH}>{t("menu.api")}</a>
             </li>
             <li>
               <button
