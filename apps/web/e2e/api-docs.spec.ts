@@ -2,7 +2,7 @@
  * The API reference at /api/docs (Scalar): every route of openapi.json on
  * screen, nothing loaded from elsewhere, no CSP violation, no console error,
  * and "Try it" with a real access key answers from this server. The settings
- * link to it next to MCP, in both languages.
+ * link to it next to MCP and the menu right after it, in both languages.
  */
 import type { Page } from "@playwright/test";
 import { readFileSync } from "node:fs";
@@ -75,6 +75,8 @@ test.describe("API reference", () => {
     const errors = await watchErrors(page);
 
     await page.goto("/api/docs#tag/account/GET/api/account");
+    // The key, not the session cookie, is what "Try it" asks for first.
+    await expect(page.getByText("Selected Auth Type: accessKey").first()).toBeVisible();
     await page.getByPlaceholder("Token").first().fill(secret);
     await page.getByRole("button", { name: "Test Request (get /api/account)" }).click();
     const client = page.getByRole("dialog");
@@ -97,10 +99,34 @@ test.describe("API reference", () => {
 for (const lang of ["de", "en"] as const) {
   const m = lang === "de" ? de : en;
 
-  test(`${lang}: the settings link to the API reference next to MCP`, async ({ page, foreign }) => {
+  test(`${lang}: the menu and the settings link to the API reference next to MCP`, async ({
+    page,
+    foreign,
+  }) => {
     void foreign;
     await login(page, uniqueEmail(`api-link-${lang}`), lang);
     await page.goto("/settings");
+
+    // The menu: "API" right after "MCP".
+    await page.getByRole("button", { name: m["menu.open"] }).click();
+    const menu = page.getByRole("dialog", { name: m["menu.title"] });
+    await expect(menu.locator(".drawer__links > li")).toHaveCount(6);
+    const entries = await menu.locator(".drawer__links > li").allInnerTexts();
+    expect(entries.map((e) => e.trim())).toEqual([
+      m["menu.characters"],
+      m["menu.campaigns"],
+      m["menu.settings"],
+      m["menu.mcp"],
+      m["menu.api"],
+      m["menu.logout"],
+    ]);
+    await expect(menu.getByRole("link", { name: m["menu.api"], exact: true })).toHaveAttribute(
+      "href",
+      "/api/docs",
+    );
+    await page.keyboard.press("Escape");
+    await expect(menu).toBeHidden();
+
     const section = page.getByRole("region", { name: m["settings.keys"] });
     await expect(section.getByRole("link", { name: m["menu.mcp"], exact: true })).toHaveAttribute(
       "href",

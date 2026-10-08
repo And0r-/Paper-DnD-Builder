@@ -50,6 +50,8 @@ const reference = ApiReference({
   telemetry: false,
   proxyUrl: "",
   persistAuth: false,
+  // "Try it" opens on the field for an access key, not on the session cookie.
+  authentication: { preferredSecurityScheme: "accessKey" },
   agent: { disabled: true },
   mcp: { disabled: true },
   showDeveloperTools: "never",
