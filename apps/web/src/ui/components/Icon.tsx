@@ -21,6 +21,8 @@ const PATHS = {
   dice: "M5 4h14a1 1 0 011 1v14a1 1 0 01-1 1H5a1 1 0 01-1-1V5a1 1 0 011-1zM8.5 8.5h.01M15.5 15.5h.01M12 12h.01",
   sparkle: "M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5L18 18M6 18l2.5-2.5M15.5 8.5L18 6",
   mail: "M4 6h16v12H4zM4 7l8 6 8-6",
+  /** A turning arrow: make it new. */
+  refresh: "M20 12a8 8 0 11-2.4-5.7M20 4v5h-5",
   download: "M12 4v11M7 10l5 5 5-5M5 20h14",
   printer: "M7 9V4h10v5M7 17H5a1 1 0 01-1-1v-5a2 2 0 012-2h12a2 2 0 012 2v5a1 1 0 01-1 1h-2M7 14h10v6H7z",
   figure:

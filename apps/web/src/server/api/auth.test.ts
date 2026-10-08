@@ -21,7 +21,8 @@ describe("signing up", () => {
     expect(res.json.account).toMatchObject({ name: "Mira", email: null, language: "de", units: {} });
     expect(res.json.password).toEqual({
       id: expect.any(String),
-      name: "2026-10-04",
+      name: null,
+      origin: "first",
       createdAt: "2026-10-04T10:00:00.000Z",
       secret: expect.stringMatching(/^[a-z]+(?:-[a-z]+){4}-\d{4}$/),
     });
@@ -130,7 +131,10 @@ describe("own passwords", () => {
     expect(second).not.toBe(first);
 
     const list = (await client.call("GET", "/api/account/passwords")).json.passwords;
-    expect(list.map((p: { name: string }) => p.name)).toEqual(["2026-10-04", "Phone"]);
+    expect(list.map((p: { name: string; origin: string }) => [p.name, p.origin])).toEqual([
+      [null, "first"],
+      ["Phone", null],
+    ]);
     expect(JSON.stringify(list)).not.toContain(second);
 
     expect((await client.call("DELETE", `/api/account/passwords/${list[0].id}`)).status).toBe(204);
@@ -144,10 +148,10 @@ describe("own passwords", () => {
     expect((await other.call("POST", "/api/auth/login", { password: second })).status).toBe(200);
   });
 
-  it("names a password by its day when none is given, and keeps at most ten", async () => {
+  it("leaves a password without a name when none is given (the screen names it by its day), and keeps at most ten", async () => {
     await signIn(client, EMAIL);
     const made = await client.call("POST", "/api/account/passwords", {});
-    expect(made.json.password.name).toBe("2026-10-04");
+    expect(made.json.password).toMatchObject({ name: null, origin: null });
     for (let i = 2; i < 10; i++)
       expect((await client.call("POST", "/api/account/passwords", {})).status).toBe(201);
     const full = await client.call("POST", "/api/account/passwords", {});
@@ -204,7 +208,8 @@ describe("a link back in", () => {
     expect(used.status).toBe(200);
     expect(used.json.account).toMatchObject({ name: "player", email: EMAIL });
     expect(used.json.password).toMatchObject({
-      name: "Reset 2026-10-04",
+      name: null,
+      origin: "reset",
       secret: expect.stringMatching(/^[a-z]+(?:-[a-z]+){4}-\d{4}$/),
     });
     expect(phone.hasSession).toBe(true);
@@ -253,7 +258,7 @@ describe("a link back in", () => {
     await ask(client, EMAIL, "de");
     expect(server.mails).toHaveLength(1);
     const text = server.mails[0]!.text;
-    expect(text).toContain("Did not ask for this?");
+    expect(text).toContain("You did not ask for this?");
     const links = linksIn(text);
     expect(Object.keys(links)).toEqual(["Max", "Mira"]);
     const mira = await client.call("POST", "/api/auth/reset/use", { token: links["Mira"] });
@@ -278,18 +283,18 @@ describe("a link back in", () => {
       await client.call("POST", "/api/account/passwords", { name: `P${i}` });
     }
     await ask(client);
+    // A second later than P9, so the order of the list does not hang on random ids.
+    server.advance(1000);
     const token = linksIn(server.mails[0]!.text)["player"]!;
     const res = await client.call("POST", "/api/auth/reset/use", { token });
     expect(res.status).toBe(200);
-    const names = (await client.call("GET", "/api/account/passwords")).json.passwords.map(
-      (p: { name: string }) => p.name,
-    );
-    expect(names).toHaveLength(10);
-    expect(names).not.toContain("2026-10-04");
-    expect(names.at(-1)).toBe("Reset 2026-10-04");
+    const passwords = (await client.call("GET", "/api/account/passwords")).json.passwords;
+    expect(passwords).toHaveLength(10);
+    expect(passwords.map((p: { origin: string }) => p.origin)).not.toContain("first");
+    expect(passwords.at(-1)).toMatchObject({ name: null, origin: "reset" });
   });
 
-  it("gives an account a game master made, which has no password yet, its first", async () => {
+  it("gives an account a game master made by address (before invitation links), which has no password yet, its first", async () => {
     await server.db.query(
       `INSERT INTO accounts (id, name, email, language, created_at)
        VALUES ('00000000-0000-4000-8000-000000000002', 'invited', $1, 'en', now())`,

@@ -9,7 +9,6 @@ import {
   newAccessKey,
 } from "../../auth/access-keys.ts";
 import {
-  defaultPasswordName,
   emailSchema,
   makePassword,
   MAX_PASSWORDS_PER_ACCOUNT,
@@ -138,11 +137,7 @@ export const accountRoutes: Route[] = [
       // Only the person makes passwords: a leaked key cannot turn itself into a login.
       if (session.via === "key") throw new HttpError(403, "keyCannotMakePasswords");
       const body = await readJson(ctx.req, z.strictObject({ name: nameSchema.optional() }));
-      const made = await makePassword(
-        ctx.app,
-        session.account,
-        body.name ?? defaultPasswordName(ctx.app.now()),
-      );
+      const made = await makePassword(ctx.app, session.account, body.name ?? null);
       if (!made) throw new HttpError(422, "tooManyPasswords", { max: MAX_PASSWORDS_PER_ACCOUNT });
       return json(201, { password: freshPassword(made) });
     },

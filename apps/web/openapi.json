@@ -47,7 +47,7 @@
     },
     {
       "name": "Campaigns",
-      "description": "Whoever makes a campaign leads it (game master) and adds players by mail address; the game master sees their names, never their addresses. The game master reaches the players' characters that belong to the campaign; a character in no campaign stays private. A player sees only their own characters and the campaigns they are in. Anyone else gets 404."
+      "description": "Whoever makes a campaign leads it (game master) and invites players with one link per campaign (`/join/{token}`), which they send themselves; the builder mails no invitations; the game master sees their names, never their addresses. The game master reaches the players' characters that belong to the campaign; a character in no campaign stays private. A player sees only their own characters and the campaigns they are in. Anyone else gets 404."
     },
     {
       "name": "Server"
@@ -661,7 +661,7 @@
         "operationId": "useResetLink",
         "summary": "Use a link back in",
         "tags": ["Login"],
-        "description": "The token from the link `/login/reset/<token>` of the mail. Works once, within 30 minutes: makes a new password named `Reset` and the day, returned in this answer only, and sets the session cookie. The account's other passwords stay. If the account already has 10, its oldest goes. At most 20 tries per 15 minutes per IP.",
+        "description": "The token from the link `/login/reset/<token>` of the mail. Works once, within 30 minutes: makes a new password (`origin: \"reset\"`, no name), returned in this answer only, and sets the session cookie. The account's other passwords stay. If the account already has 10, its oldest goes. At most 20 tries per 15 minutes per IP.",
         "security": [],
         "requestBody": {
           "required": true,
@@ -1068,7 +1068,7 @@
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 80,
-                    "description": "What the password is for, in the owner's words. One line. Default: the day it is made (`2026-10-08`)."
+                    "description": "What the password is for, in the owner's words. One line. Without one, the password has no name (`null`) and the screen names it by the day it was made."
                   }
                 },
                 "required": [],
@@ -4268,7 +4268,7 @@
             }
           }
         ],
-        "description": "The game master gets their own characters in this campaign, and the players with theirs; a player gets the campaign only.",
+        "description": "The game master gets the invitation link, their own characters in this campaign, and the players with theirs; a player gets the campaign only, without the link.",
         "responses": {
           "200": {
             "description": "The campaign.",
@@ -4483,10 +4483,10 @@
         }
       }
     },
-    "/api/campaigns/{id}/players": {
+    "/api/campaigns/{id}/invite": {
       "post": {
-        "operationId": "addPlayer",
-        "summary": "Add a player by mail address",
+        "operationId": "renewInvite",
+        "summary": "Make a new invitation link",
         "tags": ["Campaigns"],
         "parameters": [
           {
@@ -4499,55 +4499,26 @@
             }
           }
         ],
-        "description": "Game master only. Until invitations by link come: the address must be one a player gave. An existing account gets a short mail that names the game master (if two accounts give the address, the oldest is added). An address without an account gets an account without a password and no mail; its owner can get in only once a way back in by mail exists. The answer names the player, never their address. At most 50 players per campaign; at most 30 additions per hour per game master, 5 per hour per address.",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "email": {
-                    "type": "string",
-                    "maxLength": 254
-                  },
-                  "language": {
-                    "enum": ["de", "en"],
-                    "description": "Language of a new account; default: yours. An existing account keeps its own."
-                  }
-                },
-                "required": ["email"],
-                "additionalProperties": false
-              }
-            }
-          }
-        },
+        "description": "Game master only. Replaces the campaign's invitation link: the old one stops working at once, whoever joined with it stays a player. At most 30 per hour per game master.",
         "responses": {
-          "201": {
-            "description": "The player.",
+          "200": {
+            "description": "The new link.",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "player": {
-                      "$ref": "#/components/schemas/Player"
+                    "inviteUrl": {
+                      "type": "string",
+                      "format": "uri",
+                      "description": "The campaign's invitation link, `<BASE_URL>/join/<token>`."
                     }
                   },
-                  "required": ["player"],
+                  "required": ["inviteUrl"],
                   "additionalProperties": false
                 }
               }
             }
-          },
-          "400": {
-            "$ref": "#/components/responses/BadBody"
-          },
-          "413": {
-            "$ref": "#/components/responses/BodyTooLarge"
-          },
-          "415": {
-            "$ref": "#/components/responses/JsonRequired"
           },
           "401": {
             "$ref": "#/components/responses/Unauthorized"
@@ -4590,47 +4561,6 @@
               }
             }
           },
-          "409": {
-            "description": "`alreadyPlayer`",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error",
-                  "properties": {
-                    "error": {
-                      "properties": {
-                        "code": {
-                          "enum": ["alreadyPlayer"]
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "`cannotAddYourself`, `tooManyPlayers`",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error",
-                  "properties": {
-                    "error": {
-                      "properties": {
-                        "code": {
-                          "enum": ["cannotAddYourself", "tooManyPlayers"]
-                        },
-                        "max": {
-                          "type": "integer"
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
           "429": {
             "description": "`tooManyAttempts`",
             "content": {
@@ -4657,44 +4587,6 @@
                 "description": "Seconds to wait.",
                 "schema": {
                   "type": "integer"
-                }
-              }
-            }
-          },
-          "502": {
-            "description": "`mailFailed`",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error",
-                  "properties": {
-                    "error": {
-                      "properties": {
-                        "code": {
-                          "enum": ["mailFailed"]
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "`mailNotConfigured`",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error",
-                  "properties": {
-                    "error": {
-                      "properties": {
-                        "code": {
-                          "enum": ["mailNotConfigured"]
-                        }
-                      }
-                    }
-                  }
                 }
               }
             }
@@ -4927,6 +4819,235 @@
             }
           }
         ]
+      }
+    },
+    "/api/invites/{token}": {
+      "get": {
+        "operationId": "getInvite",
+        "summary": "Who invites to what",
+        "tags": ["Campaigns"],
+        "security": [],
+        "parameters": [
+          {
+            "name": "token",
+            "in": "path",
+            "required": true,
+            "description": "The last part of the invitation link (`/join/{token}`).",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Without an account: the campaign an invitation link opens and who leads it, by name. Shown before joining. At most 60 lookups (this and joining) per 15 minutes per IP, found or not.",
+        "responses": {
+          "200": {
+            "description": "The invitation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "campaign": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["id", "name"],
+                      "additionalProperties": false
+                    },
+                    "gameMaster": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["name"],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": ["campaign", "gameMaster"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`inviteNotFound`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "enum": ["inviteNotFound"]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "`tooManyAttempts`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "enum": ["tooManyAttempts"]
+                        },
+                        "retryAfter": {
+                          "type": "integer"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds to wait.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/api/invites/{token}/join": {
+      "post": {
+        "operationId": "joinCampaign",
+        "summary": "Join a campaign by its invitation link",
+        "tags": ["Campaigns"],
+        "parameters": [
+          {
+            "name": "token",
+            "in": "path",
+            "required": true,
+            "description": "The last part of the invitation link (`/join/{token}`).",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Joins the campaign as a player. Joining again, or as its game master, changes nothing and answers the same. The game master can then see, change and print the characters you put into the campaign; nothing else of yours. At most 50 players per campaign; counts against the same 60 lookups per 15 minutes per IP as `GET /api/invites/{token}`.",
+        "responses": {
+          "200": {
+            "description": "You are in the campaign.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "campaignId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["campaignId"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/CrossSite"
+          },
+          "404": {
+            "description": "`inviteNotFound`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "enum": ["inviteNotFound"]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "`tooManyPlayers`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "enum": ["tooManyPlayers"]
+                        },
+                        "max": {
+                          "type": "integer"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "`tooManyAttempts`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "enum": ["tooManyAttempts"]
+                        },
+                        "retryAfter": {
+                          "type": "integer"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds to wait.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
       }
     },
     "/mcp": {
@@ -6252,16 +6373,14 @@
         "additionalProperties": false
       },
       "ErrorCode": {
-        "description": "Every error code the API answers with. Stable and English; screens word them in the player's language.\n\n- `badJson`: 400. The body is not JSON.\n- `badRequest`: 400. The body has the wrong shape; `issues` lists `{ path, message }`.\n- `badQuery`: 400. A query parameter has a value the API does not know; `parameter` and `value` name it.\n- `designNotAvailable`: 400 (PDF) or 422 (settings). A planned sheet design that is not drawn yet; `designs` lists those that are.\n- `notLoggedIn`: 401. No session cookie and no `Authorization` header.\n- `keyNotValid`: 401. The `Authorization` header holds no valid access key (unknown, withdrawn, past its end, or not `Bearer <key>`).\n- `wrongPassword`: 401. No account has this password.\n- `wrongMailOrPassword`: 401. Login of an account from before failed.\n- `crossSite`: 403. A change sent from another site (`Origin` or `Sec-Fetch-Site`).\n- `keyCannotMakeKeys`: 403. Access keys are made on the settings screen only, never with a key.\n- `keyCannotMakePasswords`: 403. Passwords are made on the settings screen only, never with a key.\n- `notFound`: 404. No such API path.\n- `draftNotFound`: 404. No draft with this id in this account.\n- `keyNotFound`: 404. No access key with this id in this account.\n- `passwordNotFound`: 404. No password with this id in this account.\n- `resetLinkInvalid`: 404. The link back in is unknown, used already or older than 30 minutes.\n- `packageNotFound`: 404. No loaded package with this id.\n- `languageNotFound`: 404. The package has no texts in this language.\n- `valueNotFound`: 404. The draft's package has no value with this id.\n- `versionNotFound`: 404. No such version of the sheet to print: neither `original` nor a kept copy of this character.\n- `methodNotAllowed`: 405. The path exists, the method does not.\n- `versionConflict`: 409. The draft moved on; `current` holds its state now.\n- `notFinished`: 409. The character is not finished (PDF) or not finished and not in a raise (level-up); `open` lists the open choices.\n- `packageUnavailable`: 409. The draft's package is not loaded right now; `packageId` names it.\n- `copyUnreadable`: 409. A kept copy stored in a shape this server no longer prints; `version` names it.\n- `bodyTooLarge`: 413. The body is larger than 64 KiB.\n- `jsonRequired`: 415. The body is not `application/json`.\n- `changeRejected`: 422. The rule core refused the change; `reason` says why (see `ChangeError`).\n- `incomplete`: 422. Finishing with open choices; `open` lists them.\n- `languageNotSupported`: 422. The account's language cannot be printed with this package; `languages` lists those that can.\n- `tooManyKeys`: 422. The account has the most access keys allowed (`max`).\n- `tooManyPasswords`: 422. The account has the most passwords allowed (`max`).\n- `lastPassword`: 422. The account's last password cannot be deleted.\n- `unknownUnit`: 422. No loaded package offers this unit for this dimension.\n- `tooManyAttempts`: 429. Too many failed logins, new accounts, invitations or links back in; `retryAfter` seconds, also in `Retry-After`.\n- `tooManyRequests`: 429. Too many PDFs; see `Retry-After`.\n- `internal`: 500. A bug in the builder.\n- `packageRuleError`: 500. The package's rules could not be worked out (a bug in the package); `message` says where.\n- `mailFailed`: 502. The mail server refused the mail to an added player or with a link back in; nothing was changed.\n- `mailNotConfigured`: 503. The server has no mail (or no `BASE_URL` for links) set up; players cannot be added by address and no link back in can be mailed.\n- `baseUrlNotSet`: 503. The server has no public address configured (`BASE_URL`), so the MCP zip cannot say where the builder is.\n- `mcpPackageMissing`: 503. This build of the server has no `server.mjs` for the MCP zip.",
+        "description": "Every error code the API answers with. Stable and English; screens word them in the player's language.\n\n- `badJson`: 400. The body is not JSON.\n- `badRequest`: 400. The body has the wrong shape; `issues` lists `{ path, message }`.\n- `badQuery`: 400. A query parameter has a value the API does not know; `parameter` and `value` name it.\n- `designNotAvailable`: 400 (PDF) or 422 (settings). A planned sheet design that is not drawn yet; `designs` lists those that are.\n- `notLoggedIn`: 401. No session cookie and no `Authorization` header.\n- `keyNotValid`: 401. The `Authorization` header holds no valid access key (unknown, withdrawn, past its end, or not `Bearer <key>`).\n- `wrongPassword`: 401. No account has this password.\n- `wrongMailOrPassword`: 401. Login of an account from before failed.\n- `crossSite`: 403. A change sent from another site (`Origin` or `Sec-Fetch-Site`).\n- `keyCannotMakeKeys`: 403. Access keys are made on the settings screen only, never with a key.\n- `keyCannotMakePasswords`: 403. Passwords are made on the settings screen only, never with a key.\n- `notFound`: 404. No such API path.\n- `draftNotFound`: 404. No draft with this id in this account.\n- `keyNotFound`: 404. No access key with this id in this account.\n- `passwordNotFound`: 404. No password with this id in this account.\n- `inviteNotFound`: 404. No campaign has this invitation link (unknown, or replaced by a new one).\n- `resetLinkInvalid`: 404. The link back in is unknown, used already or older than 30 minutes.\n- `packageNotFound`: 404. No loaded package with this id.\n- `languageNotFound`: 404. The package has no texts in this language.\n- `valueNotFound`: 404. The draft's package has no value with this id.\n- `versionNotFound`: 404. No such version of the sheet to print: neither `original` nor a kept copy of this character.\n- `methodNotAllowed`: 405. The path exists, the method does not.\n- `versionConflict`: 409. The draft moved on; `current` holds its state now.\n- `notFinished`: 409. The character is not finished (PDF) or not finished and not in a raise (level-up); `open` lists the open choices.\n- `packageUnavailable`: 409. The draft's package is not loaded right now; `packageId` names it.\n- `copyUnreadable`: 409. A kept copy stored in a shape this server no longer prints; `version` names it.\n- `bodyTooLarge`: 413. The body is larger than 64 KiB.\n- `jsonRequired`: 415. The body is not `application/json`.\n- `changeRejected`: 422. The rule core refused the change; `reason` says why (see `ChangeError`).\n- `incomplete`: 422. Finishing with open choices; `open` lists them.\n- `languageNotSupported`: 422. The account's language cannot be printed with this package; `languages` lists those that can.\n- `tooManyKeys`: 422. The account has the most access keys allowed (`max`).\n- `tooManyPasswords`: 422. The account has the most passwords allowed (`max`).\n- `lastPassword`: 422. The account's last password cannot be deleted.\n- `unknownUnit`: 422. No loaded package offers this unit for this dimension.\n- `tooManyAttempts`: 429. Too many failed logins, new accounts, new invitation links, invitation lookups or links back in; `retryAfter` seconds, also in `Retry-After`.\n- `tooManyRequests`: 429. Too many PDFs; see `Retry-After`.\n- `internal`: 500. A bug in the builder.\n- `packageRuleError`: 500. The package's rules could not be worked out (a bug in the package); `message` says where.\n- `mailFailed`: 502. The mail server refused the mail with a link back in; nothing was changed.\n- `mailNotConfigured`: 503. The server has no mail (or no `BASE_URL` for links) set up; no link back in can be mailed.\n- `baseUrlNotSet`: 503. The server has no public address configured (`BASE_URL`), so the MCP zip cannot say where the builder is.\n- `mcpPackageMissing`: 503. This build of the server has no `server.mjs` for the MCP zip.",
         "enum": [
-          "alreadyPlayer",
           "badJson",
           "badQuery",
           "badRequest",
           "baseUrlNotSet",
           "bodyTooLarge",
           "campaignNotFound",
-          "cannotAddYourself",
           "changeRejected",
           "copyNotFound",
           "copyTooLarge",
@@ -6272,6 +6391,7 @@
           "gameMasterOnly",
           "incomplete",
           "internal",
+          "inviteNotFound",
           "jsonRequired",
           "keyCannotMakeKeys",
           "keyCannotMakePasswords",
@@ -6402,15 +6522,20 @@
             "type": "string"
           },
           "name": {
-            "type": "string",
-            "description": "What the owner called the password; display only."
+            "type": ["string", "null"],
+            "description": "What the owner called the password; display only. `null` when it has no name: the screen names it by `origin`, or by the day it was made."
+          },
+          "origin": {
+            "type": ["string", "null"],
+            "enum": ["first", "reset", null],
+            "description": "Made by the server: `first`, the account's first password (also the one after logging in an account from before); `reset`, one from a link back in. `null`: made by the owner."
           },
           "createdAt": {
             "type": "string",
             "format": "date-time"
           }
         },
-        "required": ["id", "name", "createdAt"],
+        "required": ["id", "name", "origin", "createdAt"],
         "additionalProperties": false
       },
       "NewPassword": {
@@ -6420,7 +6545,12 @@
             "type": "string"
           },
           "name": {
-            "type": "string"
+            "type": ["string", "null"]
+          },
+          "origin": {
+            "type": ["string", "null"],
+            "enum": ["first", "reset", null],
+            "description": "Made by the server: `first`, the account's first password (also the one after logging in an account from before); `reset`, one from a link back in. `null`: made by the owner."
           },
           "createdAt": {
             "type": "string",
@@ -6431,7 +6561,7 @@
             "description": "The password: five words and a number, joined by dashes. Shown only in this answer; the server keeps only its hash."
           }
         },
-        "required": ["id", "name", "createdAt", "secret"],
+        "required": ["id", "name", "origin", "createdAt", "secret"],
         "additionalProperties": false
       },
       "AccessKey": {
@@ -7723,6 +7853,11 @@
               }
             ],
             "description": "When you joined it as a player; null if you lead it."
+          },
+          "inviteUrl": {
+            "type": "string",
+            "format": "uri",
+            "description": "The campaign's invitation link, `<BASE_URL>/join/<token>`. Only for its game master, and only on a single campaign (`GET`/`POST /api/campaigns`), not in the list."
           }
         },
         "required": ["id", "name", "role", "gameMaster", "playerCount", "createdAt", "joinedAt"],

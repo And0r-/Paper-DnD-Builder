@@ -9,10 +9,13 @@
 import type { Browser, Page } from "@playwright/test";
 import de from "../src/i18n/messages/de.json" with { type: "json" };
 import en from "../src/i18n/messages/en.json" with { type: "json" };
-import { expect, expectOneLanguage, shot, signup, test, uniqueEmail } from "./helpers.ts";
+import { expect, expectOneLanguage, shot, signup, test } from "./helpers.ts";
 
-/** A game master in a browser of their own, who makes a campaign and adds the player. */
-async function invite(browser: Browser, name: string, player: string, language = "de"): Promise<string> {
+/**
+ * A game master in a browser of their own makes a campaign; the player
+ * joins with its invitation link (AND-237). Returns the campaign's id.
+ */
+async function invite(browser: Browser, name: string, player: Page): Promise<string> {
   const context = await browser.newContext({
     extraHTTPHeaders: { "x-forwarded-for": `203.0.113.${(Date.now() + name.length) % 250}` },
   });
@@ -20,13 +23,12 @@ async function invite(browser: Browser, name: string, player: string, language =
   await signup(page, "leitung");
   const made = await page.request.post("/api/campaigns", { data: { name } });
   expect(made.status()).toBe(201);
-  const id = ((await made.json()) as { campaign: { id: string } }).campaign.id;
-  const added = await page.request.post(`/api/campaigns/${id}/players`, {
-    data: { email: player, language },
-  });
-  expect(added.status()).toBe(201);
+  const { campaign } = (await made.json()) as { campaign: { id: string; inviteUrl: string } };
   await context.close();
-  return id;
+  const token = campaign.inviteUrl.split("/join/")[1]!;
+  const joined = await player.request.post(`/api/invites/${token}/join`);
+  expect(joined.status()).toBe(200);
+  return campaign.id;
 }
 
 async function campaignOf(page: Page, draftId: string): Promise<string | null> {
@@ -52,10 +54,9 @@ test("in campaigns: the one joined last is chosen, and can be changed later", as
 }) => {
   void foreign;
   const m = de;
-  const player = uniqueEmail("spieler");
-  await signup(page, "Robin", "de", player);
-  const first = await invite(browser, "Montagsrunde", player);
-  const last = await invite(browser, "Donnerstagsrunde", player);
+  await signup(page, "Robin", "de");
+  const first = await invite(browser, "Montagsrunde", page);
+  const last = await invite(browser, "Donnerstagsrunde", page);
 
   await page.goto("/new");
   await expect(page.getByRole("heading", { level: 1, name: m["new.campaignQuestion"] })).toBeVisible();
@@ -117,6 +118,7 @@ test("game master in no other campaign: their own one is chosen, and the charact
   await expect(mine.getByRole("heading", { level: 3, name: "Tamsin" })).toBeVisible();
   await expect(page.locator(".campaign-page").getByRole("heading", { level: 2 })).toHaveText([
     m["campaign.mine"],
+    m["campaign.inviteTitle"],
     m["campaign.players"],
     m["campaign.delete"],
   ]);
@@ -131,11 +133,10 @@ test("leads one, joined another later: the one joined later is chosen", async ({
 }) => {
   void foreign;
   const m = de;
-  const player = uniqueEmail("beides");
-  await signup(page, "Robin", "de", player);
+  await signup(page, "Robin", "de");
   const made = await page.request.post("/api/campaigns", { data: { name: "Eigene Runde" } });
   expect(made.status()).toBe(201);
-  const joined = await invite(browser, "Spätere Runde", player);
+  const joined = await invite(browser, "Spätere Runde", page);
 
   await page.goto("/new");
   const field = page.getByLabel(m["new.campaignLabel"]);
@@ -146,9 +147,8 @@ test("leads one, joined another later: the one joined later is chosen", async ({
 test("en: the campaign question in English only", async ({ page, browser, foreign }) => {
   void foreign;
   const m = en;
-  const player = uniqueEmail("player-en");
-  await signup(page, "Robin", "en", player);
-  const id = await invite(browser, "Thursday group", player, "en");
+  await signup(page, "Robin", "en");
+  const id = await invite(browser, "Thursday group", page);
   await page.goto("/new");
   await expect(page.getByRole("heading", { level: 1, name: m["new.campaignQuestion"] })).toBeVisible();
   await expect(page.getByLabel(m["new.campaignLabel"])).toHaveValue(id);

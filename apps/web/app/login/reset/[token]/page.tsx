@@ -71,8 +71,9 @@ export default function ResetLinkPage() {
           ) : state.kind === "fresh" ? (
             <>
               <h1 className="auth__title" id="reset-title" tabIndex={-1} ref={headingRef}>
-                {t("password.welcome", { name: state.account.name })}
+                {t("password.welcomeBack", { name: state.account.name })}
               </h1>
+              <p className="auth__intro">{t("reset.oldStay")}</p>
               <FreshPassword
                 secret={state.secret}
                 onDone={() => {

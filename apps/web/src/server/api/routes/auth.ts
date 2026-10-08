@@ -19,6 +19,7 @@ import type { Route } from "../router.ts";
 export const publicPassword = (p: PasswordRow) => ({
   id: p.id,
   name: p.name,
+  origin: p.origin,
   createdAt: p.created_at.toISOString(),
 });
 

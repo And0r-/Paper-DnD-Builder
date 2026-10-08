@@ -25,14 +25,8 @@ import { printChoiceOf } from "@builder/sheet/printouts";
 import { z } from "zod";
 import type { App } from "../app.ts";
 import { HttpError } from "../api/http.ts";
-import {
-  addedToCampaignMail,
-  MailNotConfiguredError,
-  resetMail,
-  type Invitation,
-  type Mail,
-} from "../mail.ts";
-import type { AccountRow } from "../store.ts";
+import { MailNotConfiguredError, resetMail, type Mail } from "../mail.ts";
+import type { AccountRow, PasswordOrigin } from "../store.ts";
 import {
   dummyPasswordHash,
   generatePassword,
@@ -57,7 +51,11 @@ export const emailSchema = z
   .max(254)
   .regex(/^[^\s@]+@[^\s@]+\.[^\s@]+$/, "not a mail address");
 
-/** One line of plain text, 1 to 80 characters: a person's name, a campaign's, a password's. */
+/**
+ * One line of plain text, 1 to 80 characters: a person's name, a campaign's,
+ * a password's. A name is shown to others (a campaign's on its invitation
+ * page, a game master's there too), never as markup.
+ */
 export const nameSchema = z
   .string()
   .trim()
@@ -79,20 +77,6 @@ export function limited(app: App, key: string, limit: Limit, take: boolean): voi
   }
 }
 
-// Invitations for the same address run one after another, so two quick
-// ones cannot make two accounts for it.
-const queues = new Map<string, Promise<unknown>>();
-async function serialized<T>(key: string, fn: () => Promise<T>): Promise<T> {
-  const before = queues.get(key) ?? Promise.resolve();
-  const run = before.catch(() => undefined).then(fn);
-  queues.set(key, run);
-  try {
-    return await run;
-  } finally {
-    if (queues.get(key) === run) queues.delete(key);
-  }
-}
-
 async function deliver(app: App, mail: Mail) {
   try {
     await app.mailer.send(mail);
@@ -108,17 +92,17 @@ function uiLanguage(language: string | undefined): string {
   return UI_LANGUAGES.includes(language as never) ? language! : DEFAULT_LANGUAGE;
 }
 
-/** The name a password gets when its owner gives none: the day it was made (2026-10-08), in no language. */
-export function defaultPasswordName(now: Date): string {
-  return now.toISOString().slice(0, 10);
-}
-
 /**
  * Makes a password for the account and stores its hash. Returns the plain
  * password for the one answer that shows it, or undefined if the account
  * already has the most it may.
  */
-export async function makePassword(app: App, account: { id: string; language: string }, name: string) {
+export async function makePassword(
+  app: App,
+  account: { id: string; language: string },
+  name: string | null,
+  origin: PasswordOrigin | null = null,
+) {
   const secret = generatePassword(account.language);
   const row = await app.store.createPassword(
     {
@@ -126,6 +110,7 @@ export async function makePassword(app: App, account: { id: string; language: st
       account_id: account.id,
       hash: passwordHash(secret),
       name,
+      origin,
       created_at: app.now(),
     },
     MAX_PASSWORDS_PER_ACCOUNT,
@@ -159,7 +144,7 @@ export async function signup(
     language: uiLanguage(body.language),
     created_at: app.now(),
   });
-  const made = (await makePassword(app, account, defaultPasswordName(app.now())))!;
+  const made = (await makePassword(app, account, null, "first"))!;
   const token = await openSession(app, account.id);
   return { account, password: made, token };
 }
@@ -204,7 +189,8 @@ export async function legacyLogin(app: App, email: string, password: string, ip:
           id: randomUUID(),
           account_id: account.id,
           hash: passwordHash(secret),
-          name: defaultPasswordName(app.now()),
+          name: null,
+          origin: "first",
           created_at: app.now(),
         })
       : undefined;
@@ -267,9 +253,10 @@ export async function requestReset(
 }
 
 /**
- * Uses a link back in, once: logs its account in and makes a new password,
- * named "Reset" and the day. The account's other passwords stay; its owner
- * deletes them in the settings if one is lost. If the account already has
+ * Uses a link back in, once: logs its account in and makes a new password
+ * without a name (the screen calls it "New from email link"). The
+ * account's other passwords stay; its owner deletes them in the settings
+ * if one is lost. If the account already has
  * the most passwords it may, the oldest goes, so this never fails.
  */
 export async function useReset(app: App, token: string, ip: string) {
@@ -282,52 +269,13 @@ export async function useReset(app: App, token: string, ip: string) {
       id: randomUUID(),
       account_id: account.id,
       hash: passwordHash(secret),
-      name: `Reset ${defaultPasswordName(app.now())}`,
+      name: null,
+      origin: "reset",
       created_at: app.now(),
     },
     MAX_PASSWORDS_PER_ACCOUNT,
   );
   return { account, password: { row, secret }, session: await openSession(app, account.id) };
-}
-
-/**
- * The account a game master adds to a campaign, by mail address, until
- * invitations by link come (AND-233, part 3). An existing account gets a
- * short mail that names who added it. An address without an account gets
- * one, named after the part before the "@", with no password and no mail:
- * its owner gets in only once a way back in by mail (part 2) or the
- * invitation link (part 3) exists. Meanwhile the game master can build for it.
- *
- * `add` puts the account into the campaign; it runs inside the same
- * per-address queue, so the account cannot be made twice meanwhile.
- */
-export async function inviteAccount(
-  app: App,
-  email: string,
-  language: string | undefined,
-  invitation: Invitation,
-  add: (account: AccountRow) => Promise<void>,
-): Promise<AccountRow> {
-  limited(app, `invite:address:${email}`, LIMITS.invitationMailsPerAddress, false);
-  return serialized(email, async () => {
-    // Two accounts may give the same address; the oldest one is added.
-    const existing = (await app.store.findAccountsByEmail(email))[0];
-    app.limiter.record(`invite:address:${email}`, LIMITS.invitationMailsPerAddress);
-    if (existing) {
-      await deliver(app, addedToCampaignMail(existing.language, email, app.config.baseUrl, invitation));
-      await add(existing);
-      return existing;
-    }
-    const account = await app.store.createAccount({
-      id: randomUUID(),
-      name: email.split("@")[0]!.slice(0, 80),
-      email,
-      language: uiLanguage(language),
-      created_at: app.now(),
-    });
-    await add(account);
-    return account;
-  });
 }
 
 export function publicAccount(a: AccountRow) {

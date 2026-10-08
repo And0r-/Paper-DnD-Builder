@@ -29,7 +29,7 @@ beforeEach(async () => {
   await signIn(player, PLAYER);
   const campaign = (await gm.call("POST", "/api/campaigns", { name: "Die Nebelrunde" })).json.campaign;
   campaignId = campaign.id;
-  await gm.call("POST", `/api/campaigns/${campaign.id}/players`, { email: PLAYER, language: "de" });
+  await player.call("POST", `/api/invites/${(campaign.inviteUrl as string).split("/join/")[1]}/join`);
   id = (await finished(3)).draft.id;
 });
 

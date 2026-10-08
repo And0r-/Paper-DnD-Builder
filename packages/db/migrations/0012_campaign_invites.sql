@@ -1,0 +1,16 @@
+-- Invitations by link (AND-237), replacing invitations by mail address.
+--
+-- A campaign has one invitation link, which its game master sends to
+-- every player or shows as a QR code at the table. Whoever opens it and
+-- joins is a player. The token is a random 128-bit value (22 characters
+-- base64url, so the QR code stays small). It is stored as it is, not
+-- hashed: the game master must see the link again at any time, and it
+-- opens a place in one campaign, not an account. Making a new link
+-- replaces the token; the old one stops working, the players stay.
+--
+-- Campaigns from before get their token from the server the first time
+-- their game master opens them, from the same random source as new ones.
+-- That keeps one place that makes tokens and needs no database extension
+-- (gen_random_bytes is pgcrypto's); nobody can join before the game
+-- master has seen the link anyway.
+ALTER TABLE campaigns ADD COLUMN invite_token text UNIQUE;

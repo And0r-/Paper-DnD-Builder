@@ -7,6 +7,8 @@
  * A member of a campaign (player or game master) first says which campaign
  * the character is for (AND-231, AND-234), with the campaign they joined last chosen: most come here
  * straight from the invitation. Without a campaign the question is skipped.
+ * `?campaign=<id>` alone chooses that campaign instead (from the invitation
+ * page, AND-237); "no campaign" stays a choice.
  *
  * `?campaign=<id>&player=<id>`: a game master builds for a player of their
  * campaign. The character is the player's from the start and belongs to
@@ -74,6 +76,7 @@ function NewCharacter() {
   const { t, lang } = useApp();
   const router = useRouter();
   const forPlayer = useForPlayer();
+  const preferred = useSearchParams().get("campaign");
   const [list, setList] = useState<PackageListEntry[] | null>(null);
   const [failed, setFailed] = useState(false);
   // The campaigns the viewer plays in or leads; not asked when a game master builds for a player.
@@ -134,7 +137,7 @@ function NewCharacter() {
       (c) => {
         if (!live) return;
         setCampaigns(c);
-        setCampaignPick(c[0]?.id ?? NO_CAMPAIGN);
+        setCampaignPick((c.find((x) => x.id === preferred) ?? c[0])?.id ?? NO_CAMPAIGN);
         // Nothing to ask: the character is in no campaign.
         if (c.length === 0) setCampaign(NO_CAMPAIGN);
       },
@@ -143,7 +146,7 @@ function NewCharacter() {
     return () => {
       live = false;
     };
-  }, [forPlayer, attempt]);
+  }, [forPlayer, preferred, attempt]);
 
   useEffect(() => {
     if (list?.length === 1 && ready && !started.current) {

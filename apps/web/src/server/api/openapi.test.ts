@@ -258,8 +258,7 @@ describe("openapi.json", () => {
         "campaignNotFound",
         "gameMasterOnly",
         "playerNotFound",
-        "alreadyPlayer",
-        "cannotAddYourself",
+        "inviteNotFound",
         "ownerOnly",
         "copyNotFound",
         "valueNotFound",
@@ -398,6 +397,9 @@ async function walk(server: TestServer): Promise<void> {
   // A link back in: asked for, used once, refused the second time.
   const lost = new Client(server, "198.51.100.41");
   await lost.call("POST", "/api/auth/reset", { email: "nobody@example.org" });
+  server.failMail.on = true;
+  await lost.call("POST", "/api/auth/reset", { email: "walker@example.org" });
+  server.failMail.on = false;
   await lost.call("POST", "/api/auth/reset", { email: "walker@example.org", language: "de" });
   const token = /\/login\/reset\/([\w-]+)/.exec(server.mails.at(-1)!.text)![1];
   const reset = (await lost.call("POST", "/api/auth/reset/use", { token })).json.password;
@@ -546,13 +548,17 @@ async function walk(server: TestServer): Promise<void> {
   await call("GET", "/api/campaigns/00000000-0000-4000-8000-000000000000");
   const mate = new Client(server, "198.51.100.20");
   await signIn(mate, "mate@example.org", "en");
-  await call("POST", `${cp}/players`, { email: "walker@example.org" });
-  server.failMail.on = true;
-  await call("POST", `${cp}/players`, { email: "mate@example.org" });
-  server.failMail.on = false;
-  await call("POST", `${cp}/players`, { email: "late@example.org", language: "en" });
-  const added = (await call("POST", `${cp}/players`, { email: "mate@example.org" })).json.player;
-  await call("POST", `${cp}/players`, { email: "mate@example.org" });
+  const invite = (campaign.inviteUrl as string).split("/join/")[1]!;
+  await new Client(server, "198.51.100.21").call("GET", `/api/invites/${invite}`);
+  await new Client(server, "198.51.100.21").call("POST", `/api/invites/${invite}/join`);
+  await mate.call("GET", "/api/invites/AAAAAAAAAAAAAAAAAAAAAA");
+  await mate.call("POST", `/api/invites/${invite}/join`);
+  await mate.call("POST", `/api/invites/${invite}/join`);
+  await mate.call("POST", `${cp}/invite`);
+  const fresh = (await call("POST", `${cp}/invite`)).json.inviteUrl as string;
+  await mate.call("POST", `/api/invites/${invite}/join`);
+  await call("POST", `/api/invites/${fresh.split("/join/")[1]!}/join`);
+  const added = (await call("GET", cp)).json.players[0];
   const theirs = (await mate.call("POST", "/api/drafts", { packageId: "demo", campaignId: campaign.id })).json
     .draft.id;
   await mate.call("GET", "/api/campaigns");

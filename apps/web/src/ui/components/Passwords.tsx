@@ -18,7 +18,7 @@ import { FreshPassword } from "./FreshPassword.tsx";
 const MAX_NAME = 80;
 
 export function Passwords() {
-  const { t, lang } = useApp();
+  const { t, lang, account } = useApp();
   const [passwords, setPasswords] = useState<PasswordInfo[] | null>(null);
   const [failed, setFailed] = useState(false);
   const [attempt, setAttempt] = useState(0);
@@ -43,6 +43,22 @@ export function Passwords() {
 
   const date = new Intl.DateTimeFormat(lang, { dateStyle: "long" });
   const last = passwords?.length === 1;
+
+  // A password without a name of its own is named here, in the screen's language, not by the server.
+  const nameOf = (p: PasswordInfo) => {
+    if (p.name) return p.name;
+    if (p.origin === "first") return t("settings.passwordFirst");
+    if (p.origin === "reset") return t("settings.passwordReset");
+    const made = new Date(p.createdAt);
+    const day = new Intl.DateTimeFormat(lang, {
+      day: "numeric",
+      month: "long",
+      ...(made.getFullYear() === new Date().getFullYear() ? {} : { year: "numeric" }),
+    });
+    return t("settings.passwordFrom", { date: day.format(made) });
+  };
+  // Named by its day already: the day once is enough.
+  const byDay = (p: PasswordInfo) => !p.name && !p.origin;
 
   const close = () => {
     setMaking(false);
@@ -93,14 +109,16 @@ export function Passwords() {
           {passwords.map((p) => (
             <li className="access-keys__item" key={p.id}>
               <span className="access-keys__text">
-                <span className="access-keys__name">{p.name}</span>
-                <span className="note">
-                  {t("settings.keyCreated", { date: date.format(new Date(p.createdAt)) })}
-                </span>
+                <span className="access-keys__name">{nameOf(p)}</span>
+                {!byDay(p) && (
+                  <span className="note">
+                    {t("settings.keyCreated", { date: date.format(new Date(p.createdAt)) })}
+                  </span>
+                )}
               </span>
               <Button
                 variant="ghost"
-                aria-label={t("settings.passwordDeleteLabel", { name: p.name })}
+                aria-label={t("settings.passwordDeleteLabel", { name: nameOf(p) })}
                 disabled={last}
                 onClick={() => setRemove(p)}
               >
@@ -142,7 +160,7 @@ export function Passwords() {
         }
       >
         {fresh ? (
-          <FreshPassword secret={fresh} onDone={close} />
+          <FreshPassword secret={fresh} noMail={!account?.email} onDone={close} />
         ) : (
           <form
             id="new-password"
@@ -193,7 +211,7 @@ export function Passwords() {
           }
         }}
       >
-        <p>{t("settings.passwordDeleteText", { name: remove?.name ?? "" })}</p>
+        <p>{t("settings.passwordDeleteText", { name: remove ? nameOf(remove) : "" })}</p>
       </ConfirmDialog>
 
       {toast && <Toast message={toast} duration={6000} onDone={() => setToast(undefined)} />}

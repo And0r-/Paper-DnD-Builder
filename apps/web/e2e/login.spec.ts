@@ -56,8 +56,36 @@ for (const lang of ["de", "en"] as const) {
     // The password, once, with what to do with it. Nothing moves on by itself.
     const shown = page.getByRole("region", { name: m["password.welcome"].replace("{name}", name) });
     await expect(shown.getByText(m["password.text"])).toBeVisible();
+    await expect(shown.getByText(m["password.keep"])).toBeVisible();
+    // No address given: this password is the only way back in, and the screen says so.
+    await expect(shown.getByText(m["password.noMail"])).toBeVisible();
+    // The whole screen fits on the phone, down to the button.
+    const done = (await shown.getByRole("button", { name: m["password.done"] }).boundingBox())!;
+    expect(done.y + done.height).toBeLessThanOrEqual(page.viewportSize()!.height);
     const password = (await shown.locator(".copy-text__value").textContent())!.trim();
     expect(password).toMatch(/^[a-zäöüß]+(?:-[a-zäöüß]+){4}-\d{4}$/);
+    // A line breaks only before a hyphen, never after one: no line of the password ends in "-".
+    const lines = await shown.locator(".copy-text__value code").evaluate((code) => {
+      const range = document.createRange();
+      const ends: string[] = [];
+      let lastTop = -1;
+      let line = "";
+      for (const node of [...code.childNodes].flatMap((n) => (n.nodeType === 3 ? [n] : [...n.childNodes]))) {
+        for (let i = 0; i < (node.textContent ?? "").length; i++) {
+          range.setStart(node, i);
+          range.setEnd(node, i + 1);
+          const top = Math.round(range.getBoundingClientRect().top);
+          if (lastTop >= 0 && top > lastTop + 2) {
+            ends.push(line);
+            line = "";
+          }
+          lastTop = top;
+          line += node.textContent![i];
+        }
+      }
+      return [...ends, line];
+    });
+    for (const line of lines) expect(line).not.toMatch(/-$/);
     await expectOneLanguage(page, lang);
     await noAxeViolations(page);
     await shot(page, `21-login-password-${lang}`);
@@ -109,6 +137,8 @@ test("settings: a second password, the first deleted, the last one stays", async
   await expect(section.getByText(m["settings.passwordsText"])).toBeVisible();
   const list = section.getByRole("list", { name: m["settings.passwordsListLabel"] });
   await expect(list.getByRole("listitem")).toHaveCount(1);
+  // The server's own password is named on the screen, in its language, not by a date.
+  await expect(list.getByText(m["settings.passwordFirst"])).toBeVisible();
   // The last password cannot go; the note says why.
   await expect(list.getByRole("button", { name: /.+/ })).toBeDisabled();
   await expect(section.getByText(m["settings.passwordLast"])).toBeVisible();
