@@ -539,16 +539,27 @@ describe("where a change comes from", () => {
     }
     const now = await version();
 
-    const state = await owner.call("PUT", `/api/drafts/${draftId}/state`, { version: 0, state: { hp: 7 } });
+    const state = await owner.call("PUT", `/api/drafts/${draftId}/state`, {
+      version: 0,
+      state: { hp: 7, note: "x", marks: { checks: 2 } },
+    });
     expect(state.status).toBe(200);
+    // The message names the fields that changed: the screen says which one.
     expect(await lead.live.next("playState")).toMatchObject({
       version: now,
       source: { name: "owner" },
-      change: { kind: "state", stateVersion: 1 },
+      change: { kind: "state", stateVersion: 1, fields: ["hp", "marks", "note"], more: false },
     });
-    await owner.call("PUT", `/api/drafts/${draftId}/state`, { version: 1, clearChecks: true });
+    await owner.call("PUT", `/api/drafts/${draftId}/state`, {
+      version: 1,
+      state: { hp: 5, note: "x", marks: { checks: 2 } },
+    });
     expect(await lead.live.next("playState")).toMatchObject({
-      change: { kind: "clearChecks", stateVersion: 2 },
+      change: { kind: "state", stateVersion: 2, fields: ["hp"], more: false },
+    });
+    await owner.call("PUT", `/api/drafts/${draftId}/state`, { version: 2, clearChecks: true });
+    expect(await lead.live.next("playState")).toMatchObject({
+      change: { kind: "clearChecks", stateVersion: 3, fields: ["marks"], more: false },
     });
 
     const copy = await owner.call("POST", `/api/drafts/${draftId}/sheet-copies`, {});

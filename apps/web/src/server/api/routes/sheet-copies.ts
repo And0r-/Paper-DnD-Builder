@@ -68,6 +68,8 @@ export const MAX_COPY_BYTES = 512 * 1024;
 const MAX_COPY_BODY_BYTES = MAX_COPY_BYTES + 4 * 1024;
 
 export const MAX_STATE_FIELDS = 1000;
+/** How many changed fields a play state message names: a screen says "Stamina", not a list of fifty. */
+export const MAX_TOLD_FIELDS = 20;
 
 const version = z.number().int().min(1);
 
@@ -188,6 +190,17 @@ function stateView(row: CharacterStateRow | undefined) {
     version: row?.version ?? 0,
     updatedAt: row?.updated_at.toISOString() ?? null,
   };
+}
+
+/** The fields of two play states that differ, in a fixed order, so a screen can say which field changed. */
+export function changedFields(
+  before: Record<string, PlayValue>,
+  after: Record<string, PlayValue>,
+): { fields: string[]; more: boolean } {
+  const all = [...new Set([...Object.keys(before), ...Object.keys(after)])]
+    .filter((k) => JSON.stringify(before[k]) !== JSON.stringify(after[k]))
+    .sort();
+  return { fields: all.slice(0, MAX_TOLD_FIELDS), more: all.length > MAX_TOLD_FIELDS };
 }
 
 /** The play state without any ticks: the rest. The builder does not know what a rest is; it only rubs out ticks. */
@@ -374,7 +387,8 @@ export const sheetCopyRoutes: Route[] = [
         });
       }
       const kind = "state" in body ? "state" : "clearChecks";
-      await tell(ctx, row, "state", { kind, stateVersion: stored.version });
+      const changed = changedFields(current?.state ?? {}, next);
+      await tell(ctx, row, "state", { kind, stateVersion: stored.version, ...changed });
       return json(200, stateView(stored));
     },
   },

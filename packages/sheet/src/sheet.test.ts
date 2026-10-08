@@ -2,7 +2,7 @@ import { evaluateDraft, dependentValues, type DraftDocument } from "@builder/cor
 import type { ContentPackage } from "@builder/format";
 import { readdirSync, readFileSync } from "node:fs";
 import { beforeAll, describe, expect, it } from "vitest";
-import { buildSheetModel, sheetFields, type SheetModel } from "./index.ts";
+import { buildSheetModel, sheetFieldNames, sheetFields, type SheetModel } from "./index.ts";
 import { sheetModelSchema } from "./schema.ts";
 import { demoCharacter, loadDemoPackage, raisedCharacter } from "./testing.ts";
 
@@ -84,6 +84,18 @@ describe("sheet model", () => {
       .sections.flatMap((s) => (s.kind === "statBoxes" ? s.boxes : []))
       .find((b) => b.valueId === "guard")!;
     expect(guard.field).toBeUndefined();
+  });
+
+  it("names every field as the sheet shows it", () => {
+    const model = sheet(level20, "de");
+    const names = sheetFieldNames(model);
+    expect([...names.keys()].sort()).toEqual(sheetFields(model).sort());
+    const stamina = model.sections
+      .flatMap((s) => (s.kind === "statBoxes" ? s.boxes : []))
+      .find((b) => b.field === "sheet/primary/stamina")!;
+    expect(names.get("sheet/primary/stamina")).toBe(stamina.label);
+    expect(names.get("sheet/header/playedBy")).toBe("Gespielt von");
+    for (const name of names.values()) expect(name).not.toBe("");
   });
 
   it("keeps a field's id when the character goes up a level", () => {
