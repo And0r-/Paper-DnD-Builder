@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { translator } from "../../i18n/index.ts";
 import type { Source } from "./channel.ts";
-import { personText, toldText, whatText, type Told, type Viewer } from "./words.ts";
+import { personText, toldText, whatText, withValues, type Told, type Viewer } from "./words.ts";
 
 const de = translator("de").t;
 const en = translator("en").t;
@@ -74,6 +74,28 @@ describe("the line about a change made elsewhere", () => {
     expect(whatText({ event: "finished" }, words, de)).toBe("Charakter fertig");
     expect(whatText({ event: "campaign" }, words, de)).toBe("Kampagne");
     expect(whatText({ event: "changed" }, words, de)).toBeNull();
+  });
+
+  it("says ours is saved next to values set elsewhere, also when nobody said who (AND-270)", () => {
+    const list = (items: string[]) => items.join(", ");
+    const scores = { kind: "answer", choice: "folk.pick" } as const;
+    const byGm = told({
+      source: source({ name: "Vexa", role: "gameMaster" }),
+      change: scores,
+      alongside: { a: 9 },
+    });
+    const what = withValues(whatText(byGm, words, de), ["Kraft 9"], de, list);
+    expect(toldText(byGm, owner, what, de)).toBe(
+      "Vexa (Spielleitung) hat geändert: Herkunft (Kraft 9). Deine Wahl ist auch gespeichert.",
+    );
+    const away = told({ source: null, change: scores, alongside: { a: 9 } });
+    expect(toldText(away, owner, withValues(whatText(away, words, en), ["Might 9"], en, list), en)).toBe(
+      "Changed elsewhere meanwhile: Herkunft (Might 9). Your choice is saved too.",
+    );
+    const lost = told({ source: null, change: scores, overruled: true });
+    expect(toldText(lost, owner, whatText(lost, words, de), de)).toBe(
+      "Inzwischen anderswo geändert: Herkunft. Deine Wahl dort gilt nicht mehr.",
+    );
   });
 });
 

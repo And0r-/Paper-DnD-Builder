@@ -16,11 +16,12 @@ import { Dialog } from "../components/Dialog.tsx";
 import { TextField } from "../components/Fields.tsx";
 import { Icon } from "../components/Icon.tsx";
 import { useDraft } from "../flow/draft-state.tsx";
+import { rowName } from "../flow/explain.ts";
 import { stepTitle } from "../flow/model.ts";
 import { ptext, thingName } from "../package-text.ts";
 import { HINT_MAX, type Person } from "./channel.ts";
 import { hrefOfStep } from "./where.ts";
-import { personText, toldText, whatText, type Viewer } from "./words.ts";
+import { personText, toldText, whatText, withValues, type Viewer } from "./words.ts";
 
 /** The connection must be gone this long before the line says so: a short blink says nothing. */
 const LOST_AFTER_MS = 2500;
@@ -59,7 +60,7 @@ function usePersonName() {
 
 /** The short line about the last change made elsewhere. */
 function useToldLine(): { seq: number; text: string } | null {
-  const { t } = useApp();
+  const { t, list } = useApp();
   const { told, lp, ev } = useDraft();
   const viewer = useViewer();
   if (!told) return null;
@@ -73,7 +74,8 @@ function useToldLine(): { seq: number; text: string } | null {
     },
     t,
   );
-  return { seq: told.seq, text: toldText(told, viewer, what, t) };
+  const values = Object.entries(told.alongside ?? {}).map(([v, n]) => `${rowName(lp, v)} ${n}`);
+  return { seq: told.seq, text: toldText(told, viewer, withValues(what, values, t, list), t) };
 }
 
 /** A step's title as the step list has it, or the screen's own word. */
