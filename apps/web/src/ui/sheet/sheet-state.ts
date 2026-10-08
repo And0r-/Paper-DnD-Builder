@@ -9,11 +9,18 @@
  * to the original makes a copy of it with the change already in; the
  * screen then shows that copy, and the account opens it next time. A write
  * that another device beat (409) loads what is stored and says so.
+ *
+ * Changes made elsewhere (another window, the game master, a program) come
+ * over the live channel and show without reloading (AND-258). In the play
+ * state, what this window wrote and did not save yet stays on top, unless
+ * the other wrote the same field: the stored one counts.
  */
 import { withRowRemoved, type PlayValue, type SheetModel } from "@builder/sheet";
 import { useCallback, useEffect, useMemo, useReducer, useRef } from "react";
 import { api, ApiError } from "../api.ts";
 import { useApp } from "../app-state.tsx";
+import type { DraftApi } from "../flow/draft-state.tsx";
+import { mergePlay, same, type PlayState } from "./merge-play.ts";
 
 export interface CopyEntry {
   id: string;
@@ -51,7 +58,9 @@ interface Live {
   model: SheetModel | null;
   problem: OriginalProblem | null;
   copyVersion: number;
-  state: Record<string, PlayValue>;
+  state: PlayState;
+  /** The play state as stored at `stateVersion`: what this window changed is the difference. */
+  base: PlayState;
   stateVersion: number;
   save: SaveState;
   notice: SheetNotice | null;
@@ -67,7 +76,7 @@ const RETRY_MS = 3000;
 export const UNDO_MS = 10_000;
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-export function useSheet(draftId: string) {
+export function useSheet(draftId: string, listen?: DraftApi["listen"]) {
   const { lang, account } = useApp();
   const [, render] = useReducer((n: number) => n + 1, 0);
   const live = useRef<Live>({
@@ -79,6 +88,7 @@ export function useSheet(draftId: string) {
     problem: null,
     copyVersion: 0,
     state: {},
+    base: {},
     stateVersion: 0,
     save: "idle",
     notice: null,
@@ -188,6 +198,7 @@ export function useSheet(draftId: string) {
         api<{ state: Record<string, PlayValue>; version: number }>("GET", `${base}/state`),
       ]);
       S.state = play.state;
+      S.base = play.state;
       S.stateVersion = play.version;
       if (opened && S.copies.some((c) => c.id === opened)) await openCopy(opened);
       else await openOriginal();
@@ -319,25 +330,31 @@ export function useSheet(draftId: string) {
 
   const saveState = useCallback(async () => {
     const S = live.current;
-    if (!S.stateDirty) return;
-    S.stateDirty = false;
-    const sent = S.state;
-    try {
-      // Kept alive: a note written just before the page is left still arrives.
-      const r = await api<{ state: Record<string, PlayValue>; version: number }>(
-        "PUT",
-        `${base}/state`,
-        { version: S.stateVersion, state: sent },
-        { keepalive: true },
-      );
-      S.stateVersion = r.version;
-      if (S.state === sent) S.state = r.state;
-    } catch (error) {
-      if (!(error instanceof ApiError) || error.code !== "versionConflict") throw error;
-      const current = error.details["current"] as { state: Record<string, PlayValue>; version: number };
-      S.state = current.state;
-      S.stateVersion = current.version;
-      S.notice = "otherDevice";
+    while (S.stateDirty) {
+      S.stateDirty = false;
+      const sent = S.state;
+      try {
+        // Kept alive: a note written just before the page is left still arrives.
+        const r = await api<{ state: PlayState; version: number }>(
+          "PUT",
+          `${base}/state`,
+          { version: S.stateVersion, state: sent },
+          { keepalive: true },
+        );
+        S.stateVersion = r.version;
+        S.base = r.state;
+        if (S.state === sent) S.state = r.state;
+        break;
+      } catch (error) {
+        if (!(error instanceof ApiError) || error.code !== "versionConflict") throw error;
+        // Another device was first: what it stored, and on top what only this window changed.
+        const current = error.details["current"] as { state: PlayState; version: number };
+        S.state = mergePlay(S.base, S.state, current.state);
+        S.base = current.state;
+        S.stateVersion = current.version;
+        S.notice = "otherDevice";
+        if (!same(S.state, current.state)) S.stateDirty = true;
+      }
     }
     render();
   }, [base]);
@@ -384,22 +401,67 @@ export function useSheet(draftId: string) {
     render();
     enqueue(async () => {
       try {
-        const r = await api<{ state: Record<string, PlayValue>; version: number }>("PUT", `${base}/state`, {
+        const r = await api<{ state: PlayState; version: number }>("PUT", `${base}/state`, {
           version: S.stateVersion,
           clearChecks: true,
         });
         S.state = r.state;
+        S.base = r.state;
         S.stateVersion = r.version;
       } catch (error) {
         if (!(error instanceof ApiError) || error.code !== "versionConflict") throw error;
-        const current = error.details["current"] as { state: Record<string, PlayValue>; version: number };
+        const current = error.details["current"] as { state: PlayState; version: number };
         S.state = current.state;
+        S.base = current.state;
         S.stateVersion = current.version;
         S.notice = "otherDevice";
       }
       render();
     });
   }, [base, enqueue, saveState, offerUndo]);
+
+  // ------------------------------------------------------------------ live
+
+  // A change made elsewhere: read what changed, after whatever is on its way here.
+  useEffect(() => {
+    if (!listen) return;
+    return listen((news) => {
+      const S = live.current;
+      if (S.load !== "ready") return;
+      queue.current = queue.current.then(async () => {
+        try {
+          if (news.type === "playState") {
+            const r = await api<{ state: PlayState; version: number }>("GET", `${base}/state`);
+            if (r.version <= S.stateVersion) return;
+            const merged = mergePlay(S.base, S.state, r.state);
+            S.base = r.state;
+            S.stateVersion = r.version;
+            S.state = merged;
+            // What only this window wrote goes on top of the new version; a save already queued takes it.
+            if (!same(merged, r.state) && !S.stateDirty) {
+              S.stateDirty = true;
+              enqueue(saveState);
+            }
+          } else if (news.type === "copies" && news.change && "copyId" in news.change) {
+            const { kind, copyId } = news.change;
+            await loadList();
+            if (copyId === S.version && kind === "copyDeleted") {
+              await openOriginal();
+              S.notice = "copyGone";
+            } else if (copyId === S.version && kind === "copyChanged" && !S.modelDirty) {
+              await openCopy(copyId);
+            }
+          } else if (news.type === "draft" && S.version === ORIGINAL && !S.modelDirty) {
+            // The original is made from the character: it shows the change.
+            await openOriginal();
+          }
+          render();
+        } catch {
+          // The next change or a reload brings it.
+        }
+      });
+    });
+  }, [listen, base, enqueue, saveState, loadList, openOriginal, openCopy]);
 
   // -------------------------------------------------------------- versions
 

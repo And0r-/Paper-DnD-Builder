@@ -5,7 +5,8 @@
  * short line when the connection went. It is part of the sticky top, so
  * it never lies over an answer or the Back / Next bar (AND-90); the page
  * leaves room for it when it scrolls to a field (--livebar-height). Alone
- * on a character, nothing shows.
+ * on a character, nothing shows but, for a moment, a line about a change
+ * made elsewhere: who made it and how, and what (AND-258).
  */
 import Link from "next/link";
 import { useEffect, useRef, useState, type FormEvent } from "react";
@@ -15,13 +16,15 @@ import { Dialog } from "../components/Dialog.tsx";
 import { TextField } from "../components/Fields.tsx";
 import { Icon } from "../components/Icon.tsx";
 import { useDraft } from "../flow/draft-state.tsx";
-import { thingName } from "../package-text.ts";
+import { stepTitle } from "../flow/model.ts";
+import { ptext, thingName } from "../package-text.ts";
 import { HINT_MAX, type Person } from "./channel.ts";
 import { hrefOfStep } from "./where.ts";
+import { personText, toldText, whatText, type Viewer } from "./words.ts";
 
 /** The connection must be gone this long before the line says so: a short blink says nothing. */
 const LOST_AFTER_MS = 2500;
-/** How long "Mara just changed something" stays. */
+/** How long "Mara made a change: Origin" stays. */
 const CHANGED_MS = 4000;
 /** How long the sender sees their own hint. */
 const MINE_MS = 6000;
@@ -41,9 +44,38 @@ export function useCanGuide(): boolean {
   return live.connection === "open" && live.you !== null && live.you.role !== "owner" && others.length > 0;
 }
 
+/** Whoever looks at this screen, to tell their own account's windows and programs from others. */
+function useViewer(): Viewer {
+  const { account } = useApp();
+  const { draft } = useDraft();
+  return { role: draft.access, name: account?.name ?? "" };
+}
+
 function usePersonName() {
   const { t } = useApp();
-  return (p: Person) => t(`live.person.${p.role}`, { name: p.name });
+  const viewer = useViewer();
+  return (p: Person) => personText(p, viewer, t);
+}
+
+/** The short line about the last change made elsewhere. */
+function useToldLine(): { seq: number; text: string } | null {
+  const { t } = useApp();
+  const { told, lp, ev } = useDraft();
+  const viewer = useViewer();
+  if (!told) return null;
+  const what = whatText(
+    told,
+    {
+      step: (id) => stepTitle(lp, ev, id),
+      choice: (id) => {
+        const step = ev.steps.find((s) => s.choices.includes(id));
+        return stepTitle(lp, ev, step ? step.id : id);
+      },
+      level: ptext(lp, "level.name") ?? "",
+    },
+    t,
+  );
+  return { seq: told.seq, text: toldText(told, viewer, what, t) };
 }
 
 /** A step's title as the step list has it, or the screen's own word. */
@@ -71,7 +103,8 @@ function PersonChip({ person }: { person: Person }) {
   const { lp, draft } = useDraft();
   const nameOf = usePersonName();
   const titleOf = useStepTitle();
-  const step = person.step ? titleOf(person.step) : null;
+  // A program has no screen: no step to show.
+  const step = person.step && person.via === "browser" ? titleOf(person.step) : null;
   const href = person.step ? hrefOfStep(draft.id, person.step) : null;
   const pointed = person.point ? thingName(lp, person.point) : "";
   return (
@@ -203,7 +236,8 @@ function useAfter(on: boolean, ms: number): boolean {
 
 export function LiveBar() {
   const { t } = useApp();
-  const { live, changedBy } = useDraft();
+  const { live } = useDraft();
+  const told = useToldLine();
   const others = useOthers();
   const canGuide = useCanGuide();
   const [composing, setComposing] = useState(false);
@@ -216,14 +250,16 @@ export function LiveBar() {
   const lost = useAfter(live.connection === "lost", LOST_AFTER_MS) && (hadCompany || helping);
 
   const [changed, setChanged] = useState<number | null>(null);
+  const toldSeq = told?.seq;
   useEffect(() => {
-    if (!changedBy) return;
-    setChanged(changedBy.seq);
+    if (toldSeq === undefined) return;
+    setChanged(toldSeq);
     const timer = setTimeout(() => setChanged(null), CHANGED_MS);
     return () => clearTimeout(timer);
-  }, [changedBy]);
+  }, [toldSeq]);
+  const changedLine = told && changed === told.seq ? told.text : null;
 
-  const shown = others.length > 0 || lost || live.hint !== null;
+  const shown = others.length > 0 || lost || live.hint !== null || changedLine !== null;
 
   // The page keeps fields clear of the row when it scrolls to them (base.css, scroll-padding-top).
   useEffect(() => {
@@ -271,8 +307,11 @@ export function LiveBar() {
               <span>{t("live.lost")}</span>
             </p>
           )}
-          {changed !== null && changedBy && others.length > 0 && (
-            <p className="livebar__changed">{t("live.changedBy", { name: changedBy.name })}</p>
+          {changedLine && (
+            <p className="livebar__changed" data-told>
+              <Icon name="pencil" size={16} />
+              <span>{changedLine}</span>
+            </p>
           )}
           <HintBubble />
         </div>
