@@ -143,11 +143,11 @@ works on a server without a screen. No key, nothing personal in it.
 
 ## Packages
 
-| Method & path                          | Result                                                                                                                                                                                               |
-| -------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Method & path                          | Result                                                                                                                                                                                                                                                                                              |
+| -------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `GET /api/packages?lang=de`            | Loaded packages with name and description in one language (the one asked for if the package has it, else English, else its first; `language` says which), each with the `extensions` a character may switch on (`id`, `version`, `languages`, `dependsOn`, `publishable`, `name`, `short`). Public. |
-| 🔒 `GET /api/packages/:id`             | Structure without texts: manifest, units, values, things, flow, sheet, glossary, `extensions`.                                                                                                       |
-| 🔒 `GET /api/packages/:id/texts/:lang` | All texts of one language. Missing texts are `null`, never filled from another language, except an extension's (see below); `fallbacks` names those.                                                 |
+| 🔒 `GET /api/packages/:id`             | Structure without texts: manifest, units, values, things, flow, sheet, glossary, `extensions`.                                                                                                                                                                                                      |
+| 🔒 `GET /api/packages/:id/texts/:lang` | All texts of one language. Missing texts are `null`, never filled from another language, except an extension's (see below); `fallbacks` names those.                                                                                                                                                |
 
 **Extensions** (package format SPEC 17). An extension adds to a package:
 more options, things, choices. A character switches it on for itself

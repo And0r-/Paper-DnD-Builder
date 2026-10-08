@@ -131,6 +131,7 @@ export const MESSAGES: Readonly<Record<string, Messages>> = {
     rulesTexts: "Textes de règles",
     rulesTextsTitle: "Textes de règles à relire",
     noRulesTexts: "Ce personnage n’a rien avec un texte de règle.",
+    notForSharing: (names) => `Contient du contenu de ${names}, pas pour le partage.`,
   },
   it: {
     playedBy: "Giocato da",
@@ -158,6 +159,7 @@ export const MESSAGES: Readonly<Record<string, Messages>> = {
     rulesTexts: "Testi delle regole",
     rulesTextsTitle: "Testi delle regole da rileggere",
     noRulesTexts: "Questo personaggio non ha niente con un testo delle regole.",
+    notForSharing: (names) => `Contiene contenuti da ${names}, non da condividere.`,
   },
   es: {
     playedBy: "Jugado por",
@@ -185,6 +187,7 @@ export const MESSAGES: Readonly<Record<string, Messages>> = {
     rulesTexts: "Textos de reglas",
     rulesTextsTitle: "Textos de reglas para consultar",
     noRulesTexts: "Este personaje no tiene nada con un texto de regla.",
+    notForSharing: (names) => `Contiene contenido de ${names}, no para compartir.`,
   },
 };
 
