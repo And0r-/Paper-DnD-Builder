@@ -108,7 +108,11 @@ export class ApiClient {
   }
 
   private async send(method: string, path: string, body?: unknown): Promise<Response> {
-    const headers: Record<string, string> = { authorization: `Bearer ${this.key}` };
+    // `x-builder-client` lets the live channel show a change as made over MCP (a label, not a login).
+    const headers: Record<string, string> = {
+      authorization: `Bearer ${this.key}`,
+      "x-builder-client": "mcp",
+    };
     if (body !== undefined) headers["content-type"] = "application/json";
     let res: Response;
     try {

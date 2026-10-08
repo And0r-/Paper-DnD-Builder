@@ -1,8 +1,10 @@
 /**
- * The live help: several people on one draft at once. Everyone on a draft
- * sees who else is there, on which step and pointing at what, and gets the
- * draft's new state the moment anyone changes it, over the live channel or
- * over the HTTP API. Anyone on it may answer.
+ * The live channel: several people on one character at once. Everyone on
+ * it sees who else is there (and how: browser, program, MCP), on which step
+ * and pointing at what, and hears of every stored change the moment it is
+ * made, whoever made it and however: over this channel, the HTTP API with
+ * a cookie or a key, or the MCP server. A change of the draft comes with
+ * its new state; anyone on it may answer.
  *
  * Nothing here keeps a draft: the draft is stored as always, and every
  * change goes through `commitChange`, the same function the HTTP routes
@@ -15,9 +17,9 @@
 import { RuleError } from "@builder/core";
 import { randomBytes } from "node:crypto";
 import { z } from "zod";
-import type { App, DraftEvent } from "../app.ts";
+import type { App, ChangeSource, DraftEvent, Via } from "../app.ts";
 import { HttpError } from "../api/http.ts";
-import { changeBodies, commitChange, draftView, edits, type DraftEdit } from "../api/routes/drafts.ts";
+import { changeBodies, commitChange, draftView, edits, type Edit } from "../api/routes/drafts.ts";
 import type { Limit } from "../auth/rate-limit.ts";
 import type { ReachableDraftRow } from "../store.ts";
 
@@ -35,7 +37,7 @@ export type Role = ReachableDraftRow["access"];
  * reach drafts changes.
  */
 export type Authorize = () => Promise<
-  | { ok: true; row: ReachableDraftRow; name: string }
+  | { ok: true; row: ReachableDraftRow; accountId: string; name: string; login: "cookie" | "key" }
   | { ok: false; code: "notLoggedIn" | "keyNotValid" | "draftNotFound" }
 >;
 
@@ -49,6 +51,8 @@ export const CLOSE = {
 
 /** More than a table of players and their game master; a loop opening connections stops here. */
 export const MAX_PEOPLE_PER_DRAFT = 20;
+/** How often everyone's access is checked again, so an ended session or a lost role ends the connection. */
+export const RECHECK_MS = 30_000;
 /** Clicking quickly through a list stays far below this; a script sending in a loop does not. */
 export const LIVE_MESSAGES: Limit = { max: 60, windowMs: 10_000 };
 
@@ -69,7 +73,7 @@ export const clientMessage = z.discriminatedUnion("type", [
 export type ClientMessage = z.infer<typeof clientMessage>;
 type ChangeMessage = Extract<ClientMessage, { version: number }>;
 
-function editOf(m: ChangeMessage): DraftEdit {
+function editOf(m: ChangeMessage): Edit {
   switch (m.type) {
     case "answer":
       return edits.answer(m.choice, m.answer);
@@ -89,6 +93,9 @@ interface Member {
   id: string;
   name: string;
   role: Role;
+  via: Via;
+  /** The browser window's own id (`?clientId=`), the same it sends on its HTTP changes. */
+  clientId: string | null;
   step: string | null;
   point: string | null;
   socket: LiveSocket;
@@ -114,11 +121,30 @@ export interface Joined {
   leave(): void;
 }
 
-const publicPerson = (m: Member) => ({ id: m.id, name: m.name, role: m.role, step: m.step, point: m.point });
+/** Who is on a character, as everyone on it sees them. No account id: a name and a role are enough. */
+const publicPerson = (m: Member) => ({
+  id: m.id,
+  name: m.name,
+  role: m.role,
+  via: m.via,
+  clientId: m.clientId,
+  step: m.step,
+  point: m.point,
+});
+
+/** Who made a change, as everyone on the character sees it. */
+const publicSource = (s: ChangeSource) => ({
+  via: s.via,
+  name: s.accountName,
+  role: s.role,
+  clientId: s.clientId,
+  connectionId: s.connectionId ?? null,
+});
 
 export class LiveHub {
   private readonly app: App;
   private readonly rooms = new Map<string, Room>();
+  private timer: ReturnType<typeof setInterval> | undefined;
 
   constructor(app: App) {
     this.app = app;
@@ -136,7 +162,7 @@ export class LiveHub {
    */
   join(
     row: ReachableDraftRow,
-    who: { name: string },
+    who: { name: string; via: Via; clientId: string | null },
     socket: LiveSocket,
     authorize: Authorize,
   ): Joined | undefined {
@@ -144,11 +170,12 @@ export class LiveHub {
     if (!room) {
       room = { draftId: row.id, ownerName: row.owner_name, version: row.version, members: new Map() };
       this.rooms.set(row.id, room);
+      this.startRecheck();
     }
     if (room.members.size >= MAX_PEOPLE_PER_DRAFT) {
       send(socket, { type: "error", code: "tooManyPeople", max: MAX_PEOPLE_PER_DRAFT });
       socket.close(CLOSE.tooManyPeople, "tooManyPeople");
-      if (room.members.size === 0) this.rooms.delete(row.id);
+      if (room.members.size === 0) this.removeRoom(row.id);
       return undefined;
     }
     room.version = Math.max(room.version, row.version);
@@ -156,6 +183,8 @@ export class LiveHub {
       id: randomBytes(9).toString("base64url"),
       name: who.name,
       role: row.access,
+      via: who.via,
+      clientId: who.clientId,
       step: null,
       point: null,
       socket,
@@ -164,7 +193,7 @@ export class LiveHub {
       gone: false,
     };
     room.members.set(member.id, member);
-    send(socket, { type: "welcome", you: publicPerson(member) });
+    send(socket, { type: "welcome", draftId: row.id, you: publicPerson(member) });
     this.presence(room);
     send(socket, this.state(row, member, { by: null }));
     const r = room;
@@ -181,7 +210,7 @@ export class LiveHub {
     if (member.gone) return;
     member.gone = true;
     room.members.delete(member.id);
-    if (room.members.size === 0) this.rooms.delete(room.draftId);
+    if (room.members.size === 0) this.removeRoom(room.draftId);
     else this.presence(room);
   }
 
@@ -228,6 +257,7 @@ export class LiveHub {
       case "hint":
         this.broadcast(room, () => ({
           type: "hint",
+          draftId: room.draftId,
           from: { id: member.id, name: member.name },
           text: m.text,
         }));
@@ -251,7 +281,15 @@ export class LiveHub {
           const again = await member.authorize();
           return again.ok ? again.row : undefined;
         },
-        { connectionId: member.id, ref: m.ref },
+        {
+          via: member.via,
+          accountId: auth.accountId,
+          accountName: auth.name,
+          role: auth.row.access,
+          clientId: member.clientId,
+          connectionId: member.id,
+          ref: m.ref,
+        },
       );
       // The server is the truth: an old version gets the state now, not an error.
       if (!done.ok)
@@ -279,20 +317,35 @@ export class LiveHub {
     }
     const room = this.rooms.get(e.draftId);
     if (!room) return;
-    if (e.kind === "deleted") {
-      for (const m of [...room.members.values()]) this.kick(room, m, "draftNotFound");
+    const at = this.app.now().toISOString();
+    const source = publicSource(e.source);
+    const mine = (m: Member) =>
+      e.source.connectionId === m.id && e.source.ref !== undefined ? { ref: e.source.ref } : {};
+    if (e.kind === "character") {
+      const message = {
+        // `state` is the draft's own message here: the play state is `playState`.
+        type: e.type === "state" ? "playState" : e.type,
+        draftId: e.draftId,
+        version: room.version,
+        at,
+        source,
+        ...(e.change ? { change: e.change } : {}),
+      };
+      this.broadcast(room, () => message);
+      if (e.type === "deleted")
+        for (const m of [...room.members.values()]) this.kick(room, m, "draftNotFound");
+      // Moved out of a campaign: its game master no longer reaches it.
+      if (e.type === "campaign") void this.recheck(room);
       return;
     }
     if (e.version <= room.version) return;
     room.version = e.version;
-    const by = e.source && room.members.get(e.source.connectionId);
+    const by = e.source.connectionId ? room.members.get(e.source.connectionId) : undefined;
+    const cause = { event: e.type, at, source, ...(e.change ? { change: e.change } : {}) };
     for (const m of room.members.values()) {
       const row = { ...e.row, owner_name: room.ownerName, access: m.role };
-      const mine = e.source?.connectionId === m.id && e.source.ref !== undefined ? { ref: e.source.ref } : {};
-      send(
-        m.socket,
-        this.state(row, m, { by: by ? { id: by.id, name: by.name } : null, ...mine }, e.raisedFrom),
-      );
+      const extra = { by: by ? { id: by.id, name: by.name } : null, ...cause, ...mine(m) };
+      send(m.socket, this.state(row, m, extra, e.raisedFrom));
     }
   }
 
@@ -308,19 +361,33 @@ export class LiveHub {
     }
   }
 
-  private state(
-    row: ReachableDraftRow,
-    m: Member,
-    extra: { by: { id: string; name: string } | null; ref?: string; stale?: true },
-    raisedFrom?: number,
-  ) {
+  /** The draft as `m` sees it, with what the message adds (who changed it and how, `ref`, `stale`). */
+  private state(row: ReachableDraftRow, m: Member, extra: object, raisedFrom?: number) {
     const view = draftView({ ...row, access: m.role }, this.app.packages.get(row.package_id), raisedFrom);
-    return { type: "state", ...extra, ...view };
+    return { type: "state", draftId: row.id, version: row.version, ...extra, ...view };
   }
 
   private presence(room: Room): void {
     const people = [...room.members.values()].map(publicPerson);
-    this.broadcast(room, () => ({ type: "presence", people }));
+    this.broadcast(room, () => ({ type: "presence", draftId: room.draftId, people }));
+  }
+
+  private removeRoom(draftId: string): void {
+    this.rooms.delete(draftId);
+    if (this.rooms.size === 0) {
+      clearInterval(this.timer);
+      this.timer = undefined;
+    }
+  }
+
+  /** While anyone is on a character: everyone's access again, now and then (a session may run out). */
+  private startRecheck(): void {
+    if (this.timer) return;
+    this.timer = setInterval(() => {
+      for (const room of this.rooms.values()) void this.recheck(room);
+    }, RECHECK_MS);
+    // The check alone does not keep the process running.
+    this.timer.unref?.();
   }
 
   private broadcast(room: Room, message: () => unknown): void {

@@ -103,7 +103,11 @@ export const authRoutes: Route[] = [
     handler: async ({ app, req }) => {
       // Read the cookie directly: loading the session could refresh it in the same response.
       const token = readSessionToken(req.headers.get("cookie"), app.config.secureCookies);
-      if (token) await app.store.deleteSession(sessionId(token));
+      if (token) {
+        await app.store.deleteSession(sessionId(token));
+        // Its live connections end with it; the account's other logins keep theirs.
+        app.draftEvents.publish({ kind: "access" });
+      }
       return json(204, null, { "Set-Cookie": clearSessionCookie(app.config.secureCookies) });
     },
   },

@@ -344,6 +344,7 @@
   "privacy.notStored": "Das gibt es bei uns nicht",
   "privacy.noTracking": "Wir beobachten dich nicht: keine Werbung, keine Statistik über dich, kein Mitschreiben deiner Klicks.",
   "privacy.noThirdParty": "Dein Browser lädt nichts von anderen Seiten. Keine fremden Schriften, keine fremden Skripte.",
+  "privacy.live": "Wer einen Charakter gerade offen hat, sieht, wer ihn noch offen hat: den Namen, und ob im Browser oder mit einem Programm. Wer etwas am Charakter ändert, sieht der andere mit Namen. Das weiss der Server nur, solange ihr verbunden seid. Er schreibt es nirgends auf.",
   "privacy.languageModel": "Ein Sprachmodell deiner Wahl kann deine Charaktere lesen und mit dir bauen: über die Adresse /mcp dieses Servers oder mit einem Programm, das du herunterlädst. Beides braucht einen Zugangsschlüssel, den du selbst anlegst. Unser Server nimmt dabei nur Anfragen an. Er schickt nichts an andere und enthält kein Sprachmodell. Deine Charaktere gehen nur an das Sprachmodell, das du selbst einrichtest.",
   "privacy.delete": "Unter Einstellungen kannst du dein Konto jederzeit löschen. Dann ist alles weg.",
   "privacy.back": "Zurück",
