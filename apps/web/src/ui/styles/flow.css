@@ -1548,3 +1548,280 @@
 .new-campaign .field {
   max-width: 28rem;
 }
+
+/*
+ * Live help (AND-246). The row under the top bar shares its sticky block:
+ * it never lies over an answer or the Back / Next bar (AND-90), and the
+ * page keeps fields clear of it when it scrolls (--livebar-height). On a
+ * phone the people scroll sideways in one line; the hint wraps.
+ */
+.shell__top {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.livebar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-line);
+}
+
+.livebar[hidden] {
+  display: none;
+}
+
+.livebar__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.livebar__label {
+  flex: none;
+  font-size: var(--text-xs);
+  line-height: var(--text-xs-lh);
+  color: var(--color-ink-muted);
+}
+
+.livebar__people {
+  display: flex;
+  gap: var(--space-2);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.livebar__person {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 0 var(--space-2);
+  border-radius: 999px;
+  background: var(--color-surface-sunk);
+  font-size: var(--text-xs);
+  line-height: var(--text-xs-lh);
+  white-space: nowrap;
+}
+
+.livebar__name {
+  font-weight: var(--weight-semibold);
+}
+
+/* A steady dot, no pulse: connected, not calling for attention. */
+.livebar__dot {
+  flex: none;
+  display: inline-block;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: var(--color-success);
+}
+
+.livebar__where {
+  color: var(--color-ink-muted);
+}
+
+a.livebar__where {
+  color: var(--color-primary);
+}
+
+.livebar__points {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-warning);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.livebar__hint-button {
+  flex: none;
+  margin-left: auto;
+}
+
+.livebar__lost,
+.livebar__changed {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  font-size: var(--text-xs);
+  line-height: var(--text-xs-lh);
+  color: var(--color-ink-muted);
+}
+
+.livebar__lost {
+  color: var(--color-warning);
+}
+
+/* The hint: a speech bubble with its tail towards the people above; a tap puts it away. */
+.hint-bubble {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  width: 100%;
+  margin-top: var(--space-1);
+  padding: var(--space-2) var(--space-3);
+  border: 2px solid var(--color-primary);
+  border-radius: var(--radius-md);
+  background: var(--color-primary-soft);
+  color: var(--color-ink);
+  font: inherit;
+  font-size: var(--text-sm);
+  line-height: var(--text-sm-lh);
+  font-weight: var(--weight-regular);
+  text-align: left;
+  white-space: normal;
+  cursor: pointer;
+}
+
+.hint-bubble::before {
+  content: "";
+  position: absolute;
+  top: -8px;
+  left: var(--space-5);
+  width: 12px;
+  height: 12px;
+  border-top: 2px solid var(--color-primary);
+  border-left: 2px solid var(--color-primary);
+  background: var(--color-primary-soft);
+  transform: rotate(45deg);
+}
+
+.hint-bubble--mine {
+  border-color: var(--color-line);
+  background: var(--color-surface-sunk);
+}
+
+.hint-bubble--mine::before {
+  border-color: var(--color-line);
+  background: var(--color-surface-sunk);
+}
+
+.hint-bubble__words {
+  flex: 1;
+  min-width: 0;
+  /* At most three lines on a phone: a hint is one sentence. */
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.hint-bubble__from {
+  font-weight: var(--weight-semibold);
+}
+
+.hint-bubble__close {
+  flex: none;
+  display: inline-flex;
+  color: var(--color-ink-muted);
+}
+
+.hint-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.hint-form__actions {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+/* Someone points at this card: a frame in its own colour and the words who. */
+.option--pointed {
+  outline: 3px solid var(--color-warning);
+  outline-offset: 3px;
+}
+
+.option__pointed {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  align-self: flex-start;
+  margin: 0;
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--color-warning-soft);
+  color: var(--color-warning);
+  font-size: var(--text-xs);
+  line-height: var(--text-xs-lh);
+  font-weight: var(--weight-semibold);
+}
+
+.option__point {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: var(--target-min);
+  padding: 0 var(--space-2);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-ink-muted);
+  font: inherit;
+  font-size: var(--text-xs);
+  cursor: pointer;
+}
+
+.option__point[aria-pressed="true"] {
+  border-color: var(--color-warning);
+  background: var(--color-warning-soft);
+  color: var(--color-warning);
+}
+
+.option__point:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* Where the others are, in the step list. */
+.steplist__who {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--text-xs);
+  line-height: var(--text-xs-lh);
+  font-weight: var(--weight-regular);
+  color: var(--color-success);
+}
+
+.drawer__help {
+  align-self: flex-start;
+  margin-bottom: var(--space-3);
+}
+
+.overview-help {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.overview-help p {
+  margin: 0;
+}
+
+@media (forced-colors: active) {
+  .option--pointed {
+    outline: 3px dashed Highlight;
+  }
+}

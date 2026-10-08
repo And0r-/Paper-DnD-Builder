@@ -174,6 +174,7 @@ function CampaignScreen() {
                             <li key={d.id}>
                               <CharacterCard
                                 heading="h4"
+                                helpOut
                                 item={describeCharacter(d, data.packages.get(d.packageId), t)}
                               />
                             </li>

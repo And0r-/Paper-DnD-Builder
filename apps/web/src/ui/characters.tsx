@@ -92,13 +92,17 @@ export function CharacterCard({
   item,
   onDelete,
   heading: Heading = "h2",
+  helpOut,
 }: {
   item: CharacterItem;
   onDelete?: (() => void) | undefined;
+  /** A player's character in the game master's campaign: "Help out" builds along, live (AND-246). */
+  helpOut?: boolean;
   /** h3 where the cards stand under a heading of their own (h4 under a player in a campaign). */
   heading?: "h2" | "h3" | "h4";
 }) {
   const { t } = useApp();
+  const open = helpOut ? t("characters.helpOut") : t("characters.continue");
   return (
     <article className="character">
       <div className="character__main">
@@ -117,9 +121,10 @@ export function CharacterCard({
           <ButtonLink
             href={item.href}
             variant={item.finished ? "secondary" : "primary"}
-            aria-label={`${item.finished ? t("characters.view") : t("characters.continue")}: ${item.name}`}
+            {...(!item.finished && helpOut ? { icon: "people" as const } : {})}
+            aria-label={`${item.finished ? t("characters.view") : open}: ${item.name}`}
           >
-            {item.finished ? t("characters.view") : t("characters.continue")}
+            {item.finished ? t("characters.view") : open}
           </ButtonLink>
         )}
         {item.finished && item.doneHref && (

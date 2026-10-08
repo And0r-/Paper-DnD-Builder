@@ -10,7 +10,7 @@ html {
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
   /* Focus and jumps never land under the sticky top bar or the step dock. */
-  scroll-padding-top: calc(var(--topbar-height) + var(--space-4));
+  scroll-padding-top: calc(var(--topbar-height) + var(--livebar-height, 0px) + var(--space-4));
   scroll-padding-bottom: calc(var(--dock-cover, 0px) + var(--space-4));
 }
 

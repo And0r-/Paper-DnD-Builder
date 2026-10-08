@@ -9,6 +9,13 @@
  * Saving never blocks the player. On failure it retries after 2, 5, 10 and
  * then every 30 seconds (sooner when the browser comes back online) and the
  * top bar says so (flow spec 2.4).
+ *
+ * Others may build on the same character at the same time (live help,
+ * AND-246): the owner, the game master of its campaign, a helper with the
+ * help link. The live channel (live/channel.ts) brings every new state
+ * from the server; this window takes it and puts its own changes that are
+ * still on their way back on top. After an answer the server's state
+ * counts, always: there are never two truths.
  */
 import {
   applyChange,
@@ -30,6 +37,9 @@ import {
 } from "react";
 import { useApp } from "../app-state.tsx";
 import { api, ApiError, type DraftInfo, type DraftView } from "../api.ts";
+import { useLiveChannel, viewOf, type LiveChannel } from "../live/channel.ts";
+import { draftPath, forgetHelpToken, helpTokenFor } from "../live/help-token.ts";
+import { stepOfPath } from "../live/where.ts";
 import { usePackage, type LoadedPackage } from "../packages.ts";
 import { buildFlow, stepDiff, stepTitle, type FlowEntry } from "./model.ts";
 import { planDiff, plannedDraft } from "./plan.ts";
@@ -50,14 +60,14 @@ function sameTarget(a: Pending, b: Pending): boolean {
 function send(id: string, version: number, next: Pending): Promise<DraftView> {
   switch (next.type) {
     case "setLevel":
-      return api<DraftView>("PATCH", `/api/drafts/${id}`, { version, level: next.level });
+      return api<DraftView>("PATCH", draftPath(id), { version, level: next.level });
     case "answer":
-      return api<DraftView>("PUT", `/api/drafts/${id}/answers/${encodeURIComponent(next.choice)}`, {
+      return api<DraftView>("PUT", draftPath(id, `/answers/${encodeURIComponent(next.choice)}`), {
         version,
         answer: next.answer,
       });
     case "pool":
-      return api<DraftView>("PUT", `/api/drafts/${id}/pools/${encodeURIComponent(next.step)}`, {
+      return api<DraftView>("PUT", draftPath(id, `/pools/${encodeURIComponent(next.step)}`), {
         version,
         picks: next.picks,
       });
@@ -106,6 +116,10 @@ export interface DraftApi {
   levelUp(level: number): Promise<"open" | "finished" | "failed">;
   /** Puts the character into a campaign its owner plays in, or into none (null). False if that failed. */
   setCampaign(campaignId: string | null): Promise<boolean>;
+  /** Who else is on the character, where, pointing at what; hints (live help). */
+  live: LiveChannel;
+  /** Someone else just changed the character: their name, for a short line. */
+  changedBy: { name: string; seq: number } | null;
 }
 
 const Ctx = createContext<DraftApi | null>(null);
@@ -137,6 +151,8 @@ function docOf(view: DraftView): DraftDocument {
 export type DraftLoad =
   | { state: "loading" }
   | { state: "notFound" }
+  /** A helper's help link ended: withdrawn, replaced or over. */
+  | { state: "helpEnded" }
   | { state: "packageUnavailable" }
   | { state: "error"; retry: () => void }
   | { state: "ready"; api: DraftApi };
@@ -151,12 +167,13 @@ export function DraftProvider({
 }) {
   const { lang, t } = useApp();
   const [view, setView] = useState<DraftView | null>(null);
-  const [loadError, setLoadError] = useState<"notFound" | "error" | null>(null);
+  const [loadError, setLoadError] = useState<"notFound" | "helpEnded" | "error" | null>(null);
   const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     let live = true;
-    api<DraftView>("GET", `/api/drafts/${encodeURIComponent(draftId)}`).then(
+    const helping = helpTokenFor(draftId) !== null;
+    api<DraftView>("GET", draftPath(draftId)).then(
       (v) => {
         if (!live) return;
         setView(v);
@@ -164,7 +181,11 @@ export function DraftProvider({
       },
       (error: unknown) => {
         if (!live) return;
-        setLoadError(error instanceof ApiError && error.status === 404 ? "notFound" : "error");
+        if (!(error instanceof ApiError && error.status === 404)) setLoadError("error");
+        else if (helping) {
+          forgetHelpToken(draftId);
+          setLoadError("helpEnded");
+        } else setLoadError("notFound");
       },
     );
     return () => {
@@ -176,18 +197,30 @@ export function DraftProvider({
 
   let load: DraftLoad;
   if (loadError === "notFound") load = { state: "notFound" };
+  else if (loadError === "helpEnded") load = { state: "helpEnded" };
   else if (loadError === "error") load = { state: "error", retry: () => setAttempt((n) => n + 1) };
   else if (!view) load = { state: "loading" };
   else if (!view.packageAvailable) load = { state: "packageUnavailable" };
   else if (pkg.state === "error") load = { state: "error", retry: pkg.retry };
   else if (pkg.state === "loading") load = { state: "loading" };
-  else return <ReadyDraft initial={view} onServer={setView} lp={pkg.value} t={t} render={children} />;
+  else
+    return (
+      <ReadyDraft
+        initial={view}
+        onServer={setView}
+        onGone={setLoadError}
+        lp={pkg.value}
+        t={t}
+        render={children}
+      />
+    );
   return <>{children(load)}</>;
 }
 
 function ReadyDraft({
   initial,
   onServer,
+  onGone,
   lp,
   t,
   render,
@@ -195,6 +228,8 @@ function ReadyDraft({
   initial: DraftView;
   /** Keeps the loader's copy current, so a remount starts from the newest state. */
   onServer: (v: DraftView) => void;
+  /** The live channel says there is no reach (any more). */
+  onGone: (why: "notFound" | "helpEnded") => void;
   lp: LoadedPackage;
   t: ReturnType<typeof useApp>["t"];
   render: (load: DraftLoad) => ReactNode;
@@ -225,6 +260,37 @@ function ReadyDraft({
   const waiters = useRef<((ok: boolean) => void)[]>([]);
   const pkg = lp.pkg;
 
+  // ------------------------------------------------------------ live help
+  const [changedBy, setChangedBy] = useState<{ name: string; seq: number } | null>(null);
+  const youId = useRef<string | null>(null);
+  const live = useLiveChannel(initial.draft.id, {
+    onState: (m) => {
+      // Keep the highest version: an answer of ours may have brought it already.
+      if (m.draft.version <= serverRef.current.draft.version) return;
+      const v = viewOf(m);
+      serverRef.current = v;
+      setServer(v);
+      // Ours still on their way stay on top; saving sends them on this version.
+      setDoc(apply(pkg, docOf(v), queue.current));
+      if (m.by && m.by.id !== youId.current)
+        setChangedBy((c) => ({ name: m.by!.name, seq: (c?.seq ?? 0) + 1 }));
+    },
+    onGone: (code) => {
+      if (code !== 4404) return;
+      if (helpTokenFor(initial.draft.id) !== null) {
+        forgetHelpToken(initial.draft.id);
+        onGone("helpEnded");
+      } else onGone("notFound");
+    },
+  });
+  useEffect(() => {
+    youId.current = live.you?.id ?? null;
+  }, [live.you]);
+  const sendChange = useRef(live.sendChange);
+  useEffect(() => {
+    sendChange.current = live.sendChange;
+  }, [live.sendChange]);
+
   const ev = useMemo(() => evaluateDraft(pkg, doc), [pkg, doc]);
   const flow = useMemo(() => flowOf(server.draft.id, lp, doc, ev, t), [server.draft.id, lp, doc, ev, t]);
 
@@ -245,7 +311,8 @@ function ReadyDraft({
         const id = serverRef.current.draft.id;
         const version = serverRef.current.draft.version;
         try {
-          const res = await send(id, version, next);
+          // Over the live channel while it is open, so the others learn who it was.
+          const res = await (sendChange.current(version, next) ?? send(id, version, next));
           serverRef.current = res;
           setServer(res);
           queue.current.shift();
@@ -310,13 +377,19 @@ function ReadyDraft({
   // A note about added or removed steps belongs to the screen where the change happened.
   const pathname = usePathname();
   const lastPath = useRef(pathname);
+  const { sendStep, sendPoint, dismissHint } = live;
   useEffect(() => {
     if (lastPath.current !== pathname) {
       lastPath.current = pathname;
       setNotice(null);
       setRejected(null);
+      // A hint and a pointer belong to the step they were given on.
+      dismissHint();
+      sendPoint(null);
     }
-  }, [pathname]);
+    // The others see where this window is.
+    sendStep(stepOfPath(pathname));
+  }, [pathname, sendStep, sendPoint, dismissHint]);
 
   const change = useCallback(
     (c: DraftChange): boolean => {
@@ -371,7 +444,7 @@ function ReadyDraft({
   const finish = useCallback(async (): Promise<"ok" | "incomplete" | "failed"> => {
     if (!(await flush())) return "failed";
     try {
-      const res = await api<DraftView>("POST", `/api/drafts/${serverRef.current.draft.id}/finish`, {
+      const res = await api<DraftView>("POST", draftPath(serverRef.current.draft.id, "/finish"), {
         version: serverRef.current.draft.version,
       });
       serverRef.current = res;
@@ -389,7 +462,7 @@ function ReadyDraft({
     async (level: number): Promise<"open" | "finished" | "failed"> => {
       if (!(await flush())) return "failed";
       try {
-        const res = await api<DraftView>("POST", `/api/drafts/${serverRef.current.draft.id}/level-up`, {
+        const res = await api<DraftView>("POST", draftPath(serverRef.current.draft.id, "/level-up"), {
           version: serverRef.current.draft.version,
           level,
         });
@@ -437,6 +510,8 @@ function ReadyDraft({
       finish,
       levelUp,
       setCampaign,
+      live,
+      changedBy,
     }),
     [
       lp,
@@ -452,6 +527,8 @@ function ReadyDraft({
       finish,
       levelUp,
       setCampaign,
+      live,
+      changedBy,
     ],
   );
   return <Ctx.Provider value={value}>{render({ state: "ready", api: value })}</Ctx.Provider>;

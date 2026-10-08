@@ -26,6 +26,7 @@ import {
   ptext,
   thingName,
 } from "../package-text.ts";
+import { useCanGuide, useOthers } from "../live/live-bar.tsx";
 import type { LoadedPackage } from "../packages.ts";
 import { fillNodes, ThingName } from "../components/ThingName.tsx";
 import { useDraft } from "./draft-state.tsx";
@@ -213,11 +214,17 @@ export function OptionCard({
   blocked?: string | undefined;
   onToggle: () => void;
 }) {
-  const { t } = useApp();
+  const { t, list } = useApp();
   const explain = useExplain();
   const id = useId();
   const input = useRef<HTMLInputElement>(null);
   const card = useRef<HTMLDivElement>(null);
+  const { live } = useDraft();
+  const others = useOthers();
+  const canGuide = useCanGuide();
+  // Live help: who points at this card, and whether this window does.
+  const pointedBy = others.filter((p) => p.point === thing.id).map((p) => p.name);
+  const pointing = live.people.some((p) => p.id === live.you?.id && p.point === thing.id);
   const goodIf = ptext(lp, `${thing.id}.goodIf`);
   const badgeText = badge ? ptext(lp, badge) : undefined;
   const details = <OptionDetails lp={lp} thing={thing} level={level} />;
@@ -231,7 +238,7 @@ export function OptionCard({
   return (
     <div
       ref={card}
-      className={`option${checked ? " option--checked" : ""}${blocked ? " option--blocked" : ""}`}
+      className={`option${checked ? " option--checked" : ""}${blocked ? " option--blocked" : ""}${pointedBy.length > 0 ? " option--pointed" : ""}`}
       onClick={(e) => {
         // The whole card picks the option, except its own buttons and links.
         if ((e.target as HTMLElement).closest("button, a, input, label, select, textarea")) return;
@@ -244,6 +251,12 @@ export function OptionCard({
       }}
       data-option={thing.id}
     >
+      {pointedBy.length > 0 && (
+        <p className="option__pointed" data-pointed>
+          <Icon name="target" size={18} />
+          <span>{t("live.pointedHere", { name: list(pointedBy) })}</span>
+        </p>
+      )}
       <div className="option__head">
         <input
           ref={input}
@@ -271,6 +284,25 @@ export function OptionCard({
           <span className="badge badge--neutral">{badgeText}</span>
         ) : (
           recommended && <span className="badge">{t("common.recommended")}</span>
+        )}
+        {(canGuide || pointing) && (
+          <button
+            type="button"
+            className="option__point"
+            aria-pressed={pointing}
+            aria-label={
+              pointing
+                ? t("live.pointStop")
+                : t("live.pointLabel", {
+                    name: list(others.map((p) => p.name)),
+                    thing: thingName(lp, thing.id),
+                  })
+            }
+            onClick={() => live.sendPoint(pointing ? null : thing.id)}
+          >
+            <Icon name="target" size={18} />
+            <span aria-hidden="true">{pointing ? t("live.pointStop") : t("live.point")}</span>
+          </button>
         )}
       </div>
       {blocked && (

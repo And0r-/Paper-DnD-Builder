@@ -26,6 +26,7 @@ import { distributeLines, levelGrowth, valueOrigin } from "../../../../src/ui/fl
 import { answerThings, describeAnswer, OVERVIEW_KEY, positionOf } from "../../../../src/ui/flow/model.ts";
 import { LevelGrowth } from "../../../../src/ui/flow/growth.tsx";
 import { Origins } from "../../../../src/ui/flow/origins.tsx";
+import { HelpButton } from "../../../../src/ui/live/help-dialog.tsx";
 import { choiceOf, choiceTexts, formatValue, ptext } from "../../../../src/ui/package-text.ts";
 
 export default function OverviewPage() {
@@ -81,6 +82,13 @@ export default function OverviewPage() {
       )}
 
       <CampaignField />
+
+      {draft.access === "owner" && (
+        <div className="overview-help">
+          <p>{t("overview.helpHint")}</p>
+          <HelpButton draftId={draft.id} />
+        </div>
+      )}
 
       <section className="values" aria-labelledby={`${headingId}-values`}>
         <h2 className="section-title" id={`${headingId}-values`}>

@@ -518,6 +518,18 @@ connect again with the same URL (and the same link while it works).
 A game master gets `403 ownerOnly` on the help link routes; a helper and
 anyone else `404 draftNotFound`.
 
+### On the screens
+
+The owner asks for help from the menu or the overview ("Get help": the
+link, its QR code, "Stop this link"); `/help/<token>` gets a newcomer
+started or logs them in and opens the character. A game master opens a
+player's character from the campaign ("Help out"). On the character, a
+row under the top bar shows who else is there and on which step, what
+they point at, the last hint and a lost connection; the step list marks
+where the others are. Changes go over the channel while someone else is
+there, over HTTP otherwise. Code: [`src/ui/live`](src/ui/live); browser test:
+[`e2e/live-help.spec.ts`](e2e/live-help.spec.ts).
+
 ### Where a change comes from
 
 Two request headers name the source of a change; both are labels for the
