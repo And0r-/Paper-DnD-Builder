@@ -11,7 +11,7 @@ import {
   type ChoiceState,
   type DraftDocument,
 } from "@builder/core";
-import type { ContentPackage } from "@builder/format";
+import type { Choice, ContentPackage } from "@builder/format";
 import { validatePackageDir } from "@builder/format";
 import { DEMO_PACKAGE_DIR } from "@builder/demo-package";
 
@@ -42,13 +42,15 @@ function answerFor(c: ChoiceState, name: string): unknown {
 
 /**
  * A complete character at `level`, every open choice answered in step order;
- * `calling` (a thing key) is picked first instead of the recommended one.
+ * `calling` (a thing key) is picked first instead of the recommended one,
+ * and with `tracks` each level from 2 on goes to the calling named there.
  */
 export function demoCharacter(
   pkg: ContentPackage,
   level = 3,
   name = "Mira Fennwick",
   calling?: string,
+  tracks?: string[],
 ): DraftDocument {
   const created = newDraft(pkg, level);
   if (!created.ok) throw new Error(JSON.stringify(created.error));
@@ -58,7 +60,43 @@ export function demoCharacter(
     if (!r.ok) throw new Error(JSON.stringify(r.error));
     doc = r.doc;
   }
+  if (tracks) {
+    const r = applyChange(pkg, doc, { type: "tracks", tracks });
+    if (!r.ok) throw new Error(JSON.stringify(r.error));
+    doc = r.doc;
+  }
   return answerOpen(pkg, doc, name);
+}
+
+/**
+ * The demo package with its callings as tracks (SPEC 9.7), for sheets of a
+ * character with two callings: the head and the summary line name the
+ * callings with their levels, the knacks of each calling show that
+ * calling's numbers on their cards (`cardValues`), and gear and talents come
+ * from the first calling only. Invented numbers, like the demo's own.
+ */
+export function demoWithTracks(demo: ContentPackage): ContentPackage {
+  const pkg = structuredClone(demo);
+  pkg.flow.level.tracks = { choice: "calling" };
+  pkg.flow.summary.line = { ...pkg.flow.summary.line, calling: { tracks: true } };
+  const header = pkg.sheet.sections.find((s) => s.kind === "header");
+  if (header?.kind === "header") header.fields = [{ tracks: true }, ...(header.fields ?? [])];
+  for (const t of pkg.things.filter((x) => x.kind === "calling"))
+    for (const g of t.grants ?? [])
+      if (g.choice === "gear" || g.choice?.startsWith("talents-")) g.only = "first";
+  const own = { lantern: "heartBonus", current: "graceBonus", root: "mightBonus" } as const;
+  for (const [tag, bonus] of Object.entries(own)) {
+    pkg.values.push(
+      { id: `${tag}KnackHit`, source: "mistland", formula: `practice + ${bonus}` },
+      { id: `${tag}KnackTarget`, source: "mistland", formula: `8 + practice + ${bonus}` },
+    );
+    const choice = pkg.flow.choices.find((c) => c.id === `knacks-${tag}`) as Extract<
+      Choice,
+      { kind: "pickMany" }
+    >;
+    choice.cardValues = { knackHit: `${tag}KnackHit`, knackTarget: `${tag}KnackTarget` };
+  }
+  return pkg;
 }
 
 /**
@@ -70,8 +108,9 @@ export function raisedCharacter(
   doc: DraftDocument,
   level: number,
   name = "Mira Fennwick",
+  tracks?: string[],
 ): DraftDocument {
-  const r = levelUp(pkg, doc, level);
+  const r = levelUp(pkg, doc, level, tracks);
   if (!r.ok) throw new Error(JSON.stringify(r.error));
   const { levelBefore: _, ...finished } = answerOpen(pkg, r.doc, name);
   return finished;

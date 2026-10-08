@@ -2,6 +2,7 @@ import type { DraftDocument } from "@builder/core";
 import { applyChange, evaluateDraft } from "@builder/core";
 import type { ContentPackage, TextValue } from "@builder/format";
 import { createHash } from "node:crypto";
+import { writeFileSync } from "node:fs";
 import PDFDocument from "pdfkit";
 import { getDocument } from "pdfjs-dist/legacy/build/pdf.mjs";
 import { beforeAll, describe, expect, it, vi } from "vitest";
@@ -15,7 +16,7 @@ import {
   type SheetModel,
   type SheetSection,
 } from "@builder/sheet";
-import { demoCharacter, loadDemoPackage, raisedCharacter } from "@builder/sheet/testing";
+import { demoCharacter, demoWithTracks, loadDemoPackage, raisedCharacter } from "@builder/sheet/testing";
 import { CLASSIC_GEOMETRY, classicPlan, firstColumns } from "@builder/sheet/designs/classic";
 import { columnWidth } from "@builder/sheet/designs";
 import { VERBOSE_GEOMETRY } from "@builder/sheet/designs/verbose";
@@ -2506,5 +2507,23 @@ describe("the classic design: original and copy, empty and filled", () => {
     const title = model.sections.find((s) => s.kind === "list")!.title;
     expect(text).toContain(`${title} · Continued`.toLocaleUpperCase("en"));
     expect(minFontSize).toBeGreaterThanOrEqual(6.99);
+  });
+});
+
+describe("a character with two tracks", () => {
+  it("prints the callings with their levels in the head, and each knack card with its calling's numbers", async () => {
+    const tracked = demoWithTracks(pkg);
+    const two = demoCharacter(tracked, 5, "Mira Fennwick", "calling.lantern-bearer", [
+      "calling.lantern-bearer",
+      "calling.herbalist",
+      "calling.herbalist",
+      "calling.herbalist",
+    ]);
+    const model = buildSheetModel(tracked, two, { language: "de", createdAt });
+    const pdf = await renderPdf(model);
+    const { text, pageTexts } = await extract(pdf);
+    expect(pageTexts[0]).toContain("Kräuterkundige 3 / Laternenträgerin 2");
+    for (const card of model.cards.filter((c) => c.origin)) expect(text).toContain(card.origin!.value);
+    if (process.env["PRINT_SAMPLE_OUT"]) writeFileSync(process.env["PRINT_SAMPLE_OUT"], pdf.bytes);
   });
 });
