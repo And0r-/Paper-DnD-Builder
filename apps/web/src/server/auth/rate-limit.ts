@@ -87,6 +87,8 @@ export const LIMITS = {
   resetUsesPerIp: { max: 20, windowMs: 15 * MINUTE },
   // New invitation links for a game master's campaigns; plenty for anyone who does it by hand.
   invitationsPerAccount: { max: 30, windowMs: 60 * MINUTE },
+  // New help links for one's own characters; plenty for anyone who does it by hand.
+  helpLinksPerAccount: { max: 30, windowMs: 60 * MINUTE },
   // Opening or using an invitation link: a whole table on one Wi-Fi, several times over.
   // A token has 128 bits; this only keeps a guessing loop from costing the server anything.
   inviteOpensPerIp: { max: 60, windowMs: 15 * MINUTE },

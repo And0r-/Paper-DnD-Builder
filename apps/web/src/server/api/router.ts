@@ -20,6 +20,7 @@ import { accountRoutes } from "./routes/account.ts";
 import { authRoutes } from "./routes/auth.ts";
 import { campaignRoutes } from "./routes/campaigns.ts";
 import { draftRoutes } from "./routes/drafts.ts";
+import { helpLinkRoutes } from "./routes/help-links.ts";
 import { packageRoutes } from "./routes/packages.ts";
 import { printRoutes } from "./routes/print.ts";
 import { sheetCopyRoutes } from "./routes/sheet-copies.ts";
@@ -57,6 +58,7 @@ export const ROUTES: Route[] = [
   ...accountRoutes,
   ...packageRoutes,
   ...draftRoutes,
+  ...helpLinkRoutes,
   ...printRoutes,
   ...sheetCopyRoutes,
   ...campaignRoutes,
@@ -137,7 +139,7 @@ export function createApiHandler(app: App, routes: Route[] = ROUTES): (req: Requ
  * access key alone, never by a cookie it may also carry: a tool gets exactly
  * the account its key belongs to.
  */
-async function loadSession(app: App, req: Request, out: Headers): Promise<Session | undefined> {
+export async function loadSession(app: App, req: Request, out: Headers): Promise<Session | undefined> {
   const key = readBearerKey(req.headers.get("authorization"));
   if (key !== undefined) {
     const found = key === null ? undefined : await app.store.findAccountByKey(accessKeyHash(key), app.now());

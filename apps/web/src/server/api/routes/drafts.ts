@@ -17,7 +17,7 @@ import {
 import type { ContentPackage } from "@builder/format";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
-import type { App } from "../../app.ts";
+import type { App, ChangeSource } from "../../app.ts";
 import type { AccountRow, DraftRow, ReachableDraftRow } from "../../store.ts";
 import { HttpError, json, readJson } from "../http.ts";
 import type { RequestContext, Route } from "../router.ts";
@@ -68,22 +68,44 @@ export function ownDraft(row: DraftRow, account: AccountRow): ReachableDraftRow 
   return { ...row, owner_name: account.name, access: "owner" };
 }
 
-/**
- * The draft of the URL, if the viewer may reach it: their own, or one a
- * player put into a campaign they lead (see `Store.findReachableDraft`).
- */
 /** A draft in a list: the draft's fields with `packageAvailable` and `summary`. */
 export function listEntry(app: App, row: ReachableDraftRow) {
   const { draft, packageAvailable, summary } = draftView(row, app.packages.get(row.package_id));
   return { ...draft, packageAvailable, summary };
 }
 
+/** A help link's token: 128 random bits, 22 characters base64url. */
+export const HELP_TOKEN = /^[A-Za-z0-9_-]{22}$/;
+
+/**
+ * The draft `id` if `viewerId` may reach it: their own, one a player put
+ * into a campaign they lead (see `Store.findReachableDraft`), or, with
+ * `helpToken`, the one its working help link opens. Undefined for anyone else's.
+ */
+export async function findDraftFor(
+  app: App,
+  id: string,
+  viewerId: string,
+  helpToken?: string | null,
+): Promise<ReachableDraftRow | undefined> {
+  if (!UUID.test(id)) return undefined;
+  const row = await app.store.findReachableDraft(id, viewerId);
+  if (row || !helpToken || !HELP_TOKEN.test(helpToken)) return row;
+  return app.store.findHelpedDraft(id, helpToken, app.now());
+}
+
+/**
+ * The draft of the URL, if the viewer may reach it. With `helpers`, a
+ * help link in `?help=` opens it too: only the routes that open and change
+ * a draft take one.
+ */
 export async function loadDraft(
   ctx: RequestContext,
+  options: { helpers?: boolean } = {},
 ): Promise<{ row: ReachableDraftRow; viewer: AccountRow }> {
   const { account } = await ctx.requireSession();
-  const id = ctx.params["id"]!;
-  const row = UUID.test(id) ? await ctx.app.store.findReachableDraft(id, account.id) : undefined;
+  const help = options.helpers ? ctx.url.searchParams.get("help") : null;
+  const row = await findDraftFor(ctx.app, ctx.params["id"]!, account.id, help);
   // Someone else's draft looks exactly like a missing one.
   if (!row) throw new HttpError(404, "draftNotFound");
   return { row, viewer: account };
@@ -95,36 +117,44 @@ export function packageOf(app: App, row: DraftRow): ContentPackage {
   return pkg;
 }
 
-function conflict(row: ReachableDraftRow, pkg: ContentPackage): HttpError {
-  return new HttpError(409, "versionConflict", { current: draftView(row, pkg) });
-}
+/** What a change does to the draft: the new document, and whether that finishes the character. */
+export type DraftEdit = (
+  pkg: ContentPackage,
+  row: DraftRow,
+) => { doc: DraftRow["document"]; finish?: boolean; raisedFrom?: number | undefined };
+
+export type Committed =
+  | { ok: true; row: ReachableDraftRow; raisedFrom?: number | undefined }
+  | { ok: false; current: ReachableDraftRow };
 
 /**
- * The one way a stored draft changes. A finished character stays finished
- * while it is complete; a change that leaves something open makes it a
- * draft again.
+ * The one way a stored draft changes, for the HTTP API and the live
+ * channel alike. A finished character stays finished while it is
+ * complete; a change that leaves something open makes it a draft again.
+ * If the draft is no longer at `expectedVersion`, nothing changes and the
+ * current state comes back. `reload` reads the draft again as the viewer
+ * may see it, for when it changed between our read and our write.
  */
-async function change(
-  ctx: RequestContext,
+export async function commitChange(
+  app: App,
+  row: ReachableDraftRow,
   expectedVersion: number,
-  edit: (
-    pkg: ContentPackage,
-    row: DraftRow,
-  ) => { doc: DraftRow["document"]; finish?: boolean; raisedFrom?: number | undefined },
-): Promise<Response> {
-  const { row, viewer } = await loadDraft(ctx);
+  edit: DraftEdit,
+  reload: () => Promise<ReachableDraftRow | undefined>,
+  source?: ChangeSource,
+): Promise<Committed> {
   // The draft stays its owner's, whoever changes it.
   const accountId = row.account_id;
-  const pkg = packageOf(ctx.app, row);
-  if (row.version !== expectedVersion) throw conflict(row, pkg);
+  const pkg = packageOf(app, row);
+  if (row.version !== expectedVersion) return { ok: false, current: row };
   const edited = edit(pkg, row);
   const complete = evaluateDraft(pkg, edited.doc).complete;
-  const now = ctx.app.now();
+  const now = app.now();
   const finishedAt = edited.finish ? now : complete ? row.finished_at : null;
   // A raise ends when the character is finished again.
   const { levelBefore: _, ...rest } = edited.doc;
   const doc = finishedAt ? rest : edited.doc;
-  const updated = await ctx.app.store.updateDraft(row.id, accountId, expectedVersion, {
+  const updated = await app.store.updateDraft(row.id, accountId, expectedVersion, {
     document: doc,
     finishedAt,
     packageVersion: pkg.manifest.version,
@@ -132,13 +162,35 @@ async function change(
   });
   if (!updated) {
     // Changed between our read and our write.
-    const current = await ctx.app.store.findReachableDraft(row.id, viewer.id);
+    const current = await reload();
     if (!current) throw new HttpError(404, "draftNotFound");
-    throw conflict(current, pkg);
+    return { ok: false, current };
   }
-  ctx.app.draftEvents.publish({ draftId: updated.id, accountId, version: updated.version });
-  const who = { owner_name: row.owner_name, access: row.access };
-  return json(200, draftView({ ...updated, ...who }, pkg, edited.raisedFrom));
+  app.draftEvents.publish({
+    kind: "changed",
+    draftId: updated.id,
+    accountId,
+    version: updated.version,
+    row: updated,
+    raisedFrom: edited.raisedFrom,
+    source,
+  });
+  return {
+    ok: true,
+    row: { ...updated, owner_name: row.owner_name, access: row.access },
+    raisedFrom: edited.raisedFrom,
+  };
+}
+
+async function change(ctx: RequestContext, expectedVersion: number, edit: DraftEdit): Promise<Response> {
+  const { row, viewer } = await loadDraft(ctx, { helpers: true });
+  const help = ctx.url.searchParams.get("help");
+  const done = await commitChange(ctx.app, row, expectedVersion, edit, () =>
+    findDraftFor(ctx.app, row.id, viewer.id, help),
+  );
+  const pkg = packageOf(ctx.app, row);
+  if (!done.ok) throw new HttpError(409, "versionConflict", { current: draftView(done.current, pkg) });
+  return json(200, draftView(done.row, pkg, done.raisedFrom));
 }
 
 function applyOrReject(pkg: ContentPackage, row: DraftRow, c: DraftChange) {
@@ -146,6 +198,54 @@ function applyOrReject(pkg: ContentPackage, row: DraftRow, c: DraftChange) {
   if (!r.ok) throw new HttpError(422, "changeRejected", { reason: r.error });
   return { doc: r.doc };
 }
+
+/**
+ * The changes a draft takes, by the API's routes and by the live channel's
+ * messages alike. Each throws an HttpError when the change is refused.
+ */
+export const edits = {
+  setLevel:
+    (level: number): DraftEdit =>
+    (pkg, row) =>
+      applyOrReject(pkg, row, { type: "setLevel", level }),
+  answer:
+    (choice: string, answer: unknown): DraftEdit =>
+    (pkg, row) =>
+      applyOrReject(pkg, row, { type: "answer", choice, answer: answer ?? null }),
+  pool:
+    (step: string, picks: string[]): DraftEdit =>
+    (pkg, row) =>
+      applyOrReject(pkg, row, { type: "pool", step, picks }),
+  levelUp:
+    (level: number): DraftEdit =>
+    (pkg, row) => {
+      // A raise that is not finished yet may go higher still; any other draft is built first.
+      if (!row.finished_at && row.document.levelBefore === undefined) {
+        throw new HttpError(409, "notFinished", { open: evaluateDraft(pkg, row.document).open });
+      }
+      const r = levelUp(pkg, row.document, level);
+      if (!r.ok) throw new HttpError(422, "changeRejected", { reason: r.error });
+      return {
+        doc: r.doc,
+        finish: evaluateDraft(pkg, r.doc).complete,
+        raisedFrom: r.doc.levelBefore,
+      };
+    },
+  finish: (): DraftEdit => (pkg, row) => {
+    const ev = evaluateDraft(pkg, row.document);
+    if (!ev.complete) throw new HttpError(422, "incomplete", { open: ev.open });
+    return { doc: row.document, finish: true };
+  },
+};
+
+/** The bodies of the changing routes; the live channel's messages carry the same fields. */
+export const changeBodies = {
+  setLevel: z.strictObject({ version, level: z.number().int() }),
+  answer: z.strictObject({ version, answer: z.unknown() }),
+  pool: z.strictObject({ version, picks: z.array(z.string().min(1).max(200)).max(200) }),
+  levelUp: z.strictObject({ version, level: z.number().int() }),
+  finish: z.strictObject({ version }),
+};
 
 export const newDraftSchema = z.strictObject({
   packageId: z.string().max(100),
@@ -212,7 +312,7 @@ export const draftRoutes: Route[] = [
     method: "GET",
     path: "/api/drafts/:id",
     handler: async (ctx) => {
-      const { row } = await loadDraft(ctx);
+      const { row } = await loadDraft(ctx, { helpers: true });
       return json(200, draftView(row, ctx.app.packages.get(row.package_id)));
     },
   },
@@ -222,7 +322,7 @@ export const draftRoutes: Route[] = [
     method: "GET",
     path: "/api/drafts/:id/explain/:value",
     handler: async (ctx) => {
-      const { row } = await loadDraft(ctx);
+      const { row } = await loadDraft(ctx, { helpers: true });
       const pkg = packageOf(ctx.app, row);
       const value = ctx.params["value"]!;
       const ev = evaluateDraft(pkg, row.document);
@@ -237,10 +337,8 @@ export const draftRoutes: Route[] = [
     method: "PATCH",
     path: "/api/drafts/:id",
     handler: async (ctx) => {
-      const body = await readJson(ctx.req, z.strictObject({ version, level: z.number().int() }));
-      return change(ctx, body.version, (pkg, row) =>
-        applyOrReject(pkg, row, { type: "setLevel", level: body.level }),
-      );
+      const body = await readJson(ctx.req, changeBodies.setLevel);
+      return change(ctx, body.version, edits.setLevel(body.level));
     },
   },
   {
@@ -248,11 +346,8 @@ export const draftRoutes: Route[] = [
     method: "PUT",
     path: "/api/drafts/:id/answers/:choice",
     handler: async (ctx) => {
-      const body = await readJson(ctx.req, z.strictObject({ version, answer: z.unknown() }));
-      const choice = ctx.params["choice"]!;
-      return change(ctx, body.version, (pkg, row) =>
-        applyOrReject(pkg, row, { type: "answer", choice, answer: body.answer ?? null }),
-      );
+      const body = await readJson(ctx.req, changeBodies.answer);
+      return change(ctx, body.version, edits.answer(ctx.params["choice"]!, body.answer));
     },
   },
   {
@@ -260,14 +355,8 @@ export const draftRoutes: Route[] = [
     method: "PUT",
     path: "/api/drafts/:id/pools/:step",
     handler: async (ctx) => {
-      const body = await readJson(
-        ctx.req,
-        z.strictObject({ version, picks: z.array(z.string().min(1).max(200)).max(200) }),
-      );
-      const step = ctx.params["step"]!;
-      return change(ctx, body.version, (pkg, row) =>
-        applyOrReject(pkg, row, { type: "pool", step, picks: body.picks }),
-      );
+      const body = await readJson(ctx.req, changeBodies.pool);
+      return change(ctx, body.version, edits.pool(ctx.params["step"]!, body.picks));
     },
   },
   {
@@ -277,32 +366,16 @@ export const draftRoutes: Route[] = [
     method: "POST",
     path: "/api/drafts/:id/level-up",
     handler: async (ctx) => {
-      const body = await readJson(ctx.req, z.strictObject({ version, level: z.number().int() }));
-      return change(ctx, body.version, (pkg, row) => {
-        // A raise that is not finished yet may go higher still; any other draft is built first.
-        if (!row.finished_at && row.document.levelBefore === undefined) {
-          throw new HttpError(409, "notFinished", { open: evaluateDraft(pkg, row.document).open });
-        }
-        const r = levelUp(pkg, row.document, body.level);
-        if (!r.ok) throw new HttpError(422, "changeRejected", { reason: r.error });
-        return {
-          doc: r.doc,
-          finish: evaluateDraft(pkg, r.doc).complete,
-          raisedFrom: r.doc.levelBefore,
-        };
-      });
+      const body = await readJson(ctx.req, changeBodies.levelUp);
+      return change(ctx, body.version, edits.levelUp(body.level));
     },
   },
   {
     method: "POST",
     path: "/api/drafts/:id/finish",
     handler: async (ctx) => {
-      const body = await readJson(ctx.req, z.strictObject({ version }));
-      return change(ctx, body.version, (pkg, row) => {
-        const ev = evaluateDraft(pkg, row.document);
-        if (!ev.complete) throw new HttpError(422, "incomplete", { open: ev.open });
-        return { doc: row.document, finish: true };
-      });
+      const body = await readJson(ctx.req, changeBodies.finish);
+      return change(ctx, body.version, edits.finish());
     },
   },
   {
@@ -316,6 +389,8 @@ export const draftRoutes: Route[] = [
       const body = await readJson(ctx.req, z.strictObject({ campaignId: z.string().regex(UUID).nullable() }));
       const set = await ctx.app.store.setDraftCampaign(row.id, viewer.id, body.campaignId);
       if (!set) throw new HttpError(404, "campaignNotFound");
+      // A game master may have lost the character, or gained it.
+      ctx.app.draftEvents.publish({ kind: "access", draftId: row.id });
       return json(
         200,
         draftView({ ...row, campaign_id: body.campaignId }, ctx.app.packages.get(row.package_id)),
@@ -330,6 +405,7 @@ export const draftRoutes: Route[] = [
       const { row } = await loadDraft(ctx);
       if (row.access !== "owner") throw new HttpError(403, "ownerOnly");
       await ctx.app.store.deleteDraft(row.id, row.account_id);
+      ctx.app.draftEvents.publish({ kind: "deleted", draftId: row.id });
       return json(204, null);
     },
   },

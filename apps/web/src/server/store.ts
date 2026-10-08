@@ -71,9 +71,23 @@ export type AccessKeyRow = {
 /** A draft with whose it is and why the viewer may see it. */
 export type ReachableDraftRow = DraftRow & {
   owner_name: string;
-  /** "owner": the viewer's own; "gameMaster": a character of a player in a campaign the viewer leads. */
-  access: "owner" | "gameMaster";
+  /**
+   * "owner": the viewer's own; "gameMaster": a character of a player in a campaign the viewer leads;
+   * "helper": someone else's, opened with its help link.
+   */
+  access: "owner" | "gameMaster" | "helper";
 };
+
+/** A draft's help link (see migration 0016). */
+export type HelpLinkRow = {
+  token: string;
+  draft_id: string;
+  expires_at: Date;
+  created_at: Date;
+};
+
+/** What a help link tells whoever opens it. */
+export type HelpRow = HelpLinkRow & { owner_id: string; owner_name: string };
 
 export type CampaignRow = {
   id: string;
@@ -492,6 +506,21 @@ export class Store {
     return rows[0];
   }
 
+  /**
+   * A draft opened with its help link `token`, as the helper sees it;
+   * undefined when the token is not this draft's or has expired.
+   */
+  async findHelpedDraft(id: string, token: string, now: Date): Promise<ReachableDraftRow | undefined> {
+    const rows = await this.db.query<ReachableDraftRow>(
+      `SELECT ${DRAFT_COLUMNS_D}, o.name AS owner_name, 'helper' AS access
+       FROM drafts d JOIN accounts o ON o.id = d.account_id
+       JOIN help_links h ON h.draft_id = d.id
+       WHERE d.id = $1 AND h.token = $2 AND h.expires_at > $3`,
+      [id, token, now],
+    );
+    return rows[0];
+  }
+
   async listDrafts(accountId: string): Promise<DraftRow[]> {
     return this.db.query<DraftRow>(
       `SELECT ${DRAFT_COLUMNS} FROM drafts WHERE account_id = $1 ORDER BY updated_at DESC, id`,
@@ -541,6 +570,57 @@ export class Store {
       accountId,
     ]);
     return rows.length > 0;
+  }
+
+  // -------------------------------------------------------------- help links
+
+  /**
+   * Gives the owner's draft a new help link; the one before, if any, stops
+   * working. Expired links of every draft go on the way. Returns undefined
+   * if the draft is not theirs.
+   */
+  async replaceHelpLink(
+    draftId: string,
+    ownerId: string,
+    token: string,
+    expiresAt: Date,
+    now: Date,
+  ): Promise<HelpLinkRow | undefined> {
+    await this.db.query("DELETE FROM help_links WHERE expires_at <= $1", [now]);
+    const rows = await this.db.query<HelpLinkRow>(
+      `INSERT INTO help_links (token, draft_id, expires_at, created_at)
+       SELECT $3, d.id, $4, $5 FROM drafts d WHERE d.id = $1 AND d.account_id = $2
+       ON CONFLICT (draft_id) DO UPDATE
+         SET token = EXCLUDED.token, expires_at = EXCLUDED.expires_at, created_at = EXCLUDED.created_at
+       RETURNING token, draft_id, expires_at, created_at`,
+      [draftId, ownerId, token, expiresAt, now],
+    );
+    return rows[0];
+  }
+
+  /** The draft's help link while it works; undefined for none or an expired one. */
+  async findHelpLink(draftId: string, now: Date): Promise<HelpLinkRow | undefined> {
+    const rows = await this.db.query<HelpLinkRow>(
+      `SELECT token, draft_id, expires_at, created_at FROM help_links
+       WHERE draft_id = $1 AND expires_at > $2`,
+      [draftId, now],
+    );
+    return rows[0];
+  }
+
+  /** The draft a working help link opens, and whose it is. */
+  async findHelp(token: string, now: Date): Promise<HelpRow | undefined> {
+    const rows = await this.db.query<HelpRow>(
+      `SELECT h.token, h.draft_id, h.expires_at, h.created_at, o.id AS owner_id, o.name AS owner_name
+       FROM help_links h JOIN drafts d ON d.id = h.draft_id JOIN accounts o ON o.id = d.account_id
+       WHERE h.token = $1 AND h.expires_at > $2`,
+      [token, now],
+    );
+    return rows[0];
+  }
+
+  async deleteHelpLink(draftId: string): Promise<void> {
+    await this.db.query("DELETE FROM help_links WHERE draft_id = $1", [draftId]);
   }
 
   // --------------------------------------------------------------- campaigns

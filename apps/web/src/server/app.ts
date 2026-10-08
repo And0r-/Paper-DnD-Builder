@@ -9,28 +9,49 @@ import { readConfig, type Config } from "./config.ts";
 import { memoryDatabase, outboxMailer, PGLITE_MEMORY_URL } from "./local-backends.ts";
 import { createSmtpMailer, type Mailer } from "./mail.ts";
 import { loadPackages, type PackageRegistry } from "./packages/loader.ts";
-import { Store } from "./store.ts";
+import { Store, type DraftRow } from "./store.ts";
 
+/** Who made a change over the live channel, so their own answer can say so (see live/hub.ts). */
+export interface ChangeSource {
+  connectionId: string;
+  ref?: string | undefined;
+}
+
+/** A stored draft changed; `row` is the draft as stored now. */
 export interface DraftChanged {
+  kind: "changed";
   draftId: string;
   accountId: string;
   version: number;
+  row: DraftRow;
+  /** The level a raise started from, when the change finished it at once (see `draftView`). */
+  raisedFrom?: number | undefined;
+  /** Set when the change came over the live channel. */
+  source?: ChangeSource | undefined;
 }
 
 /**
- * Notifies about every stored draft change. Nothing listens yet; the live
- * help (several people on one draft over WebSocket) will subscribe here and
- * forward changes, without touching how drafts are changed.
+ * What happens to drafts that the live channel passes on: a change, a
+ * deleted draft, or a change of who may reach drafts (a help link made
+ * or withdrawn, a campaign left). `draftId` undefined: any draft.
+ */
+export type DraftEvent =
+  DraftChanged | { kind: "deleted"; draftId: string } | { kind: "access"; draftId?: string | undefined };
+
+/**
+ * Notifies about every stored draft change. The live help (live/hub.ts)
+ * subscribes here and forwards changes to everyone on the draft, without
+ * touching how drafts are changed.
  */
 export class DraftEvents {
-  private readonly listeners = new Set<(e: DraftChanged) => void>();
+  private readonly listeners = new Set<(e: DraftEvent) => void>();
 
-  subscribe(listener: (e: DraftChanged) => void): () => void {
+  subscribe(listener: (e: DraftEvent) => void): () => void {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);
   }
 
-  publish(e: DraftChanged): void {
+  publish(e: DraftEvent): void {
     for (const l of this.listeners) {
       try {
         l(e);

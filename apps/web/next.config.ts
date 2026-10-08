@@ -37,7 +37,8 @@ const nextConfig: NextConfig = {
   ],
   // pdfkit reads its own data files at run time; it stays a plain Node module.
   // In-process database for local trials and browser tests (see src/server/local-backends.ts).
-  serverExternalPackages: ["pdfkit", "@electric-sql/pglite"],
+  // ws (the live help's WebSocket server) has optional native add-ons a bundle cannot resolve.
+  serverExternalPackages: ["pdfkit", "@electric-sql/pglite", "ws"],
   poweredByHeader: false,
   async headers() {
     return [
