@@ -344,3 +344,26 @@ describe("the tracks in the summary line and the header (format 0.21)", () => {
     expect(messages(r)[0]).toMatch(/^flow\.json summary\.line\.calling/);
   });
 });
+
+describe("the demo's example drafts with more than one calling", () => {
+  const dir = fileURLToPath(new URL("../../demo-package/examples", import.meta.url));
+  const drafts = ["lantern-herbalist", "herbalist-river-runner", "refused-lantern-bearer"];
+
+  it.each(drafts)("%s names only choices, tracks and things of the package", async (name) => {
+    const { readFile } = await import("node:fs/promises");
+    const doc = JSON.parse(await readFile(`${dir}/${name}.json`, "utf8"));
+    const pkg = validatePackageFiles(demo).package!;
+    const choices = new Set(pkg.flow.choices.map((c) => c.id));
+    const things = new Set(pkg.things.map((t) => t.id));
+    const tracks = new Set(pkg.things.filter((t) => t.kind === "calling").map((t) => t.id));
+    expect(doc.tracks.length).toBe(doc.level - 1);
+    for (const t of doc.tracks) expect(tracks).toContain(t);
+    for (const [key, answer] of Object.entries<{ pick?: string; picks?: string[] }>(doc.answers)) {
+      const [declared, track] = key.split("@");
+      expect(choices, key).toContain(declared);
+      if (track) expect(tracks, key).toContain(track);
+      for (const id of [answer.pick, ...(answer.picks ?? [])].filter(Boolean))
+        expect(things, key).toContain(id);
+    }
+  });
+});

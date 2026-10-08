@@ -1,0 +1,225 @@
+{
+  "lantern-herbalist": {
+    "about": "Two callings that share glow slots: lantern bearer from level 1 to 3, herbalist added at character level 4.",
+    "levels": {
+      "calling.lantern-bearer": 3,
+      "calling.herbalist": 2
+    },
+    "tracksLine": {
+      "de": "Laternenträgerin 3 / Kräuterkundige 2",
+      "en": "Lantern Bearer 3 / Herbalist 2"
+    },
+    "complete": true,
+    "values": {
+      "glowLevel": 4,
+      "lanternSlots1": 3,
+      "lanternSlots2": 1,
+      "lanternSlots3": 0,
+      "currentSlots": 0,
+      "currentSlotRank": 0,
+      "lanternKnackRank": 2,
+      "rootKnackRank": 1,
+      "stamina": 26,
+      "practice": 3,
+      "might": 8,
+      "grace": 7,
+      "wit": 10,
+      "heart": 12,
+      "guard": 9,
+      "pace": 25,
+      "nerve": 5,
+      "luck": 3,
+      "lanternKnackTarget": 13,
+      "lanternKnackHit": 5,
+      "rootKnackTarget": 12,
+      "rootKnackHit": 4,
+      "knackTarget": 13,
+      "knackHit": 5,
+      "borrowedKnackTarget": 13,
+      "borrowedKnackHit": 5,
+      "bloomWardUses": 0
+    },
+    "counts": {
+      "item.provisions": 5
+    },
+    "has": [
+      "item.lantern-staff",
+      "item.rope",
+      "item.reed-shield",
+      "trait.steady-flame",
+      "trait.green-thumb",
+      "trait.warding-glow",
+      "trait.leaf-lore",
+      "knack.lantern-call",
+      "talent.legends",
+      "talent.tracking"
+    ],
+    "hasNot": ["item.herb-satchel", "trait.bright-beacon", "path.mushroom-whisperer"],
+    "stepLevels": {
+      "extra-talent": 2,
+      "path": 3,
+      "added-talent-herbalist@calling.herbalist": 4,
+      "knacks-root@calling.herbalist": 4,
+      "herb-craft@calling.herbalist": 4,
+      "extra-talent@calling.herbalist": 5,
+      "borrowed-knack@calling.herbalist": 5
+    },
+    "notAsked": [
+      "talents-herbalist",
+      "added-talent-lantern-bearer",
+      "gear@calling.herbalist",
+      "path@calling.herbalist",
+      "boon-4",
+      "extra-talent@calling.lantern-bearer"
+    ],
+    "pickCounts": {
+      "knacks-lantern": 3,
+      "knacks-root@calling.herbalist": 3
+    },
+    "options": {
+      "knacks-lantern": {
+        "has": ["knack.light-bridge"],
+        "hasNot": ["knack.dawn-flare"]
+      },
+      "knacks-root@calling.herbalist": {
+        "maxRank": 1
+      }
+    },
+    "cards": {
+      "knack.light-bridge": {
+        "target": 13,
+        "hit": 5
+      },
+      "knack.moss-bed": {
+        "target": 12,
+        "hit": 4
+      },
+      "knack.spark-shower": {
+        "target": 13,
+        "hit": 5
+      },
+      "knack.lantern-call": {
+        "target": 13,
+        "hit": 5
+      }
+    }
+  },
+  "herbalist-river-runner": {
+    "about": "A calling with shared slots and one with slots of its own: herbalist at level 1, river runner added at character level 2.",
+    "levels": {
+      "calling.herbalist": 1,
+      "calling.river-runner": 4
+    },
+    "tracksLine": {
+      "de": "Flussläufer 4 / Kräuterkundige 1",
+      "en": "River Runner 4 / Herbalist 1"
+    },
+    "complete": true,
+    "values": {
+      "glowLevel": 1,
+      "lanternSlots1": 1,
+      "lanternSlots2": 0,
+      "currentSlots": 2,
+      "currentSlotRank": 2,
+      "lanternKnackRank": 0,
+      "rootKnackRank": 1,
+      "stamina": 36,
+      "practice": 3,
+      "might": 8,
+      "grace": 13,
+      "wit": 10,
+      "heart": 6,
+      "guard": 8,
+      "pace": 35,
+      "nerve": 4,
+      "luck": 1,
+      "rootKnackTarget": 12,
+      "rootKnackHit": 4,
+      "currentKnackTarget": 13,
+      "currentKnackHit": 5,
+      "knackTarget": 13,
+      "knackHit": 5
+    },
+    "counts": {
+      "item.provisions": 3
+    },
+    "has": [
+      "item.herb-satchel",
+      "item.rope",
+      "item.mortar",
+      "trait.leaf-lore",
+      "trait.quick-feet",
+      "trait.ferry-sense",
+      "knack.river-voice",
+      "boon.sure-step",
+      "talent.sneaking",
+      "talent.climbing"
+    ],
+    "hasNot": ["item.boat-hook", "trait.green-thumb"],
+    "stepLevels": {
+      "herb-craft": 1,
+      "knacks-root": 1,
+      "added-talent-river-runner@calling.river-runner": 2,
+      "knacks-current@calling.river-runner": 2,
+      "extra-talent@calling.river-runner": 3,
+      "path@calling.river-runner": 4,
+      "boon-4@calling.river-runner": 5
+    },
+    "notAsked": [
+      "talents-river-runner",
+      "gear@calling.river-runner",
+      "added-talent-herbalist",
+      "extra-talent",
+      "borrowed-knack",
+      "boon-4"
+    ],
+    "pickCounts": {
+      "knacks-root": 2,
+      "knacks-current@calling.river-runner": 3
+    },
+    "options": {
+      "knacks-current@calling.river-runner": {
+        "has": ["knack.rapid-rush"],
+        "hasNot": ["knack.whirlpool"]
+      }
+    },
+    "cards": {
+      "knack.herb-scent": {
+        "target": 12,
+        "hit": 4
+      },
+      "knack.rapid-rush": {
+        "target": 13,
+        "hit": 5
+      },
+      "knack.river-voice": {
+        "target": 13,
+        "hit": 5
+      }
+    }
+  },
+  "refused-lantern-bearer": {
+    "about": "Counter-example: a river runner with grace 9 may not add the lantern bearer at level 3. The lantern bearer's own condition holds (heart 12); the river runner's does not, and addRequiresCurrent checks it too.",
+    "levels": {
+      "calling.river-runner": 2
+    },
+    "complete": false,
+    "refused": {
+      "level": 3,
+      "track": "calling.lantern-bearer",
+      "failed": ["calling.river-runner"],
+      "reason": "calling.river-runner.addReason"
+    },
+    "valuesBefore": {
+      "might": 10,
+      "grace": 9,
+      "wit": 9,
+      "heart": 12,
+      "stamina": 18,
+      "practice": 2,
+      "pace": 30,
+      "guard": 9
+    },
+    "alsoValid": "With tracks [\"calling.river-runner\", \"calling.river-runner\"] the same draft is a valid river runner 3; without addRequiresCurrent the lantern bearer could be added."
+  }
+}

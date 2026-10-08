@@ -13,3 +13,9 @@ export const DEMO_PACKAGE_ID = "demo";
 
 /** Absolute path of the package root (the folder holding manifest.json). */
 export const DEMO_PACKAGE_DIR = fileURLToPath(new URL("..", import.meta.url));
+
+/**
+ * Example drafts with more than one calling (format 0.21) and the numbers a
+ * rule core must work out for them (`expected.json`). Not part of the package.
+ */
+export const DEMO_EXAMPLES_DIR = fileURLToPath(new URL("../examples", import.meta.url));

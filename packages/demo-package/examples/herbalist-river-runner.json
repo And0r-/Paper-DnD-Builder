@@ -1,0 +1,63 @@
+{
+  "level": 5,
+  "tracks": ["calling.river-runner", "calling.river-runner", "calling.river-runner", "calling.river-runner"],
+  "answers": {
+    "name": {
+      "text": "Bero Schilfgrund"
+    },
+    "calling": {
+      "pick": "calling.herbalist"
+    },
+    "folk": {
+      "pick": "folk.moorfolk"
+    },
+    "upbringing": {
+      "pick": "upbringing.ferry-child"
+    },
+    "path@calling.river-runner": {
+      "pick": "path.ferrymaster"
+    },
+    "herb-craft": {
+      "pick": "trait.leaf-lore"
+    },
+    "scores": {
+      "method": 0,
+      "assign": {
+        "mightBase": 8,
+        "graceBase": 12,
+        "witBase": 10,
+        "heartBase": 6
+      }
+    },
+    "boon-4@calling.river-runner": {
+      "pick": "boon.sure-step"
+    },
+    "talents-herbalist": {
+      "picks": ["talent.mending", "talent.tracking"]
+    },
+    "added-talent-river-runner@calling.river-runner": {
+      "pick": "talent.sneaking"
+    },
+    "extra-talent@calling.river-runner": {
+      "pick": "talent.climbing"
+    },
+    "knacks-root": {
+      "picks": ["knack.herb-scent", "knack.root-grip"]
+    },
+    "knacks-current@calling.river-runner": {
+      "picks": ["knack.fog-hop", "knack.dew-breath", "knack.rapid-rush"]
+    },
+    "gear": {
+      "pick": "item.mortar"
+    },
+    "handling-river-runner": {
+      "picks": ["handling.rope", "handling.boat-hook"]
+    },
+    "handling-herbalist": {
+      "pick": "handling.trail-boots"
+    },
+    "age": {
+      "value": 31
+    }
+  }
+}
