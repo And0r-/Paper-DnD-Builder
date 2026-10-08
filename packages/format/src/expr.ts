@@ -31,6 +31,11 @@ export const FUNCTIONS = {
   has: [1, 1],
   /** `count("tag")`: number of things the character has that carry the tag. */
   count: [1, 1],
+  /**
+   * `levelOf("thing.id")`: the levels the character has in that track (a
+   * thing of the choice `flow.level.tracks` names), 0 if it does not have it.
+   */
+  levelOf: [1, 1],
 } as const satisfies Record<string, readonly [number, number]>;
 
 export type FunctionName = keyof typeof FUNCTIONS;
@@ -202,7 +207,7 @@ export function parseExpr(src: string): Expr {
           const want = min === max ? `${min}` : max === Infinity ? `at least ${min}` : `${min}-${max}`;
           throw new ExprSyntaxError(`${fn}() takes ${want} argument(s), got ${args.length}`, t.p);
         }
-        if ((fn === "has" || fn === "count") && args[0]!.type !== "str") {
+        if ((fn === "has" || fn === "count" || fn === "levelOf") && args[0]!.type !== "str") {
           throw new ExprSyntaxError(`${fn}() takes a quoted string, e.g. ${fn}("some.id")`, t.p);
         }
         return { type: "call", fn, args };
@@ -226,6 +231,8 @@ export interface ExprRefs {
   values: Set<string>;
   things: Set<string>;
   tags: Set<string>;
+  /** Things named in `levelOf()`. */
+  tracks: Set<string>;
 }
 
 export function collectRefs(expr: Expr, into: ExprRefs = emptyRefs()): ExprRefs {
@@ -244,6 +251,7 @@ export function collectRefs(expr: Expr, into: ExprRefs = emptyRefs()): ExprRefs 
       const first = expr.args[0];
       if (expr.fn === "has" && first?.type === "str") into.things.add(first.value);
       else if (expr.fn === "count" && first?.type === "str") into.tags.add(first.value);
+      else if (expr.fn === "levelOf" && first?.type === "str") into.tracks.add(first.value);
       else for (const a of expr.args) collectRefs(a, into);
       break;
     }
@@ -254,5 +262,5 @@ export function collectRefs(expr: Expr, into: ExprRefs = emptyRefs()): ExprRefs 
 }
 
 function emptyRefs(): ExprRefs {
-  return { values: new Set(), things: new Set(), tags: new Set() };
+  return { values: new Set(), things: new Set(), tags: new Set(), tracks: new Set() };
 }

@@ -129,7 +129,7 @@ describe("cross-file rules", () => {
     [
       "format version",
       (f) => (f.get("manifest.json").formatVersion = "0.3"),
-      "manifest.json formatVersion: package is written for format 0.3, this builder understands 0.20",
+      "manifest.json formatVersion: package is written for format 0.3, this builder understands 0.21",
     ],
     [
       "duplicate thing",
@@ -664,7 +664,7 @@ describe("levels 1 to 20 (format 0.9)", () => {
     const p = (id: string) => `flow.json choices[${choiceIndex(id)}]`;
     expect(messages(r)).toEqual(
       expect.arrayContaining([
-        `values.json [${valueIndex("knackRank")}]: use only one of formula, default and byLevel`,
+        `values.json [${valueIndex("knackRank")}]: use only one of formula, default, byLevel and byValue`,
         `${p("boon-raise")}.methods[0].points: Too small: expected number to be >0`,
         `${p("knacks-root")}.count.byLevel[1]: Too small: expected number to be >0`,
         "things/boons-and-high-levels.json [0].repeatable: Invalid input: expected boolean, received string",

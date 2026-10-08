@@ -49,6 +49,7 @@ export const draftDocumentSchema = z.strictObject({
   level: z.number().int().min(1),
   levelBefore: z.number().int().min(1).optional(),
   answers: z.record(z.string(), z.unknown()),
+  tracks: z.array(z.string().min(1).max(200)).max(1000).optional(),
 });
 
 export interface DraftDocument {
@@ -61,6 +62,12 @@ export interface DraftDocument {
   levelBefore?: number;
   /** Raw answers by choice key. Shapes are checked against the package on use. */
   answers: Record<string, unknown>;
+  /**
+   * With `flow.level.tracks`: the track (a thing key) each level from 2 on
+   * went to, in level order. Level 1 goes to the answer of the tracks
+   * choice; a missing entry, or a missing list, means that track too.
+   */
+  tracks?: string[];
 }
 
 /** One edit of a draft. Every change to a draft goes through one of these. */

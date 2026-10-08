@@ -360,16 +360,18 @@ export function buildSheetModel(
           summary: text("summary.line", lineVars),
           packageName,
           playedByField: fieldId("sheet", s.id, "playedBy"),
-          fields: (s.fields ?? []).map((f) =>
-            "choice" in f
-              ? { label: text(f.label ?? `choice.${f.choice}.title`), text: answerText(f.choice) }
-              : {
-                  label: text(f.label ?? `kind.${f.things.kind}.name`),
-                  text: heldOf(f.things)
-                    .map((t) => thingName(t.id))
-                    .join(", "),
-                },
-          ),
+          fields: (s.fields ?? []).map((f) => {
+            if ("things" in f)
+              return {
+                label: text(f.label ?? `kind.${f.things.kind}.name`),
+                text: heldOf(f.things)
+                  .map((t) => thingName(t.id))
+                  .join(", "),
+              };
+            // `{ tracks }` prints the first track only until the core counts levels per track (AND-248).
+            const choice = "choice" in f ? f.choice : (pkg.flow.level.tracks?.choice ?? "");
+            return { label: text(f.label ?? `choice.${choice}.title`), text: answerText(choice) };
+          }),
         };
       case "statBoxes": {
         // Two boxes of one value in a section are told apart by their place among the package's boxes, not the shown ones.

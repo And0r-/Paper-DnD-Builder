@@ -242,6 +242,34 @@ export function validatePackageFiles(files: PackageFiles): ValidationResult {
     thingById.set(thing.id, thing);
   }
 
+  const resolveOptions = (o: OptionSource): Thing[] =>
+    [...thingById.values()].filter(
+      (t) =>
+        (o.kind === undefined || t.kind === o.kind) &&
+        (o.ids === undefined || o.ids.includes(t.id)) &&
+        (o.tags ?? []).every((tag) => t.tags?.includes(tag)),
+    );
+
+  // Tracks: the options of the choice flow.level.tracks names, and every thing that can
+  // come through one of them (its grants, the options of the choices it grants, and so on).
+  const tracksChoice = flow.level.tracks ? choiceById.get(flow.level.tracks.choice) : undefined;
+  const trackIds = new Set(
+    tracksChoice && "options" in tracksChoice ? resolveOptions(tracksChoice.options).map((t) => t.id) : [],
+  );
+  const inTrack = new Set(trackIds);
+  for (const queue = [...trackIds]; queue.length > 0;) {
+    const reach = (tid: string) => {
+      if (!thingById.has(tid) || inTrack.has(tid)) return;
+      inTrack.add(tid);
+      queue.push(tid);
+    };
+    for (const g of thingById.get(queue.pop()!)?.grants ?? []) {
+      if (g.thing !== undefined) reach(g.thing);
+      const c = g.choice !== undefined ? choiceById.get(g.choice) : undefined;
+      if (c && "options" in c) resolveOptions(c.options).forEach((t) => reach(t.id));
+    }
+  }
+
   /** A choice that gives what is picked in it: a pick choice without `options.owned`. */
   const checkGivingPick = (file: string, path: string, cid: string) => {
     const c = choiceById.get(cid);
@@ -281,10 +309,23 @@ export function validatePackageFiles(files: PackageFiles): ValidationResult {
       if (!allTags.has(t))
         warn(file, path, `expression ${lit(src)} counts tag ${lit(t)}, which no thing carries`);
     }
+    for (const t of refs.tracks) {
+      if (!flow.level.tracks)
+        err(file, path, `expression ${lit(src)} asks levelOf(${lit(t)}), but flow.level.tracks is not set`);
+      else if (!trackIds.has(t))
+        err(
+          file,
+          path,
+          `expression ${lit(src)} asks levelOf(${lit(t)}), but that is no option of the tracks choice ${lit(flow.level.tracks.choice)}`,
+        );
+    }
     return refs;
   };
 
   const isValueRef = (v: string) => valueIds.has(v) || v === "level";
+  /** A value worked out from others, so no choice can set it. */
+  const computed = (v: Value) =>
+    v.formula !== undefined || v.byLevel !== undefined || v.byValue !== undefined;
 
   // A table by level has one number per level the flow offers.
   const levels = flow.level.max - flow.level.min + 1;
@@ -393,6 +434,17 @@ export function validatePackageFiles(files: PackageFiles): ValidationResult {
     }
     if (v.formula !== undefined) checkExpr("values.json", `${p}.formula`, v.formula);
     if (v.byLevel !== undefined) checkByLevel("values.json", `${p}.byLevel`, v.byLevel);
+    if (v.byValue !== undefined && v.table !== undefined) {
+      const by = valueById.get(v.byValue);
+      if (!isValueRef(v.byValue)) err("values.json", `${p}.byValue`, `unknown value ${lit(v.byValue)}`);
+      else if (v.byValue === v.id) err("values.json", `${p}.byValue`, "a value cannot be a table by itself");
+      else if (by?.max !== undefined && v.table.length < by.max + 1)
+        warn(
+          "values.json",
+          `${p}.table`,
+          `has ${v.table.length} numbers, but ${lit(v.byValue)} goes up to ${by.max}; higher values get the last number`,
+        );
+    }
     if (v.min !== undefined && v.max !== undefined && v.min > v.max)
       err("values.json", p, "min is greater than max");
   });
@@ -404,13 +456,6 @@ export function validatePackageFiles(files: PackageFiles): ValidationResult {
   }
 
   // ----------------------------------------------------------------- things
-  const resolveOptions = (o: OptionSource): Thing[] =>
-    [...thingById.values()].filter(
-      (t) =>
-        (o.kind === undefined || t.kind === o.kind) &&
-        (o.ids === undefined || o.ids.includes(t.id)) &&
-        (o.tags ?? []).every((tag) => t.tags?.includes(tag)),
-    );
   const checkOptionSource = (file: string, path: string, o: OptionSource): Thing[] => {
     if (o.kind !== undefined && !manifest.kinds.includes(o.kind))
       err(file, `${path}.kind`, `unknown kind ${lit(o.kind)}${known(manifest.kinds)}`);
@@ -462,6 +507,17 @@ export function validatePackageFiles(files: PackageFiles): ValidationResult {
     checkProvenance(file, p, t.source, t.license);
     if (t.group !== undefined) groups.add(t.group);
     if (t.requires !== undefined) checkExpr(file, `${p}.requires`, t.requires);
+    if (t.addRequires !== undefined) {
+      checkExpr(file, `${p}.addRequires`, t.addRequires);
+      if (!trackIds.has(t.id))
+        err(
+          file,
+          `${p}.addRequires`,
+          flow.level.tracks
+            ? `only a track can be added; ${lit(t.id)} is no option of the tracks choice ${lit(flow.level.tracks.choice)}`
+            : "only a track can be added, and flow.level.tracks is not set",
+        );
+    }
     for (const [k, s] of Object.entries(t.stats ?? {})) {
       statKeys.add(k);
       if (typeof s === "object" && "amount" in s) checkAmount(file, `${p}.stats.${k}`, s.amount, s.unit);
@@ -487,6 +543,16 @@ export function validatePackageFiles(files: PackageFiles): ValidationResult {
       }
       if (g.atLevel !== undefined && g.atLevel < flow.level.min) {
         warn(file, `${gp}.atLevel`, `level ${g.atLevel} is below the lowest level ${flow.level.min}`);
+      }
+      if (g.only !== undefined) {
+        if (!flow.level.tracks)
+          err(file, `${gp}.only`, `"only" needs tracks, and flow.level.tracks is not set`);
+        else if (!inTrack.has(t.id))
+          warn(
+            file,
+            `${gp}.only`,
+            `${lit(t.id)} never belongs to a track (it does not come through the tracks choice), so this grant never applies`,
+          );
       }
     });
     if (t.about !== undefined) {
@@ -558,6 +624,17 @@ export function validatePackageFiles(files: PackageFiles): ValidationResult {
         if (c.held && !options.some((o) => o.about !== undefined))
           err(F, `${p}.held`, 'none of this choice\'s options is "about" another thing');
         c.options.ownedFrom?.forEach((cid, k) => checkGivingPick(F, `${p}.options.ownedFrom[${k}]`, cid));
+        if (c.options.rankUpTo !== undefined) {
+          checkExpr(F, `${p}.options.rankUpTo`, c.options.rankUpTo);
+          if (options.length > 0 && !options.some((o) => o.rank !== undefined))
+            warn(F, `${p}.options.rankUpTo`, "none of this choice's options has a rank; all count as rank 0");
+        }
+        for (const [from, to] of Object.entries(c.cardValues ?? {})) {
+          if (!valueIds.has(from)) err(F, `${p}.cardValues.${from}`, `unknown value ${lit(from)}`);
+          if (!valueIds.has(to)) err(F, `${p}.cardValues.${from}`, `unknown value ${lit(to)}`);
+        }
+        if (c.cardValues !== undefined && options.length > 0 && !options.some((o) => o.card))
+          warn(F, `${p}.cardValues`, "none of this choice's options has a card");
         break;
       }
       case "distribute": {
@@ -568,7 +645,7 @@ export function validatePackageFiles(files: PackageFiles): ValidationResult {
         c.targets.forEach((v, j) => {
           const value = valueById.get(v);
           if (!value) err(F, `${p}.targets[${j}]`, `unknown value ${lit(v)}`);
-          else if (!raise && (value.formula !== undefined || value.byLevel !== undefined))
+          else if (!raise && computed(value))
             err(F, `${p}.targets[${j}]`, `value ${lit(v)} has a formula and cannot take input`);
         });
         c.methods.forEach((m, j) => {
@@ -622,7 +699,7 @@ export function validatePackageFiles(files: PackageFiles): ValidationResult {
       case "number": {
         const value = valueById.get(c.target);
         if (!value) err(F, `${p}.target`, `unknown value ${lit(c.target)}`);
-        else if (value.formula !== undefined || value.byLevel !== undefined)
+        else if (computed(value))
           err(F, `${p}.target`, `value ${lit(c.target)} has a formula and cannot take input`);
         if (typeof c.min === "string") checkExpr(F, `${p}.min`, c.min);
         if (typeof c.max === "string") checkExpr(F, `${p}.max`, c.max);
@@ -717,6 +794,19 @@ export function validatePackageFiles(files: PackageFiles): ValidationResult {
         `no choice is gathered in group ${lit(s.gather)}; the step is never shown`,
       );
   });
+  const tracks = flow.level.tracks;
+  if (tracks) {
+    const tp = "level.tracks.choice";
+    if (!tracksChoice) err(F, tp, `unknown choice ${lit(tracks.choice)}${known(choiceById)}`);
+    else if (tracksChoice.kind !== "pickOne")
+      err(F, tp, `choice ${lit(tracks.choice)} is ${tracksChoice.kind}; tracks come from a pickOne choice`);
+    else if (tracksChoice.options.owned)
+      err(F, tp, `choice ${lit(tracks.choice)} only marks what the character has (options.owned)`);
+    else if (!inStep.has(tracks.choice))
+      err(F, tp, `choice ${lit(tracks.choice)} must be listed in a step: the first track is its answer`);
+    if (tracks.addRequiresCurrent && ![...thingById.values()].some((t) => t.addRequires !== undefined))
+      warn(F, "level.tracks.addRequiresCurrent", 'no thing has "addRequires"; there is nothing to check');
+  }
   const nameChoice = choiceById.get(flow.characterName);
   if (!nameChoice) err(F, "characterName", `unknown choice ${lit(flow.characterName)}`);
   else if (nameChoice.kind !== "text")
@@ -729,6 +819,8 @@ export function validatePackageFiles(files: PackageFiles): ValidationResult {
       err(F, `summary.line.${name}`, `unknown choice ${lit(arg.choice)}`);
     if ("value" in arg && !isValueRef(arg.value))
       err(F, `summary.line.${name}`, `unknown value ${lit(arg.value)}`);
+    if ("tracks" in arg && !tracks)
+      err(F, `summary.line.${name}`, "names the tracks, but flow.level.tracks is not set");
   }
 
   // ------------------------------------------------------------------ sheet
@@ -810,6 +902,10 @@ export function validatePackageFiles(files: PackageFiles): ValidationResult {
           if ("choice" in f) {
             if (!choiceById.has(f.choice))
               err(S, `${p}.fields[${j}].choice`, `unknown choice ${lit(f.choice)}`);
+            return;
+          }
+          if ("tracks" in f) {
+            if (!tracks) err(S, `${p}.fields[${j}].tracks`, "flow.level.tracks is not set");
             return;
           }
           checkOptionSource(S, `${p}.fields[${j}].things`, f.things);
@@ -950,6 +1046,7 @@ export function validatePackageFiles(files: PackageFiles): ValidationResult {
   };
   for (const t of thingById.values()) {
     needExplained(t.id, `thing ${lit(t.id)}`);
+    if (t.addRequires !== undefined) need(`${t.id}.addReason`, `why ${lit(t.id)} cannot be added`);
     optional.add(`${t.id}.goodIf`).add(`${t.id}.rules`);
   }
   for (const c of flow.choices) {
@@ -1028,7 +1125,7 @@ export function validatePackageFiles(files: PackageFiles): ValidationResult {
         if (f.label !== undefined)
           need(
             f.label,
-            `label of header field ${lit("choice" in f ? f.choice : (f.things.kind ?? "things"))}`,
+            `label of header field ${lit("choice" in f ? f.choice : "tracks" in f ? "tracks" : (f.things.kind ?? "things"))}`,
           );
     if (s.kind === "checkList" && s.strongLegend !== undefined)
       need(s.strongLegend, `legend of the double mark in sheet section ${lit(s.id)}`);
@@ -1269,6 +1366,7 @@ function known(set: Iterable<string> | Map<string, unknown> | Record<string, unk
 function formulaCycles(values: readonly Value[]): string[][] {
   const deps = new Map<string, string[]>();
   for (const v of values) {
+    if (v.byValue !== undefined) deps.set(v.id, [v.byValue]);
     if (v.formula === undefined) continue;
     try {
       deps.set(v.id, [...collectRefs(parseExpr(v.formula)).values]);

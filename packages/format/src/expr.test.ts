@@ -39,6 +39,8 @@ describe("parseExpr", () => {
     ["floor(1, 2)", "floor() takes 1 argument(s), got 2"],
     ["shout(1)", 'unknown function "shout"'],
     ["has(thing)", "has() takes a quoted string"],
+    ["levelOf(calling)", "levelOf() takes a quoted string"],
+    ["levelOf('a.b', 2)", "levelOf() takes 1 argument(s), got 2"],
     ["a b", 'unexpected "b" after end of expression'],
     ["a # b", 'unexpected character "#"'],
     ["'open", "unterminated string"],
@@ -63,5 +65,13 @@ describe("collectRefs", () => {
     expect([...refs.values].sort()).toEqual(["level", "might"]);
     expect([...refs.things]).toEqual(["a.b"]);
     expect([...refs.tags]).toEqual(["lantern"]);
+    expect([...refs.tracks]).toEqual([]);
+  });
+
+  it("collects the things named in levelOf() apart from has()", () => {
+    const refs = collectRefs(parseExpr("levelOf('calling.a') + ceil(levelOf('calling.b') / 2)"));
+    expect([...refs.tracks].sort()).toEqual(["calling.a", "calling.b"]);
+    expect([...refs.things]).toEqual([]);
+    expect([...refs.values]).toEqual([]);
   });
 });
