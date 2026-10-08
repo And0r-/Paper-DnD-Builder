@@ -96,6 +96,11 @@ describe("printing a character", () => {
     await client.call("PATCH", "/api/account/settings", { language: "en" });
     const en = await latin1(await client.request("GET", `/api/drafts/${id}/pdf`));
     expect(en).toContain("/Lang (en)");
+
+    // A language the package does not have: the whole document in English, never mixed.
+    await client.call("PATCH", "/api/account/settings", { language: "fr" });
+    const fr = await latin1(await client.request("GET", `/api/drafts/${id}/pdf`));
+    expect(fr).toContain("/Lang (en)");
   });
 
   it("refuses a character that is not finished", async () => {
@@ -232,13 +237,25 @@ describe("the parts of a printout", () => {
       designs: [
         {
           id: "verbose",
-          name: { de: "Ausführlich", en: "Detailed" },
-          description: { de: expect.any(String), en: expect.any(String) },
+          name: { de: "Ausführlich", en: "Detailed", fr: "Détaillée", it: "Dettagliata", es: "Detallada" },
+          description: {
+            de: expect.any(String),
+            en: expect.any(String),
+            fr: expect.any(String),
+            it: expect.any(String),
+            es: expect.any(String),
+          },
         },
         {
           id: "classic",
-          name: { de: "Klassisch", en: "Classic" },
-          description: { de: expect.any(String), en: expect.any(String) },
+          name: { de: "Klassisch", en: "Classic", fr: "Classique", it: "Classica", es: "Clásica" },
+          description: {
+            de: expect.any(String),
+            en: expect.any(String),
+            fr: expect.any(String),
+            it: expect.any(String),
+            es: expect.any(String),
+          },
         },
       ],
     });

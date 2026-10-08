@@ -22,6 +22,7 @@ import { useApp } from "../app-state.tsx";
 import { Button, ButtonLink } from "../components/Button.tsx";
 import { Callout, EmptyState, ErrorState, Loading } from "../components/Feedback.tsx";
 import { CompactSelect, type CompactOption } from "../components/Fields.tsx";
+import { PackageLanguageNote } from "../components/PackageLanguageNote.tsx";
 import { AppShell } from "../components/Shell.tsx";
 import { useDraft } from "../flow/draft-state.tsx";
 import { SaveLine as SaveStatusLine, usePageTitle } from "../flow/frame.tsx";
@@ -186,6 +187,7 @@ function SheetBody({
   children: ReactNode;
 }) {
   const { t } = useApp();
+  const { lp } = useDraft();
   if (sheet.load === "loading") return <Loading shape="page" count={3} />;
   if (sheet.load === "error") return <ErrorState onRetry={() => void sheet.reload()} />;
   if (sheet.problem === "notFinished") {
@@ -198,7 +200,12 @@ function SheetBody({
   }
   if (sheet.problem === "language") return <EmptyState title={t("sheet.languageMissing")} />;
   if (sheet.problem === "package") return <EmptyState title={t("flow.packageUnavailable")} />;
-  return <>{children}</>;
+  return (
+    <>
+      <PackageLanguageNote shown={lp.lang} />
+      {children}
+    </>
+  );
 }
 
 interface ToolProps {

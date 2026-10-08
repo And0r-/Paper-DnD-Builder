@@ -7,8 +7,11 @@
  */
 import de from "./messages/de.json";
 import en from "./messages/en.json";
+import es from "./messages/es.json";
+import fr from "./messages/fr.json";
+import it from "./messages/it.json";
 
-export const UI_LANGUAGES = ["de", "en"] as const;
+export const UI_LANGUAGES = ["de", "en", "fr", "it", "es"] as const;
 export type UiLanguage = (typeof UI_LANGUAGES)[number];
 export const DEFAULT_LANGUAGE: UiLanguage = "de";
 
@@ -25,14 +28,20 @@ export const LANGUAGE_COOKIE = "lang";
  * language may appear on screen: whoever switched by mistake must find
  * their own language again. Shown with a matching `lang` attribute.
  */
-export const LANGUAGE_NAMES: Record<UiLanguage, string> = { de: "Deutsch", en: "English" };
+export const LANGUAGE_NAMES: Record<UiLanguage, string> = {
+  de: "Deutsch",
+  en: "English",
+  fr: "Français",
+  it: "Italiano",
+  es: "Español",
+};
 
 export type MessageKey = keyof typeof de;
 type Base<K> = K extends `${infer B}.one` ? B : never;
 export type CountedKey = Base<MessageKey>;
 export type Vars = Readonly<Record<string, string | number>>;
 
-export const MESSAGES: Record<UiLanguage, Record<MessageKey, string>> = { de, en };
+export const MESSAGES: Record<UiLanguage, Record<MessageKey, string>> = { de, en, fr, it, es };
 
 export function isUiLanguage(value: unknown): value is UiLanguage {
   return typeof value === "string" && (UI_LANGUAGES as readonly string[]).includes(value);
@@ -51,12 +60,19 @@ export function formatNumber(lang: string, n: number): string {
   return new Intl.NumberFormat(lang).format(n);
 }
 
-export function fill(template: string, lang: string, vars: Vars = {}): string {
-  return template.replace(/\{(\w+)\}/g, (whole, name: string) => {
+/**
+ * Fills the placeholders. A text that starts with one starts with a capital:
+ * a word put in small for the middle of a sentence ("level") may open one.
+ */
+export function fill(template: string, lang: string, vars: Vars = {}, capital = true): string {
+  const out = template.replace(/\{(\w+)\}/g, (whole, name: string) => {
     const v = vars[name];
     if (v === undefined) return whole;
     return typeof v === "number" ? formatNumber(lang, v) : v;
   });
+  if (!capital || !template.startsWith("{") || out === "") return out;
+  const first = String.fromCodePoint(out.codePointAt(0)!);
+  return first.toLocaleUpperCase(lang) + out.slice(first.length);
 }
 
 export interface Translator {
@@ -79,7 +95,8 @@ export function translator(lang: UiLanguage): Translator {
     list: (items) => {
       if (items.length <= 1) return items[0] ?? "";
       const head = items.slice(0, -1).join(", ");
-      return t("flow.and", { a: head, b: items.at(-1)! });
+      // A piece of a sentence: no capital, whatever it starts with.
+      return fill(messages["flow.and"], lang, { a: head, b: items.at(-1)! }, false);
     },
   };
 }

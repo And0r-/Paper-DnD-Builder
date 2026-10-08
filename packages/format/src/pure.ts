@@ -13,3 +13,4 @@ export { parseTemplate, TemplateSyntaxError } from "./template.ts";
 export type { TemplatePart } from "./template.ts";
 export { convertAmount, dimensionOf } from "./units.ts";
 export type { ContentPackage, TextOrigin } from "./validate.ts";
+export { FALLBACK_LANGUAGE, shownLanguage } from "./languages.ts";

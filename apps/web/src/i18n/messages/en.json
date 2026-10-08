@@ -133,6 +133,7 @@
   "flow.stepNotFound": "Your character does not have this step right now.",
   "flow.toFirstOpen": "Go to the next open step",
   "flow.packageUnavailable": "The game for this character is not loaded right now. The character stays saved.",
+  "package.otherLanguage": "This game does not come in {language}. You see it in {shown} instead.",
   "flow.and": "{a} and {b}",
   "level.question": "What {levelName} is your character?",
   "level.another": "Another {levelName}",

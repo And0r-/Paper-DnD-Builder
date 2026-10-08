@@ -32,6 +32,7 @@ import { loadMemberCampaigns, NO_CAMPAIGN } from "../../src/ui/campaigns.ts";
 import { Button, ButtonLink } from "../../src/ui/components/Button.tsx";
 import { Callout, EmptyState, ErrorState, Loading } from "../../src/ui/components/Feedback.tsx";
 import { SelectField } from "../../src/ui/components/Fields.tsx";
+import { PackageLanguageNote } from "../../src/ui/components/PackageLanguageNote.tsx";
 import { AppShell } from "../../src/ui/components/Shell.tsx";
 import { QuestionHeader, usePageTitle } from "../../src/ui/flow/frame.tsx";
 import { RequireAccount } from "../../src/ui/guards.tsx";
@@ -233,6 +234,7 @@ function NewCharacter() {
   } else if (list.length === 1) {
     content = <ErrorState message={problem} onRetry={() => void create(list[0]!.id)} />;
   } else {
+    const foreign = list.find((p) => p.language !== lang);
     content = (
       <form
         onSubmit={(e) => {
@@ -278,6 +280,7 @@ function NewCharacter() {
             ))}
           </div>
         </fieldset>
+        {foreign && <PackageLanguageNote shown={foreign.language} />}
         <p className="note">{t("new.note")}</p>
         {problem && <Callout tone="warning">{problem}</Callout>}
         <div className="step-footer__bar">

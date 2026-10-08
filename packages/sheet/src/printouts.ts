@@ -39,18 +39,24 @@ export interface SheetDesign {
 export const SHEET_DESIGNS: readonly SheetDesign[] = [
   {
     id: "verbose",
-    name: { de: "Ausführlich", en: "Detailed" },
+    name: { de: "Ausführlich", en: "Detailed", fr: "Détaillée", it: "Dettagliata", es: "Detallada" },
     description: {
       de: "Mit Hinweisen und Erklärungen in einfachen Worten. Gut für den Anfang.",
       en: "With hints and explanations in plain words. Good to start with.",
+      fr: "Avec des conseils et des explications en mots simples. Bien pour commencer.",
+      it: "Con consigli e spiegazioni in parole semplici. Buona per iniziare.",
+      es: "Con pistas y explicaciones en palabras sencillas. Buena para empezar.",
     },
   },
   {
     id: "classic",
-    name: { de: "Klassisch", en: "Classic" },
+    name: { de: "Klassisch", en: "Classic", fr: "Classique", it: "Classica", es: "Clásica" },
     description: {
       de: "Alles am gewohnten Platz, wenig Text. Für alle, die das Spiel kennen.",
       en: "Everything in its usual place, little text. For those who know the game.",
+      fr: "Tout à sa place habituelle, peu de texte. Pour qui connaît déjà le jeu.",
+      it: "Tutto al solito posto, poco testo. Per chi conosce già il gioco.",
+      es: "Todo en su sitio de siempre, poco texto. Para quien ya conoce el juego.",
     },
   },
 ];

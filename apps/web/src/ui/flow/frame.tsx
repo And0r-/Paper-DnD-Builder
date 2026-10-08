@@ -22,6 +22,7 @@ import { useApp } from "../app-state.tsx";
 import { Button, ButtonLink } from "../components/Button.tsx";
 import { Callout } from "../components/Feedback.tsx";
 import { Icon } from "../components/Icon.tsx";
+import { PackageLanguageNote } from "../components/PackageLanguageNote.tsx";
 import { RichText } from "../components/RichText.tsx";
 import { AppShell } from "../components/Shell.tsx";
 import { takeJoined } from "../joined.ts";
@@ -462,6 +463,7 @@ export function FlowLayout({ current, children }: { current: string | undefined;
             ) : undefined
           }
         >
+          <PackageLanguageNote shown={lp.lang} />
           {children}
         </AppShell>
         {draft.access === "owner" && (

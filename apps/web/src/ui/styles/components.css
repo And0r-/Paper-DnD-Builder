@@ -380,6 +380,15 @@ textarea.field__input {
   grid-template-columns: repeat(auto-fill, minmax(3.5rem, 1fr));
 }
 
+/* Five language names do not fit one phone row: they wrap, each as wide as its name needs. */
+.language-select .segmented__track {
+  flex-wrap: wrap;
+}
+
+.language-select .segmented__item {
+  flex: 1 1 auto;
+}
+
 .segmented__input {
   position: absolute;
   opacity: 0;
@@ -1431,4 +1440,9 @@ textarea.field__input {
 .copy-text__value:focus-visible {
   outline: var(--focus-ring);
   outline-offset: 2px;
+}
+
+/* A game shown in another language than the screen (PackageLanguageNote). */
+.package-language-note {
+  margin-bottom: var(--space-4);
 }

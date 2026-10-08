@@ -13,6 +13,7 @@ export type { Expr, BinaryOp, FunctionName, ExprRefs } from "./expr.ts";
 export { parseTemplate, TemplateSyntaxError } from "./template.ts";
 export type { TemplatePart } from "./template.ts";
 export { convertAmount, dimensionOf } from "./units.ts";
+export { FALLBACK_LANGUAGE, shownLanguage } from "./languages.ts";
 export { readPackageDir, ROOT_FILES } from "./read.ts";
 export type { PackageFiles, ReadResult } from "./read.ts";
 export { validatePackageDir, validatePackageFiles, RESERVED_PREFIXES } from "./validate.ts";

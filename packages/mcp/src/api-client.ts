@@ -14,7 +14,7 @@
  * so each change reads the character's version afresh) and hands every one
  * the same `PackageCache`, so package texts are loaded once per process.
  */
-import type { Units } from "@builder/format/pure";
+import { shownLanguage, type Units } from "@builder/format/pure";
 import type { Account, DraftView, PackageStructure, Texts } from "./api-types.ts";
 import { Words } from "./words.ts";
 
@@ -166,12 +166,12 @@ export class ApiClient {
 
   /**
    * The words of a package for this account: its language if the package
-   * has it, else the package's first language (never a mix of two).
+   * has it, else English, else the package's first language (never a mix of two).
    */
   async words(packageId: string): Promise<Words> {
     const [account, structure] = await Promise.all([this.account(), this.structure(packageId)]);
     const languages = structure.manifest.languages;
-    const language = languages.includes(account.language) ? account.language : (languages[0] ?? "en");
+    const language = languages.length > 0 ? shownLanguage(languages, account.language) : "en";
     const texts = await this.packageTexts(packageId, language);
     return new Words({
       texts,

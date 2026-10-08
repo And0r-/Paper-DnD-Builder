@@ -1412,6 +1412,76 @@ describe("printed character (demo package)", () => {
   });
 });
 
+describe("printed in French, Italian and Spanish: accents and ñ in every box and card", () => {
+  /** Letters the three languages write, and their punctuation; the fonts must have a glyph for each. */
+  const LETTERS = "àâäæçéèêëîïôœùûüÿÀÂÄÆÇÉÈÊËÎÏÔŒÙÛÜŸáíóúñÁÍÓÚÑìòÌÒ¿¡«»’“”–—…";
+  /** Accents on every vowel and on c and n, outside placeholders and glossary ids. */
+  const ACCENTS: Record<string, string> = {
+    a: "à",
+    e: "é",
+    i: "ï",
+    o: "ô",
+    u: "ù",
+    c: "ç",
+    n: "ñ",
+    E: "É",
+    A: "À",
+  };
+  const accented = (s: string) =>
+    s
+      .split(/(\{\{[^}]*\}\}|\[\[glossary:[^|\]]*\|)/u)
+      .map((part, i) => (i % 2 === 1 ? part : part.replace(/[aeioucnEA]/gu, (c) => ACCENTS[c]!)))
+      .join("");
+  /** The demo package with a text set in `language`: its English texts, every one full of accents. */
+  const inLanguage = (language: string): ContentPackage => {
+    const en = pkg.texts["en"]!;
+    const texts = Object.fromEntries(
+      Object.entries(en).map(([k, v]) => [
+        k,
+        typeof v === "string" ? accented(v) : Array.isArray(v) ? v.map(accented) : v,
+      ]),
+    ) as typeof en;
+    return {
+      ...pkg,
+      manifest: { ...pkg.manifest, languages: [...pkg.manifest.languages, language] },
+      texts: { ...pkg.texts, [language]: texts },
+    };
+  };
+
+  it("has a glyph for every letter in all three fonts", async () => {
+    const fontkit = await import("fontkit");
+    const { FONTS } = await import("./pen.ts");
+    const { fileURLToPath } = await import("node:url");
+    for (const [name, url] of Object.entries(FONTS)) {
+      const font = fontkit.openSync(fileURLToPath(url));
+      const missing = [...LETTERS].filter((c) => !font.hasGlyphForCodePoint(c.codePointAt(0)!));
+      expect(missing, name).toEqual([]);
+    }
+  });
+
+  it.each([
+    ["fr", "Page 1 sur", "Unités : "],
+    ["it", "Pagina 1 di", "Unità: "],
+    ["es", "Página 1 de", "Unidades: "],
+  ])(
+    "%s: the page words and the package's accented texts come out of the PDF whole",
+    async (language, page, units) => {
+      const p = inLanguage(language);
+      for (const design of ["verbose", "classic"]) {
+        const model = buildSheetModel(p, doc, { language, units: { length: "m" }, createdAt });
+        expect(model.cards.length).toBeGreaterThan(0);
+        const { text } = await extract(await renderPdf(model, { design }));
+        expect(text, design).toContain(page);
+        expect(text, design).toContain(units);
+        for (const c of model.cards) expect(text, `${design}: card ${c.name}`).toContain(c.name);
+        // Every box and every card: the accents are there, nothing fell back to a plain letter.
+        expect(text, design).toMatch(/[àéïôùçñ]/u);
+        expect(text, design).not.toContain("\uFFFD");
+      }
+    },
+  );
+});
+
 describe("what a game master would otherwise write on the sheet by hand (demo package)", () => {
   const section = <K extends SheetSection["kind"]>(model: SheetModel, id: string, kind: K) => {
     const s = model.sections.find((x) => x.id === id);

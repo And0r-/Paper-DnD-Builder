@@ -20,6 +20,7 @@
     "@builder/demo-package": "workspace:*",
     "@builder/format": "workspace:*",
     "@types/pdfkit": "^0.17.6",
+    "fontkit": "2.0.4",
     "pdfjs-dist": "^6.3.289"
   }
 }
