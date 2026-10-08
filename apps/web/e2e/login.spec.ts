@@ -117,6 +117,10 @@ for (const lang of ["de", "en"] as const) {
     await shot(page, `21-login-password-${lang}`);
     await page.waitForTimeout(500);
     await expect(page).toHaveURL(/\/login$/);
+    // Firefox offers to save only from a form the player typed into: the password shows in the register form.
+    const form = page.locator("form", { has: shown });
+    await expect(form.locator('input[autocomplete="username"]')).toHaveValue(name);
+    await expect(form.locator('input[autocomplete="new-password"]')).toHaveValue(password);
     // The button really sends the form, so browsers offer to save the password; the request carries nothing.
     const sent = page.waitForRequest((r) => new URL(r.url()).pathname === "/form-sent");
     await shown.getByRole("button", { name: m["password.done"] }).click();

@@ -60,17 +60,19 @@ export default function LoginPage() {
   const [sentAt, setSentAt] = useState(0);
   const [now, setNow] = useState(0);
   const [resent, setResent] = useState(false);
-  // A password just made: shown until the player says they have it. The
-  // account is taken over only then, so nothing moves on before.
-  // `back`: an account from before, not a new one.
-  const [fresh, setFresh] = useState<{ account: Account; secret: string; back: boolean }>();
+  // A password just made for an account from before: shown until the
+  // player says they have it. The account is taken over only then, so
+  // nothing moves on before.
+  const [fresh, setFresh] = useState<{ account: Account; secret: string }>();
+  // Registered: the password shows in the register form itself, which stays in its place (GetStarted).
+  const [registered, setRegistered] = useState(false);
   const whoRef = useRef<HTMLInputElement & HTMLTextAreaElement>(null);
   const emailRef = useRef<HTMLInputElement & HTMLTextAreaElement>(null);
   const passwordRef = useRef<HTMLInputElement & HTMLTextAreaElement>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
 
   usePageTitle([
-    fresh
+    fresh || registered
       ? t("password.title")
       : mode === "lost"
         ? t("login.lostTitle")
@@ -140,7 +142,7 @@ export default function LoginPage() {
       });
       if (r.password) {
         // An account from before: its old password was swapped for this one.
-        setFresh({ account: r.account, secret: r.password.secret, back: true });
+        setFresh({ account: r.account, secret: r.password.secret });
         setPassword("");
         focusHeading();
       } else {
@@ -254,7 +256,7 @@ export default function LoginPage() {
 
   return (
     <GuestShell>
-      <div className={`auth${!fresh && mode === "pair" ? " auth--pair" : ""}`}>
+      <div className={`auth${!fresh && !registered && mode === "pair" ? " auth--pair" : ""}`}>
         {/* The name explains itself where it is seen first, as in the top bar after login (AND-90). */}
         <p className="auth__brand">
           <Explained hint={t("app.about")}>
@@ -265,7 +267,7 @@ export default function LoginPage() {
         {fresh ? (
           <section className="auth__card" aria-labelledby="fresh-title">
             <h1 className="auth__title" id="fresh-title" tabIndex={-1} ref={headingRef}>
-              {t(fresh.back ? "password.welcomeBack" : "password.welcome", { name: fresh.account.name })}
+              {t("password.welcomeBack", { name: fresh.account.name })}
             </h1>
             <FreshPassword
               secret={fresh.secret}
@@ -279,18 +281,22 @@ export default function LoginPage() {
           </section>
         ) : mode === "pair" ? (
           <>
-            <h1 className="visually-hidden" tabIndex={-1} ref={headingRef}>
-              {t("login.haveTitle")} · {t("login.registerTitle")}
-            </h1>
-            <div className="auth__pair">
-              {loginForm}
+            {!registered && (
+              <h1 className="visually-hidden" tabIndex={-1} ref={headingRef}>
+                {t("login.haveTitle")} · {t("login.registerTitle")}
+              </h1>
+            )}
+            {/* Only the login form goes once registered: the register form must stay the same one. */}
+            <div className={registered ? undefined : "auth__pair"}>
+              {!registered && loginForm}
               <GetStarted
                 title={t("login.registerTitle")}
                 heading="h2"
                 intro={t("login.intro")}
-                onStarted={(r) => {
-                  setFresh({ account: r.account, secret: r.password.secret, back: false });
-                  focusHeading();
+                onStarted={() => setRegistered(true)}
+                onDone={(r) => {
+                  app.setAccount(r.account);
+                  router.replace(nextPath());
                 }}
               />
             </div>
