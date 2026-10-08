@@ -6,10 +6,13 @@
  */
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useId, useState, type ReactNode } from "react";
+import { useEffect, useId, useState, type ReactNode } from "react";
+import type { Campaign } from "../../../../src/ui/api.ts";
 import { useApp } from "../../../../src/ui/app-state.tsx";
+import { loadPlayedCampaigns, NO_CAMPAIGN } from "../../../../src/ui/campaigns.ts";
 import { Button, ButtonLink } from "../../../../src/ui/components/Button.tsx";
 import { Callout } from "../../../../src/ui/components/Feedback.tsx";
+import { SelectField } from "../../../../src/ui/components/Fields.tsx";
 import { RichText, useMeasure } from "../../../../src/ui/components/RichText.tsx";
 import { listNodes, ThingName } from "../../../../src/ui/components/ThingName.tsx";
 import { useDraft } from "../../../../src/ui/flow/draft-state.tsx";
@@ -76,6 +79,8 @@ export default function OverviewPage() {
           </p>
         </Callout>
       )}
+
+      <CampaignField />
 
       <section className="values" aria-labelledby={`${headingId}-values`}>
         <h2 className="section-title" id={`${headingId}-values`}>
@@ -193,6 +198,56 @@ export default function OverviewPage() {
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+/**
+ * Which campaign the character belongs to; its owner changes it here, saved
+ * at once. Shown only to an owner who plays in a campaign, or whose
+ * character is in one.
+ */
+function CampaignField() {
+  const { t } = useApp();
+  const { draft, setCampaign } = useDraft();
+  const [campaigns, setCampaigns] = useState<Campaign[]>();
+  const [busy, setBusy] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const owner = draft.access === "owner";
+
+  useEffect(() => {
+    if (!owner) return;
+    let live = true;
+    // Without the list there is nothing to choose from; the field stays away.
+    loadPlayedCampaigns().then(
+      (c) => live && setCampaigns(c),
+      () => undefined,
+    );
+    return () => {
+      live = false;
+    };
+  }, [owner]);
+
+  if (!owner || !campaigns || (campaigns.length === 0 && !draft.campaignId)) return null;
+  const known = campaigns.some((c) => c.id === draft.campaignId);
+  return (
+    <div className="overview-campaign">
+      <SelectField
+        label={t("overview.campaign")}
+        value={known ? draft.campaignId! : NO_CAMPAIGN}
+        busy={busy}
+        onChange={async (v) => {
+          setBusy(true);
+          setFailed(false);
+          setFailed(!(await setCampaign(v || null)));
+          setBusy(false);
+        }}
+        options={[
+          ...campaigns.map((c) => ({ value: c.id, label: c.name })),
+          { value: NO_CAMPAIGN, label: t("new.noCampaign") },
+        ]}
+      />
+      {failed && <Callout tone="warning">{t("save.error")}</Callout>}
     </div>
   );
 }

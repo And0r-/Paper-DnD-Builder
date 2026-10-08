@@ -43,6 +43,8 @@ export function draftView(row: ReachableDraftRow, pkg: ContentPackage | undefine
       level: row.document.level,
       /** The level a raise started from, until the character is finished again. */
       levelBefore: row.document.levelBefore ?? null,
+      /** The campaign the character belongs to; null for none. */
+      campaignId: row.campaign_id,
       answers: row.document.answers,
       createdAt: row.created_at.toISOString(),
       updatedAt: row.updated_at.toISOString(),
@@ -67,8 +69,8 @@ export function ownDraft(row: DraftRow, account: AccountRow): ReachableDraftRow 
 }
 
 /**
- * The draft of the URL, if the viewer may reach it: their own, or a
- * player's in a campaign they lead (see `Store.findReachableDraft`).
+ * The draft of the URL, if the viewer may reach it: their own, or one a
+ * player put into a campaign they lead (see `Store.findReachableDraft`).
  */
 /** A draft in a list: the draft's fields with `packageAvailable` and `summary`. */
 export function listEntry(app: App, row: ReachableDraftRow) {
@@ -148,15 +150,29 @@ function applyOrReject(pkg: ContentPackage, row: DraftRow, c: DraftChange) {
 export const newDraftSchema = z.strictObject({
   packageId: z.string().max(100),
   level: z.number().int().optional(),
+  /** A campaign the owner plays in; none if left out or null. */
+  campaignId: z.string().regex(UUID).nullable().optional(),
 });
 
-/** A new character for `owner`; a game master makes one for a player this way, too. */
+/**
+ * A new character for `owner`; a game master makes one for a player this
+ * way, too, and passes their campaign: the character belongs to it.
+ */
 export async function createDraft(
   ctx: RequestContext,
   owner: { id: string; email: string },
   access: ReachableDraftRow["access"],
+  ledCampaignId?: string,
 ): Promise<Response> {
   const body = await readJson(ctx.req, newDraftSchema);
+  let campaignId = body.campaignId ?? null;
+  if (ledCampaignId) {
+    if (campaignId && campaignId !== ledCampaignId) throw new HttpError(404, "campaignNotFound");
+    campaignId = ledCampaignId;
+  } else if (campaignId && !(await ctx.app.store.findPlayer(campaignId, owner.id))) {
+    // Only a campaign the owner plays in; any other looks missing.
+    throw new HttpError(404, "campaignNotFound");
+  }
   const pkg = ctx.app.packages.get(body.packageId);
   if (!pkg) throw new HttpError(404, "packageNotFound");
   const r = newDraft(pkg, body.level);
@@ -168,6 +184,7 @@ export async function createDraft(
     package_version: pkg.manifest.version,
     version: 1,
     document: r.doc,
+    campaign_id: campaignId,
     created_at: ctx.app.now(),
   });
   return json(201, draftView({ ...row, owner_email: owner.email, access }, pkg));
@@ -286,6 +303,23 @@ export const draftRoutes: Route[] = [
         if (!ev.complete) throw new HttpError(422, "incomplete", { open: ev.open });
         return { doc: row.document, finish: true };
       });
+    },
+  },
+  {
+    // The owner puts the character into a campaign they play in, or into
+    // none. The character itself does not change: its version stays.
+    method: "PUT",
+    path: "/api/drafts/:id/campaign",
+    handler: async (ctx) => {
+      const { row, viewer } = await loadDraft(ctx);
+      if (row.access !== "owner") throw new HttpError(403, "ownerOnly");
+      const body = await readJson(ctx.req, z.strictObject({ campaignId: z.string().regex(UUID).nullable() }));
+      const set = await ctx.app.store.setDraftCampaign(row.id, viewer.id, body.campaignId);
+      if (!set) throw new HttpError(404, "campaignNotFound");
+      return json(
+        200,
+        draftView({ ...row, campaign_id: body.campaignId }, ctx.app.packages.get(row.package_id)),
+      );
     },
   },
   {

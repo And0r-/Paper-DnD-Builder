@@ -501,6 +501,8 @@ async function walk(server: TestServer): Promise<void> {
   await call("GET", "/api/drafts", undefined, k);
   view = (await call("POST", `/api/drafts/${id}/level-up`, { version: view.draft.version, level: 4 }, k))
     .json;
+  await call("PUT", `/api/drafts/${id}/campaign`, { campaignId: null }, k);
+  await call("PUT", `/api/drafts/${id}/campaign`, { campaignId: "00000000-0000-4000-8000-000000000000" }, k);
   await call("DELETE", `/api/drafts/${id}`, undefined, k);
 
   // A campaign, led by the walker, with a player who has a character.
@@ -522,13 +524,16 @@ async function walk(server: TestServer): Promise<void> {
     email: "mate@example.org",
     password: passwordFromMail(server.mails, "mate@example.org"),
   });
-  const theirs = (await mate.call("POST", "/api/drafts", { packageId: "demo" })).json.draft.id;
+  const theirs = (await mate.call("POST", "/api/drafts", { packageId: "demo", campaignId: campaign.id })).json
+    .draft.id;
   await mate.call("GET", "/api/campaigns");
   await mate.call("GET", cp);
   await mate.call("PATCH", cp, { name: "Meine" });
   await call("GET", cp);
   await call("GET", `/api/drafts/${theirs}`, undefined, k);
   await call("DELETE", `/api/drafts/${theirs}`, undefined, k);
+  await call("PUT", `/api/drafts/${theirs}/campaign`, { campaignId: null }, k);
+  await call("POST", "/api/drafts", { packageId: "demo", campaignId: campaign.id }, k);
   await call("POST", `${cp}/players/${added.id}/drafts`, { packageId: "demo", level: 2 }, k);
   await call("POST", `${cp}/players/00000000-0000-4000-8000-000000000000/drafts`, { packageId: "demo" });
   await call("DELETE", `${cp}/players/00000000-0000-4000-8000-000000000000`);

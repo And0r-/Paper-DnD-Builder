@@ -28,6 +28,8 @@ export type DraftRow = {
   package_version: string;
   version: number;
   document: DraftDocument;
+  /** The campaign the character belongs to; null for none. */
+  campaign_id: string | null;
   finished_at: Date | null;
   created_at: Date;
   updated_at: Date;
@@ -62,6 +64,8 @@ export type CampaignRow = {
   game_master_email: string;
   /** Whether the viewer leads it; else the viewer plays in it. */
   leading: boolean;
+  /** When the viewer joined it as a player; null for the game master. */
+  joined_at: Date | null;
   player_count: number;
 };
 
@@ -103,7 +107,7 @@ export type CharacterStateRow = {
 const ACCESS_KEY_COLUMNS = "id, name, hint, created_at";
 const ACCOUNT_COLUMNS = "id, email, password_hash, language, units, print_choice, created_at";
 const DRAFT_COLUMNS =
-  "id, account_id, package_id, package_version, version, document, finished_at, created_at, updated_at";
+  "id, account_id, package_id, package_version, version, document, campaign_id, finished_at, created_at, updated_at";
 const COPY_ENTRY_COLUMNS =
   "id, draft_id, name, created_at, updated_at, from_level, from_changed_at, from_package_version, language, units, version";
 const COPY_COLUMNS = `${COPY_ENTRY_COLUMNS}, model`;
@@ -113,16 +117,18 @@ const DRAFT_COLUMNS_D = DRAFT_COLUMNS.split(", ")
 
 /**
  * The one rule of who may reach whose characters: the owner, and the game
- * master of a campaign the owner plays in. `$viewer` is the viewer's
- * account id, `d` the drafts row.
+ * master of the campaign the character belongs to, while the owner plays
+ * in it. A character in no campaign is the owner's alone. `$viewer` is the
+ * viewer's account id, `d` the drafts row.
  */
 const reachable = (viewer: string) => `(d.account_id = ${viewer} OR EXISTS (
   SELECT 1 FROM campaign_players p JOIN campaigns c ON c.id = p.campaign_id
-  WHERE p.account_id = d.account_id AND c.account_id = ${viewer}))`;
+  WHERE c.id = d.campaign_id AND p.account_id = d.account_id AND c.account_id = ${viewer}))`;
 
 /** A campaign as the viewer `$1` sees it; `c` the campaigns row. */
 const CAMPAIGN_SELECT = `SELECT c.id, c.name, c.created_at, gm.email AS game_master_email,
   c.account_id = $1 AS leading,
+  (SELECT j.added_at FROM campaign_players j WHERE j.campaign_id = c.id AND j.account_id = $1) AS joined_at,
   (SELECT count(*) FROM campaign_players n WHERE n.campaign_id = c.id)::int AS player_count
   FROM campaigns c JOIN accounts gm ON gm.id = c.account_id`;
 const VISIBLE_CAMPAIGN = `(c.account_id = $1 OR EXISTS (
@@ -276,10 +282,19 @@ export class Store {
 
   async createDraft(d: Omit<DraftRow, "finished_at" | "updated_at">): Promise<DraftRow> {
     const rows = await this.db.query<DraftRow>(
-      `INSERT INTO drafts (id, account_id, package_id, package_version, version, document, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $7)
+      `INSERT INTO drafts (id, account_id, package_id, package_version, version, document, campaign_id, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8, $8)
        RETURNING ${DRAFT_COLUMNS}`,
-      [d.id, d.account_id, d.package_id, d.package_version, d.version, d.document, d.created_at],
+      [
+        d.id,
+        d.account_id,
+        d.package_id,
+        d.package_version,
+        d.version,
+        d.document,
+        d.campaign_id,
+        d.created_at,
+      ],
     );
     return rows[0]!;
   }
@@ -321,6 +336,23 @@ export class Store {
       [id, accountId, expectedVersion, next.document, next.finishedAt, next.packageVersion, next.now],
     );
     return rows[0];
+  }
+
+  /**
+   * Puts the owner's character into a campaign they play in, or into none
+   * (`campaignId` null). Returns false if the draft is not theirs or they
+   * do not play in that campaign. Not a change of the character itself:
+   * its version stays.
+   */
+  async setDraftCampaign(id: string, accountId: string, campaignId: string | null): Promise<boolean> {
+    const rows = await this.db.query(
+      `UPDATE drafts SET campaign_id = $3
+       WHERE id = $1 AND account_id = $2 AND ($3::uuid IS NULL OR EXISTS (
+         SELECT 1 FROM campaign_players p WHERE p.campaign_id = $3 AND p.account_id = $2))
+       RETURNING id`,
+      [id, accountId, campaignId],
+    );
+    return rows.length > 0;
   }
 
   async deleteDraft(id: string, accountId: string): Promise<boolean> {
@@ -413,21 +445,31 @@ export class Store {
     return rows.length > 0 || (await this.findPlayer(campaignId, accountId)) !== undefined;
   }
 
+  /**
+   * Removes a player; their characters in this campaign go back to none, so
+   * they stay private when the player joins again.
+   */
   async removePlayer(campaignId: string, accountId: string): Promise<boolean> {
     const rows = await this.db.query(
-      "DELETE FROM campaign_players WHERE campaign_id = $1 AND account_id = $2 RETURNING account_id",
+      `WITH removed AS (
+         DELETE FROM campaign_players WHERE campaign_id = $1 AND account_id = $2 RETURNING account_id
+       ), released AS (
+         UPDATE drafts SET campaign_id = NULL
+         WHERE campaign_id = $1 AND account_id IN (SELECT account_id FROM removed)
+       )
+       SELECT account_id FROM removed`,
       [campaignId, accountId],
     );
     return rows.length > 0;
   }
 
-  /** Every character of the campaign's players, newest first. */
+  /** The players' characters that belong to the campaign, newest first. */
   async listCampaignDrafts(campaignId: string): Promise<ReachableDraftRow[]> {
     return this.db.query<ReachableDraftRow>(
       `SELECT ${DRAFT_COLUMNS_D}, o.email AS owner_email, 'gameMaster' AS access
-       FROM drafts d JOIN campaign_players p ON p.account_id = d.account_id
+       FROM drafts d JOIN campaign_players p ON p.account_id = d.account_id AND p.campaign_id = d.campaign_id
        JOIN accounts o ON o.id = d.account_id
-       WHERE p.campaign_id = $1 ORDER BY d.updated_at DESC, d.id`,
+       WHERE d.campaign_id = $1 ORDER BY d.updated_at DESC, d.id`,
       [campaignId],
     );
   }

@@ -1529,3 +1529,22 @@
 .print-version__select {
   max-width: 100%;
 }
+
+/* The character's campaign on the overview (AND-231): one field, not a section. */
+.overview-campaign {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  max-width: 28rem;
+}
+
+/* The campaign question before a new character (AND-231). */
+.new-campaign {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.new-campaign .field {
+  max-width: 28rem;
+}

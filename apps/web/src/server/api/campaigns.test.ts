@@ -1,7 +1,8 @@
 /**
  * Campaigns: three people on every route. The game master leads the
  * campaign, the player plays in it, the stranger has nothing to do with
- * it. The game master reaches the player's characters; the player sees
+ * it. The game master reaches the player's characters in the campaign
+ * (a character in none stays private); the player sees
  * only their own; the stranger gets 404 everywhere, as for something
  * that does not exist. And what deleting either account leaves behind.
  */
@@ -38,8 +39,8 @@ beforeEach(async () => {
   expect((await player.call("POST", "/api/auth/login", { email: PLAYER, password })).status).toBe(200);
 });
 
-const newDraft = async (c: Client) => {
-  const res = await c.call("POST", "/api/drafts", { packageId: "demo" });
+const newDraft = async (c: Client, campaign?: string) => {
+  const res = await c.call("POST", "/api/drafts", { packageId: "demo", campaignId: campaign });
   expect(res.status).toBe(201);
   return res.json.draft as { id: string; version: number };
 };
@@ -152,15 +153,17 @@ describe("who sees what", () => {
         gameMaster: { email: GM },
         playerCount: 1,
         createdAt: "2026-10-04T10:00:00.000Z",
+        joinedAt: null,
       },
     ]);
     const plays = (await player.call("GET", "/api/campaigns")).json.campaigns;
-    expect(plays).toEqual([{ ...lead[0], role: "player" }]);
+    expect(plays).toEqual([{ ...lead[0], role: "player", joinedAt: "2026-10-04T10:00:00.000Z" }]);
     expect((await stranger.call("GET", "/api/campaigns")).json.campaigns).toEqual([]);
   });
 
   it("shows a campaign: players and characters to the game master, nothing of others to the player", async () => {
-    const mine = await newDraft(player);
+    const mine = await newDraft(player, campaignId);
+    await newDraft(player);
     const view = (await gm.call("GET", `/api/campaigns/${campaignId}`)).json;
     expect(view.players).toMatchObject([
       {
@@ -218,7 +221,7 @@ describe("who sees what", () => {
   });
 
   it("checks every draft route for all three on a player's character", async () => {
-    const d = await newDraft(player);
+    const d = await newDraft(player, campaignId);
     const p = `/api/drafts/${d.id}`;
 
     // The stranger: 404 on everything, as if it did not exist.
@@ -317,23 +320,47 @@ describe("who sees what", () => {
     expect((await player.call("GET", "/api/drafts")).json.drafts).toMatchObject([{ id, access: "owner" }]);
   });
 
-  it("ends the game master's reach the moment a player is removed or leaves", async () => {
-    const d = await newDraft(player);
+  it("keeps a player's character in no campaign, or in another, from the game master", async () => {
+    const none = await newDraft(player);
+    const other = (await gm.call("POST", "/api/campaigns", { name: "Zweite Runde" })).json.campaign.id;
+    await gm.call("POST", `/api/campaigns/${other}/players`, { email: PLAYER });
+    const elsewhere = await newDraft(player, other);
+    // Same game master, but the character is not in this campaign: it shows only there.
+    const view = (await gm.call("GET", `/api/campaigns/${campaignId}`)).json;
+    expect(view.players[0].characters).toEqual([]);
+    expect((await gm.call("GET", `/api/drafts/${none.id}`)).status).toBe(404);
+    expect((await gm.call("GET", `/api/drafts/${elsewhere.id}`)).status).toBe(200);
+
+    // Moved into the campaign later, it is reached; moved out, no longer.
+    await player.call("PUT", `/api/drafts/${none.id}/campaign`, { campaignId });
+    expect((await gm.call("GET", `/api/drafts/${none.id}`)).status).toBe(200);
+    await player.call("PUT", `/api/drafts/${none.id}/campaign`, { campaignId: null });
+    expect((await gm.call("GET", `/api/drafts/${none.id}`)).status).toBe(404);
+  });
+
+  it("ends the game master's reach the moment a player leaves or is removed; the character goes private", async () => {
+    const d = await newDraft(player, campaignId);
     expect((await gm.call("GET", `/api/drafts/${d.id}`)).status).toBe(200);
     expect((await player.call("DELETE", `/api/campaigns/${campaignId}/players/me`)).status).toBe(204);
     expect((await gm.call("GET", `/api/drafts/${d.id}`)).status).toBe(404);
     expect((await player.call("GET", `/api/campaigns/${campaignId}`)).status).toBe(404);
-    // The character stays with the player.
-    expect((await player.call("GET", `/api/drafts/${d.id}`)).status).toBe(200);
+    // The character stays with the player, in no campaign.
+    const after = await player.call("GET", `/api/drafts/${d.id}`);
+    expect(after.status).toBe(200);
+    expect(after.json.draft.campaignId).toBeNull();
 
+    // Joining again does not bring it back; the player puts it in again.
     await gm.call("POST", `/api/campaigns/${campaignId}/players`, { email: PLAYER });
+    expect((await gm.call("GET", `/api/drafts/${d.id}`)).status).toBe(404);
+    await player.call("PUT", `/api/drafts/${d.id}/campaign`, { campaignId });
     expect((await gm.call("GET", `/api/drafts/${d.id}`)).status).toBe(200);
     expect((await gm.call("DELETE", `/api/campaigns/${campaignId}/players/${playerId}`)).status).toBe(204);
     expect((await gm.call("GET", `/api/drafts/${d.id}`)).status).toBe(404);
+    expect((await player.call("GET", `/api/drafts/${d.id}`)).json.draft.campaignId).toBeNull();
   });
 
   it("gives an access key the same rights as the screen", async () => {
-    const d = await newDraft(player);
+    const d = await newDraft(player, campaignId);
     const key = (await gm.call("POST", "/api/account/keys", { name: "Laptop" })).json.key.secret;
     const res = await server.fetch(
       new Request(`http://builder.test/api/drafts/${d.id}`, { headers: { authorization: `Bearer ${key}` } }),
@@ -345,6 +372,63 @@ describe("who sees what", () => {
       }),
     );
     expect((await list.json()).players).toHaveLength(1);
+  });
+});
+
+describe("a character's campaign", () => {
+  it("is chosen when the character is made: only a campaign the owner plays in", async () => {
+    const none = await newDraft(player);
+    expect(none).toMatchObject({ campaignId: null });
+    const res = await player.call("POST", "/api/drafts", { packageId: "demo", campaignId });
+    expect(res.status).toBe(201);
+    expect(res.json.draft.campaignId).toBe(campaignId);
+
+    // The game master leads it but does not play in it; the stranger knows nothing of it.
+    for (const c of [gm, stranger]) {
+      const refused = await c.call("POST", "/api/drafts", { packageId: "demo", campaignId });
+      expect(refused.status).toBe(404);
+      expect(refused.json.error.code).toBe("campaignNotFound");
+    }
+    expect((await player.call("POST", "/api/drafts", { packageId: "demo", campaignId: "x" })).status).toBe(
+      400,
+    );
+  });
+
+  it("is the game master's campaign when they build for a player", async () => {
+    const path = `/api/campaigns/${campaignId}/players/${playerId}/drafts`;
+    const made = await gm.call("POST", path, { packageId: "demo" });
+    expect(made.json.draft).toMatchObject({ campaignId, owner: { email: PLAYER } });
+    const other = await player.call("POST", "/api/campaigns", { name: "Andere Runde" });
+    const refused = await gm.call("POST", path, { packageId: "demo", campaignId: other.json.campaign.id });
+    expect(refused.status).toBe(404);
+  });
+
+  it("is changed later by the owner alone, without a new version", async () => {
+    const d = await newDraft(player);
+    const path = `/api/drafts/${d.id}/campaign`;
+    const set = await player.call("PUT", path, { campaignId });
+    expect(set.status).toBe(200);
+    expect(set.json.draft).toMatchObject({ campaignId, version: d.version });
+    expect((await player.call("GET", `/api/drafts/${d.id}`)).json.draft.campaignId).toBe(campaignId);
+
+    const gmTry = await gm.call("PUT", path, { campaignId: null });
+    expect(gmTry.status).toBe(403);
+    expect((await stranger.call("PUT", path, { campaignId: null })).status).toBe(404);
+    // A campaign the player does not play in.
+    const other = (await gm.call("POST", "/api/campaigns", { name: "Zweite Runde" })).json.campaign.id;
+    const notIn = await player.call("PUT", path, { campaignId: other });
+    expect(notIn.status).toBe(404);
+    expect(notIn.json.error.code).toBe("campaignNotFound");
+
+    const cleared = await player.call("PUT", path, { campaignId: null });
+    expect(cleared.json.draft.campaignId).toBeNull();
+  });
+
+  it("is none once the campaign is deleted; the character stays", async () => {
+    const res = await player.call("POST", "/api/drafts", { packageId: "demo", campaignId });
+    expect((await gm.call("DELETE", `/api/campaigns/${campaignId}`)).status).toBe(204);
+    const after = await player.call("GET", `/api/drafts/${res.json.draft.id}`);
+    expect(after.json.draft.campaignId).toBeNull();
   });
 });
 

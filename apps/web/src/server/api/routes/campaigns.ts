@@ -1,8 +1,9 @@
 /**
  * Campaigns. Whoever makes one leads it (the game master) and adds players
- * by mail address. The game master reaches every character of the players
- * (open, change, print, make a new one for a player); the characters stay
- * the players'. A player sees the campaigns they are in and who leads
+ * by mail address. The game master reaches the players' characters that
+ * belong to the campaign (open, change, print, make a new one for a
+ * player); the characters stay the players'. A character in no campaign,
+ * or in another one, stays private. A player sees the campaigns they are in and who leads
  * them, nothing of the other players. Anyone else sees nothing: a campaign
  * they are not in answers 404, exactly like a missing one.
  *
@@ -39,6 +40,8 @@ const publicCampaign = (c: CampaignRow) => ({
   gameMaster: { email: c.game_master_email },
   playerCount: c.player_count,
   createdAt: c.created_at.toISOString(),
+  /** When the viewer joined as a player; null for the game master. */
+  joinedAt: c.joined_at?.toISOString() ?? null,
 });
 
 const publicPlayer = (p: PlayerRow) => ({ id: p.id, email: p.email, addedAt: p.added_at.toISOString() });
@@ -95,7 +98,7 @@ export const campaignRoutes: Route[] = [
     },
   },
   {
-    // The game master gets the players with all their characters; a player gets `players: null`.
+    // The game master gets the players with their characters in this campaign; a player gets `players: null`.
     method: "GET",
     path: "/api/campaigns/:id",
     handler: async (ctx) => {
@@ -180,7 +183,7 @@ export const campaignRoutes: Route[] = [
   },
   {
     // The game master removes a player; a player leaves with `me` as the id.
-    // The player's characters stay theirs; the game master no longer reaches them.
+    // The player's characters stay theirs and leave the campaign; the game master no longer reaches them.
     method: "DELETE",
     path: "/api/campaigns/:id/players/:playerId",
     handler: async (ctx) => {
@@ -201,8 +204,8 @@ export const campaignRoutes: Route[] = [
     method: "POST",
     path: "/api/campaigns/:id/players/:playerId/drafts",
     handler: async (ctx) => {
-      const { player } = await loadPlayer(ctx);
-      return createDraft(ctx, player, "gameMaster");
+      const { campaign, player } = await loadPlayer(ctx);
+      return createDraft(ctx, player, "gameMaster", campaign.id);
     },
   },
 ];
