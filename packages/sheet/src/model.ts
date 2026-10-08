@@ -17,9 +17,11 @@ import {
   effectiveUnits,
   explainValue,
   formatMeasure,
+  headTracks,
   renderText,
   selectThings,
   summarize,
+  tracksText,
   type ChoiceState,
   type DraftDocument,
   type Evaluation,
@@ -331,7 +333,8 @@ export function buildSheetModel(
   for (const [k, v] of Object.entries(summary.line)) {
     if (v === null) lineVars[k] = "";
     else if (typeof v === "number") lineVars[k] = v;
-    else lineVars[k] = thingName(v);
+    else if (typeof v === "string") lineVars[k] = thingName(v);
+    else lineVars[k] = tracksText(v, thingName, (n) => numberFormat.format(n));
   }
   const levelLabel = `${text("level.name")} ${numberFormat.format(ev.level)}`;
   const packageName = text("package.name");
@@ -368,9 +371,13 @@ export function buildSheetModel(
                   .map((t) => thingName(t.id))
                   .join(", "),
               };
-            // `{ tracks }` prints the first track only until the core counts levels per track (AND-248).
-            const choice = "choice" in f ? f.choice : (pkg.flow.level.tracks?.choice ?? "");
-            return { label: text(f.label ?? `choice.${choice}.title`), text: answerText(choice) };
+            if ("choice" in f)
+              return { label: text(f.label ?? `choice.${f.choice}.title`), text: answerText(f.choice) };
+            // The tracks with their levels, "A 3 / B 2" (SPEC 9.7); labelled like the tracks choice.
+            return {
+              label: text(f.label ?? `choice.${pkg.flow.level.tracks?.choice ?? ""}.title`),
+              text: tracksText(headTracks(ev), thingName, (n) => numberFormat.format(n)),
+            };
           }),
         };
       case "statBoxes": {

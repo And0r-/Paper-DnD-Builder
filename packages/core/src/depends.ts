@@ -5,7 +5,7 @@
  * in pencil knows what else to change.
  */
 import { collectRefs, parseExpr, type ContentPackage } from "@builder/format/pure";
-import type { Evaluation } from "./evaluate.ts";
+import { grantAppliesFrom, type Evaluation } from "./evaluate.ts";
 
 /**
  * For each value (and `level`) that others are made from: every value that
@@ -15,7 +15,7 @@ import type { Evaluation } from "./evaluate.ts";
  */
 export function dependentValues(
   pkg: ContentPackage,
-  ev: Pick<Evaluation, "things" | "level">,
+  ev: Pick<Evaluation, "things" | "level" | "tracks">,
 ): Record<string, string[]> {
   /** value → values it is made from */
   const uses = new Map<string, Set<string>>();
@@ -29,11 +29,12 @@ export function dependentValues(
   for (const v of pkg.values) {
     if (v.formula !== undefined) add(v.id, refsOf(v.formula));
     else if (v.byLevel !== undefined) add(v.id, ["level"]);
+    else if (v.byValue !== undefined) add(v.id, [v.byValue]);
   }
   const things = new Map(pkg.things.map((t) => [t.id, t]));
   for (const h of ev.things) {
     for (const g of things.get(h.id)?.grants ?? []) {
-      if (g.value === undefined || g.add === undefined || (g.atLevel ?? 1) > ev.level) continue;
+      if (g.value === undefined || g.add === undefined || grantAppliesFrom(ev, h, g) === undefined) continue;
       if (typeof g.add === "string") add(g.value, refsOf(g.add));
       else if (typeof g.add === "object") add(g.value, ["level"]);
     }
