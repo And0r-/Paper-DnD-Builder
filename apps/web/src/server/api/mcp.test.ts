@@ -439,9 +439,9 @@ describe("the HTTP server: a key per request, nothing kept between requests", ()
 });
 
 /**
- * The demo package with its callings as tracks (package format SPEC 9.7),
- * named with their levels in the summary line; the river runner needs more
- * grace than the demo's scores give.
+ * The demo package (its callings are tracks, package format SPEC 9.7) with
+ * the callings and their levels in the summary line; the river runner needs
+ * more grace than the demo's scores give.
  */
 async function demoWithTracksDir(): Promise<string> {
   const dir = await mkdtemp(path.join(tmpdir(), "demo-tracks-"));
@@ -457,7 +457,6 @@ async function demoWithTracksDir(): Promise<string> {
     await writeFile(path.join(dir, file), JSON.stringify(json));
   };
   await edit("flow.json", (flow) => {
-    flow.level.tracks = { choice: "calling", addRequiresCurrent: true };
     flow.summary.line.calling = { tracks: true };
   });
   await edit("things/callings-and-paths.json", (things) => {
@@ -467,7 +466,7 @@ async function demoWithTracksDir(): Promise<string> {
     ["en", "Needs grace 30 or more."],
     ["de", "Braucht Geschick 30 oder mehr."],
   ])
-    await edit(`texts/${language}/core.json`, (texts) => {
+    await edit(`texts/${language}/tracks.json`, (texts) => {
       texts.entries["calling.river-runner.addReason"] = reason;
     });
   return dir;
@@ -490,6 +489,13 @@ describe("tracks over MCP", () => {
         answer: { pick: "calling.lantern-bearer" },
       });
       expect(calling.isError, JSON.stringify(calling.data)).toBeFalsy();
+      // Wit 10, so the herbalist can be added later.
+      const scores = await call("set_answer", {
+        characterId,
+        choice: "scores",
+        answer: { method: 0, assign: { mightBase: 8, graceBase: 6, witBase: 10, heartBase: 12 } },
+      });
+      expect(scores.isError, JSON.stringify(scores.data)).toBeFalsy();
       await answerAllOpen(call, characterId);
       expect((await call("finish_character", { characterId })).data).toMatchObject({ done: true, level: 3 });
 
@@ -511,11 +517,12 @@ describe("tracks over MCP", () => {
       const raised = await call("level_up", { characterId, level: 4, tracks: ["calling.herbalist"] });
       expect(raised.isError, JSON.stringify(raised.data)).toBeFalsy();
       expect(raised.data.raised).toEqual({ from: 3, to: 4 });
-      // The herbalist's choices come as copies of their own (a flow step of the demo for herbalists too).
       const fresh = raised.data.toAnswer
         .filter((c: { new?: true }) => c.new)
         .map((c: { choice: string }) => c.choice);
-      expect(fresh).toContain("talents-herbalist@calling.herbalist");
+      // An added herbalist picks one talent of its own, not the first calling's talents.
+      expect(fresh).toContain("added-talent-herbalist@calling.herbalist");
+      expect(fresh).not.toContain("talents-herbalist@calling.herbalist");
       expect(fresh.every((c: string) => c.endsWith("@calling.herbalist"))).toBe(true);
       await answerAllOpen(call, characterId);
       expect((await call("finish_character", { characterId })).data).toMatchObject({ done: true, level: 4 });
@@ -539,7 +546,7 @@ describe("tracks over MCP", () => {
       expect(back.isError, JSON.stringify(back.data)).toBeFalsy();
       const again = await call("get_character", { characterId });
       expect(again.data.answered.map((a: { choice: string }) => a.choice)).toContain(
-        "talents-herbalist@calling.herbalist",
+        "added-talent-herbalist@calling.herbalist",
       );
     } finally {
       await rm(dir, { recursive: true, force: true });

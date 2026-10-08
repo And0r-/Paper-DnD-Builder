@@ -16,7 +16,13 @@ import {
   type SheetModel,
   type SheetSection,
 } from "@builder/sheet";
-import { demoCharacter, demoWithTracks, loadDemoPackage, raisedCharacter } from "@builder/sheet/testing";
+import {
+  demoCharacter,
+  demoExample,
+  demoWithTracksHead,
+  loadDemoPackage,
+  raisedCharacter,
+} from "@builder/sheet/testing";
 import { CLASSIC_GEOMETRY, classicPlan, firstColumns } from "@builder/sheet/designs/classic";
 import { columnWidth } from "@builder/sheet/designs";
 import { VERBOSE_GEOMETRY } from "@builder/sheet/designs/verbose";
@@ -750,7 +756,8 @@ describe("printed character (demo package)", () => {
     const low = await print("de", {}, pkg, level2);
     const ids = pkg.sheet.sections
       .map((s) => s.id)
-      .filter((id) => !["path", "lantern-slots-high", "mastery", "practice"].includes(id));
+      // A lantern bearer has no current slots (the river runner's own, format 0.21).
+      .filter((id) => !["path", "lantern-slots-high", "mastery", "practice", "current-slots"].includes(id));
     expect(low.model.sections.map((s) => s.id)).toEqual(ids);
     expect(low.pdf.sheetLayout.flat().map((p) => p.section.id)).toEqual(ids);
     expect(low.extracted.pageTexts.slice(0, low.pdf.sheetPages).join("\n")).not.toContain(title);
@@ -810,7 +817,7 @@ describe("printed character (demo package)", () => {
       ["Rang 9", 2],
     ]);
     const sheet = extracted.pageTexts.slice(0, pdf.sheetPages).join("\n");
-    expect(sheet).toContain("LATERNEN-PLÄTZE, HOHE RÄNGE");
+    expect(sheet).toContain("LICHT-PLÄTZE, HOHE RÄNGE");
 
     // At level 5 only ranks 1 to 3 have slots; the high row is not printed at all.
     const low = buildSheetModel(pkg, demoCharacter(pkg, 5), { language: "de", createdAt });
@@ -1754,8 +1761,8 @@ describe("the PDF made from the sheet model", () => {
   // or the demo package changes these: then check the sample PDFs and
   // update them.
   const before = {
-    de: { pages: 4, sha256: "559ae326dfbacf68d4996b541a39b038145ab0e79670e9bb773e15eaa16aa6d3" },
-    en: { pages: 4, sha256: "31cb3b7dd97a2281b77342cc7170b6069c7bfb2ece26e6c71f63e07549cb90ed" },
+    de: { pages: 4, sha256: "1344046e5be4dbd4cb8c27af4e93204d6b0c09927ca7b6677ef6789c6a3564c4" },
+    en: { pages: 4, sha256: "8343d2ca33f1b5f19798f457a575276a3154fbbba897fd7882fd056a475008fd" },
   };
 
   it("is unchanged for the level 20 demo character with cards", async () => {
@@ -1923,7 +1930,7 @@ describe("the verbose design: original and copy, empty and filled", () => {
 
   it("prints the sheet alone within its page targets, in one language and its units, never below 7 pt", async () => {
     for (const [doc, pages] of [
-      [river3(), 2],
+      [river3(), 3],
       [lantern20(), 3],
     ] as const) {
       for (const [language, other, units, unitsLine] of [
@@ -1934,7 +1941,7 @@ describe("the verbose design: original and copy, empty and filled", () => {
         const pdf = await renderPdf(model, sheetOnly);
         const { text, pageTexts, minFontSize } = await extract(pdf);
         const what = `level ${model.level} ${language}`;
-        // The sketch: two pages without slots, three with nine ranks of them; the plan allows five.
+        // The sketch: three pages with slots (the river runner has its own since format 0.21); the plan allows five.
         expect(pdf.pages, what).toBe(pages);
         expect(pdf.pages).toBeLessThanOrEqual(5);
         expect(minFontSize, what).toBeGreaterThanOrEqual(6.99);
@@ -2269,7 +2276,8 @@ describe("the classic design: original and copy, empty and filled", () => {
       expect(apart.size).toBeGreaterThan(0);
       const last = new Set(pdf.sheetLayout.at(-1)!.map((p) => p.section.id));
       if (plan.apartPage) {
-        expect(last).toEqual(apart);
+        // A short apart part (under 40 % of a page) may go under the last page's end instead.
+        for (const id of apart) expect(last.has(id), id).toBe(true);
         for (const page of pdf.sheetLayout.slice(0, -1)) {
           for (const p of page) expect(apart.has(p.section.id), p.section.id).toBe(false);
         }
@@ -2383,7 +2391,9 @@ describe("the classic design: original and copy, empty and filled", () => {
   });
 
   it("lets notes that end the sheet shrink to the room left rather than take a page alone", async () => {
-    const base = buildSheetModel(pkg, river3(), { language: "de", createdAt });
+    const river = buildSheetModel(pkg, river3(), { language: "de", createdAt });
+    // Without the river runner's own slots, the notes end the sheet: no apart part goes under them.
+    const base = { ...river, sections: river.sections.filter((s) => s.id !== "current-slots") };
     const notes = base.sections.find((s) => s.kind === "notes");
     if (notes?.kind !== "notes") throw new Error("no notes");
     expect(notes.lines).toBeGreaterThan(2);
@@ -2512,17 +2522,13 @@ describe("the classic design: original and copy, empty and filled", () => {
 
 describe("a character with two tracks", () => {
   it("prints the callings with their levels in the head, and each knack card with its calling's numbers", async () => {
-    const tracked = demoWithTracks(pkg);
-    const two = demoCharacter(tracked, 5, "Mira Fennwick", "calling.lantern-bearer", [
-      "calling.lantern-bearer",
-      "calling.herbalist",
-      "calling.herbalist",
-      "calling.herbalist",
-    ]);
+    // The demo's example: lantern bearer 3 / herbalist 2.
+    const tracked = demoWithTracksHead(pkg);
+    const two = await demoExample("lantern-herbalist");
     const model = buildSheetModel(tracked, two, { language: "de", createdAt });
     const pdf = await renderPdf(model);
     const { text, pageTexts } = await extract(pdf);
-    expect(pageTexts[0]).toContain("Kräuterkundige 3 / Laternenträgerin 2");
+    expect(pageTexts[0]).toContain("Laternenträgerin 3 / Kräuterkundige 2");
     for (const card of model.cards.filter((c) => c.origin)) expect(text).toContain(card.origin!.value);
     if (process.env["PRINT_SAMPLE_OUT"]) writeFileSync(process.env["PRINT_SAMPLE_OUT"], pdf.bytes);
   });

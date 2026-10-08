@@ -461,14 +461,12 @@ async function walk(server: TestServer): Promise<void> {
     { version: view.draft.version, answer: { pick: "x" } },
     k,
   );
-  // The demo package has no tracks: only "every level in the first" fits.
-  view = (await call("PUT", `/api/drafts/${id}/tracks`, { version: view.draft.version, tracks: [] }, k)).json;
-  await call(
-    "PUT",
-    `/api/drafts/${id}/tracks`,
-    { version: view.draft.version, tracks: ["calling.herbalist"] },
-    k,
-  );
+  // Level 2 to the herbalist, then every level back in the first calling; a knack carries no levels.
+  const tracks = async (list: string[]) =>
+    call("PUT", `/api/drafts/${id}/tracks`, { version: view.draft.version, tracks: list }, k);
+  view = (await tracks(["calling.herbalist"])).json;
+  await tracks(["knack.eddy"]);
+  view = (await tracks([])).json;
   await call("POST", `/api/drafts/${id}/finish`, { version: view.draft.version }, k);
   await call("POST", `/api/drafts/${id}/level-up`, { version: view.draft.version, level: 4 }, k);
   await call("GET", `/api/drafts/${id}/pdf`, undefined, k);
