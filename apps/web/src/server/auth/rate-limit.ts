@@ -72,13 +72,19 @@ const MINUTE = 60_000;
 /**
  * Limits used by the login. Failed logins are counted per IP; failed logins
  * with an old password (address and password) per address too. New
- * accounts are counted per IP.
+ * accounts are counted per IP. Mails with a way back in are counted per
+ * address and per IP, whether the address has an account or not.
  */
 export const LIMITS = {
   loginFailuresPerAccount: { max: 10, windowMs: 15 * MINUTE },
   loginFailuresPerIp: { max: 30, windowMs: 15 * MINUTE },
   // A family or a club behind one address signs up together; a script does not get far.
   signupsPerIp: { max: 10, windowMs: 60 * MINUTE },
+  // Enough to ask again when a mail is slow; not enough to flood a mailbox.
+  resetMailsPerAddress: { max: 3, windowMs: 60 * MINUTE },
+  resetMailsPerIp: { max: 10, windowMs: 60 * MINUTE },
+  // A token has 256 bits; this only keeps a guessing loop from costing the server anything.
+  resetUsesPerIp: { max: 20, windowMs: 15 * MINUTE },
   // A game master adds a group at a time; a loop cannot turn the builder into a mail cannon.
   invitationsPerAccount: { max: 30, windowMs: 60 * MINUTE },
   invitationMailsPerAddress: { max: 5, windowMs: 60 * MINUTE },

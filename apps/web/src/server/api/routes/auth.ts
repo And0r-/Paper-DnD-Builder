@@ -6,7 +6,9 @@ import {
   nameSchema,
   passwordInputSchema,
   publicAccount,
+  requestReset,
   signup,
+  useReset,
 } from "../../auth/accounts.ts";
 import { clearSessionCookie, readSessionToken, sessionCookie, sessionId } from "../../auth/session.ts";
 import type { PasswordRow } from "../../store.ts";
@@ -73,6 +75,34 @@ export const authRoutes: Route[] = [
         200,
         { account: publicAccount(account), password: freshPassword(password) },
         { "Set-Cookie": sessionCookie(token, app.config.secureCookies) },
+      );
+    },
+  },
+  {
+    // A link back in to every account with this address. The same answer whether one has it or not.
+    method: "POST",
+    path: "/api/auth/reset",
+    handler: async ({ app, req }) => {
+      const body = await readJson(
+        req,
+        z.strictObject({ email: emailSchema, language: z.string().max(10).optional() }),
+      );
+      await requestReset(app, body.email, body.language, clientIp(req));
+      return json(202, { status: "sent" });
+    },
+  },
+  {
+    // Uses a link back in, once: a new password, shown here, and a session.
+    method: "POST",
+    path: "/api/auth/reset/use",
+    handler: async ({ app, req }) => {
+      // A string that is no token is simply not found, like a used one.
+      const body = await readJson(req, z.strictObject({ token: z.string().max(100) }));
+      const { account, password, session } = await useReset(app, body.token, clientIp(req));
+      return json(
+        200,
+        { account: publicAccount(account), password: freshPassword(password) },
+        { "Set-Cookie": sessionCookie(session, app.config.secureCookies) },
       );
     },
   },

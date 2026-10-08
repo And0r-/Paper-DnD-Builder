@@ -20,6 +20,7 @@ import { Passwords } from "../../src/ui/components/Passwords.tsx";
 import { AppShell } from "../../src/ui/components/Shell.tsx";
 import { usePageTitle } from "../../src/ui/flow/frame.tsx";
 import { RequireAccount } from "../../src/ui/guards.tsx";
+import { RESEND_AFTER_S, resetLinkError, sendResetLink } from "../../src/ui/reset-link.ts";
 import { measureContext, ptext } from "../../src/ui/package-text.ts";
 import { loadPackage, loadPackageList, type LoadedPackage } from "../../src/ui/packages.ts";
 
@@ -239,6 +240,35 @@ function Identity({ account }: { account: Account }) {
   const [error, setError] = useState<string>();
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<string>();
+  // "Test: send a link": only for the saved address, with the same wait as on the login screen.
+  const saved = app.account?.email ?? account.email;
+  const [testBusy, setTestBusy] = useState(false);
+  const [testError, setTestError] = useState<string>();
+  const [testSentAt, setTestSentAt] = useState(0);
+  const [now, setNow] = useState(0);
+  const wait = testSentAt ? Math.max(0, RESEND_AFTER_S - Math.floor((now - testSentAt) / 1000)) : 0;
+
+  useEffect(() => {
+    if (!testSentAt) return;
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [testSentAt]);
+
+  const test = async () => {
+    if (!saved || wait > 0) return;
+    setTestError(undefined);
+    setTestBusy(true);
+    try {
+      await sendResetLink(saved, app.lang);
+      setTestSentAt(Date.now());
+      setNow(Date.now());
+      setToast(t("settings.resetTestSent"));
+    } catch (err) {
+      setTestError(resetLinkError(err, app));
+    } finally {
+      setTestBusy(false);
+    }
+  };
 
   const save = async (e: FormEvent) => {
     e.preventDefault();
@@ -310,6 +340,28 @@ function Identity({ account }: { account: Account }) {
           </Button>
         </div>
       </form>
+      {saved && (
+        <div className="settings__reset-test">
+          <p className="settings__hint">{t("settings.resetTestHelp")}</p>
+          {testError && (
+            <Callout tone="danger" role="alert">
+              {testError}
+            </Callout>
+          )}
+          <div>
+            <Button
+              variant="secondary"
+              icon="mail"
+              busy={testBusy}
+              busyLabel={t("login.lostSending")}
+              aria-disabled={wait > 0 || undefined}
+              onClick={test}
+            >
+              {wait > 0 ? t("login.resendIn", { seconds: wait }) : t("settings.resetTest")}
+            </Button>
+          </div>
+        </div>
+      )}
       {toast && <Toast message={toast} duration={4000} onDone={() => setToast(undefined)} />}
     </section>
   );

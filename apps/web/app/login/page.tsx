@@ -8,6 +8,9 @@
  * - "Log in": the password alone.
  * - "Account from before": mail address and the password that used to be
  *   mailed, once; it is swapped for a new password, shown like a new one.
+ * - "Lost your password?" (AND-236): a link by mail to the address of the
+ *   account, which shows a new password (`login/reset/[token]`). Opened
+ *   with `?lost`, from a link that no longer works.
  */
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -21,8 +24,9 @@ import { TextField } from "../../src/ui/components/Fields.tsx";
 import { FreshPassword } from "../../src/ui/components/FreshPassword.tsx";
 import { GuestShell } from "../../src/ui/components/Shell.tsx";
 import { usePageTitle } from "../../src/ui/flow/frame.tsx";
+import { RESEND_AFTER_S, resetLinkError, sendResetLink } from "../../src/ui/reset-link.ts";
 
-type Mode = "start" | "login" | "legacy";
+type Mode = "start" | "login" | "legacy" | "lost" | "sent";
 
 const MAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 /** The server's limit for a name (see API.md). */
@@ -42,6 +46,10 @@ export default function LoginPage() {
   const [visible, setVisible] = useState(true);
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState<string>();
+  // When the last link was sent, and a clock for the wait before "Send again".
+  const [sentAt, setSentAt] = useState(0);
+  const [now, setNow] = useState(0);
+  const [resent, setResent] = useState(false);
   // A password just made: shown until the player says they have it. The
   // account is taken over only then, so nothing moves on before.
   const [fresh, setFresh] = useState<{ account: Account; secret: string }>();
@@ -57,8 +65,23 @@ export default function LoginPage() {
         ? t("login.haveTitle")
         : mode === "legacy"
           ? t("login.legacyTitle")
-          : t("login.title"),
+          : mode === "lost"
+            ? t("login.lostTitle")
+            : mode === "sent"
+              ? t("login.sentTitle")
+              : t("login.title"),
   ]);
+
+  // From "Ask for a new link" on a link that no longer works.
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).has("lost")) setMode("lost");
+  }, []);
+
+  useEffect(() => {
+    if (mode !== "sent") return;
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [mode]);
 
   useEffect(() => {
     if (account && !fresh) router.replace("/characters");
@@ -73,6 +96,7 @@ export default function LoginPage() {
     setEmailError(undefined);
     setNameError(undefined);
     setPassword("");
+    setResent(false);
     focusHeading();
   };
 
@@ -178,6 +202,53 @@ export default function LoginPage() {
     }
   };
 
+  const requestLink = async (): Promise<boolean> => {
+    setFormError(undefined);
+    setBusy(true);
+    try {
+      await sendResetLink(email.trim(), lang);
+      setSentAt(Date.now());
+      setNow(Date.now());
+      return true;
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 400) {
+        setEmailError(t("login.emailInvalid"));
+        emailRef.current?.focus();
+      } else setFormError(resetLinkError(error, app));
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const onLost = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!checkEmail(true)) return;
+    if (await requestLink()) go("sent");
+  };
+
+  const wait = Math.max(0, RESEND_AFTER_S - Math.floor((now - sentAt) / 1000));
+
+  const emailField = (label: string, help?: string) => (
+    <TextField
+      ref={emailRef}
+      label={label}
+      help={help}
+      type="email"
+      inputMode="email"
+      autoComplete="email"
+      autoCapitalize="none"
+      spellCheck={false}
+      value={email}
+      error={emailError}
+      onChange={(e) => {
+        setEmail(e.target.value);
+        if (emailError) setEmailError(undefined);
+      }}
+      onBlur={() => email.trim() && !MAIL.test(email.trim()) && setEmailError(t("login.emailInvalid"))}
+    />
+  );
+
   const passwordField = (label: string) => (
     <TextField
       ref={passwordRef}
@@ -250,25 +321,7 @@ export default function LoginPage() {
                 setNameError(undefined);
               }}
             />
-            <TextField
-              ref={emailRef}
-              label={t("login.emailLabel")}
-              help={t("login.emailHelp")}
-              type="email"
-              inputMode="email"
-              autoComplete="email"
-              autoCapitalize="none"
-              spellCheck={false}
-              value={email}
-              error={emailError}
-              onChange={(e) => {
-                setEmail(e.target.value);
-                if (emailError) setEmailError(undefined);
-              }}
-              onBlur={() =>
-                email.trim() && !MAIL.test(email.trim()) && setEmailError(t("login.emailInvalid"))
-              }
-            />
+            {emailField(t("login.emailLabel"), t("login.emailHelp"))}
             {errorBox}
             <Button type="submit" block busy={busy} busyLabel={t("login.starting")}>
               {t("login.start")}
@@ -289,6 +342,11 @@ export default function LoginPage() {
             </h1>
             <p className="auth__intro">{t("login.haveIntro")}</p>
             {passwordField(t("login.passwordLabel"))}
+            <p className="auth__small">
+              <button type="button" className="link-button" onClick={() => go("lost")}>
+                {t("login.lost")}
+              </button>
+            </p>
             {errorBox}
             <Button type="submit" block busy={busy} busyLabel={t("login.submitting")}>
               {t("login.submit")}
@@ -304,27 +362,62 @@ export default function LoginPage() {
               </button>
             </p>
           </form>
+        ) : mode === "lost" ? (
+          <form className="auth__card" onSubmit={onLost} noValidate>
+            <h1 className="auth__title" tabIndex={-1} ref={headingRef}>
+              {t("login.lostTitle")}
+            </h1>
+            <p className="auth__intro">{t("login.lostIntro")}</p>
+            {emailField(t("login.lostEmailLabel"))}
+            {errorBox}
+            <Button type="submit" block busy={busy} busyLabel={t("login.lostSending")}>
+              {t("login.lostSend")}
+            </Button>
+            <p className="auth__small">{t("login.lostNoMail")}</p>
+            <p className="auth__switch">
+              <button type="button" className="link-button" onClick={() => go("login")}>
+                {t("login.toLogin")}
+              </button>
+            </p>
+          </form>
+        ) : mode === "sent" ? (
+          <section className="auth__card" aria-labelledby="sent-title">
+            <h1 className="auth__title" id="sent-title" tabIndex={-1} ref={headingRef}>
+              {t("login.sentTitle")}
+            </h1>
+            <p className="auth__intro">{t("login.sent")}</p>
+            {errorBox}
+            <Button
+              variant="secondary"
+              block
+              busy={busy}
+              busyLabel={t("login.lostSending")}
+              aria-disabled={wait > 0 || undefined}
+              onClick={async () => {
+                if (wait > 0) return;
+                setResent(false);
+                if (await requestLink()) setResent(true);
+              }}
+            >
+              {wait > 0 ? t("login.resendIn", { seconds: wait }) : t("login.resend")}
+            </Button>
+            <p aria-live="polite" className="auth__small">
+              {resent ? t("login.resent") : ""}
+            </p>
+            <p className="auth__small">{t("login.lostNoMail")}</p>
+            <p className="auth__switch">
+              <button type="button" className="link-button" onClick={() => go("login")}>
+                {t("login.toLogin")}
+              </button>
+            </p>
+          </section>
         ) : (
           <form className="auth__card" onSubmit={onLegacy} noValidate>
             <h1 className="auth__title" tabIndex={-1} ref={headingRef}>
               {t("login.legacyTitle")}
             </h1>
             <p className="auth__intro">{t("login.legacyIntro")}</p>
-            <TextField
-              ref={emailRef}
-              label={t("login.legacyEmailLabel")}
-              type="email"
-              inputMode="email"
-              autoComplete="email"
-              autoCapitalize="none"
-              spellCheck={false}
-              value={email}
-              error={emailError}
-              onChange={(e) => {
-                setEmail(e.target.value);
-                if (emailError) setEmailError(undefined);
-              }}
-            />
+            {emailField(t("login.legacyEmailLabel"))}
             {passwordField(t("login.legacyPasswordLabel"))}
             {errorBox}
             <Button type="submit" block busy={busy} busyLabel={t("login.submitting")}>

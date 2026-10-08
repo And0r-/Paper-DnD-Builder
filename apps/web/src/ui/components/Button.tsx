@@ -44,7 +44,7 @@ export function Button({
       {...rest}
       type={type}
       className={classes(variant, block, className)}
-      aria-disabled={busy || undefined}
+      aria-disabled={busy || rest["aria-disabled"] || undefined}
       onClick={(e) => {
         if (busy) {
           e.preventDefault();

@@ -172,6 +172,167 @@ describe("own passwords", () => {
   });
 });
 
+describe("a link back in", () => {
+  /** The links in the newest mail, by account name. */
+  function linksIn(text: string): Record<string, string> {
+    const links: Record<string, string> = {};
+    for (const m of text.matchAll(/^(.+): http:\/\/builder\.test\/login\/reset\/([\w-]{43})$/gm))
+      links[m[1]!] = m[2]!;
+    return links;
+  }
+  const ask = (c: Client, email = EMAIL, language?: string) =>
+    c.call("POST", "/api/auth/reset", { email, ...(language ? { language } : {}) });
+
+  it("mails a link with no password in it; the link shows a new password once and logs in", async () => {
+    const first = await signIn(client, EMAIL);
+    const res = await ask(new Client(server), " Player@Example.org ");
+    expect(res.status).toBe(202);
+    expect(res.json).toEqual({ status: "sent" });
+    expect(server.mails).toHaveLength(1);
+    const mail = server.mails[0]!;
+    expect(mail.to).toBe(EMAIL);
+    expect(mail.text).toContain("30 Minuten");
+    expect(mail.text).toContain("Hast du das nicht angefordert? Dann lösche die Mail, es passiert nichts.");
+    expect(mail.text).not.toMatch(/[a-zäöü]+(?:-[a-zäöü]+){4}-\d{4}/);
+    const token = linksIn(mail.text)["player"]!;
+    expect(token).toBeDefined();
+    // Only its hash is kept.
+    expect(JSON.stringify(await server.db.query("SELECT * FROM reset_links"))).not.toContain(token);
+
+    const phone = new Client(server, "198.51.100.50");
+    const used = await phone.call("POST", "/api/auth/reset/use", { token });
+    expect(used.status).toBe(200);
+    expect(used.json.account).toMatchObject({ name: "player", email: EMAIL });
+    expect(used.json.password).toMatchObject({
+      name: "Reset 2026-10-04",
+      secret: expect.stringMatching(/^[a-z]+(?:-[a-z]+){4}-\d{4}$/),
+    });
+    expect(phone.hasSession).toBe(true);
+    expect((await phone.call("GET", "/api/account")).status).toBe(200);
+
+    // The new password works elsewhere; the old one stays until its owner deletes it.
+    const other = new Client(server, "198.51.100.51");
+    expect(
+      (await other.call("POST", "/api/auth/login", { password: used.json.password.secret })).status,
+    ).toBe(200);
+    expect((await other.call("POST", "/api/auth/login", { password: first })).status).toBe(200);
+
+    // Once only.
+    const again = await new Client(server).call("POST", "/api/auth/reset/use", { token });
+    expect(again.status).toBe(404);
+    expect(again.json.error.code).toBe("resetLinkInvalid");
+    expect(await server.db.query("SELECT 1 FROM reset_links")).toEqual([]);
+  });
+
+  it("stops working after 30 minutes", async () => {
+    await signIn(client, EMAIL);
+    await signIn(new Client(server, "198.51.100.53"), "else@example.org");
+    await ask(client);
+    const token = linksIn(server.mails[0]!.text)["player"]!;
+    server.advance(30 * MINUTE);
+    // Expired rows go at the next occasion.
+    await ask(new Client(server, "198.51.100.52"), "else@example.org");
+    expect((await server.db.query("SELECT 1 FROM reset_links")).length).toBe(1);
+    const res = await client.call("POST", "/api/auth/reset/use", { token });
+    expect(res.status).toBe(404);
+    expect(res.json.error.code).toBe("resetLinkInvalid");
+    expect((await client.call("POST", "/api/auth/reset/use", { token: "x".repeat(101) })).status).toBe(400);
+  });
+
+  it("sends one mail for two accounts with the address, a link for each, named, in the first one's language", async () => {
+    await new Client(server, "198.51.100.60").call("POST", "/api/auth/signup", {
+      name: "Max",
+      email: EMAIL,
+      language: "en",
+    });
+    server.advance(1000);
+    await new Client(server, "198.51.100.61").call("POST", "/api/auth/signup", {
+      name: "Mira",
+      email: EMAIL,
+    });
+    await ask(client, EMAIL, "de");
+    expect(server.mails).toHaveLength(1);
+    const text = server.mails[0]!.text;
+    expect(text).toContain("Did not ask for this?");
+    const links = linksIn(text);
+    expect(Object.keys(links)).toEqual(["Max", "Mira"]);
+    const mira = await client.call("POST", "/api/auth/reset/use", { token: links["Mira"] });
+    expect(mira.json.account.name).toBe("Mira");
+    const max = await new Client(server).call("POST", "/api/auth/reset/use", { token: links["Max"] });
+    expect(max.json.account.name).toBe("Max");
+  });
+
+  it("answers the same for an unknown address and sends nothing", async () => {
+    await signIn(client, EMAIL);
+    const res = await ask(new Client(server), "nobody@example.org");
+    expect(res.status).toBe(202);
+    expect(res.json).toEqual({ status: "sent" });
+    expect(server.mails).toEqual([]);
+    expect((await ask(new Client(server), "not an address")).status).toBe(400);
+  });
+
+  it("gives an account that has the most passwords a new one in place of the oldest", async () => {
+    await signIn(client, EMAIL);
+    for (let i = 1; i < 10; i++) {
+      server.advance(1000);
+      await client.call("POST", "/api/account/passwords", { name: `P${i}` });
+    }
+    await ask(client);
+    const token = linksIn(server.mails[0]!.text)["player"]!;
+    const res = await client.call("POST", "/api/auth/reset/use", { token });
+    expect(res.status).toBe(200);
+    const names = (await client.call("GET", "/api/account/passwords")).json.passwords.map(
+      (p: { name: string }) => p.name,
+    );
+    expect(names).toHaveLength(10);
+    expect(names).not.toContain("2026-10-04");
+    expect(names.at(-1)).toBe("Reset 2026-10-04");
+  });
+
+  it("gives an account a game master made, which has no password yet, its first", async () => {
+    await server.db.query(
+      `INSERT INTO accounts (id, name, email, language, created_at)
+       VALUES ('00000000-0000-4000-8000-000000000002', 'invited', $1, 'en', now())`,
+      [EMAIL],
+    );
+    await ask(client);
+    expect(server.mails[0]!.subject).toBe("Your link to log in");
+    const token = linksIn(server.mails[0]!.text)["invited"]!;
+    const res = await client.call("POST", "/api/auth/reset/use", { token });
+    expect(res.status).toBe(200);
+    expect((await client.call("GET", "/api/account/passwords")).json.passwords).toHaveLength(1);
+  });
+
+  it("stores no link when the mail cannot be sent", async () => {
+    await signIn(client, EMAIL);
+    server.failMail.on = true;
+    const res = await ask(client);
+    expect(res.status).toBe(502);
+    expect(res.json.error.code).toBe("mailFailed");
+    expect(await server.db.query("SELECT 1 FROM reset_links")).toEqual([]);
+  });
+
+  it("limits mails per address and per IP, and uses per IP", async () => {
+    await signIn(client, EMAIL);
+    for (let i = 0; i < 3; i++) expect((await ask(new Client(server, `192.0.2.${i}`))).status).toBe(202);
+    const perAddress = await ask(new Client(server, "192.0.2.99"));
+    expect(perAddress.status).toBe(429);
+    expect(perAddress.json.error.code).toBe("tooManyAttempts");
+    expect(server.mails).toHaveLength(3);
+
+    const ip = new Client(server, "192.0.2.200");
+    for (let i = 0; i < 10; i++) expect((await ask(ip, `n${i}@example.org`)).status).toBe(202);
+    expect((await ask(ip, "n10@example.org")).status).toBe(429);
+
+    const guesser = new Client(server, "192.0.2.201");
+    for (let i = 0; i < 20; i++)
+      expect((await guesser.call("POST", "/api/auth/reset/use", { token: `guess-${i}` })).status).toBe(404);
+    expect((await guesser.call("POST", "/api/auth/reset/use", { token: "guess" })).status).toBe(429);
+    server.advance(60 * MINUTE + 1000);
+    expect((await ask(new Client(server, "192.0.2.99"))).status).toBe(202);
+  });
+});
+
 describe("accounts from before", () => {
   const OLD = "anker-falke-wiese-7320";
   async function oldAccount() {
