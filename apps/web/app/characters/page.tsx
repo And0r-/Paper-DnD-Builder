@@ -19,6 +19,7 @@ import { AppShell } from "../../src/ui/components/Shell.tsx";
 import { CharacterCard, describeCharacter, packagesFor } from "../../src/ui/characters.tsx";
 import { usePageTitle } from "../../src/ui/flow/frame.tsx";
 import { RequireAccount } from "../../src/ui/guards.tsx";
+import { clearFlash, peekFlash } from "../../src/ui/live/flash.ts";
 import { draftPackageKey, type LoadedPackage } from "../../src/ui/packages.ts";
 
 const UNDO_MS = 10_000;
@@ -48,6 +49,9 @@ function Characters() {
   const [undo, setUndo] = useState<{ id: string; name: string } | null>(null);
   const hidden = useRef(new Set<string>());
   const [, rerender] = useState(0);
+  // Sent here because the open character was deleted elsewhere: say so once.
+  const [flash, setFlash] = useState<string | null>(null);
+  useEffect(() => setFlash(peekFlash()), []);
 
   useEffect(() => {
     let live = true;
@@ -184,6 +188,16 @@ function Characters() {
       >
         <p>{t("characters.deleteText")}</p>
       </ConfirmDialog>
+      {flash && !undo && (
+        <Toast
+          message={flash}
+          duration={8000}
+          onDone={() => {
+            clearFlash();
+            setFlash(null);
+          }}
+        />
+      )}
       {undo && (
         <Toast
           key={undo.id}

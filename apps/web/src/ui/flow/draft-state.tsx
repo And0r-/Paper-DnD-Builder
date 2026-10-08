@@ -15,7 +15,9 @@
  * help link. The live channel (live/channel.ts) brings every new state
  * from the server; this window takes it and puts its own changes that are
  * still on their way back on top. After an answer the server's state
- * counts, always: there are never two truths.
+ * counts, always: there are never two truths. A change of this window to a
+ * question that someone else saved meanwhile gives way: the stored one
+ * counts, and the short line says so (AND-258).
  */
 import {
   applyChange,
@@ -24,7 +26,7 @@ import {
   type DraftDocument,
   type Evaluation,
 } from "@builder/core";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   createContext,
   useCallback,
@@ -37,9 +39,18 @@ import {
 } from "react";
 import { useApp } from "../app-state.tsx";
 import { api, ApiError, type DraftInfo, type DraftView } from "../api.ts";
-import { useLiveChannel, viewOf, type LiveChannel } from "../live/channel.ts";
+import {
+  isOwn,
+  useLiveChannel,
+  viewOf,
+  type Change,
+  type LiveChannel,
+  type OtherEvent,
+} from "../live/channel.ts";
+import { setFlash } from "../live/flash.ts";
 import { draftPath, forgetHelpToken, helpTokenFor } from "../live/help-token.ts";
 import { stepOfPath } from "../live/where.ts";
+import type { Told } from "../live/words.ts";
 import { draftPackageKey, usePackage, type LoadedPackage } from "../packages.ts";
 import { buildFlow, stepDiff, stepTitle, type FlowEntry } from "./model.ts";
 import { planDiff, plannedDraft } from "./plan.ts";
@@ -76,6 +87,40 @@ function send(id: string, version: number, next: Pending): Promise<DraftView> {
       return api<DraftView>("PUT", draftPath(id, "/tracks"), { version, tracks: next.tracks });
   }
 }
+
+/**
+ * Whether the server's state changed what `p` changes: the answer to its
+ * question, the answers of its list step, or the level.
+ */
+function touched(before: DraftView, after: DraftView, p: Pending): boolean {
+  if (p.type === "setLevel") return before.draft.level !== after.draft.level;
+  const choices =
+    p.type === "answer" ? [p.choice] : (after.evaluation?.steps.find((s) => s.id === p.step)?.choices ?? []);
+  return choices.some(
+    (c) => JSON.stringify(before.draft.answers[c]) !== JSON.stringify(after.draft.answers[c]),
+  );
+}
+
+/** Whether a change the channel told was to the same question as `p`. */
+function hits(change: Change | undefined, p: Pending, view: DraftView): boolean {
+  if (!change) return false;
+  const inStep = (step: string, choice: string) =>
+    view.evaluation?.steps.find((s) => s.id === step)?.choices.includes(choice) ?? false;
+  switch (change.kind) {
+    case "answer":
+      return p.type === "answer" ? p.choice === change.choice : p.type === "pool" && inStep(p.step, change.choice);
+    case "pool":
+      return p.type === "pool" ? p.step === change.step : p.type === "answer" && inStep(change.step, p.choice);
+    case "level":
+    case "levelUp":
+      return p.type === "setLevel";
+    default:
+      return false;
+  }
+}
+
+/** What else the live channel tells, for a screen that shows more than the draft (the sheet). */
+export type LiveNews = OtherEvent | { type: "draft"; version: number };
 
 /** Titles of steps a change added or removed: counted steps, and parts of a step. */
 export interface StepNotice {
@@ -121,8 +166,10 @@ export interface DraftApi {
   setCampaign(campaignId: string | null): Promise<boolean>;
   /** Who else is on the character, where, pointing at what; hints (live help). */
   live: LiveChannel;
-  /** Someone else just changed the character: their name, for a short line. */
-  changedBy: { name: string; seq: number } | null;
+  /** Someone else, another window or a program just changed the character: for a short line. */
+  told: Told | null;
+  /** Hears of every change made elsewhere; returns the way to stop. */
+  listen(f: (news: LiveNews) => void): () => void;
   /**
    * Switches the package's extensions for this character. The screen then
    * loads the package with them. "inUse": an answer still comes from one
@@ -270,22 +317,77 @@ function ReadyDraft({
   const pkg = lp.pkg;
 
   // ------------------------------------------------------------ live help
-  const [changedBy, setChangedBy] = useState<{ name: string; seq: number } | null>(null);
+  const [told, setTold] = useState<Told | null>(null);
+  const tell = useCallback((next: Omit<Told, "seq">) => setTold((c) => ({ ...next, seq: (c?.seq ?? 0) + 1 })), []);
   const youId = useRef<string | null>(null);
+  const listeners = useRef(new Set<(news: LiveNews) => void>());
+  const listen = useCallback((f: (news: LiveNews) => void) => {
+    listeners.current.add(f);
+    return () => void listeners.current.delete(f);
+  }, []);
+  // The change on its way that someone else's saved change to the same question beat.
+  const beaten = useRef<Pending | null>(null);
+  // A change of ours a conflict dropped before the channel said who beat it.
+  const gaveWay = useRef(false);
+  const deleted = useRef(false);
+  const router = useRouter();
   const live = useLiveChannel(initial.draft.id, {
     onState: (m) => {
+      const elsewhere = m.event !== undefined && !isOwn(m.source) && !(m.by && m.by.id === youId.current);
+      let overruled = false;
       // Keep the highest version: an answer of ours may have brought it already.
-      if (m.draft.version <= serverRef.current.draft.version) return;
-      const v = viewOf(m);
-      serverRef.current = v;
-      setServer(v);
-      // Ours still on their way stay on top; saving sends them on this version.
-      setDoc(apply(pkg, docOf(v), queue.current));
-      if (m.by && m.by.id !== youId.current)
-        setChangedBy((c) => ({ name: m.by!.name, seq: (c?.seq ?? 0) + 1 }));
+      if (m.draft.version > serverRef.current.draft.version) {
+        const v = viewOf(m);
+        if (elsewhere) {
+          // Ours to the same question, not saved yet, give way: the stored one counts.
+          const from = running.current ? 1 : 0;
+          const kept = queue.current.filter((p, i) => i < from || !hits(m.change, p, v));
+          overruled = kept.length < queue.current.length;
+          queue.current = kept;
+          const sending = running.current ? queue.current[0] : undefined;
+          if (sending && hits(m.change, sending, v)) {
+            beaten.current = sending;
+            overruled = true;
+          }
+        }
+        serverRef.current = v;
+        setServer(v);
+        // Ours still on their way stay on top (not one that gave way); saving sends them on this version.
+        setDoc(apply(pkg, docOf(v), queue.current.filter((p) => p !== beaten.current)));
+        if (elsewhere) for (const f of listeners.current) f({ type: "draft", version: v.draft.version });
+      }
+      if (elsewhere && m.source) {
+        tell({ source: m.source, event: m.event!, change: m.change, overruled: overruled || gaveWay.current });
+        gaveWay.current = false;
+      }
+    },
+    onEvent: (m) => {
+      if (m.type === "deleted") {
+        // Everyone is put out right after: back to the list, which says why.
+        deleted.current = true;
+        setFlash(t("live.deleted"));
+        router.replace("/characters");
+        return;
+      }
+      if (isOwn(m.source) || !m.source) return;
+      tell({ source: m.source, event: m.type, change: m.change, overruled: false });
+      if (m.type === "campaign") {
+        // The version stays; only where the character belongs changed.
+        void api<DraftView>("GET", draftPath(serverRef.current.draft.id)).then(
+          (v) => {
+            serverRef.current = {
+              ...serverRef.current,
+              draft: { ...serverRef.current.draft, campaignId: v.draft.campaignId },
+            };
+            setServer(serverRef.current);
+          },
+          () => {},
+        );
+      }
+      for (const f of listeners.current) f(m);
     },
     onGone: (code) => {
-      if (code !== 4404) return;
+      if (code !== 4404 || deleted.current) return;
       if (helpTokenFor(initial.draft.id) !== null) {
         forgetHelpToken(initial.draft.id);
         onGone("helpEnded");
@@ -322,16 +424,28 @@ function ReadyDraft({
         try {
           // Over the live channel while it is open, so the others learn who it was.
           const res = await (sendChange.current(version, next) ?? send(id, version, next));
-          serverRef.current = res;
-          setServer(res);
+          // The channel may have brought a newer state already.
+          if (res.draft.version > serverRef.current.draft.version) {
+            serverRef.current = res;
+            setServer(res);
+          }
+          if (beaten.current === next) beaten.current = null;
           queue.current.shift();
           failures = 0;
           if (queue.current.length > 0) setSaveState("saving");
         } catch (error) {
           if (error instanceof ApiError && error.code === "versionConflict" && error.details["current"]) {
-            // Changed elsewhere (another tab): take the current state and send ours on top of it.
-            serverRef.current = error.details["current"] as DraftView;
-            setServer(serverRef.current);
+            // Changed elsewhere (another tab): take the current state and send ours on top of it,
+            // unless it was the same question: then the stored one counts.
+            const current = error.details["current"] as DraftView;
+            if (beaten.current === next || touched(serverRef.current, current, next)) {
+              if (beaten.current !== next) gaveWay.current = true;
+              beaten.current = null;
+              queue.current.shift();
+            }
+            serverRef.current = current;
+            setServer(current);
+            setDoc(apply(pkg, docOf(current), queue.current));
             continue;
           }
           if (
@@ -539,7 +653,8 @@ function ReadyDraft({
       levelUp,
       setCampaign,
       live,
-      changedBy,
+      told,
+      listen,
       setExtensions,
     }),
     [
@@ -557,7 +672,8 @@ function ReadyDraft({
       levelUp,
       setCampaign,
       live,
-      changedBy,
+      told,
+      listen,
       setExtensions,
     ],
   );

@@ -25,6 +25,7 @@ import { CompactSelect, type CompactOption } from "../components/Fields.tsx";
 import { PackageLanguageNote } from "../components/PackageLanguageNote.tsx";
 import { AppShell } from "../components/Shell.tsx";
 import { useDraft } from "../flow/draft-state.tsx";
+import { LiveBar } from "../live/live-bar.tsx";
 import { SaveLine as SaveStatusLine, usePageTitle } from "../flow/frame.tsx";
 import { ptext } from "../package-text.ts";
 import { PrintDialog } from "../flow/print-dialog.tsx";
@@ -54,8 +55,8 @@ function SaveLine({ sheet }: { sheet: SheetController }) {
 
 export function SheetPage() {
   const { t, account, setAccount } = useApp();
-  const { lp, ev, draft } = useDraft();
-  const sheet = useSheet(draft.id);
+  const { lp, ev, draft, listen } = useDraft();
+  const sheet = useSheet(draft.id, listen);
   const [printing, setPrinting] = useState(false);
   const [designs, setDesigns] = useState<SheetDesignInfo[]>(
     SHEET_DESIGNS.map((d) => ({ id: d.id, name: { ...d.name }, description: { ...d.description } })),
@@ -102,6 +103,7 @@ export function SheetPage() {
         </span>
       }
       status={<SaveLine sheet={sheet} />}
+      bar={<LiveBar />}
       tools={<SheetLists {...tools} />}
       menuExtra={<SheetTools {...tools} variant="menu" />}
       wide

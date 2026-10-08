@@ -6,6 +6,7 @@
 import type { ContentPackage, TextValue } from "@builder/format/pure";
 import type { DraftSummary, Evaluation, LevelUpState } from "@builder/core";
 import type { PrintChoice } from "@builder/sheet/printouts";
+import { CLIENT_ID_HEADER, clientId } from "./live/client-id.ts";
 
 export class ApiError extends Error {
   readonly status: number;
@@ -48,7 +49,11 @@ export async function api<T>(
       method,
       credentials: "same-origin",
       cache: "no-store",
-      headers: json !== undefined ? { "content-type": "application/json" } : {},
+      headers: {
+        ...(json !== undefined ? { "content-type": "application/json" } : {}),
+        // Changes carry the window's id, so it knows them when the live channel tells them back.
+        ...(method !== "GET" ? { [CLIENT_ID_HEADER]: clientId() } : {}),
+      },
       ...(json !== undefined ? { body: json } : {}),
       ...(options.keepalive && new Blob([json ?? ""]).size <= KEEPALIVE_MAX_BYTES ? { keepalive: true } : {}),
     });
