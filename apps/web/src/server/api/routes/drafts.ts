@@ -50,7 +50,7 @@ export function draftView(row: ReachableDraftRow, pkg: ContentPackage | undefine
       updatedAt: row.updated_at.toISOString(),
       finishedAt: row.finished_at?.toISOString() ?? null,
       /** Whose character it is. A game master's view shows the player here. */
-      owner: { email: row.owner_email },
+      owner: { name: row.owner_name },
       /** Why the viewer may see it: their own, or a player's in a campaign they lead. */
       access: row.access,
     },
@@ -65,7 +65,7 @@ export function draftView(row: ReachableDraftRow, pkg: ContentPackage | undefine
 
 /** One's own drafts, in the shape `draftView` takes. */
 export function ownDraft(row: DraftRow, account: AccountRow): ReachableDraftRow {
-  return { ...row, owner_email: account.email, access: "owner" };
+  return { ...row, owner_name: account.name, access: "owner" };
 }
 
 /**
@@ -137,7 +137,7 @@ async function change(
     throw conflict(current, pkg);
   }
   ctx.app.draftEvents.publish({ draftId: updated.id, accountId, version: updated.version });
-  const who = { owner_email: row.owner_email, access: row.access };
+  const who = { owner_name: row.owner_name, access: row.access };
   return json(200, draftView({ ...updated, ...who }, pkg, edited.raisedFrom));
 }
 
@@ -160,7 +160,7 @@ export const newDraftSchema = z.strictObject({
  */
 export async function createDraft(
   ctx: RequestContext,
-  owner: { id: string; email: string },
+  owner: { id: string; name: string },
   access: ReachableDraftRow["access"],
   ledCampaignId?: string,
 ): Promise<Response> {
@@ -187,7 +187,7 @@ export async function createDraft(
     campaign_id: campaignId,
     created_at: ctx.app.now(),
   });
-  return json(201, draftView({ ...row, owner_email: owner.email, access }, pkg));
+  return json(201, draftView({ ...row, owner_name: owner.name, access }, pkg));
 }
 
 export const draftRoutes: Route[] = [
@@ -205,7 +205,7 @@ export const draftRoutes: Route[] = [
     path: "/api/drafts",
     handler: async (ctx) => {
       const { account } = await ctx.requireSession();
-      return createDraft(ctx, { id: account.id, email: account.email }, "owner");
+      return createDraft(ctx, account, "owner");
     },
   },
   {

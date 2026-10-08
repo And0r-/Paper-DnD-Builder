@@ -11,7 +11,7 @@ let client: Client;
 beforeEach(async () => {
   server = await startTestServer();
   client = new Client(server);
-  await signIn(client, server, "player@example.org");
+  await signIn(client, "player@example.org");
 });
 
 interface ChoiceState {

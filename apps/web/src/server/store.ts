@@ -12,8 +12,12 @@ import type { DraftDocument } from "@builder/core";
 
 export type AccountRow = {
   id: string;
-  email: string;
-  password_hash: string;
+  /** What the owner wants to be called; not unique. */
+  name: string;
+  /** A way back in only; several accounts may give the same one. */
+  email: string | null;
+  /** Argon2id hash of the one password of an account from before; null for every other. */
+  password_hash: string | null;
   language: string;
   units: Record<string, string>;
   /** The last download's choice as stored; read through `printChoiceOf`. */
@@ -41,6 +45,14 @@ export interface SessionAccount {
   account: AccountRow;
 }
 
+/** A password as its owner sees it; the hash never leaves the store. */
+export type PasswordRow = {
+  id: string;
+  /** What its owner called it; display only. */
+  name: string;
+  created_at: Date;
+};
+
 /** An access key as its owner sees it; the hash never leaves the store. */
 export type AccessKeyRow = {
   id: string;
@@ -52,7 +64,7 @@ export type AccessKeyRow = {
 
 /** A draft with whose it is and why the viewer may see it. */
 export type ReachableDraftRow = DraftRow & {
-  owner_email: string;
+  owner_name: string;
   /** "owner": the viewer's own; "gameMaster": a character of a player in a campaign the viewer leads. */
   access: "owner" | "gameMaster";
 };
@@ -61,7 +73,7 @@ export type CampaignRow = {
   id: string;
   name: string;
   created_at: Date;
-  game_master_email: string;
+  game_master_name: string;
   /** Whether the viewer leads it; else the viewer plays in it. */
   leading: boolean;
   /** When the viewer joined it as a player; null for the game master. */
@@ -72,7 +84,7 @@ export type CampaignRow = {
 export type PlayerRow = {
   /** The player's account id. */
   id: string;
-  email: string;
+  name: string;
   added_at: Date;
 };
 
@@ -105,7 +117,11 @@ export type CharacterStateRow = {
 };
 
 const ACCESS_KEY_COLUMNS = "id, name, hint, created_at";
-const ACCOUNT_COLUMNS = "id, email, password_hash, language, units, print_choice, created_at";
+const ACCOUNT_COLUMNS = "id, name, email, password_hash, language, units, print_choice, created_at";
+const ACCOUNT_COLUMNS_A = ACCOUNT_COLUMNS.split(", ")
+  .map((c) => `a.${c}`)
+  .join(", ");
+const PASSWORD_COLUMNS = "id, name, created_at";
 const DRAFT_COLUMNS =
   "id, account_id, package_id, package_version, version, document, campaign_id, finished_at, created_at, updated_at";
 const COPY_ENTRY_COLUMNS =
@@ -126,7 +142,7 @@ const reachable = (viewer: string) => `(d.account_id = ${viewer} OR EXISTS (
   WHERE c.id = d.campaign_id AND p.account_id = d.account_id AND c.account_id = ${viewer}))`;
 
 /** A campaign as the viewer `$1` sees it; `c` the campaigns row. */
-const CAMPAIGN_SELECT = `SELECT c.id, c.name, c.created_at, gm.email AS game_master_email,
+const CAMPAIGN_SELECT = `SELECT c.id, c.name, c.created_at, gm.name AS game_master_name,
   c.account_id = $1 AS leading,
   (SELECT j.added_at FROM campaign_players j WHERE j.campaign_id = c.id AND j.account_id = $1) AS joined_at,
   (SELECT count(*) FROM campaign_players n WHERE n.campaign_id = c.id)::int AS player_count
@@ -152,27 +168,42 @@ export class Store {
 
   // ---------------------------------------------------------------- accounts
 
-  async findAccountByEmail(email: string): Promise<AccountRow | undefined> {
-    const rows = await this.db.query<AccountRow>(`SELECT ${ACCOUNT_COLUMNS} FROM accounts WHERE email = $1`, [
-      email,
-    ]);
-    return rows[0];
+  /** The accounts that give this address, oldest first: it is no key, several may. */
+  async findAccountsByEmail(email: string): Promise<AccountRow[]> {
+    return this.db.query<AccountRow>(
+      `SELECT ${ACCOUNT_COLUMNS} FROM accounts WHERE email = $1 ORDER BY created_at, id`,
+      [email],
+    );
   }
 
-  /** Inserts an account; returns undefined if the address already has one (concurrent sign-up). */
-  async createAccount(a: Omit<AccountRow, "units" | "print_choice">): Promise<AccountRow | undefined> {
+  /** The account from before with this address that still has its old password. */
+  async findLegacyAccount(email: string): Promise<AccountRow | undefined> {
     const rows = await this.db.query<AccountRow>(
-      `INSERT INTO accounts (id, email, password_hash, language, units, created_at)
-       VALUES ($1, $2, $3, $4, '{}'::jsonb, $5)
-       ON CONFLICT (email) DO NOTHING
-       RETURNING ${ACCOUNT_COLUMNS}`,
-      [a.id, a.email, a.password_hash, a.language, a.created_at],
+      `SELECT ${ACCOUNT_COLUMNS} FROM accounts
+       WHERE email = $1 AND password_hash IS NOT NULL ORDER BY created_at, id LIMIT 1`,
+      [email],
     );
     return rows[0];
   }
 
-  async setPasswordHash(accountId: string, passwordHash: string): Promise<void> {
-    await this.db.query("UPDATE accounts SET password_hash = $2 WHERE id = $1", [accountId, passwordHash]);
+  async createAccount(
+    a: Pick<AccountRow, "id" | "name" | "email" | "language" | "created_at">,
+  ): Promise<AccountRow> {
+    const rows = await this.db.query<AccountRow>(
+      `INSERT INTO accounts (id, name, email, language, units, created_at)
+       VALUES ($1, $2, $3, $4, '{}'::jsonb, $5)
+       RETURNING ${ACCOUNT_COLUMNS}`,
+      [a.id, a.name, a.email, a.language, a.created_at],
+    );
+    return rows[0]!;
+  }
+
+  async updateIdentity(accountId: string, name: string, email: string | null): Promise<AccountRow> {
+    const rows = await this.db.query<AccountRow>(
+      `UPDATE accounts SET name = $2, email = $3 WHERE id = $1 RETURNING ${ACCOUNT_COLUMNS}`,
+      [accountId, name, email],
+    );
+    return rows[0]!;
   }
 
   async updateSettings(
@@ -209,7 +240,7 @@ export class Store {
 
   async findSession(id: string, now: Date): Promise<SessionAccount | undefined> {
     const rows = await this.db.query<AccountRow & { session_id: string; refreshed_at: Date }>(
-      `SELECT s.id AS session_id, s.refreshed_at, a.id, a.email, a.password_hash, a.language, a.units, a.print_choice, a.created_at
+      `SELECT s.id AS session_id, s.refreshed_at, ${ACCOUNT_COLUMNS_A}
        FROM sessions s JOIN accounts a ON a.id = s.account_id
        WHERE s.id = $1 AND s.expires_at > $2`,
       [id, now],
@@ -232,13 +263,82 @@ export class Store {
     await this.db.query("DELETE FROM sessions WHERE id = $1", [id]);
   }
 
-  /** Ends every session of an account except `keep`. */
-  async deleteOtherSessions(accountId: string, keep: string): Promise<void> {
-    await this.db.query("DELETE FROM sessions WHERE account_id = $1 AND id <> $2", [accountId, keep]);
-  }
-
   async deleteExpiredSessions(now: Date): Promise<void> {
     await this.db.query("DELETE FROM sessions WHERE expires_at <= $1", [now]);
+  }
+
+  // --------------------------------------------------------------- passwords
+
+  /** Inserts a password unless the account already has `max`; returns undefined then. */
+  async createPassword(
+    p: PasswordRow & { account_id: string; hash: string },
+    max: number,
+  ): Promise<PasswordRow | undefined> {
+    const rows = await this.db.query<PasswordRow>(
+      `INSERT INTO passwords (id, account_id, hash, name, created_at)
+       SELECT $1, $2, $3, $4, $5
+       WHERE (SELECT count(*) FROM passwords WHERE account_id = $2) < $6
+       RETURNING ${PASSWORD_COLUMNS}`,
+      [p.id, p.account_id, p.hash, p.name, p.created_at, max],
+    );
+    return rows[0];
+  }
+
+  /**
+   * Swaps an account's old password for a new one, in one statement and
+   * only while the old hash is still `oldHash`; returns undefined otherwise.
+   */
+  async replaceLegacyPassword(
+    accountId: string,
+    oldHash: string,
+    p: PasswordRow & { account_id: string; hash: string },
+  ): Promise<PasswordRow | undefined> {
+    const rows = await this.db.query<PasswordRow>(
+      `WITH cleared AS (
+         UPDATE accounts SET password_hash = NULL WHERE id = $1 AND password_hash = $2 RETURNING id
+       )
+       INSERT INTO passwords (id, account_id, hash, name, created_at)
+       SELECT $3, cleared.id, $4, $5, $6 FROM cleared
+       RETURNING ${PASSWORD_COLUMNS}`,
+      [accountId, oldHash, p.id, p.hash, p.name, p.created_at],
+    );
+    return rows[0];
+  }
+
+  async listPasswords(accountId: string): Promise<PasswordRow[]> {
+    return this.db.query<PasswordRow>(
+      `SELECT ${PASSWORD_COLUMNS} FROM passwords WHERE account_id = $1 ORDER BY created_at, id`,
+      [accountId],
+    );
+  }
+
+  async findAccountByPasswordHash(hash: string): Promise<AccountRow | undefined> {
+    const rows = await this.db.query<AccountRow>(
+      `SELECT ${ACCOUNT_COLUMNS_A} FROM passwords p JOIN accounts a ON a.id = p.account_id WHERE p.hash = $1`,
+      [hash],
+    );
+    return rows[0];
+  }
+
+  /**
+   * Deletes a password of the account unless it is its last one: without a
+   * password, the owner could not get back in. Two deletes at the same time
+   * could each see the other password still there; the owner is logged in
+   * then and can make a new one.
+   */
+  async deletePassword(id: string, accountId: string): Promise<"deleted" | "last" | "missing"> {
+    const rows = await this.db.query<{ deleted: boolean }>(
+      `WITH target AS (SELECT id FROM passwords WHERE id = $1 AND account_id = $2),
+       removed AS (
+         DELETE FROM passwords WHERE id IN (SELECT id FROM target)
+           AND EXISTS (SELECT 1 FROM passwords o WHERE o.account_id = $2 AND o.id <> $1)
+         RETURNING id
+       )
+       SELECT EXISTS (SELECT 1 FROM removed) AS deleted FROM target`,
+      [id, accountId],
+    );
+    if (!rows[0]) return "missing";
+    return rows[0].deleted ? "deleted" : "last";
   }
 
   // ------------------------------------------------------------- access keys
@@ -268,7 +368,7 @@ export class Store {
     now: Date,
   ): Promise<{ key_id: string; account: AccountRow } | undefined> {
     const rows = await this.db.query<AccountRow & { key_id: string }>(
-      `SELECT k.id AS key_id, a.id, a.email, a.password_hash, a.language, a.units, a.print_choice, a.created_at
+      `SELECT k.id AS key_id, ${ACCOUNT_COLUMNS_A}
        FROM access_keys k JOIN accounts a ON a.id = k.account_id
        WHERE k.key_hash = $1 AND (k.expires_at IS NULL OR k.expires_at > $2)`,
       [keyHash, now],
@@ -311,7 +411,7 @@ export class Store {
   /** A draft the viewer may reach (see {@link reachable}); undefined for anyone else's. */
   async findReachableDraft(id: string, viewerId: string): Promise<ReachableDraftRow | undefined> {
     const rows = await this.db.query<ReachableDraftRow>(
-      `SELECT ${DRAFT_COLUMNS_D}, o.email AS owner_email,
+      `SELECT ${DRAFT_COLUMNS_D}, o.name AS owner_name,
          CASE WHEN d.account_id = $2 THEN 'owner' ELSE 'gameMaster' END AS access
        FROM drafts d JOIN accounts o ON o.id = d.account_id
        WHERE d.id = $1 AND ${reachable("$2")}`,
@@ -420,9 +520,9 @@ export class Store {
 
   async listPlayers(campaignId: string): Promise<PlayerRow[]> {
     return this.db.query<PlayerRow>(
-      `SELECT a.id, a.email, p.added_at
+      `SELECT a.id, a.name, p.added_at
        FROM campaign_players p JOIN accounts a ON a.id = p.account_id
-       WHERE p.campaign_id = $1 ORDER BY p.added_at, a.email`,
+       WHERE p.campaign_id = $1 ORDER BY p.added_at, a.id`,
       [campaignId],
     );
   }
@@ -438,7 +538,7 @@ export class Store {
 
   async findPlayer(campaignId: string, accountId: string): Promise<PlayerRow | undefined> {
     const rows = await this.db.query<PlayerRow>(
-      `SELECT a.id, a.email, p.added_at
+      `SELECT a.id, a.name, p.added_at
        FROM campaign_players p JOIN accounts a ON a.id = p.account_id
        WHERE p.campaign_id = $1 AND p.account_id = $2`,
       [campaignId, accountId],
@@ -486,7 +586,7 @@ export class Store {
    */
   async listCampaignDrafts(campaignId: string): Promise<ReachableDraftRow[]> {
     return this.db.query<ReachableDraftRow>(
-      `SELECT ${DRAFT_COLUMNS_D}, o.email AS owner_email,
+      `SELECT ${DRAFT_COLUMNS_D}, o.name AS owner_name,
          CASE WHEN d.account_id = c.account_id THEN 'owner' ELSE 'gameMaster' END AS access
        FROM drafts d JOIN campaigns c ON c.id = d.campaign_id
        JOIN accounts o ON o.id = d.account_id

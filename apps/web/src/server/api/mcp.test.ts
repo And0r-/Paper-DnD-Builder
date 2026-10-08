@@ -25,7 +25,7 @@ let owner: Client;
 beforeEach(async () => {
   server = await startTestServer();
   owner = new Client(server);
-  await signIn(owner, server, "owner@example.org", "en");
+  await signIn(owner, "owner@example.org", "en");
 });
 
 async function makeKey(client: Client = owner): Promise<{ id: string; secret: string }> {
@@ -319,7 +319,7 @@ describe("the shared tools over the API, with nothing but a key", () => {
 
   it("does not see someone else's character", async () => {
     const other = new Client(server, "203.0.113.8");
-    await signIn(other, server, "other@example.org");
+    await signIn(other, "other@example.org");
     const theirs = await other.call("POST", "/api/drafts", { packageId: "demo" });
     expect(theirs.status).toBe(201);
     const theirId: string = theirs.json.draft.id;
@@ -367,7 +367,7 @@ describe("the HTTP server: a key per request, nothing kept between requests", ()
 
   it("with key A shows only A's characters, never B's", async () => {
     const other = new Client(server, "203.0.113.8");
-    await signIn(other, server, "other@example.org");
+    await signIn(other, "other@example.org");
     const theirs = await other.call("POST", "/api/drafts", { packageId: "demo" });
     const theirId: string = theirs.json.draft.id;
     const keyB = (await other.call("POST", "/api/account/keys", { name: "B" })).json.key.secret as string;

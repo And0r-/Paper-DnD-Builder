@@ -64,6 +64,33 @@ describe("migrate", () => {
     expect(rows).toEqual([{ name: "2026-10-04", expires_at: null, kind: "personal" }]);
   });
 
+  it("names the accounts made before by their address, keeps their old password, frees the address", async () => {
+    const migrations = await loadMigrations(new URL("../migrations/", import.meta.url));
+    const at = migrations.findIndex((m) => m.id === "0010_passwords");
+    await migrate(db, migrations.slice(0, at));
+    await db.query(
+      `INSERT INTO accounts (id, email, password_hash, language, created_at)
+       VALUES ('00000000-0000-4000-8000-000000000001', 'mira.fenn@example.org', 'x', 'de', now())`,
+    );
+
+    await migrate(db, migrations);
+
+    const rows = await db.query("SELECT name, email, password_hash FROM accounts");
+    expect(rows).toEqual([{ name: "mira.fenn", email: "mira.fenn@example.org", password_hash: "x" }]);
+    // The address is no key anymore; an account may have none.
+    await db.query(
+      `INSERT INTO accounts (id, name, email, language, created_at) VALUES
+       ('00000000-0000-4000-8000-000000000002', 'B', 'mira.fenn@example.org', 'de', now()),
+       ('00000000-0000-4000-8000-000000000003', 'C', NULL, 'de', now())`,
+    );
+    await expect(
+      db.query(
+        `INSERT INTO accounts (id, name, language, created_at)
+         VALUES ('00000000-0000-4000-8000-000000000004', '', 'de', now())`,
+      ),
+    ).rejects.toThrow();
+  });
+
   it("is idempotent", async () => {
     const migrations = [migration("0001_a", "CREATE TABLE a (x int)")];
     await migrate(db, migrations);

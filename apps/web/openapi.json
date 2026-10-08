@@ -23,21 +23,35 @@
     }
   ],
   "tags": [
-    { "name": "Login" },
-    { "name": "Account" },
-    { "name": "Access keys" },
-    { "name": "Packages" },
-    { "name": "Characters" },
-    { "name": "Print" },
+    {
+      "name": "Login"
+    },
+    {
+      "name": "Account"
+    },
+    {
+      "name": "Access keys"
+    },
+    {
+      "name": "Packages"
+    },
+    {
+      "name": "Characters"
+    },
+    {
+      "name": "Print"
+    },
     {
       "name": "Sheet copies",
       "description": "Copies of the sheet a player keeps and changes freely, and the play state. Kept apart from the character; the builder never reads them. Same access as the character: owner, game master of the owner's campaign, an access key of either; anyone else gets 404."
     },
     {
       "name": "Campaigns",
-      "description": "Whoever makes a campaign leads it (game master) and adds players by mail address. The game master reaches the players' characters that belong to the campaign; a character in no campaign stays private. A player sees only their own characters and the campaigns they are in. Anyone else gets 404."
+      "description": "Whoever makes a campaign leads it (game master) and adds players by mail address; the game master sees their names, never their addresses. The game master reaches the players' characters that belong to the campaign; a character in no campaign stays private. A player sees only their own characters and the campaigns they are in. Anyone else gets 404."
     },
-    { "name": "Server" },
+    {
+      "name": "Server"
+    },
     {
       "name": "MCP",
       "description": "The public MCP server and the download for running one yourself. Outside `/api`; see API.md, section MCP."
@@ -67,9 +81,15 @@
                       "items": {
                         "type": "object",
                         "properties": {
-                          "id": { "type": "string" },
-                          "version": { "type": "string" },
-                          "formatVersion": { "type": "string" }
+                          "id": {
+                            "type": "string"
+                          },
+                          "version": {
+                            "type": "string"
+                          },
+                          "formatVersion": {
+                            "type": "string"
+                          }
                         },
                         "required": ["id", "version", "formatVersion"],
                         "additionalProperties": false
@@ -77,7 +97,9 @@
                     },
                     "warnings": {
                       "type": "array",
-                      "items": { "type": "string" }
+                      "items": {
+                        "type": "string"
+                      }
                     }
                   },
                   "required": ["status", "packages", "warnings"],
@@ -104,7 +126,9 @@
             "description": "The description of every route.",
             "content": {
               "application/json": {
-                "schema": { "type": "object" }
+                "schema": {
+                  "type": "object"
+                }
               }
             }
           }
@@ -123,19 +147,21 @@
             "description": "The page.",
             "content": {
               "text/html": {
-                "schema": { "type": "string" }
+                "schema": {
+                  "type": "string"
+                }
               }
             }
           }
         }
       }
     },
-    "/api/auth/password": {
+    "/api/auth/signup": {
       "post": {
-        "operationId": "requestPassword",
-        "summary": "Mail a new password",
+        "operationId": "signup",
+        "summary": "Make an account",
         "tags": ["Login"],
-        "description": "Sign-up and \"forgot password\" in one: the server makes a password (four words and a number) and mails it. For an existing account the old password stops working. The answer is the same whether the address has an account or not.",
+        "description": "Makes an account with a name and, if given, a mail address (only a way back in; nothing is mailed now). The server makes the first password (five words and a number) and returns it in this answer only, and sets the session cookie: the player is logged in at once. At most 10 new accounts per hour per IP.",
         "security": [],
         "requestBody": {
           "required": true,
@@ -144,29 +170,61 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "email": {
+                  "name": {
                     "type": "string",
-                    "maxLength": 254
+                    "minLength": 1,
+                    "maxLength": 80,
+                    "description": "What the player wants to be called. Trimmed; 1 to 80 characters, one line. Not unique."
+                  },
+                  "email": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 254
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "Optional. A way back in if every password is lost. Several accounts may give the same address."
                   },
                   "language": {
                     "type": "string",
                     "maxLength": 10,
-                    "description": "Language of the mail for a new account (`de`, `en`)."
+                    "description": "Language of the screens and of the password's words (`de`, `en`); default `de`."
                   }
                 },
-                "required": ["email"],
-                "additionalProperties": true
+                "required": ["name"],
+                "additionalProperties": false
               }
             }
           }
         },
         "responses": {
-          "202": {
-            "description": "The mail is on its way.",
+          "201": {
+            "description": "The account and its first password, shown this once.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Sent"
+                  "type": "object",
+                  "properties": {
+                    "account": {
+                      "$ref": "#/components/schemas/Account"
+                    },
+                    "password": {
+                      "$ref": "#/components/schemas/NewPassword"
+                    }
+                  },
+                  "required": ["account", "password"],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "headers": {
+              "Set-Cookie": {
+                "description": "The session cookie (httpOnly).",
+                "schema": {
+                  "type": "string"
                 }
               }
             }
@@ -213,44 +271,6 @@
               }
             }
           },
-          "502": {
-            "description": "`mailFailed`",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error",
-                  "properties": {
-                    "error": {
-                      "properties": {
-                        "code": {
-                          "enum": ["mailFailed"]
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "`mailNotConfigured`",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error",
-                  "properties": {
-                    "error": {
-                      "properties": {
-                        "code": {
-                          "enum": ["mailNotConfigured"]
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
           "default": {
             "$ref": "#/components/responses/ServerError"
           }
@@ -260,9 +280,9 @@
     "/api/auth/login": {
       "post": {
         "operationId": "login",
-        "summary": "Log in with the mailed password",
+        "summary": "Log in with a password",
         "tags": ["Login"],
-        "description": "Sets the session cookie. Tools use an access key instead.",
+        "description": "The password alone finds the account; case, spaces instead of dashes and spaces around it do not matter. Sets the session cookie. Tools use an access key instead. Failed logins are limited per IP (30 in 15 minutes).",
         "security": [],
         "requestBody": {
           "required": true,
@@ -271,15 +291,14 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "email": {
-                    "type": "string"
-                  },
                   "password": {
-                    "type": "string"
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
                   }
                 },
-                "required": ["email", "password"],
-                "additionalProperties": true
+                "required": ["password"],
+                "additionalProperties": false
               }
             }
           }
@@ -314,6 +333,141 @@
             "$ref": "#/components/responses/BadBody"
           },
           "401": {
+            "description": "`wrongPassword`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "enum": ["wrongPassword"]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/CrossSite"
+          },
+          "413": {
+            "$ref": "#/components/responses/BodyTooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/JsonRequired"
+          },
+          "429": {
+            "description": "`tooManyAttempts`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "enum": ["tooManyAttempts"]
+                        },
+                        "retryAfter": {
+                          "type": "integer"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds to wait.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/api/auth/legacy-login": {
+      "post": {
+        "operationId": "legacyLogin",
+        "summary": "Log in an account from before",
+        "tags": ["Login"],
+        "description": "For accounts made when passwords were mailed: mail address and that password, once. The old password is swapped for a new one, returned in this answer only; from then on only the new one works. Sets the session cookie. Unknown addresses and wrong passwords get the same answer. Failed attempts are limited per address and per IP.",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "maxLength": 254
+                  },
+                  "password": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  }
+                },
+                "required": ["email", "password"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Logged in; the new password, shown this once.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "account": {
+                      "$ref": "#/components/schemas/Account"
+                    },
+                    "password": {
+                      "$ref": "#/components/schemas/NewPassword"
+                    }
+                  },
+                  "required": ["account", "password"],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "headers": {
+              "Set-Cookie": {
+                "description": "The session cookie (httpOnly).",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadBody"
+          },
+          "403": {
+            "$ref": "#/components/responses/CrossSite"
+          },
+          "413": {
+            "$ref": "#/components/responses/BodyTooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/JsonRequired"
+          },
+          "401": {
             "description": "`wrongMailOrPassword`",
             "content": {
               "application/json": {
@@ -331,15 +485,6 @@
                 }
               }
             }
-          },
-          "403": {
-            "$ref": "#/components/responses/CrossSite"
-          },
-          "413": {
-            "$ref": "#/components/responses/BodyTooLarge"
-          },
-          "415": {
-            "$ref": "#/components/responses/JsonRequired"
           },
           "429": {
             "description": "`tooManyAttempts`",
@@ -478,9 +623,9 @@
     "/api/account/settings": {
       "patch": {
         "operationId": "updateSettings",
-        "summary": "Change language, units or the print choice",
+        "summary": "Change name, mail address, language, units or the print choice",
         "tags": ["Account"],
-        "description": "`units` maps a dimension to a unit; `null` follows the language's default again. `print` keeps what the download dialog offers next time; fields left out stay as they are.",
+        "description": "`name` is what the player is called (shown to game masters); `email` the way back in, `null` removes it. `units` maps a dimension to a unit; `null` follows the language's default again. `print` keeps what the download dialog offers next time; fields left out stay as they are.",
         "requestBody": {
           "required": true,
           "content": {
@@ -488,6 +633,23 @@
               "schema": {
                 "type": "object",
                 "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 80,
+                    "description": "Trimmed; one line."
+                  },
+                  "email": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 254
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
                   "language": {
                     "enum": ["de", "en"]
                   },
@@ -600,19 +762,29 @@
         }
       }
     },
-    "/api/account/password": {
-      "post": {
-        "operationId": "renewPassword",
-        "summary": "Mail a new password",
+    "/api/account/passwords": {
+      "get": {
+        "operationId": "listPasswords",
+        "summary": "List the account's passwords",
         "tags": ["Account"],
-        "description": "The old password stops working and every other browser session ends.",
+        "description": "Oldest first. The passwords themselves are not stored and never shown again; `name` is what the owner called one.",
         "responses": {
-          "202": {
-            "description": "The mail is on its way.",
+          "200": {
+            "description": "The passwords.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Sent"
+                  "type": "object",
+                  "properties": {
+                    "passwords": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Password"
+                      }
+                    }
+                  },
+                  "required": ["passwords"],
+                  "additionalProperties": false
                 }
               }
             }
@@ -620,11 +792,62 @@
           "401": {
             "$ref": "#/components/responses/Unauthorized"
           },
-          "403": {
-            "$ref": "#/components/responses/CrossSite"
+          "default": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      },
+      "post": {
+        "operationId": "createPassword",
+        "summary": "Make a password",
+        "tags": ["Account"],
+        "description": "Another password for the account, for example one per device or one on paper; each one logs in. Only with the session cookie (the settings screen); a request with a key gets `403 keyCannotMakePasswords`. `password.secret` is in this answer only. At most 10 per account.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 80,
+                    "description": "What the password is for, in the owner's words. One line. Default: the day it is made (`2026-10-08`)."
+                  }
+                },
+                "required": [],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The new password, shown this once.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "password": {
+                      "$ref": "#/components/schemas/NewPassword"
+                    }
+                  },
+                  "required": ["password"],
+                  "additionalProperties": false
+                }
+              }
+            }
           },
-          "429": {
-            "description": "`tooManyAttempts`",
+          "400": {
+            "$ref": "#/components/responses/BadBody"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "description": "`keyCannotMakePasswords`, `crossSite`",
             "content": {
               "application/json": {
                 "schema": {
@@ -633,9 +856,34 @@
                     "error": {
                       "properties": {
                         "code": {
-                          "enum": ["tooManyAttempts"]
+                          "enum": ["keyCannotMakePasswords", "crossSite"]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "$ref": "#/components/responses/BodyTooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/JsonRequired"
+          },
+          "422": {
+            "description": "`tooManyPasswords`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "enum": ["tooManyPasswords"]
                         },
-                        "retryAfter": {
+                        "max": {
                           "type": "integer"
                         }
                       }
@@ -643,18 +891,43 @@
                   }
                 }
               }
-            },
-            "headers": {
-              "Retry-After": {
-                "description": "Seconds to wait.",
-                "schema": {
-                  "type": "integer"
-                }
-              }
             }
           },
-          "502": {
-            "description": "`mailFailed`",
+          "default": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/api/account/passwords/{id}": {
+      "delete": {
+        "operationId": "deletePassword",
+        "summary": "Delete a password",
+        "tags": ["Account"],
+        "description": "Takes effect at once: a login with it fails. Sessions opened with it stay. The account's last password cannot be deleted (`422 lastPassword`): without one, nobody gets back in.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Password id from the list.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Done. No body."
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/CrossSite"
+          },
+          "404": {
+            "description": "`passwordNotFound`",
             "content": {
               "application/json": {
                 "schema": {
@@ -663,7 +936,7 @@
                     "error": {
                       "properties": {
                         "code": {
-                          "enum": ["mailFailed"]
+                          "enum": ["passwordNotFound"]
                         }
                       }
                     }
@@ -672,8 +945,8 @@
               }
             }
           },
-          "503": {
-            "description": "`mailNotConfigured`",
+          "422": {
+            "description": "`lastPassword`",
             "content": {
               "application/json": {
                 "schema": {
@@ -682,7 +955,7 @@
                     "error": {
                       "properties": {
                         "code": {
-                          "enum": ["mailNotConfigured"]
+                          "enum": ["lastPassword"]
                         }
                       }
                     }
@@ -1140,7 +1413,14 @@
                     "type": "integer"
                   },
                   "campaignId": {
-                    "anyOf": [{ "type": "string" }, { "type": "null" }],
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
                     "description": "A campaign you play in or lead; left out or null for none."
                   }
                 },
@@ -1492,24 +1772,34 @@
             "in": "path",
             "required": true,
             "description": "Draft id (a UUID).",
-            "schema": { "type": "string" }
+            "schema": {
+              "type": "string"
+            }
           },
           {
             "name": "value",
             "in": "path",
             "required": true,
             "description": "Value id from the package (`evaluation.values` lists them).",
-            "schema": { "type": "string" }
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
           "200": {
             "description": "The parts of the value.",
             "content": {
-              "application/json": { "schema": { "$ref": "#/components/schemas/ValueExplanation" } }
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValueExplanation"
+                }
+              }
             }
           },
-          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
           "404": {
             "description": "`draftNotFound` (also someone else's character: it looks exactly like a missing one), `valueNotFound` (the package has no such value)",
             "content": {
@@ -1517,7 +1807,13 @@
                 "schema": {
                   "$ref": "#/components/schemas/Error",
                   "properties": {
-                    "error": { "properties": { "code": { "enum": ["draftNotFound", "valueNotFound"] } } }
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "enum": ["draftNotFound", "valueNotFound"]
+                        }
+                      }
+                    }
                   }
                 }
               }
@@ -1529,12 +1825,22 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Error",
-                  "properties": { "error": { "properties": { "code": { "enum": ["packageUnavailable"] } } } }
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "enum": ["packageUnavailable"]
+                        }
+                      }
+                    }
+                  }
                 }
               }
             }
           },
-          "default": { "$ref": "#/components/responses/ServerError" }
+          "default": {
+            "$ref": "#/components/responses/ServerError"
+          }
         }
       }
     },
@@ -2011,7 +2317,14 @@
                 "type": "object",
                 "properties": {
                   "campaignId": {
-                    "anyOf": [{ "type": "string" }, { "type": "null" }],
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
                     "description": "A campaign you play in or lead, or null for none."
                   }
                 },
@@ -2455,7 +2768,9 @@
             "in": "query",
             "required": false,
             "description": "The reader's time zone (`Europe/Zurich`). A copy that kept the name it was made with is printed as the screen names it, by the minute it was made in this zone; the file name of a copy names it too. Without it, the server's zone.",
-            "schema": { "type": "string" }
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -2638,7 +2953,9 @@
             "in": "path",
             "required": true,
             "description": "Draft id (a UUID).",
-            "schema": { "type": "string" }
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -2649,13 +2966,23 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "copies": { "type": "array", "items": { "$ref": "#/components/schemas/SheetCopy" } },
-                    "original": { "$ref": "#/components/schemas/OriginalStamp" },
+                    "copies": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/SheetCopy"
+                      }
+                    },
+                    "original": {
+                      "$ref": "#/components/schemas/OriginalStamp"
+                    },
                     "opened": {
                       "type": ["string", "null"],
                       "description": "The copy this account opened last; null for the original."
                     },
-                    "max": { "type": "integer", "description": "How many copies a character may have." }
+                    "max": {
+                      "type": "integer",
+                      "description": "How many copies a character may have."
+                    }
                   },
                   "required": ["copies", "original", "opened", "max"],
                   "additionalProperties": false
@@ -2663,19 +2990,31 @@
               }
             }
           },
-          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
           "404": {
             "description": "`draftNotFound` (also someone else's character: it looks exactly like a missing one)",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Error",
-                  "properties": { "error": { "properties": { "code": { "enum": ["draftNotFound"] } } } }
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "enum": ["draftNotFound"]
+                        }
+                      }
+                    }
+                  }
                 }
               }
             }
           },
-          "default": { "$ref": "#/components/responses/ServerError" }
+          "default": {
+            "$ref": "#/components/responses/ServerError"
+          }
         }
       },
       "post": {
@@ -2689,7 +3028,9 @@
             "in": "path",
             "required": true,
             "description": "Draft id (a UUID).",
-            "schema": { "type": "string" }
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -2705,7 +3046,9 @@
                     "maxLength": 80,
                     "description": "One line, no control characters."
                   },
-                  "model": { "$ref": "#/components/schemas/SheetModel" }
+                  "model": {
+                    "$ref": "#/components/schemas/SheetModel"
+                  }
                 },
                 "additionalProperties": false
               }
@@ -2715,18 +3058,38 @@
         "responses": {
           "201": {
             "description": "The new copy.",
-            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/SheetCopyView" } } }
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SheetCopyView"
+                }
+              }
+            }
           },
-          "400": { "$ref": "#/components/responses/BadBody" },
-          "401": { "$ref": "#/components/responses/Unauthorized" },
-          "403": { "$ref": "#/components/responses/CrossSite" },
+          "400": {
+            "$ref": "#/components/responses/BadBody"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/CrossSite"
+          },
           "404": {
             "description": "`draftNotFound` (also someone else's character: it looks exactly like a missing one)",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Error",
-                  "properties": { "error": { "properties": { "code": { "enum": ["draftNotFound"] } } } }
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "enum": ["draftNotFound"]
+                        }
+                      }
+                    }
+                  }
                 }
               }
             }
@@ -2743,10 +3106,21 @@
                         "code": {
                           "enum": ["notFinished", "tooManyCopies", "originalChanged", "packageUnavailable"]
                         },
-                        "open": { "type": "array", "items": { "type": "string" } },
-                        "max": { "type": "integer" },
-                        "original": { "$ref": "#/components/schemas/OriginalStamp" },
-                        "packageId": { "type": "string" }
+                        "open": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "max": {
+                          "type": "integer"
+                        },
+                        "original": {
+                          "$ref": "#/components/schemas/OriginalStamp"
+                        },
+                        "packageId": {
+                          "type": "string"
+                        }
                       }
                     }
                   }
@@ -2763,8 +3137,12 @@
                   "properties": {
                     "error": {
                       "properties": {
-                        "code": { "enum": ["bodyTooLarge", "copyTooLarge"] },
-                        "max": { "type": "integer" }
+                        "code": {
+                          "enum": ["bodyTooLarge", "copyTooLarge"]
+                        },
+                        "max": {
+                          "type": "integer"
+                        }
                       }
                     }
                   }
@@ -2772,7 +3150,9 @@
               }
             }
           },
-          "415": { "$ref": "#/components/responses/JsonRequired" },
+          "415": {
+            "$ref": "#/components/responses/JsonRequired"
+          },
           "422": {
             "description": "`languageNotSupported`",
             "content": {
@@ -2782,9 +3162,18 @@
                   "properties": {
                     "error": {
                       "properties": {
-                        "code": { "enum": ["languageNotSupported"] },
-                        "language": { "type": "string" },
-                        "languages": { "type": "array", "items": { "type": "string" } }
+                        "code": {
+                          "enum": ["languageNotSupported"]
+                        },
+                        "language": {
+                          "type": "string"
+                        },
+                        "languages": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
                       }
                     }
                   }
@@ -2792,7 +3181,9 @@
               }
             }
           },
-          "default": { "$ref": "#/components/responses/ServerError" }
+          "default": {
+            "$ref": "#/components/responses/ServerError"
+          }
         }
       }
     },
@@ -2808,22 +3199,34 @@
             "in": "path",
             "required": true,
             "description": "Draft id (a UUID).",
-            "schema": { "type": "string" }
+            "schema": {
+              "type": "string"
+            }
           },
           {
             "name": "copyId",
             "in": "path",
             "required": true,
             "description": "Copy id (a UUID).",
-            "schema": { "type": "string" }
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
           "200": {
             "description": "The copy.",
-            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/SheetCopyView" } } }
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SheetCopyView"
+                }
+              }
+            }
           },
-          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
           "404": {
             "description": "`draftNotFound` (also someone else's character), `copyNotFound`",
             "content": {
@@ -2831,13 +3234,21 @@
                 "schema": {
                   "$ref": "#/components/schemas/Error",
                   "properties": {
-                    "error": { "properties": { "code": { "enum": ["draftNotFound", "copyNotFound"] } } }
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "enum": ["draftNotFound", "copyNotFound"]
+                        }
+                      }
+                    }
                   }
                 }
               }
             }
           },
-          "default": { "$ref": "#/components/responses/ServerError" }
+          "default": {
+            "$ref": "#/components/responses/ServerError"
+          }
         }
       },
       "put": {
@@ -2851,14 +3262,18 @@
             "in": "path",
             "required": true,
             "description": "Draft id (a UUID).",
-            "schema": { "type": "string" }
+            "schema": {
+              "type": "string"
+            }
           },
           {
             "name": "copyId",
             "in": "path",
             "required": true,
             "description": "Copy id (a UUID).",
-            "schema": { "type": "string" }
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -2879,7 +3294,9 @@
                     "maxLength": 80,
                     "description": "One line, no control characters."
                   },
-                  "model": { "$ref": "#/components/schemas/SheetModel" }
+                  "model": {
+                    "$ref": "#/components/schemas/SheetModel"
+                  }
                 },
                 "required": ["version"],
                 "additionalProperties": false
@@ -2890,11 +3307,23 @@
         "responses": {
           "200": {
             "description": "The changed copy.",
-            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/SheetCopyView" } } }
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SheetCopyView"
+                }
+              }
+            }
           },
-          "400": { "$ref": "#/components/responses/BadBody" },
-          "401": { "$ref": "#/components/responses/Unauthorized" },
-          "403": { "$ref": "#/components/responses/CrossSite" },
+          "400": {
+            "$ref": "#/components/responses/BadBody"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/CrossSite"
+          },
           "404": {
             "description": "`draftNotFound` (also someone else's character), `copyNotFound`",
             "content": {
@@ -2902,7 +3331,13 @@
                 "schema": {
                   "$ref": "#/components/schemas/Error",
                   "properties": {
-                    "error": { "properties": { "code": { "enum": ["draftNotFound", "copyNotFound"] } } }
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "enum": ["draftNotFound", "copyNotFound"]
+                        }
+                      }
+                    }
                   }
                 }
               }
@@ -2917,8 +3352,12 @@
                   "properties": {
                     "error": {
                       "properties": {
-                        "code": { "enum": ["versionConflict"] },
-                        "current": { "$ref": "#/components/schemas/SheetCopyView" }
+                        "code": {
+                          "enum": ["versionConflict"]
+                        },
+                        "current": {
+                          "$ref": "#/components/schemas/SheetCopyView"
+                        }
                       }
                     }
                   }
@@ -2935,8 +3374,12 @@
                   "properties": {
                     "error": {
                       "properties": {
-                        "code": { "enum": ["bodyTooLarge", "copyTooLarge"] },
-                        "max": { "type": "integer" }
+                        "code": {
+                          "enum": ["bodyTooLarge", "copyTooLarge"]
+                        },
+                        "max": {
+                          "type": "integer"
+                        }
                       }
                     }
                   }
@@ -2944,8 +3387,12 @@
               }
             }
           },
-          "415": { "$ref": "#/components/responses/JsonRequired" },
-          "default": { "$ref": "#/components/responses/ServerError" }
+          "415": {
+            "$ref": "#/components/responses/JsonRequired"
+          },
+          "default": {
+            "$ref": "#/components/responses/ServerError"
+          }
         }
       },
       "delete": {
@@ -2958,20 +3405,30 @@
             "in": "path",
             "required": true,
             "description": "Draft id (a UUID).",
-            "schema": { "type": "string" }
+            "schema": {
+              "type": "string"
+            }
           },
           {
             "name": "copyId",
             "in": "path",
             "required": true,
             "description": "Copy id (a UUID).",
-            "schema": { "type": "string" }
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
-          "204": { "description": "Done. No body." },
-          "401": { "$ref": "#/components/responses/Unauthorized" },
-          "403": { "$ref": "#/components/responses/CrossSite" },
+          "204": {
+            "description": "Done. No body."
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/CrossSite"
+          },
           "404": {
             "description": "`draftNotFound` (also someone else's character), `copyNotFound`",
             "content": {
@@ -2979,13 +3436,21 @@
                 "schema": {
                   "$ref": "#/components/schemas/Error",
                   "properties": {
-                    "error": { "properties": { "code": { "enum": ["draftNotFound", "copyNotFound"] } } }
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "enum": ["draftNotFound", "copyNotFound"]
+                        }
+                      }
+                    }
                   }
                 }
               }
             }
           },
-          "default": { "$ref": "#/components/responses/ServerError" }
+          "default": {
+            "$ref": "#/components/responses/ServerError"
+          }
         }
       }
     },
@@ -3051,7 +3516,13 @@
                             "type": "integer",
                             "minimum": 0
                           },
-                          "cols": { "type": "array", "items": { "type": "integer", "minimum": 0 } }
+                          "cols": {
+                            "type": "array",
+                            "items": {
+                              "type": "integer",
+                              "minimum": 0
+                            }
+                          }
                         },
                         "required": ["page", "col", "cols"],
                         "additionalProperties": false
@@ -3159,7 +3630,9 @@
             "in": "path",
             "required": true,
             "description": "Draft id (a UUID).",
-            "schema": { "type": "string" }
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -3168,7 +3641,11 @@
             "application/json": {
               "schema": {
                 "type": "object",
-                "properties": { "copyId": { "type": ["string", "null"] } },
+                "properties": {
+                  "copyId": {
+                    "type": ["string", "null"]
+                  }
+                },
                 "required": ["copyId"],
                 "additionalProperties": false
               }
@@ -3182,15 +3659,23 @@
               "application/json": {
                 "schema": {
                   "type": "object",
-                  "properties": { "opened": { "type": ["string", "null"] } },
+                  "properties": {
+                    "opened": {
+                      "type": ["string", "null"]
+                    }
+                  },
                   "required": ["opened"],
                   "additionalProperties": false
                 }
               }
             }
           },
-          "400": { "$ref": "#/components/responses/BadBody" },
-          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "400": {
+            "$ref": "#/components/responses/BadBody"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
           "404": {
             "description": "`draftNotFound` (also someone else's character), `copyNotFound`",
             "content": {
@@ -3198,13 +3683,21 @@
                 "schema": {
                   "$ref": "#/components/schemas/Error",
                   "properties": {
-                    "error": { "properties": { "code": { "enum": ["draftNotFound", "copyNotFound"] } } }
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "enum": ["draftNotFound", "copyNotFound"]
+                        }
+                      }
+                    }
                   }
                 }
               }
             }
           },
-          "default": { "$ref": "#/components/responses/ServerError" }
+          "default": {
+            "$ref": "#/components/responses/ServerError"
+          }
         }
       }
     },
@@ -3220,27 +3713,47 @@
             "in": "path",
             "required": true,
             "description": "Draft id (a UUID).",
-            "schema": { "type": "string" }
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
           "200": {
             "description": "The play state; `version: 0` and `{}` while nothing is stored.",
-            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PlayStateView" } } }
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlayStateView"
+                }
+              }
+            }
           },
-          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
           "404": {
             "description": "`draftNotFound` (also someone else's character: it looks exactly like a missing one)",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Error",
-                  "properties": { "error": { "properties": { "code": { "enum": ["draftNotFound"] } } } }
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "enum": ["draftNotFound"]
+                        }
+                      }
+                    }
+                  }
                 }
               }
             }
           },
-          "default": { "$ref": "#/components/responses/ServerError" }
+          "default": {
+            "$ref": "#/components/responses/ServerError"
+          }
         }
       },
       "put": {
@@ -3254,7 +3767,9 @@
             "in": "path",
             "required": true,
             "description": "Draft id (a UUID).",
-            "schema": { "type": "string" }
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -3266,8 +3781,13 @@
                   {
                     "type": "object",
                     "properties": {
-                      "version": { "type": "integer", "minimum": 0 },
-                      "state": { "$ref": "#/components/schemas/PlayState" }
+                      "version": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "state": {
+                        "$ref": "#/components/schemas/PlayState"
+                      }
                     },
                     "required": ["version", "state"],
                     "additionalProperties": false
@@ -3275,8 +3795,13 @@
                   {
                     "type": "object",
                     "properties": {
-                      "version": { "type": "integer", "minimum": 0 },
-                      "clearChecks": { "const": true }
+                      "version": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "clearChecks": {
+                        "const": true
+                      }
                     },
                     "required": ["version", "clearChecks"],
                     "additionalProperties": false
@@ -3289,18 +3814,38 @@
         "responses": {
           "200": {
             "description": "The stored state.",
-            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PlayStateView" } } }
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlayStateView"
+                }
+              }
+            }
           },
-          "400": { "$ref": "#/components/responses/BadBody" },
-          "401": { "$ref": "#/components/responses/Unauthorized" },
-          "403": { "$ref": "#/components/responses/CrossSite" },
+          "400": {
+            "$ref": "#/components/responses/BadBody"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/CrossSite"
+          },
           "404": {
             "description": "`draftNotFound` (also someone else's character: it looks exactly like a missing one)",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Error",
-                  "properties": { "error": { "properties": { "code": { "enum": ["draftNotFound"] } } } }
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "enum": ["draftNotFound"]
+                        }
+                      }
+                    }
+                  }
                 }
               }
             }
@@ -3314,8 +3859,12 @@
                   "properties": {
                     "error": {
                       "properties": {
-                        "code": { "enum": ["versionConflict"] },
-                        "current": { "$ref": "#/components/schemas/PlayStateView" }
+                        "code": {
+                          "enum": ["versionConflict"]
+                        },
+                        "current": {
+                          "$ref": "#/components/schemas/PlayStateView"
+                        }
                       }
                     }
                   }
@@ -3323,9 +3872,15 @@
               }
             }
           },
-          "413": { "$ref": "#/components/responses/BodyTooLarge" },
-          "415": { "$ref": "#/components/responses/JsonRequired" },
-          "default": { "$ref": "#/components/responses/ServerError" }
+          "413": {
+            "$ref": "#/components/responses/BodyTooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/JsonRequired"
+          },
+          "default": {
+            "$ref": "#/components/responses/ServerError"
+          }
         }
       }
     },
@@ -3689,7 +4244,7 @@
             }
           }
         ],
-        "description": "Game master only. An address without an account gets one and the password mail; an existing account keeps its password and gets a short mail. Both mails name the game master. The answer is the same either way. The mail goes out before anything is stored. At most 50 players per campaign; at most 30 additions per hour per game master, 5 mails per hour per address.",
+        "description": "Game master only. Until invitations by link come: the address must be one a player gave. An existing account gets a short mail that names the game master (if two accounts give the address, the oldest is added). An address without an account gets an account without a password and no mail; its owner can get in only once a way back in by mail exists. The answer names the player, never their address. At most 50 players per campaign; at most 30 additions per hour per game master, 5 per hour per address.",
         "requestBody": {
           "required": true,
           "content": {
@@ -3703,7 +4258,7 @@
                   },
                   "language": {
                     "enum": ["de", "en"],
-                    "description": "Language of a new account and its mail; default: yours. An existing account keeps its own."
+                    "description": "Language of a new account; default: yours. An existing account keeps its own."
                   }
                 },
                 "required": ["email"],
@@ -3993,7 +4548,14 @@
                     "type": "integer"
                   },
                   "campaignId": {
-                    "anyOf": [{ "type": "string" }, { "type": "null" }],
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
                     "description": "Optional; if given, this campaign's id."
                   }
                 },
@@ -4467,21 +5029,35 @@
       "SheetModel": {
         "type": "object",
         "properties": {
-          "version": { "type": "number", "const": 1 },
-          "language": { "type": "string" },
+          "version": {
+            "type": "number",
+            "const": 1
+          },
+          "language": {
+            "type": "string"
+          },
           "origin": {
             "oneOf": [
               {
                 "type": "object",
                 "properties": {
-                  "kind": { "type": "string", "const": "original" },
-                  "level": { "type": "integer", "minimum": -9007199254740991, "maximum": 9007199254740991 },
+                  "kind": {
+                    "type": "string",
+                    "const": "original"
+                  },
+                  "level": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
                   "builtAt": {
                     "type": "string",
                     "format": "date-time",
                     "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
                   },
-                  "packageVersion": { "type": "string" },
+                  "packageVersion": {
+                    "type": "string"
+                  },
                   "changedAt": {
                     "type": "string",
                     "format": "date-time",
@@ -4494,8 +5070,13 @@
               {
                 "type": "object",
                 "properties": {
-                  "kind": { "type": "string", "const": "copy" },
-                  "name": { "type": "string" },
+                  "kind": {
+                    "type": "string",
+                    "const": "copy"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
                   "createdAt": {
                     "type": "string",
                     "format": "date-time",
@@ -4506,7 +5087,9 @@
                     "minimum": -9007199254740991,
                     "maximum": 9007199254740991
                   },
-                  "fromPackageVersion": { "type": "string" },
+                  "fromPackageVersion": {
+                    "type": "string"
+                  },
                   "fromChangedAt": {
                     "type": "string",
                     "format": "date-time",
@@ -4518,19 +5101,41 @@
               }
             ]
           },
-          "packageId": { "type": "string" },
-          "name": { "type": "string" },
-          "level": { "type": "integer", "minimum": -9007199254740991, "maximum": 9007199254740991 },
-          "levelLabel": { "type": "string" },
-          "packageName": { "type": "string" },
+          "packageId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "level": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "levelLabel": {
+            "type": "string"
+          },
+          "packageName": {
+            "type": "string"
+          },
           "units": {
             "type": "object",
-            "propertyNames": { "type": "string" },
-            "additionalProperties": { "type": "string" }
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {
+              "type": "string"
+            }
           },
-          "unitsLine": { "type": "string" },
-          "attribution": { "type": "string" },
-          "createdOn": { "type": "string" },
+          "unitsLine": {
+            "type": "string"
+          },
+          "attribution": {
+            "type": "string"
+          },
+          "createdOn": {
+            "type": "string"
+          },
           "sections": {
             "type": "array",
             "items": {
@@ -4538,25 +5143,56 @@
                 {
                   "type": "object",
                   "properties": {
-                    "id": { "type": "string" },
-                    "span": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
-                    "apart": { "type": "boolean" },
-                    "title": { "type": "string" },
-                    "hint": { "type": "string" },
-                    "kind": { "type": "string", "const": "header" },
-                    "name": { "type": "string" },
-                    "summary": { "type": "string" },
-                    "packageName": { "type": "string" },
+                    "id": {
+                      "type": "string"
+                    },
+                    "span": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 9007199254740991
+                    },
+                    "apart": {
+                      "type": "boolean"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "hint": {
+                      "type": "string"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "const": "header"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "summary": {
+                      "type": "string"
+                    },
+                    "packageName": {
+                      "type": "string"
+                    },
                     "fields": {
                       "type": "array",
                       "items": {
                         "type": "object",
-                        "properties": { "label": { "type": "string" }, "text": { "type": "string" } },
+                        "properties": {
+                          "label": {
+                            "type": "string"
+                          },
+                          "text": {
+                            "type": "string"
+                          }
+                        },
                         "required": ["label", "text"],
                         "additionalProperties": false
                       }
                     },
-                    "playedByField": { "type": "string", "minLength": 1 }
+                    "playedByField": {
+                      "type": "string",
+                      "minLength": 1
+                    }
                   },
                   "required": [
                     "id",
@@ -4574,25 +5210,62 @@
                 {
                   "type": "object",
                   "properties": {
-                    "id": { "type": "string" },
-                    "span": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
-                    "apart": { "type": "boolean" },
-                    "title": { "type": "string" },
-                    "hint": { "type": "string" },
-                    "kind": { "type": "string", "const": "statBoxes" },
+                    "id": {
+                      "type": "string"
+                    },
+                    "span": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 9007199254740991
+                    },
+                    "apart": {
+                      "type": "boolean"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "hint": {
+                      "type": "string"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "const": "statBoxes"
+                    },
                     "boxes": {
                       "type": "array",
                       "items": {
                         "type": "object",
                         "properties": {
-                          "valueId": { "type": "string" },
-                          "label": { "type": "string" },
-                          "style": { "type": "string", "enum": ["number", "pencil", "circles", "boxes"] },
-                          "text": { "type": "string" },
-                          "circles": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
-                          "squares": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
-                          "hint": { "type": "string" },
-                          "field": { "type": "string", "minLength": 1 }
+                          "valueId": {
+                            "type": "string"
+                          },
+                          "label": {
+                            "type": "string"
+                          },
+                          "style": {
+                            "type": "string",
+                            "enum": ["number", "pencil", "circles", "boxes"]
+                          },
+                          "text": {
+                            "type": "string"
+                          },
+                          "circles": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "squares": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "hint": {
+                            "type": "string"
+                          },
+                          "field": {
+                            "type": "string",
+                            "minLength": 1
+                          }
                         },
                         "required": ["valueId", "label", "style", "text", "circles", "squares", "hint"],
                         "additionalProperties": false
@@ -4605,35 +5278,68 @@
                 {
                   "type": "object",
                   "properties": {
-                    "id": { "type": "string" },
-                    "span": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
-                    "apart": { "type": "boolean" },
-                    "title": { "type": "string" },
-                    "hint": { "type": "string" },
-                    "kind": { "type": "string", "const": "scoreColumn" },
+                    "id": {
+                      "type": "string"
+                    },
+                    "span": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 9007199254740991
+                    },
+                    "apart": {
+                      "type": "boolean"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "hint": {
+                      "type": "string"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "const": "scoreColumn"
+                    },
                     "scores": {
                       "type": "array",
                       "items": {
                         "type": "object",
                         "properties": {
-                          "valueId": { "type": "string" },
-                          "label": { "type": "string" },
-                          "value": { "type": "string" },
-                          "derivedId": { "type": "string" },
-                          "derivedLabel": { "type": "string" },
-                          "derived": { "type": ["string", "null"] },
+                          "valueId": {
+                            "type": "string"
+                          },
+                          "label": {
+                            "type": "string"
+                          },
+                          "value": {
+                            "type": "string"
+                          },
+                          "derivedId": {
+                            "type": "string"
+                          },
+                          "derivedLabel": {
+                            "type": "string"
+                          },
+                          "derived": {
+                            "type": ["string", "null"]
+                          },
                           "extra": {
                             "anyOf": [
                               {
                                 "type": "object",
                                 "properties": {
-                                  "label": { "type": "string" },
-                                  "value": { "type": "string" }
+                                  "label": {
+                                    "type": "string"
+                                  },
+                                  "value": {
+                                    "type": "string"
+                                  }
                                 },
                                 "required": ["label", "value"],
                                 "additionalProperties": false
                               },
-                              { "type": "null" }
+                              {
+                                "type": "null"
+                              }
                             ]
                           }
                         },
@@ -4648,35 +5354,75 @@
                 {
                   "type": "object",
                   "properties": {
-                    "id": { "type": "string" },
-                    "span": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
-                    "apart": { "type": "boolean" },
-                    "title": { "type": "string" },
-                    "hint": { "type": "string" },
-                    "kind": { "type": "string", "const": "checkList" },
+                    "id": {
+                      "type": "string"
+                    },
+                    "span": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 9007199254740991
+                    },
+                    "apart": {
+                      "type": "boolean"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "hint": {
+                      "type": "string"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "const": "checkList"
+                    },
                     "items": {
                       "type": "array",
                       "items": {
                         "type": "object",
                         "properties": {
-                          "id": { "type": "string" },
-                          "name": { "type": "string" },
-                          "marked": { "type": "boolean" },
-                          "strong": { "type": "boolean" },
-                          "note": { "type": "string" },
+                          "id": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "marked": {
+                            "type": "boolean"
+                          },
+                          "strong": {
+                            "type": "boolean"
+                          },
+                          "note": {
+                            "type": "string"
+                          },
                           "total": {
                             "type": "object",
-                            "properties": { "text": { "type": "string" }, "parts": { "type": "string" } },
+                            "properties": {
+                              "text": {
+                                "type": "string"
+                              },
+                              "parts": {
+                                "type": "string"
+                              }
+                            },
                             "required": ["text", "parts"],
                             "additionalProperties": false
                           },
-                          "field": { "type": "string", "minLength": 1 }
+                          "field": {
+                            "type": "string",
+                            "minLength": 1
+                          }
                         },
                         "required": ["id", "name", "marked", "note", "total"],
                         "additionalProperties": false
                       }
                     },
-                    "legend": { "type": "array", "items": { "type": "string" } }
+                    "legend": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
                   },
                   "required": ["id", "span", "title", "hint", "kind", "items", "legend"],
                   "additionalProperties": false
@@ -4684,21 +5430,53 @@
                 {
                   "type": "object",
                   "properties": {
-                    "id": { "type": "string" },
-                    "span": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
-                    "apart": { "type": "boolean" },
-                    "title": { "type": "string" },
-                    "hint": { "type": "string" },
-                    "kind": { "type": "string", "const": "statTable" },
-                    "columns": { "type": "array", "items": { "type": "string" } },
-                    "wrap": { "type": "array", "items": { "type": "boolean" } },
+                    "id": {
+                      "type": "string"
+                    },
+                    "span": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 9007199254740991
+                    },
+                    "apart": {
+                      "type": "boolean"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "hint": {
+                      "type": "string"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "const": "statTable"
+                    },
+                    "columns": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "wrap": {
+                      "type": "array",
+                      "items": {
+                        "type": "boolean"
+                      }
+                    },
                     "rows": {
                       "type": "array",
                       "items": {
                         "type": "object",
                         "properties": {
-                          "name": { "type": "string" },
-                          "cells": { "type": "array", "items": { "type": "string" } }
+                          "name": {
+                            "type": "string"
+                          },
+                          "cells": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          }
                         },
                         "required": ["name", "cells"],
                         "additionalProperties": false
@@ -4711,23 +5489,53 @@
                 {
                   "type": "object",
                   "properties": {
-                    "id": { "type": "string" },
-                    "span": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
-                    "apart": { "type": "boolean" },
-                    "title": { "type": "string" },
-                    "hint": { "type": "string" },
-                    "kind": { "type": "string", "const": "featureTable" },
-                    "lead": { "type": "array", "items": { "type": "string" } },
+                    "id": {
+                      "type": "string"
+                    },
+                    "span": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 9007199254740991
+                    },
+                    "apart": {
+                      "type": "boolean"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "hint": {
+                      "type": "string"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "const": "featureTable"
+                    },
+                    "lead": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
                     "rows": {
                       "type": "array",
                       "items": {
                         "type": "object",
                         "properties": {
-                          "id": { "type": "string" },
-                          "name": { "type": "string" },
-                          "marks": { "type": "string" },
-                          "note": { "type": "string" },
-                          "text": { "type": "string" },
+                          "id": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "marks": {
+                            "type": "string"
+                          },
+                          "note": {
+                            "type": "string"
+                          },
+                          "text": {
+                            "type": "string"
+                          },
                           "uses": {
                             "anyOf": [
                               {
@@ -4758,29 +5566,46 @@
                                   },
                                   {
                                     "type": "object",
-                                    "properties": { "text": { "type": "string" } },
+                                    "properties": {
+                                      "text": {
+                                        "type": "string"
+                                      }
+                                    },
                                     "required": ["text"],
                                     "additionalProperties": false
                                   }
                                 ]
                               },
-                              { "type": "null" }
+                              {
+                                "type": "null"
+                              }
                             ]
                           },
-                          "usesField": { "type": "string", "minLength": 1 },
+                          "usesField": {
+                            "type": "string",
+                            "minLength": 1
+                          },
                           "group": {
                             "anyOf": [
                               {
                                 "type": "object",
                                 "properties": {
-                                  "key": { "type": "string" },
-                                  "title": { "type": "string" },
-                                  "hint": { "type": "string" }
+                                  "key": {
+                                    "type": "string"
+                                  },
+                                  "title": {
+                                    "type": "string"
+                                  },
+                                  "hint": {
+                                    "type": "string"
+                                  }
                                 },
                                 "required": ["key", "title", "hint"],
                                 "additionalProperties": false
                               },
-                              { "type": "null" }
+                              {
+                                "type": "null"
+                              }
                             ]
                           }
                         },
@@ -4788,7 +5613,12 @@
                         "additionalProperties": false
                       }
                     },
-                    "legend": { "type": "array", "items": { "type": "string" } }
+                    "legend": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
                   },
                   "required": ["id", "span", "title", "hint", "kind", "lead", "rows", "legend"],
                   "additionalProperties": false
@@ -4796,15 +5626,42 @@
                 {
                   "type": "object",
                   "properties": {
-                    "id": { "type": "string" },
-                    "span": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
-                    "apart": { "type": "boolean" },
-                    "title": { "type": "string" },
-                    "hint": { "type": "string" },
-                    "kind": { "type": "string", "const": "list" },
-                    "items": { "type": "array", "items": { "type": "string" } },
-                    "blankLines": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
-                    "field": { "type": "string", "minLength": 1 }
+                    "id": {
+                      "type": "string"
+                    },
+                    "span": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 9007199254740991
+                    },
+                    "apart": {
+                      "type": "boolean"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "hint": {
+                      "type": "string"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "const": "list"
+                    },
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "blankLines": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "field": {
+                      "type": "string",
+                      "minLength": 1
+                    }
                   },
                   "required": ["id", "span", "title", "hint", "kind", "items", "blankLines"],
                   "additionalProperties": false
@@ -4812,17 +5669,39 @@
                 {
                   "type": "object",
                   "properties": {
-                    "id": { "type": "string" },
-                    "span": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
-                    "apart": { "type": "boolean" },
-                    "title": { "type": "string" },
-                    "hint": { "type": "string" },
-                    "kind": { "type": "string", "const": "answers" },
+                    "id": {
+                      "type": "string"
+                    },
+                    "span": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 9007199254740991
+                    },
+                    "apart": {
+                      "type": "boolean"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "hint": {
+                      "type": "string"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "const": "answers"
+                    },
                     "rows": {
                       "type": "array",
                       "items": {
                         "type": "object",
-                        "properties": { "label": { "type": "string" }, "text": { "type": "string" } },
+                        "properties": {
+                          "label": {
+                            "type": "string"
+                          },
+                          "text": {
+                            "type": "string"
+                          }
+                        },
                         "required": ["label", "text"],
                         "additionalProperties": false
                       }
@@ -4834,13 +5713,33 @@
                 {
                   "type": "object",
                   "properties": {
-                    "id": { "type": "string" },
-                    "span": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
-                    "apart": { "type": "boolean" },
-                    "title": { "type": "string" },
-                    "hint": { "type": "string" },
-                    "kind": { "type": "string", "const": "helpBox" },
-                    "paragraphs": { "type": "array", "items": { "type": "string" } }
+                    "id": {
+                      "type": "string"
+                    },
+                    "span": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 9007199254740991
+                    },
+                    "apart": {
+                      "type": "boolean"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "hint": {
+                      "type": "string"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "const": "helpBox"
+                    },
+                    "paragraphs": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
                   },
                   "required": ["id", "span", "title", "hint", "kind", "paragraphs"],
                   "additionalProperties": false
@@ -4848,14 +5747,36 @@
                 {
                   "type": "object",
                   "properties": {
-                    "id": { "type": "string" },
-                    "span": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
-                    "apart": { "type": "boolean" },
-                    "title": { "type": "string" },
-                    "hint": { "type": "string" },
-                    "kind": { "type": "string", "const": "notes" },
-                    "lines": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
-                    "field": { "type": "string", "minLength": 1 }
+                    "id": {
+                      "type": "string"
+                    },
+                    "span": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 9007199254740991
+                    },
+                    "apart": {
+                      "type": "boolean"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "hint": {
+                      "type": "string"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "const": "notes"
+                    },
+                    "lines": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "field": {
+                      "type": "string",
+                      "minLength": 1
+                    }
                   },
                   "required": ["id", "span", "title", "hint", "kind", "lines"],
                   "additionalProperties": false
@@ -4868,26 +5789,53 @@
             "items": {
               "type": "object",
               "properties": {
-                "id": { "type": "string" },
-                "typeLine": { "type": "string" },
-                "name": { "type": "string" },
+                "id": {
+                  "type": "string"
+                },
+                "typeLine": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
                 "fields": {
                   "type": "array",
                   "items": {
                     "type": "object",
-                    "properties": { "label": { "type": "string" }, "value": { "type": "string" } },
+                    "properties": {
+                      "label": {
+                        "type": "string"
+                      },
+                      "value": {
+                        "type": "string"
+                      }
+                    },
                     "required": ["label", "value"],
                     "additionalProperties": false
                   }
                 },
                 "origin": {
                   "type": "object",
-                  "properties": { "label": { "type": "string" }, "value": { "type": "string" } },
+                  "properties": {
+                    "label": {
+                      "type": "string"
+                    },
+                    "value": {
+                      "type": "string"
+                    }
+                  },
                   "required": ["label", "value"],
                   "additionalProperties": false
                 },
-                "table": { "type": "string" },
-                "rules": { "type": "array", "items": { "type": "string" } },
+                "table": {
+                  "type": "string"
+                },
+                "rules": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
                 "uses": {
                   "anyOf": [
                     {
@@ -4895,7 +5843,11 @@
                         {
                           "type": "object",
                           "properties": {
-                            "boxes": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 }
+                            "boxes": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 9007199254740991
+                            }
                           },
                           "required": ["boxes"],
                           "additionalProperties": false
@@ -4903,24 +5855,39 @@
                         {
                           "type": "object",
                           "properties": {
-                            "count": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 }
+                            "count": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 9007199254740991
+                            }
                           },
                           "required": ["count"],
                           "additionalProperties": false
                         },
                         {
                           "type": "object",
-                          "properties": { "text": { "type": "string" } },
+                          "properties": {
+                            "text": {
+                              "type": "string"
+                            }
+                          },
                           "required": ["text"],
                           "additionalProperties": false
                         }
                       ]
                     },
-                    { "type": "null" }
+                    {
+                      "type": "null"
+                    }
                   ]
                 },
-                "usesField": { "type": "string", "minLength": 1 },
-                "hint": { "type": "string" }
+                "usesField": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "hint": {
+                  "type": "string"
+                }
               },
               "required": ["id", "typeLine", "name", "fields", "table", "rules", "uses", "hint"],
               "additionalProperties": false
@@ -4931,14 +5898,27 @@
             "items": {
               "type": "object",
               "properties": {
-                "id": { "type": "string" },
-                "label": { "type": "string" },
-                "text": { "type": "string" },
+                "id": {
+                  "type": "string"
+                },
+                "label": {
+                  "type": "string"
+                },
+                "text": {
+                  "type": "string"
+                },
                 "dependents": {
                   "type": "array",
                   "items": {
                     "type": "object",
-                    "properties": { "id": { "type": "string" }, "label": { "type": "string" } },
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "label": {
+                        "type": "string"
+                      }
+                    },
                     "required": ["id", "label"],
                     "additionalProperties": false
                   }
@@ -4953,18 +5933,38 @@
             "items": {
               "type": "object",
               "properties": {
-                "origin": { "type": "string" },
-                "title": { "type": "string" },
+                "origin": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                },
                 "entries": {
                   "type": "array",
                   "items": {
                     "type": "object",
                     "properties": {
-                      "id": { "type": "string" },
-                      "name": { "type": "string" },
-                      "kindName": { "type": "string" },
-                      "rules": { "type": "array", "items": { "type": "string" } },
-                      "explain": { "type": "array", "items": { "type": "string" } }
+                      "id": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "kindName": {
+                        "type": "string"
+                      },
+                      "rules": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "explain": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      }
                     },
                     "required": ["id", "name", "kindName", "rules", "explain"],
                     "additionalProperties": false
@@ -4997,13 +5997,13 @@
         "additionalProperties": false
       },
       "ErrorCode": {
-        "description": "Every error code the API answers with. Stable and English; screens word them in the player's language.\n\n- `badJson`: 400. The body is not JSON.\n- `badRequest`: 400. The body has the wrong shape; `issues` lists `{ path, message }`.\n- `badQuery`: 400. A query parameter has a value the API does not know; `parameter` and `value` name it.\n- `designNotAvailable`: 400 (PDF) or 422 (settings). A planned sheet design that is not drawn yet; `designs` lists those that are.\n- `notLoggedIn`: 401. No session cookie and no `Authorization` header.\n- `keyNotValid`: 401. The `Authorization` header holds no valid access key (unknown, withdrawn, past its end, or not `Bearer <key>`).\n- `wrongMailOrPassword`: 401. Login failed.\n- `crossSite`: 403. A change sent from another site (`Origin` or `Sec-Fetch-Site`).\n- `keyCannotMakeKeys`: 403. Access keys are made on the settings screen only, never with a key.\n- `notFound`: 404. No such API path.\n- `draftNotFound`: 404. No draft with this id in this account.\n- `keyNotFound`: 404. No access key with this id in this account.\n- `packageNotFound`: 404. No loaded package with this id.\n- `languageNotFound`: 404. The package has no texts in this language.\n- `valueNotFound`: 404. The draft's package has no value with this id.\n- `versionNotFound`: 404. No such version of the sheet to print: neither `original` nor a kept copy of this character.\n- `methodNotAllowed`: 405. The path exists, the method does not.\n- `versionConflict`: 409. The draft moved on; `current` holds its state now.\n- `notFinished`: 409. The character is not finished (PDF) or not finished and not in a raise (level-up); `open` lists the open choices.\n- `packageUnavailable`: 409. The draft's package is not loaded right now; `packageId` names it.\n- `copyUnreadable`: 409. A kept copy stored in a shape this server no longer prints; `version` names it.\n- `bodyTooLarge`: 413. The body is larger than 64 KiB.\n- `jsonRequired`: 415. The body is not `application/json`.\n- `changeRejected`: 422. The rule core refused the change; `reason` says why (see `ChangeError`).\n- `incomplete`: 422. Finishing with open choices; `open` lists them.\n- `languageNotSupported`: 422. The account's language cannot be printed with this package; `languages` lists those that can.\n- `tooManyKeys`: 422. The account has the most access keys allowed (`max`).\n- `unknownUnit`: 422. No loaded package offers this unit for this dimension.\n- `tooManyAttempts`: 429. Too many logins or password mails; `retryAfter` seconds, also in `Retry-After`.\n- `tooManyRequests`: 429. Too many PDFs; see `Retry-After`.\n- `internal`: 500. A bug in the builder.\n- `packageRuleError`: 500. The package's rules could not be worked out (a bug in the package); `message` says where.\n- `mailFailed`: 502. The mail server refused the password mail; nothing was changed.\n- `mailNotConfigured`: 503. The server has no mail set up; nobody can get a password.\n- `baseUrlNotSet`: 503. The server has no public address configured (`BASE_URL`), so the MCP zip cannot say where the builder is.\n- `mcpPackageMissing`: 503. This build of the server has no `server.mjs` for the MCP zip.",
+        "description": "Every error code the API answers with. Stable and English; screens word them in the player's language.\n\n- `badJson`: 400. The body is not JSON.\n- `badRequest`: 400. The body has the wrong shape; `issues` lists `{ path, message }`.\n- `badQuery`: 400. A query parameter has a value the API does not know; `parameter` and `value` name it.\n- `designNotAvailable`: 400 (PDF) or 422 (settings). A planned sheet design that is not drawn yet; `designs` lists those that are.\n- `notLoggedIn`: 401. No session cookie and no `Authorization` header.\n- `keyNotValid`: 401. The `Authorization` header holds no valid access key (unknown, withdrawn, past its end, or not `Bearer <key>`).\n- `wrongPassword`: 401. No account has this password.\n- `wrongMailOrPassword`: 401. Login of an account from before failed.\n- `crossSite`: 403. A change sent from another site (`Origin` or `Sec-Fetch-Site`).\n- `keyCannotMakeKeys`: 403. Access keys are made on the settings screen only, never with a key.\n- `keyCannotMakePasswords`: 403. Passwords are made on the settings screen only, never with a key.\n- `notFound`: 404. No such API path.\n- `draftNotFound`: 404. No draft with this id in this account.\n- `keyNotFound`: 404. No access key with this id in this account.\n- `passwordNotFound`: 404. No password with this id in this account.\n- `packageNotFound`: 404. No loaded package with this id.\n- `languageNotFound`: 404. The package has no texts in this language.\n- `valueNotFound`: 404. The draft's package has no value with this id.\n- `versionNotFound`: 404. No such version of the sheet to print: neither `original` nor a kept copy of this character.\n- `methodNotAllowed`: 405. The path exists, the method does not.\n- `versionConflict`: 409. The draft moved on; `current` holds its state now.\n- `notFinished`: 409. The character is not finished (PDF) or not finished and not in a raise (level-up); `open` lists the open choices.\n- `packageUnavailable`: 409. The draft's package is not loaded right now; `packageId` names it.\n- `copyUnreadable`: 409. A kept copy stored in a shape this server no longer prints; `version` names it.\n- `bodyTooLarge`: 413. The body is larger than 64 KiB.\n- `jsonRequired`: 415. The body is not `application/json`.\n- `changeRejected`: 422. The rule core refused the change; `reason` says why (see `ChangeError`).\n- `incomplete`: 422. Finishing with open choices; `open` lists them.\n- `languageNotSupported`: 422. The account's language cannot be printed with this package; `languages` lists those that can.\n- `tooManyKeys`: 422. The account has the most access keys allowed (`max`).\n- `tooManyPasswords`: 422. The account has the most passwords allowed (`max`).\n- `lastPassword`: 422. The account's last password cannot be deleted.\n- `unknownUnit`: 422. No loaded package offers this unit for this dimension.\n- `tooManyAttempts`: 429. Too many failed logins, new accounts or invitations; `retryAfter` seconds, also in `Retry-After`.\n- `tooManyRequests`: 429. Too many PDFs; see `Retry-After`.\n- `internal`: 500. A bug in the builder.\n- `packageRuleError`: 500. The package's rules could not be worked out (a bug in the package); `message` says where.\n- `mailFailed`: 502. The mail server refused the mail to an added player; nothing was changed.\n- `mailNotConfigured`: 503. The server has no mail set up; players cannot be added by address.\n- `baseUrlNotSet`: 503. The server has no public address configured (`BASE_URL`), so the MCP zip cannot say where the builder is.\n- `mcpPackageMissing`: 503. This build of the server has no `server.mjs` for the MCP zip.",
         "enum": [
           "alreadyPlayer",
           "badJson",
-          "baseUrlNotSet",
           "badQuery",
           "badRequest",
+          "baseUrlNotSet",
           "bodyTooLarge",
           "campaignNotFound",
           "cannotAddYourself",
@@ -5019,10 +6019,12 @@
           "internal",
           "jsonRequired",
           "keyCannotMakeKeys",
+          "keyCannotMakePasswords",
           "keyNotFound",
           "keyNotValid",
           "languageNotFound",
           "languageNotSupported",
+          "lastPassword",
           "mailFailed",
           "mailNotConfigured",
           "mcpPackageMissing",
@@ -5035,18 +6037,21 @@
           "packageNotFound",
           "packageRuleError",
           "packageUnavailable",
+          "passwordNotFound",
           "playerNotFound",
           "tooManyAttempts",
           "tooManyCampaigns",
           "tooManyCopies",
           "tooManyKeys",
+          "tooManyPasswords",
           "tooManyPlayers",
           "tooManyRequests",
           "unknownUnit",
           "valueNotFound",
           "versionConflict",
           "versionNotFound",
-          "wrongMailOrPassword"
+          "wrongMailOrPassword",
+          "wrongPassword"
         ]
       },
       "JsonRpcError": {
@@ -5094,21 +6099,23 @@
         "additionalProperties": false,
         "description": "`{ \"error\": { \"code\": ..., ...details } }`. Details depend on the code."
       },
-      "Sent": {
-        "type": "object",
-        "properties": {
-          "status": {
-            "const": "sent"
-          }
-        },
-        "required": ["status"],
-        "additionalProperties": false
-      },
       "Account": {
         "type": "object",
         "properties": {
+          "name": {
+            "type": "string",
+            "description": "What the player wants to be called."
+          },
           "email": {
-            "type": "string"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The way back in, if one was given; null for none."
           },
           "language": {
             "type": "string",
@@ -5129,7 +6136,46 @@
             "format": "date-time"
           }
         },
-        "required": ["email", "language", "units", "print", "createdAt"],
+        "required": ["name", "email", "language", "units", "print", "createdAt"],
+        "additionalProperties": false
+      },
+      "Password": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string",
+            "description": "What the owner called the password; display only."
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": ["id", "name", "createdAt"],
+        "additionalProperties": false
+      },
+      "NewPassword": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "secret": {
+            "type": "string",
+            "description": "The password: five words and a number, joined by dashes. Shown only in this answer; the server keeps only its hash."
+          }
+        },
+        "required": ["id", "name", "createdAt", "secret"],
         "additionalProperties": false
       },
       "AccessKey": {
@@ -5298,7 +6344,14 @@
             "description": "The level a raise started from, until the character is finished again."
           },
           "campaignId": {
-            "anyOf": [{ "type": "string" }, { "type": "null" }],
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "description": "The campaign the character belongs to (one its owner plays in); null for none."
           },
           "answers": {
@@ -5327,13 +6380,13 @@
           "owner": {
             "type": "object",
             "properties": {
-              "email": {
+              "name": {
                 "type": "string"
               }
             },
-            "required": ["email"],
+            "required": ["name"],
             "additionalProperties": false,
-            "description": "Whose character it is. It stays theirs, whoever changes it."
+            "description": "Whose character it is, by name. It stays theirs, whoever changes it."
           },
           "access": {
             "enum": ["owner", "gameMaster"],
@@ -5393,7 +6446,14 @@
             "description": "The level a raise started from, until the character is finished again."
           },
           "campaignId": {
-            "anyOf": [{ "type": "string" }, { "type": "null" }],
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "description": "The campaign the character belongs to (one its owner plays in); null for none."
           },
           "answers": {
@@ -5435,13 +6495,13 @@
           "owner": {
             "type": "object",
             "properties": {
-              "email": {
+              "name": {
                 "type": "string"
               }
             },
-            "required": ["email"],
+            "required": ["name"],
             "additionalProperties": false,
-            "description": "Whose character it is. It stays theirs, whoever changes it."
+            "description": "Whose character it is, by name. It stays theirs, whoever changes it."
           },
           "access": {
             "enum": ["owner", "gameMaster"],
@@ -5473,13 +6533,26 @@
         "type": "object",
         "description": "Where a value comes from: its number and the parts it adds up from.",
         "properties": {
-          "value": { "type": "string", "description": "The value id asked for." },
-          "total": { "type": "number", "description": "The value's number, as in `evaluation.values`." },
+          "value": {
+            "type": "string",
+            "description": "The value id asked for."
+          },
+          "total": {
+            "type": "number",
+            "description": "The value's number, as in `evaluation.values`."
+          },
           "parts": {
             "description": "In order of appearance; their amounts add up to `total`. Null if the value cannot be told apart as a sum.",
             "oneOf": [
-              { "type": "array", "items": { "$ref": "#/components/schemas/ValuePart" } },
-              { "type": "null" }
+              {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/ValuePart"
+                }
+              },
+              {
+                "type": "null"
+              }
             ]
           }
         },
@@ -5489,40 +6562,73 @@
       "ValuePart": {
         "type": "object",
         "properties": {
-          "amount": { "type": "number", "description": "Negative for a part that takes away." },
+          "amount": {
+            "type": "number",
+            "description": "Negative for a part that takes away."
+          },
           "source": {
             "description": "- `start`: the fixed number the value starts at (or the number in its formula).\n- `choice`: set or raised by the answer to this choice (`choice` is its id; for a copy, the copy's id; a choice a thing brought along is in `evaluation.steps[].grantedBy`).\n- `thing`: given by a thing the character has (`thing` is its id).\n- `values`: worked out from these other values (`level` included).\n- `unclear`: two ways gave the same number; no source rather than a wrong one.",
             "oneOf": [
               {
                 "type": "object",
-                "properties": { "kind": { "const": "start" } },
+                "properties": {
+                  "kind": {
+                    "const": "start"
+                  }
+                },
                 "required": ["kind"],
                 "additionalProperties": false
               },
               {
                 "type": "object",
-                "properties": { "kind": { "const": "choice" }, "choice": { "type": "string" } },
+                "properties": {
+                  "kind": {
+                    "const": "choice"
+                  },
+                  "choice": {
+                    "type": "string"
+                  }
+                },
                 "required": ["kind", "choice"],
                 "additionalProperties": false
               },
               {
                 "type": "object",
-                "properties": { "kind": { "const": "thing" }, "thing": { "type": "string" } },
+                "properties": {
+                  "kind": {
+                    "const": "thing"
+                  },
+                  "thing": {
+                    "type": "string"
+                  }
+                },
                 "required": ["kind", "thing"],
                 "additionalProperties": false
               },
               {
                 "type": "object",
                 "properties": {
-                  "kind": { "const": "values" },
-                  "values": { "type": "array", "items": { "type": "string" }, "minItems": 1 }
+                  "kind": {
+                    "const": "values"
+                  },
+                  "values": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "minItems": 1
+                  }
                 },
                 "required": ["kind", "values"],
                 "additionalProperties": false
               },
               {
                 "type": "object",
-                "properties": { "kind": { "const": "unclear" } },
+                "properties": {
+                  "kind": {
+                    "const": "unclear"
+                  }
+                },
                 "required": ["kind"],
                 "additionalProperties": false
               }
@@ -6335,13 +7441,13 @@
           "gameMaster": {
             "type": "object",
             "properties": {
-              "email": {
+              "name": {
                 "type": "string"
               }
             },
-            "required": ["email"],
+            "required": ["name"],
             "additionalProperties": false,
-            "description": "Who leads it."
+            "description": "Who leads it, by name."
           },
           "playerCount": {
             "type": "integer"
@@ -6351,7 +7457,15 @@
             "format": "date-time"
           },
           "joinedAt": {
-            "anyOf": [{ "type": "string", "format": "date-time" }, { "type": "null" }],
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "description": "When you joined it as a player; null if you lead it."
           }
         },
@@ -6365,15 +7479,16 @@
             "type": "string",
             "description": "The player's id; used in the player routes."
           },
-          "email": {
-            "type": "string"
+          "name": {
+            "type": "string",
+            "description": "The player's name. Mail addresses of other people are never given out."
           },
           "addedAt": {
             "type": "string",
             "format": "date-time"
           }
         },
-        "required": ["id", "email", "addedAt"],
+        "required": ["id", "name", "addedAt"],
         "additionalProperties": false,
         "description": "A player as the game master sees them."
       },
@@ -6385,8 +7500,15 @@
           },
           "characters": {
             "anyOf": [
-              { "type": "array", "items": { "$ref": "#/components/schemas/DraftListEntry" } },
-              { "type": "null" }
+              {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/DraftListEntry"
+                }
+              },
+              {
+                "type": "null"
+              }
             ],
             "description": "For the game master: their own characters in this campaign, newest first. For a player: null."
           },
@@ -6401,8 +7523,9 @@
                       "type": "string",
                       "description": "The player's id; used in the player routes."
                     },
-                    "email": {
-                      "type": "string"
+                    "name": {
+                      "type": "string",
+                      "description": "The player's name. Mail addresses of other people are never given out."
                     },
                     "addedAt": {
                       "type": "string",
@@ -6416,7 +7539,7 @@
                       "description": "Every character of the player, newest first."
                     }
                   },
-                  "required": ["id", "email", "addedAt", "characters"],
+                  "required": ["id", "name", "addedAt", "characters"],
                   "additionalProperties": false
                 }
               },
@@ -6435,11 +7558,24 @@
         "type": "object",
         "description": "A kept copy of the sheet, without its model.",
         "properties": {
-          "id": { "type": "string" },
-          "name": { "type": "string" },
-          "createdAt": { "type": "string", "format": "date-time" },
-          "updatedAt": { "type": "string", "format": "date-time" },
-          "fromLevel": { "type": "integer", "description": "Level of the original it was made from." },
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "fromLevel": {
+            "type": "integer",
+            "description": "Level of the original it was made from."
+          },
           "fromChangedAt": {
             "type": "string",
             "format": "date-time",
@@ -6455,10 +7591,15 @@
           },
           "units": {
             "type": "object",
-            "additionalProperties": { "type": "string" },
+            "additionalProperties": {
+              "type": "string"
+            },
             "description": "Units the copy is written in."
           },
-          "version": { "type": "integer", "minimum": 1 }
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          }
         },
         "required": [
           "id",
@@ -6478,8 +7619,12 @@
         "type": "object",
         "description": "A copy with its model. The model's `origin` is `{ kind: \"copy\", name, createdAt, fromLevel, fromPackageVersion, fromChangedAt }`.",
         "properties": {
-          "copy": { "$ref": "#/components/schemas/SheetCopy" },
-          "model": { "$ref": "#/components/schemas/SheetModel" }
+          "copy": {
+            "$ref": "#/components/schemas/SheetCopy"
+          },
+          "model": {
+            "$ref": "#/components/schemas/SheetModel"
+          }
         },
         "required": ["copy", "model"],
         "additionalProperties": false
@@ -6488,8 +7633,13 @@
         "type": "object",
         "description": "The original as it is now, without building it. Differs from a copy's `fromLevel`, `fromChangedAt` or `fromPackageVersion`: the original changed since the copy was made.",
         "properties": {
-          "level": { "type": "integer" },
-          "changedAt": { "type": "string", "format": "date-time" },
+          "level": {
+            "type": "integer"
+          },
+          "changedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
           "packageVersion": {
             "type": ["string", "null"],
             "description": "Null while the character's package is not loaded."
@@ -6505,11 +7655,22 @@
       "PlayValue": {
         "description": "A number, a text, or a count of ticks.",
         "anyOf": [
-          { "type": "number" },
-          { "type": "string", "maxLength": 2000 },
+          {
+            "type": "number"
+          },
+          {
+            "type": "string",
+            "maxLength": 2000
+          },
           {
             "type": "object",
-            "properties": { "checks": { "type": "integer", "minimum": 0, "maximum": 1000 } },
+            "properties": {
+              "checks": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 1000
+              }
+            },
             "required": ["checks"],
             "additionalProperties": false
           }
@@ -6518,15 +7679,29 @@
       "PlayState": {
         "type": "object",
         "description": "The play state: field id of the sheet (`field`, `usesField`, `playedByField`) to its value. At most 1000 fields.",
-        "propertyNames": { "minLength": 1, "maxLength": 300 },
-        "additionalProperties": { "$ref": "#/components/schemas/PlayValue" }
+        "propertyNames": {
+          "minLength": 1,
+          "maxLength": 300
+        },
+        "additionalProperties": {
+          "$ref": "#/components/schemas/PlayValue"
+        }
       },
       "PlayStateView": {
         "type": "object",
         "properties": {
-          "state": { "$ref": "#/components/schemas/PlayState" },
-          "version": { "type": "integer", "minimum": 0, "description": "0 while nothing is stored yet." },
-          "updatedAt": { "type": ["string", "null"], "format": "date-time" }
+          "state": {
+            "$ref": "#/components/schemas/PlayState"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "0 while nothing is stored yet."
+          },
+          "updatedAt": {
+            "type": ["string", "null"],
+            "format": "date-time"
+          }
         },
         "required": ["state", "version", "updatedAt"],
         "additionalProperties": false

@@ -4,6 +4,7 @@ import {
   hashPassword,
   normalizePassword,
   passwordEntropyBits,
+  passwordHash,
   verifyPassword,
 } from "./password.ts";
 import { RateLimiter } from "./rate-limit.ts";
@@ -18,16 +19,16 @@ describe("word lists", () => {
 });
 
 describe("generatePassword", () => {
-  it("makes four different words from the language's list and a four-digit number", () => {
+  it("makes five different words from the language's list and a four-digit number", () => {
     for (const lang of ["de", "en"]) {
       for (let i = 0; i < 50; i++) {
         const pw = generatePassword(lang);
         const parts = pw.split("-");
-        expect(parts).toHaveLength(5);
-        const words = parts.slice(0, 4);
-        expect(new Set(words).size).toBe(4);
+        expect(parts).toHaveLength(6);
+        const words = parts.slice(0, 5);
+        expect(new Set(words).size).toBe(5);
         for (const w of words) expect(WORD_LISTS[lang]).toContain(w);
-        expect(parts[4]).toMatch(/^[1-9]\d{3}$/);
+        expect(parts[5]).toMatch(/^[1-9]\d{3}$/);
       }
     }
   });
@@ -37,9 +38,9 @@ describe("generatePassword", () => {
     expect(seen.size).toBe(2000);
   });
 
-  it("is strong: more than 50 bits", () => {
-    expect(passwordEntropyBits("de")).toBeGreaterThan(50);
-    expect(passwordEntropyBits("en")).toBeGreaterThan(50);
+  it("is strong enough to be found by an unsalted hash: about 60 bits", () => {
+    expect(passwordEntropyBits("de")).toBeGreaterThan(59);
+    expect(passwordEntropyBits("en")).toBeGreaterThan(59);
   });
 
   it("falls back to English words for a language without a list", () => {
@@ -56,7 +57,16 @@ describe("normalizePassword", () => {
 });
 
 describe("hashing", () => {
-  it("uses Argon2id with a fresh salt and verifies only the right password", async () => {
+  it("finds a password by the SHA-256 of its normalised form, forgiving what people type", () => {
+    const pw = generatePassword("de");
+    const h = passwordHash(pw);
+    expect(h).toMatch(/^[0-9a-f]{64}$/);
+    expect(h).not.toContain(pw);
+    expect(passwordHash(` ${pw.replace(/-/g, " ").replace(/^./, (c) => c.toUpperCase())} `)).toBe(h);
+    expect(passwordHash(`${pw}x`)).not.toBe(h);
+  });
+
+  it("keeps Argon2id for passwords from before, with a fresh salt, verifying only the right one", async () => {
     const pw = generatePassword("de");
     const a = await hashPassword(pw);
     const b = await hashPassword(pw);

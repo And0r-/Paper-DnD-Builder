@@ -7,7 +7,7 @@ let client: Client;
 beforeEach(async () => {
   server = await startTestServer();
   client = new Client(server);
-  await signIn(client, server, "player@example.org");
+  await signIn(client, "player@example.org");
 });
 
 interface ChoiceState {
@@ -209,7 +209,7 @@ describe("building a character over the API", () => {
   it("keeps drafts private to their account", async () => {
     const created = await client.call("POST", "/api/drafts", { packageId: "demo" });
     const other = new Client(server, "198.51.100.9");
-    await signIn(other, server, "someone-else@example.org");
+    await signIn(other, "someone-else@example.org");
     const read = await other.call("GET", `/api/drafts/${created.json.draft.id}`);
     expect(read.status).toBe(404);
     const del = await other.call("DELETE", `/api/drafts/${created.json.draft.id}`);

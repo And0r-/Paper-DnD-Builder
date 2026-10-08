@@ -10,7 +10,7 @@ let client: Client;
 beforeEach(async () => {
   server = await startTestServer();
   client = new Client(server);
-  await signIn(client, server, "player@example.org", "de");
+  await signIn(client, "player@example.org", "de");
 });
 
 interface ChoiceState {
@@ -108,7 +108,7 @@ describe("printing a character", () => {
   it("prints only your own characters, and only when logged in", async () => {
     const id = await character();
     const other = new Client(server, "198.51.100.9");
-    await signIn(other, server, "someone-else@example.org");
+    await signIn(other, "someone-else@example.org");
     expect((await other.call("GET", `/api/drafts/${id}/pdf`)).status).toBe(404);
     expect((await new Client(server).call("GET", `/api/drafts/${id}/pdf`)).status).toBe(401);
   });
@@ -367,7 +367,7 @@ describe("printing a kept copy and the play state", () => {
     const id = await character();
     const made = (await client.call("POST", `/api/drafts/${id}/sheet-copies`, {})).json;
     const other = new Client(server, "198.51.100.9");
-    await signIn(other, server, "someone-else@example.org");
+    await signIn(other, "someone-else@example.org");
     const mine = await character();
     expect((await other.call("GET", `/api/drafts/${id}/pdf?version=${made.copy.id}`)).status).toBe(404);
     // A copy of one character is not a version of another.
@@ -413,7 +413,7 @@ describe("the sheet as data", () => {
 
     const id = await character();
     const other = new Client(server, "198.51.100.9");
-    await signIn(other, server, "someone-else@example.org");
+    await signIn(other, "someone-else@example.org");
     expect((await other.call("GET", `/api/drafts/${id}/sheet`)).status).toBe(404);
     expect((await new Client(server).call("GET", `/api/drafts/${id}/sheet`)).status).toBe(401);
   });

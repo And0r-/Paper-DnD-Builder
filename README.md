@@ -19,8 +19,14 @@ particular game's data, that is a bug in the builder.
 - **Units are a separate setting**, stored with the account, independent of
   the language. Values are stored once in the package's source unit and
   converted with a table from the package.
-- **We collect nothing.** Stored data is limited to an email address, a
-  password hash, settings and character data. No tracking, no analytics, no
+- **Login without mail.** A player gives a name and, if they want, a mail
+  address (only a way back in). The server makes the password (five words
+  and a number), shows it once on the screen and logs the player in; later,
+  the password alone logs in. Players make and delete further passwords
+  (one per device, one on paper) in the settings; nobody chooses one, and
+  nothing waits for a mail.
+- **We collect nothing.** Stored data is limited to a name, a mail address
+  if one is given, password hashes, settings and character data. No tracking, no analytics, no
   third-party scripts, no requests from the browser to any other domain
   (enforced by a Content-Security-Policy).
 - **The draft lives on the server** as a single document, so collaborative
@@ -64,9 +70,10 @@ Tests use an in-process PostgreSQL (PGlite), so `pnpm check` needs no
 running database.
 
 For `pnpm dev`, set `PACKAGES_DIR=packages/demo-package` (it may point at a
-single package or at a folder of packages) and `DATABASE_URL`. Logging in
-needs SMTP (`SMTP_*`, `MAIL_FROM`); for local development point it at a
-local mail catcher. The server never logs passwords.
+single package or at a folder of packages) and `DATABASE_URL`. Logging in needs no
+mail. SMTP (`SMTP_*`, `MAIL_FROM`) is used only when a game master adds a
+player by address; for local development point it at a local mail catcher.
+The server never logs or stores passwords, only their hashes.
 
 The HTTP API is described in [apps/web/API.md](apps/web/API.md).
 
