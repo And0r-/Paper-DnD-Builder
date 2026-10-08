@@ -26,7 +26,7 @@ import { z } from "zod";
 import type { App } from "../app.ts";
 import { HttpError } from "../api/http.ts";
 import { MailNotConfiguredError, resetMail, type Mail } from "../mail.ts";
-import type { AccountRow } from "../store.ts";
+import type { AccountRow, PasswordOrigin } from "../store.ts";
 import {
   dummyPasswordHash,
   generatePassword,
@@ -92,17 +92,17 @@ function uiLanguage(language: string | undefined): string {
   return UI_LANGUAGES.includes(language as never) ? language! : DEFAULT_LANGUAGE;
 }
 
-/** The name a password gets when its owner gives none: the day it was made (2026-10-08), in no language. */
-export function defaultPasswordName(now: Date): string {
-  return now.toISOString().slice(0, 10);
-}
-
 /**
  * Makes a password for the account and stores its hash. Returns the plain
  * password for the one answer that shows it, or undefined if the account
  * already has the most it may.
  */
-export async function makePassword(app: App, account: { id: string; language: string }, name: string) {
+export async function makePassword(
+  app: App,
+  account: { id: string; language: string },
+  name: string | null,
+  origin: PasswordOrigin | null = null,
+) {
   const secret = generatePassword(account.language);
   const row = await app.store.createPassword(
     {
@@ -110,6 +110,7 @@ export async function makePassword(app: App, account: { id: string; language: st
       account_id: account.id,
       hash: passwordHash(secret),
       name,
+      origin,
       created_at: app.now(),
     },
     MAX_PASSWORDS_PER_ACCOUNT,
@@ -143,7 +144,7 @@ export async function signup(
     language: uiLanguage(body.language),
     created_at: app.now(),
   });
-  const made = (await makePassword(app, account, defaultPasswordName(app.now())))!;
+  const made = (await makePassword(app, account, null, "first"))!;
   const token = await openSession(app, account.id);
   return { account, password: made, token };
 }
@@ -188,7 +189,8 @@ export async function legacyLogin(app: App, email: string, password: string, ip:
           id: randomUUID(),
           account_id: account.id,
           hash: passwordHash(secret),
-          name: defaultPasswordName(app.now()),
+          name: null,
+          origin: "first",
           created_at: app.now(),
         })
       : undefined;
@@ -251,9 +253,10 @@ export async function requestReset(
 }
 
 /**
- * Uses a link back in, once: logs its account in and makes a new password,
- * named "Reset" and the day. The account's other passwords stay; its owner
- * deletes them in the settings if one is lost. If the account already has
+ * Uses a link back in, once: logs its account in and makes a new password
+ * without a name (the screen calls it "New from email link"). The
+ * account's other passwords stay; its owner deletes them in the settings
+ * if one is lost. If the account already has
  * the most passwords it may, the oldest goes, so this never fails.
  */
 export async function useReset(app: App, token: string, ip: string) {
@@ -266,7 +269,8 @@ export async function useReset(app: App, token: string, ip: string) {
       id: randomUUID(),
       account_id: account.id,
       hash: passwordHash(secret),
-      name: `Reset ${defaultPasswordName(app.now())}`,
+      name: null,
+      origin: "reset",
       created_at: app.now(),
     },
     MAX_PASSWORDS_PER_ACCOUNT,

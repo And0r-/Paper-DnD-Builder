@@ -48,10 +48,14 @@ export interface SessionAccount {
 /** A password as its owner sees it; the hash never leaves the store. */
 export type PasswordRow = {
   id: string;
-  /** What its owner called it; display only. */
-  name: string;
+  /** What its owner called it; display only. Null: the screen names it, by `origin` or by the day. */
+  name: string | null;
+  /** Made by the server: the account's first one, or one from a link back in. Null: made by its owner. */
+  origin: PasswordOrigin | null;
   created_at: Date;
 };
+
+export type PasswordOrigin = "first" | "reset";
 
 /** An access key as its owner sees it; the hash never leaves the store. */
 export type AccessKeyRow = {
@@ -131,7 +135,7 @@ const ACCOUNT_COLUMNS = "id, name, email, password_hash, language, units, print_
 const ACCOUNT_COLUMNS_A = ACCOUNT_COLUMNS.split(", ")
   .map((c) => `a.${c}`)
   .join(", ");
-const PASSWORD_COLUMNS = "id, name, created_at";
+const PASSWORD_COLUMNS = "id, name, origin, created_at";
 const DRAFT_COLUMNS =
   "id, account_id, package_id, package_version, version, document, campaign_id, finished_at, created_at, updated_at";
 const COPY_ENTRY_COLUMNS =
@@ -323,10 +327,10 @@ export class Store {
            LIMIT GREATEST(0, (SELECT count(*) FROM passwords WHERE account_id = $2) - $6 + 1)
          )
        )
-       INSERT INTO passwords (id, account_id, hash, name, created_at)
-       VALUES ($1, $2, $3, $4, $5)
+       INSERT INTO passwords (id, account_id, hash, name, origin, created_at)
+       VALUES ($1, $2, $3, $4, $7, $5)
        RETURNING ${PASSWORD_COLUMNS}`,
-      [p.id, p.account_id, p.hash, p.name, p.created_at, max],
+      [p.id, p.account_id, p.hash, p.name, p.created_at, max, p.origin],
     );
     return rows[0]!;
   }
@@ -337,11 +341,11 @@ export class Store {
     max: number,
   ): Promise<PasswordRow | undefined> {
     const rows = await this.db.query<PasswordRow>(
-      `INSERT INTO passwords (id, account_id, hash, name, created_at)
-       SELECT $1, $2, $3, $4, $5
+      `INSERT INTO passwords (id, account_id, hash, name, origin, created_at)
+       SELECT $1, $2, $3, $4, $7, $5
        WHERE (SELECT count(*) FROM passwords WHERE account_id = $2) < $6
        RETURNING ${PASSWORD_COLUMNS}`,
-      [p.id, p.account_id, p.hash, p.name, p.created_at, max],
+      [p.id, p.account_id, p.hash, p.name, p.created_at, max, p.origin],
     );
     return rows[0];
   }
@@ -359,10 +363,10 @@ export class Store {
       `WITH cleared AS (
          UPDATE accounts SET password_hash = NULL WHERE id = $1 AND password_hash = $2 RETURNING id
        )
-       INSERT INTO passwords (id, account_id, hash, name, created_at)
-       SELECT $3, cleared.id, $4, $5, $6 FROM cleared
+       INSERT INTO passwords (id, account_id, hash, name, origin, created_at)
+       SELECT $3, cleared.id, $4, $5, $7, $6 FROM cleared
        RETURNING ${PASSWORD_COLUMNS}`,
-      [accountId, oldHash, p.id, p.hash, p.name, p.created_at],
+      [accountId, oldHash, p.id, p.hash, p.name, p.created_at, p.origin],
     );
     return rows[0];
   }

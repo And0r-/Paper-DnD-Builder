@@ -87,7 +87,7 @@ export function resetMail(language: string, to: string, links: ResetLink[], minu
       "",
       `The link works for ${minutes} minutes and only once. It shows you a new password.`,
       "",
-      "Did not ask for this? Then delete the mail, nothing happens.",
+      "You did not ask for this? Then delete this email. Nothing will happen.",
     ].join("\n"),
   };
 }

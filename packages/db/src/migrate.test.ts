@@ -91,6 +91,41 @@ describe("migrate", () => {
     ).rejects.toThrow();
   });
 
+  it("takes the server's names off the passwords made before and keeps where they came from", async () => {
+    const migrations = await loadMigrations(new URL("../migrations/", import.meta.url));
+    const at = migrations.findIndex((m) => m.id === "0013_password_origin");
+    await migrate(db, migrations.slice(0, at));
+    const account = "00000000-0000-4000-8000-000000000001";
+    await db.query(`INSERT INTO accounts (id, name, language, created_at) VALUES ($1, 'Mira', 'de', now())`, [
+      account,
+    ]);
+    await db.query(
+      `INSERT INTO passwords (id, account_id, hash, name, created_at) VALUES
+       ('00000000-0000-4000-8000-000000000011', $1, 'h1', '2026-10-04', '2026-10-04T10:00:00Z'),
+       ('00000000-0000-4000-8000-000000000012', $1, 'h2', 'Phone', '2026-10-05T10:00:00Z'),
+       ('00000000-0000-4000-8000-000000000013', $1, 'h3', '2026-10-06', '2026-10-06T10:00:00Z'),
+       ('00000000-0000-4000-8000-000000000014', $1, 'h4', 'Reset 2026-10-07', '2026-10-07T10:00:00Z')`,
+      [account],
+    );
+
+    await migrate(db, migrations);
+
+    const rows = await db.query("SELECT name, origin FROM passwords ORDER BY created_at");
+    expect(rows).toEqual([
+      { name: null, origin: "first" },
+      { name: "Phone", origin: null },
+      { name: null, origin: null },
+      { name: null, origin: "reset" },
+    ]);
+    await expect(
+      db.query(
+        `INSERT INTO passwords (id, account_id, hash, origin, created_at)
+         VALUES ('00000000-0000-4000-8000-000000000015', $1, 'h5', 'other', now())`,
+        [account],
+      ),
+    ).rejects.toThrow();
+  });
+
   it("is idempotent", async () => {
     const migrations = [migration("0001_a", "CREATE TABLE a (x int)")];
     await migrate(db, migrations);

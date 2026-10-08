@@ -661,7 +661,7 @@
         "operationId": "useResetLink",
         "summary": "Use a link back in",
         "tags": ["Login"],
-        "description": "The token from the link `/login/reset/<token>` of the mail. Works once, within 30 minutes: makes a new password named `Reset` and the day, returned in this answer only, and sets the session cookie. The account's other passwords stay. If the account already has 10, its oldest goes. At most 20 tries per 15 minutes per IP.",
+        "description": "The token from the link `/login/reset/<token>` of the mail. Works once, within 30 minutes: makes a new password (`origin: \"reset\"`, no name), returned in this answer only, and sets the session cookie. The account's other passwords stay. If the account already has 10, its oldest goes. At most 20 tries per 15 minutes per IP.",
         "security": [],
         "requestBody": {
           "required": true,
@@ -1068,7 +1068,7 @@
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 80,
-                    "description": "What the password is for, in the owner's words. One line. Default: the day it is made (`2026-10-08`)."
+                    "description": "What the password is for, in the owner's words. One line. Without one, the password has no name (`null`) and the screen names it by the day it was made."
                   }
                 },
                 "required": [],
@@ -6522,15 +6522,20 @@
             "type": "string"
           },
           "name": {
-            "type": "string",
-            "description": "What the owner called the password; display only."
+            "type": ["string", "null"],
+            "description": "What the owner called the password; display only. `null` when it has no name: the screen names it by `origin`, or by the day it was made."
+          },
+          "origin": {
+            "type": ["string", "null"],
+            "enum": ["first", "reset", null],
+            "description": "Made by the server: `first`, the account's first password (also the one after logging in an account from before); `reset`, one from a link back in. `null`: made by the owner."
           },
           "createdAt": {
             "type": "string",
             "format": "date-time"
           }
         },
-        "required": ["id", "name", "createdAt"],
+        "required": ["id", "name", "origin", "createdAt"],
         "additionalProperties": false
       },
       "NewPassword": {
@@ -6540,7 +6545,12 @@
             "type": "string"
           },
           "name": {
-            "type": "string"
+            "type": ["string", "null"]
+          },
+          "origin": {
+            "type": ["string", "null"],
+            "enum": ["first", "reset", null],
+            "description": "Made by the server: `first`, the account's first password (also the one after logging in an account from before); `reset`, one from a link back in. `null`: made by the owner."
           },
           "createdAt": {
             "type": "string",
@@ -6551,7 +6561,7 @@
             "description": "The password: five words and a number, joined by dashes. Shown only in this answer; the server keeps only its hash."
           }
         },
-        "required": ["id", "name", "createdAt", "secret"],
+        "required": ["id", "name", "origin", "createdAt", "secret"],
         "additionalProperties": false
       },
       "AccessKey": {
