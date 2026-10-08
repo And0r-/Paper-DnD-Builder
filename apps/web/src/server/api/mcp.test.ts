@@ -16,6 +16,10 @@ import {
 import { Client as McpClient } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
+import { DEMO_PACKAGE_DIR } from "@builder/demo-package";
+import { cp, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import { beforeEach, describe, expect, it } from "vitest";
 import { Client, signIn, startTestServer, type TestServer } from "../testing.ts";
 
@@ -431,5 +435,114 @@ describe("the HTTP server: a key per request, nothing kept between requests", ()
     const res = await httpServer()(new Request(MCP_URL, { method: "GET" }));
     expect(res.status).toBe(405);
     expect(res.headers.get("allow")).toBe("POST");
+  });
+});
+
+/**
+ * The demo package with its callings as tracks (package format SPEC 9.7),
+ * named with their levels in the summary line; the river runner needs more
+ * grace than the demo's scores give.
+ */
+async function demoWithTracksDir(): Promise<string> {
+  const dir = await mkdtemp(path.join(tmpdir(), "demo-tracks-"));
+  await cp(DEMO_PACKAGE_DIR, dir, {
+    recursive: true,
+    filter: (src) =>
+      !src.includes("node_modules") && !src.startsWith(path.join(DEMO_PACKAGE_DIR, "extensions")),
+  });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- package files are edited field by field
+  const edit = async (file: string, change: (json: any) => void) => {
+    const json = JSON.parse(await readFile(path.join(dir, file), "utf8"));
+    change(json);
+    await writeFile(path.join(dir, file), JSON.stringify(json));
+  };
+  await edit("flow.json", (flow) => {
+    flow.level.tracks = { choice: "calling", addRequiresCurrent: true };
+    flow.summary.line.calling = { tracks: true };
+  });
+  await edit("things/callings-and-paths.json", (things) => {
+    things.find((t: { id: string }) => t.id === "calling.river-runner").addRequires = "grace >= 30";
+  });
+  for (const [language, reason] of [
+    ["en", "Needs grace 30 or more."],
+    ["de", "Braucht Geschick 30 oder mehr."],
+  ])
+    await edit(`texts/${language}/core.json`, (texts) => {
+      texts.entries["calling.river-runner.addReason"] = reason;
+    });
+  return dir;
+}
+
+describe("tracks over MCP", () => {
+  it("raises a level-3 character into a second calling, and says why another is not allowed", async () => {
+    const dir = await demoWithTracksDir();
+    try {
+      server = await startTestServer({ packagesDir: dir });
+      owner = new Client(server);
+      await signIn(owner, "owner@example.org", "en");
+      const call = toolsWith((await makeKey()).secret);
+
+      const started = await call("start_character", { packageId: "demo", level: 3 });
+      const characterId: string = started.data.characterId;
+      const calling = await call("set_answer", {
+        characterId,
+        choice: "calling",
+        answer: { pick: "calling.lantern-bearer" },
+      });
+      expect(calling.isError, JSON.stringify(calling.data)).toBeFalsy();
+      await answerAllOpen(call, characterId);
+      expect((await call("finish_character", { characterId })).data).toMatchObject({ done: true, level: 3 });
+
+      const before = await call("get_character", { characterId });
+      expect(before.data.tracks).toMatchObject({
+        levels: [{ thing: "calling.lantern-bearer", name: "Lantern Bearer", levels: 3, first: true }],
+      });
+      expect(before.data.tracks.nextLevel).toContainEqual({
+        thing: "calling.river-runner",
+        name: "River Runner",
+        allowed: false,
+        because: ["Needs grace 30 or more."],
+      });
+
+      const refused = await call("level_up", { characterId, level: 4, tracks: ["calling.river-runner"] });
+      expect(refused.isError).toBe(true);
+      expect(refused.data.because).toEqual(["Needs grace 30 or more."]);
+
+      const raised = await call("level_up", { characterId, level: 4, tracks: ["calling.herbalist"] });
+      expect(raised.isError, JSON.stringify(raised.data)).toBeFalsy();
+      expect(raised.data.raised).toEqual({ from: 3, to: 4 });
+      // The herbalist's choices come as copies of their own (a flow step of the demo for herbalists too).
+      const fresh = raised.data.toAnswer
+        .filter((c: { new?: true }) => c.new)
+        .map((c: { choice: string }) => c.choice);
+      expect(fresh).toContain("talents-herbalist@calling.herbalist");
+      expect(fresh.every((c: string) => c.endsWith("@calling.herbalist"))).toBe(true);
+      await answerAllOpen(call, characterId);
+      expect((await call("finish_character", { characterId })).data).toMatchObject({ done: true, level: 4 });
+
+      const after = await call("get_character", { characterId });
+      expect(after.data.summary).toContain("Lantern Bearer 3 / Herbalist 1");
+      expect(after.data.tracks.levels).toEqual([
+        { thing: "calling.lantern-bearer", name: "Lantern Bearer", levels: 3, fromLevel: 1, first: true },
+        { thing: "calling.herbalist", name: "Herbalist", levels: 1, fromLevel: 4, added: true },
+      ]);
+
+      // Taken away while building and back: the answers stay.
+      const open = await call("set_level", { characterId, level: 5 });
+      expect(open.isError, JSON.stringify(open.data)).toBeFalsy();
+      const single = await call("set_tracks", { characterId, tracks: [] });
+      expect(single.isError, JSON.stringify(single.data)).toBeFalsy();
+      const back = await call("set_tracks", {
+        characterId,
+        tracks: ["calling.lantern-bearer", "calling.lantern-bearer", "calling.herbalist"],
+      });
+      expect(back.isError, JSON.stringify(back.data)).toBeFalsy();
+      const again = await call("get_character", { characterId });
+      expect(again.data.answered.map((a: { choice: string }) => a.choice)).toContain(
+        "talents-herbalist@calling.herbalist",
+      );
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
   });
 });
