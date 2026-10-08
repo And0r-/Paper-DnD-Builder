@@ -69,6 +69,8 @@ const settingsSchema = z.strictObject({
   units: z.record(z.string().max(50), z.string().max(20).nullable()).optional(),
   /** What the download dialog starts from next time; fields left out stay as they are. */
   print: printChoiceSchema.partial().optional(),
+  /** `false` ("Later"): no more reminder to add an address, on any device. It does not come back. */
+  mailReminder: z.literal(false).optional(),
 });
 
 export const accountRoutes: Route[] = [
@@ -110,6 +112,7 @@ export const accountRoutes: Route[] = [
           body.email === undefined ? account.email : body.email,
         );
       }
+      if (body.mailReminder === false) await ctx.app.store.turnMailReminderOff(account.id);
       const updated = await ctx.app.store.updateSettings(
         account.id,
         body.language ?? account.language,

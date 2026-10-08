@@ -234,8 +234,7 @@ describe("openapi.json", () => {
         "badRequest",
         "notLoggedIn",
         "keyNotValid",
-        "wrongPassword",
-        "wrongMailOrPassword",
+        "wrongLogin",
         "crossSite",
         "keyCannotMakeKeys",
         "keyCannotMakePasswords",
@@ -378,23 +377,20 @@ async function walk(server: TestServer): Promise<void> {
   await call("POST", "/api/auth/signup", "{nope", { "content-type": "application/json" });
   await call("POST", "/api/auth/signup", { name: "Walker", email: "not a mail" });
   await call("POST", "/api/auth/signup", "x", { "content-type": "text/plain" });
-  await call("POST", "/api/auth/login", { password: "wrong-words-here-and-there-1234" });
-  await call("POST", "/api/auth/legacy-login", {
-    email: "old@example.org",
-    password: "wrong-words-here-1234",
-  });
+  await call("POST", "/api/auth/login", { login: "Walker", password: "wrong-words-here-and-there-1234" });
+  await call("POST", "/api/auth/login", { login: "old@example.org", password: "wrong-words-here-1234" });
   // An account from before, with its one old password: swapped for a new one at its first login.
   await server.db.query(
     `INSERT INTO accounts (id, name, email, password_hash, language, created_at)
      VALUES ('00000000-0000-4000-8000-0000000000aa', 'old', 'old@example.org', $1, 'en', now())`,
     [await hashPassword("anker-falke-wiese-7320")],
   );
-  await new Client(server, "198.51.100.40").call("POST", "/api/auth/legacy-login", {
-    email: "old@example.org",
+  await new Client(server, "198.51.100.40").call("POST", "/api/auth/login", {
+    login: "old@example.org",
     password: "anker-falke-wiese-7320",
   });
-  const password = await signIn(c, "walker@example.org");
-  // A link back in: asked for, used once, refused the second time.
+  await signIn(c, "walker@example.org");
+  // A link back in: asked for, used once, refused the second time. Its password is the only one then.
   const lost = new Client(server, "198.51.100.41");
   await lost.call("POST", "/api/auth/reset", { email: "nobody@example.org" });
   server.failMail.on = true;
@@ -416,6 +412,7 @@ async function walk(server: TestServer): Promise<void> {
   await call("PATCH", "/api/account/settings", { email: "walker@example.org" });
   await call("PATCH", "/api/account/settings", { print: { parts: ["sheet", "texts"], design: "verbose" } });
   await call("PATCH", "/api/account/settings", { print: { design: "classic" } });
+  await call("PATCH", "/api/account/settings", { mailReminder: false });
   await call("GET", "/api/sheet-designs");
 
   // Own passwords.
@@ -425,8 +422,6 @@ async function walk(server: TestServer): Promise<void> {
   await call("DELETE", "/api/account/passwords/00000000-0000-4000-8000-000000000000");
   await call("DELETE", `/api/account/passwords/${paper.id}`);
   await call("DELETE", `/api/account/passwords/${reset.id}`);
-  const [first] = (await call("GET", "/api/account/passwords")).json.passwords;
-  await call("DELETE", `/api/account/passwords/${first.id}`);
 
   // Keys.
   const made = await call("POST", "/api/account/keys", { name: "Laptop at home" });
@@ -553,6 +548,7 @@ async function walk(server: TestServer): Promise<void> {
   await new Client(server, "198.51.100.21").call("POST", `/api/invites/${invite}/join`);
   await mate.call("GET", "/api/invites/AAAAAAAAAAAAAAAAAAAAAA");
   await mate.call("POST", `/api/invites/${invite}/join`);
+  await mate.call("GET", `/api/invites/${invite}`);
   await mate.call("POST", `/api/invites/${invite}/join`);
   await mate.call("POST", `${cp}/invite`);
   const fresh = (await call("POST", `${cp}/invite`)).json.inviteUrl as string;
@@ -576,6 +572,6 @@ async function walk(server: TestServer): Promise<void> {
   await call("DELETE", cp);
 
   await call("POST", "/api/auth/logout");
-  await call("POST", "/api/auth/login", { password });
+  await call("POST", "/api/auth/login", { login: "walker", password: reset.secret });
   await call("DELETE", "/api/account", { confirm: true });
 }

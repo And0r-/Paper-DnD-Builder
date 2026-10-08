@@ -5,7 +5,7 @@
  * a name and, if they want, a mail address, kept only as a way back in.
  * The server makes a password, shows it once on the screen and logs the
  * player in at once; nothing waits for a mail. Logging in later is the
- * password alone. An account may have several passwords (one per device,
+ * name or the address, and a password (`login`). An account may have several passwords (one per device,
  * one on paper), which its owner makes and deletes in the settings; the
  * last one cannot be deleted. Nobody ever chooses a password themselves.
  *
@@ -14,11 +14,13 @@
  *
  * Whoever loses every password and gave an address asks for a link back in
  * (`requestReset`): a mail with a one-time link per account, valid 30
- * minutes, which shows a new password on the screen (`useReset`).
+ * minutes, which shows a new password on the screen and ends every other
+ * (`useReset`).
  *
  * Accounts from before had one password, mailed to them, and are found by
- * their address. Their owner logs in once with address and password
- * (`legacyLogin`) and gets a password of the new kind in exchange.
+ * their address. Their owner logs in once with address and password, in
+ * the same form as everyone (`login`), and gets a password of the new kind
+ * in exchange.
  */
 import { randomBytes, randomUUID } from "node:crypto";
 import { printChoiceOf } from "@builder/sheet/printouts";
@@ -149,32 +151,48 @@ export async function signup(
   return { account, password: made, token };
 }
 
+/** A name or an address as typed at login, compared without case and outer spaces. */
+const loginName = (s: string) => s.normalize("NFC").trim().toLowerCase();
+
 /**
- * Logs in with a password alone: it is found by its hash. Failures are
- * limited per IP; there is no account to count them against, and a guess
- * is a guess at every account at once, which 60 bits make hopeless.
+ * Logs in with a name or an address, and a password, whatever kind of
+ * account it is. In one call, two ways:
+ *
+ * 1. The password is found by its hash (case and spaces forgiven, see
+ *    password.ts), and the name or the address typed must be its
+ *    account's. The password alone would do (60 bits); the name is asked
+ *    so that every account logs in with the same form, and it costs a
+ *    guesser one more thing to know.
+ * 2. Else, if what was typed is an address: an account from before with
+ *    that address and its old password (`legacyLogin`), once; the answer
+ *    then holds a new password, as at sign-up.
+ *
+ * One answer for every failure, so nobody learns which part was wrong.
+ * Failures are limited per IP, and per address on the second way.
  */
-export async function login(app: App, password: string, ip: string) {
+export async function login(app: App, who: string, password: string, ip: string) {
   const ipKey = `login:ip:${ip}`;
   limited(app, ipKey, LIMITS.loginFailuresPerIp, false);
-  const account = await app.store.findAccountByPasswordHash(passwordHash(password));
-  if (!account) {
-    app.limiter.record(ipKey, LIMITS.loginFailuresPerIp);
-    throw new HttpError(401, "wrongPassword");
+  const typed = loginName(who);
+  const found = await app.store.findAccountByPasswordHash(passwordHash(password));
+  if (found && (loginName(found.name) === typed || found.email === typed)) {
+    return { account: found, password: undefined, token: await openSession(app, found.id) };
   }
-  return { account, token: await openSession(app, account.id) };
+  const email = emailSchema.safeParse(who);
+  const old = email.success ? await legacyLogin(app, email.data, password) : undefined;
+  if (old) return old;
+  app.limiter.record(ipKey, LIMITS.loginFailuresPerIp);
+  throw new HttpError(401, "wrongLogin");
 }
 
 /**
- * Logs in an account from before with its address and its old password,
- * once: the old password is swapped for one of the new kind, shown in the
- * answer. Failed attempts are limited per address and per IP. Unknown
- * addresses take as long as known ones and get the same answer.
+ * An account from before with its address and its old password, once: the
+ * old password is swapped for one of the new kind. Undefined if that does
+ * not fit; unknown addresses take as long as known ones. Failures are
+ * limited per address, against guesses from many IPs.
  */
-export async function legacyLogin(app: App, email: string, password: string, ip: string) {
+async function legacyLogin(app: App, email: string, password: string) {
   const accountKey = `login:account:${email}`;
-  const ipKey = `login:ip:${ip}`;
-  limited(app, ipKey, LIMITS.loginFailuresPerIp, false);
   limited(app, accountKey, LIMITS.loginFailuresPerAccount, false);
 
   const account = await app.store.findLegacyAccount(email);
@@ -195,9 +213,8 @@ export async function legacyLogin(app: App, email: string, password: string, ip:
         })
       : undefined;
   if (!account || !secret || !row) {
-    app.limiter.record(ipKey, LIMITS.loginFailuresPerIp);
     app.limiter.record(accountKey, LIMITS.loginFailuresPerAccount);
-    throw new HttpError(401, "wrongMailOrPassword");
+    return undefined;
   }
   app.limiter.reset(accountKey);
   const token = await openSession(app, account.id);
@@ -254,27 +271,24 @@ export async function requestReset(
 
 /**
  * Uses a link back in, once: logs its account in and makes a new password
- * without a name (the screen calls it "New from email link"). The
- * account's other passwords stay; its owner deletes them in the settings
- * if one is lost. If the account already has
- * the most passwords it may, the oldest goes, so this never fails.
+ * without a name (the screen calls it "New from email link"). Every other
+ * password of the account ends with it: whoever needed the link may have
+ * lost one, and someone else may have found it. Sessions stay, as when a
+ * password is deleted in the settings.
  */
 export async function useReset(app: App, token: string, ip: string) {
   limited(app, `reset-use:ip:${ip}`, LIMITS.resetUsesPerIp, true);
   const account = await app.store.takeResetLink(resetLinkId(token), app.now());
   if (!account) throw new HttpError(404, "resetLinkInvalid");
   const secret = generatePassword(account.language);
-  const row = await app.store.createPasswordReplacingOldest(
-    {
-      id: randomUUID(),
-      account_id: account.id,
-      hash: passwordHash(secret),
-      name: null,
-      origin: "reset",
-      created_at: app.now(),
-    },
-    MAX_PASSWORDS_PER_ACCOUNT,
-  );
+  const row = await app.store.replaceAllPasswords({
+    id: randomUUID(),
+    account_id: account.id,
+    hash: passwordHash(secret),
+    name: null,
+    origin: "reset",
+    created_at: app.now(),
+  });
   return { account, password: { row, secret }, session: await openSession(app, account.id) };
 }
 
@@ -285,6 +299,8 @@ export function publicAccount(a: AccountRow) {
     language: a.language,
     units: a.units,
     print: printChoiceOf(a.print_choice),
+    /** Whether "My characters" reminds the owner to add an address: none given, and not put off. */
+    mailReminder: !a.email && !a.mail_reminder_off,
     createdAt: a.created_at.toISOString(),
   };
 }

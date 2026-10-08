@@ -17,6 +17,7 @@ import { randomBytes, randomUUID } from "node:crypto";
 import { z } from "zod";
 import { limited, nameSchema } from "../../auth/accounts.ts";
 import { LIMITS } from "../../auth/rate-limit.ts";
+import { sessionId } from "../../auth/session.ts";
 import type { AccountRow, CampaignRow, PlayerRow } from "../../store.ts";
 import { clientIp, HttpError, json, readJson } from "../http.ts";
 import type { RequestContext, Route } from "../router.ts";
@@ -31,6 +32,8 @@ export const MAX_PLAYERS_PER_CAMPAIGN = 50;
 /** 128 random bits, 22 characters: enough that nobody guesses one, short enough for a small QR code. */
 const newInviteToken = () => randomBytes(16).toString("base64url");
 const INVITE_TOKEN = /^[A-Za-z0-9_-]{22}$/;
+/** How the store keeps a replaced token: its SHA-256, like a session's. */
+const oldInviteId = sessionId;
 
 /**
  * The link the game master hands out. On BASE_URL when it is set, else on
@@ -84,12 +87,20 @@ async function loadPlayer(ctx: RequestContext) {
  * not: 128 bits cannot be guessed, and the limit keeps a guessing loop from
  * costing the server anything.
  */
-async function loadInvite(ctx: RequestContext) {
+/**
+ * The campaign a link opens. With `viewer`, a replaced link is looked up
+ * too (`old`); the caller answers it only to a member.
+ */
+async function loadInvite(ctx: RequestContext, viewer?: AccountRow) {
   limited(ctx.app, `invite-open:ip:${clientIp(ctx.req)}`, LIMITS.inviteOpensPerIp, true);
   const token = ctx.params["token"]!;
-  const invite = INVITE_TOKEN.test(token) ? await ctx.app.store.findInvite(token) : undefined;
-  if (!invite) throw new HttpError(404, "inviteNotFound");
-  return invite;
+  if (INVITE_TOKEN.test(token)) {
+    const invite = await ctx.app.store.findInvite(token);
+    if (invite) return { ...invite, old: false };
+    const old = viewer && (await ctx.app.store.findOldInvite(oldInviteId(token)));
+    if (old) return { ...old, old: true };
+  }
+  throw new HttpError(404, "inviteNotFound");
 }
 
 export const campaignRoutes: Route[] = [
@@ -182,7 +193,7 @@ export const campaignRoutes: Route[] = [
       const { campaign, viewer } = await loadLedCampaign(ctx);
       limited(ctx.app, `invite:account:${viewer.id}`, LIMITS.invitationsPerAccount, true);
       const token = newInviteToken();
-      await ctx.app.store.replaceInviteToken(campaign.id, viewer.id, token);
+      await ctx.app.store.replaceInviteToken(campaign.id, viewer.id, token, ctx.app.now());
       return json(200, { inviteUrl: inviteUrl(ctx, token) });
     },
   },
@@ -215,13 +226,27 @@ export const campaignRoutes: Route[] = [
   },
   {
     // Who invites to what: shown before joining, also to whoever has no account yet.
+    // Logged in, also whether one leads the campaign or plays in it already;
+    // a member learns that from a replaced link too, nobody else does.
     method: "GET",
     path: "/api/invites/:token",
     handler: async (ctx) => {
-      const invite = await loadInvite(ctx);
+      const session = await ctx.session();
+      const invite = await loadInvite(ctx, session?.account);
+      const viewer = session?.account.id;
+      const you =
+        viewer === undefined
+          ? null
+          : invite.game_master_id === viewer
+            ? "gameMaster"
+            : (await ctx.app.store.isMember(invite.campaign_id, viewer))
+              ? "player"
+              : null;
+      if (invite.old && !you) throw new HttpError(404, "inviteNotFound");
       return json(200, {
         campaign: { id: invite.campaign_id, name: invite.campaign_name },
         gameMaster: { name: invite.game_master_name },
+        you,
       });
     },
   },

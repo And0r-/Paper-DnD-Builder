@@ -280,9 +280,9 @@
     "/api/auth/login": {
       "post": {
         "operationId": "login",
-        "summary": "Log in with a password",
+        "summary": "Log in",
         "tags": ["Login"],
-        "description": "The password alone finds the account; case, spaces instead of dashes and spaces around it do not matter. Sets the session cookie. Tools use an access key instead. Failed logins are limited per IP (30 in 15 minutes).",
+        "description": "Any account: a name or a mail address, and a password. The password finds the account (case, spaces instead of dashes and spaces around it do not matter); the name or the address must be that account's (case and spaces around it do not matter). If none fits and `login` is an address: an account from before, made when passwords were mailed, with that password, once. Its old password is then swapped for a new one, returned in this answer only (`password`); from then on only the new one works. Every failure gets the same answer. Sets the session cookie. Tools use an access key instead. Failed logins are limited per IP (30 in 15 minutes), and per address for accounts from before (10 in 15 minutes).",
         "security": [],
         "requestBody": {
           "required": true,
@@ -291,13 +291,19 @@
               "schema": {
                 "type": "object",
                 "properties": {
+                  "login": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 254,
+                    "description": "The account's name or its mail address. Trimmed."
+                  },
                   "password": {
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 200
                   }
                 },
-                "required": ["password"],
+                "required": ["login", "password"],
                 "additionalProperties": false
               }
             }
@@ -305,7 +311,7 @@
         },
         "responses": {
           "200": {
-            "description": "Logged in.",
+            "description": "Logged in. With `password` for an account from before, at its first login: the new password, shown this once.",
             "content": {
               "application/json": {
                 "schema": {
@@ -313,6 +319,9 @@
                   "properties": {
                     "account": {
                       "$ref": "#/components/schemas/Account"
+                    },
+                    "password": {
+                      "$ref": "#/components/schemas/NewPassword"
                     }
                   },
                   "required": ["account"],
@@ -333,7 +342,7 @@
             "$ref": "#/components/responses/BadBody"
           },
           "401": {
-            "description": "`wrongPassword`",
+            "description": "`wrongLogin`",
             "content": {
               "application/json": {
                 "schema": {
@@ -342,7 +351,7 @@
                     "error": {
                       "properties": {
                         "code": {
-                          "enum": ["wrongPassword"]
+                          "enum": ["wrongLogin"]
                         }
                       }
                     }
@@ -359,132 +368,6 @@
           },
           "415": {
             "$ref": "#/components/responses/JsonRequired"
-          },
-          "429": {
-            "description": "`tooManyAttempts`",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error",
-                  "properties": {
-                    "error": {
-                      "properties": {
-                        "code": {
-                          "enum": ["tooManyAttempts"]
-                        },
-                        "retryAfter": {
-                          "type": "integer"
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            },
-            "headers": {
-              "Retry-After": {
-                "description": "Seconds to wait.",
-                "schema": {
-                  "type": "integer"
-                }
-              }
-            }
-          },
-          "default": {
-            "$ref": "#/components/responses/ServerError"
-          }
-        }
-      }
-    },
-    "/api/auth/legacy-login": {
-      "post": {
-        "operationId": "legacyLogin",
-        "summary": "Log in an account from before",
-        "tags": ["Login"],
-        "description": "For accounts made when passwords were mailed: mail address and that password, once. The old password is swapped for a new one, returned in this answer only; from then on only the new one works. Sets the session cookie. Unknown addresses and wrong passwords get the same answer. Failed attempts are limited per address and per IP.",
-        "security": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "email": {
-                    "type": "string",
-                    "maxLength": 254
-                  },
-                  "password": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 200
-                  }
-                },
-                "required": ["email", "password"],
-                "additionalProperties": false
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Logged in; the new password, shown this once.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "account": {
-                      "$ref": "#/components/schemas/Account"
-                    },
-                    "password": {
-                      "$ref": "#/components/schemas/NewPassword"
-                    }
-                  },
-                  "required": ["account", "password"],
-                  "additionalProperties": false
-                }
-              }
-            },
-            "headers": {
-              "Set-Cookie": {
-                "description": "The session cookie (httpOnly).",
-                "schema": {
-                  "type": "string"
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/BadBody"
-          },
-          "403": {
-            "$ref": "#/components/responses/CrossSite"
-          },
-          "413": {
-            "$ref": "#/components/responses/BodyTooLarge"
-          },
-          "415": {
-            "$ref": "#/components/responses/JsonRequired"
-          },
-          "401": {
-            "description": "`wrongMailOrPassword`",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error",
-                  "properties": {
-                    "error": {
-                      "properties": {
-                        "code": {
-                          "enum": ["wrongMailOrPassword"]
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
           },
           "429": {
             "description": "`tooManyAttempts`",
@@ -942,6 +825,10 @@
                       }
                     },
                     "additionalProperties": false
+                  },
+                  "mailReminder": {
+                    "const": false,
+                    "description": "\"Later\": no more reminder to add an address, on any device. It does not come back."
                   }
                 },
                 "required": [],
@@ -4838,7 +4725,7 @@
             }
           }
         ],
-        "description": "Without an account: the campaign an invitation link opens and who leads it, by name. Shown before joining. At most 60 lookups (this and joining) per 15 minutes per IP, found or not.",
+        "description": "The campaign an invitation link opens and who leads it, by name. Shown before joining; also without an account. Logged in, `you` says whether one leads the campaign (`gameMaster`) or plays in it already (`player`); a member gets this for a replaced link too, which opens nothing for anyone else. At most 60 lookups (this and joining) per 15 minutes per IP, found or not.",
         "responses": {
           "200": {
             "description": "The invitation.",
@@ -4869,9 +4756,20 @@
                       },
                       "required": ["name"],
                       "additionalProperties": false
+                    },
+                    "you": {
+                      "anyOf": [
+                        {
+                          "enum": ["gameMaster", "player"]
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Logged in: `gameMaster` or `player` if one is in the campaign already; null otherwise, and without an account."
                     }
                   },
-                  "required": ["campaign", "gameMaster"],
+                  "required": ["campaign", "gameMaster", "you"],
                   "additionalProperties": false
                 }
               }
@@ -6373,7 +6271,7 @@
         "additionalProperties": false
       },
       "ErrorCode": {
-        "description": "Every error code the API answers with. Stable and English; screens word them in the player's language.\n\n- `badJson`: 400. The body is not JSON.\n- `badRequest`: 400. The body has the wrong shape; `issues` lists `{ path, message }`.\n- `badQuery`: 400. A query parameter has a value the API does not know; `parameter` and `value` name it.\n- `designNotAvailable`: 400 (PDF) or 422 (settings). A planned sheet design that is not drawn yet; `designs` lists those that are.\n- `notLoggedIn`: 401. No session cookie and no `Authorization` header.\n- `keyNotValid`: 401. The `Authorization` header holds no valid access key (unknown, withdrawn, past its end, or not `Bearer <key>`).\n- `wrongPassword`: 401. No account has this password.\n- `wrongMailOrPassword`: 401. Login of an account from before failed.\n- `crossSite`: 403. A change sent from another site (`Origin` or `Sec-Fetch-Site`).\n- `keyCannotMakeKeys`: 403. Access keys are made on the settings screen only, never with a key.\n- `keyCannotMakePasswords`: 403. Passwords are made on the settings screen only, never with a key.\n- `notFound`: 404. No such API path.\n- `draftNotFound`: 404. No draft with this id in this account.\n- `keyNotFound`: 404. No access key with this id in this account.\n- `passwordNotFound`: 404. No password with this id in this account.\n- `inviteNotFound`: 404. No campaign has this invitation link (unknown, or replaced by a new one).\n- `resetLinkInvalid`: 404. The link back in is unknown, used already or older than 30 minutes.\n- `packageNotFound`: 404. No loaded package with this id.\n- `languageNotFound`: 404. The package has no texts in this language.\n- `valueNotFound`: 404. The draft's package has no value with this id.\n- `versionNotFound`: 404. No such version of the sheet to print: neither `original` nor a kept copy of this character.\n- `methodNotAllowed`: 405. The path exists, the method does not.\n- `versionConflict`: 409. The draft moved on; `current` holds its state now.\n- `notFinished`: 409. The character is not finished (PDF) or not finished and not in a raise (level-up); `open` lists the open choices.\n- `packageUnavailable`: 409. The draft's package is not loaded right now; `packageId` names it.\n- `copyUnreadable`: 409. A kept copy stored in a shape this server no longer prints; `version` names it.\n- `bodyTooLarge`: 413. The body is larger than 64 KiB.\n- `jsonRequired`: 415. The body is not `application/json`.\n- `changeRejected`: 422. The rule core refused the change; `reason` says why (see `ChangeError`).\n- `incomplete`: 422. Finishing with open choices; `open` lists them.\n- `languageNotSupported`: 422. The account's language cannot be printed with this package; `languages` lists those that can.\n- `tooManyKeys`: 422. The account has the most access keys allowed (`max`).\n- `tooManyPasswords`: 422. The account has the most passwords allowed (`max`).\n- `lastPassword`: 422. The account's last password cannot be deleted.\n- `unknownUnit`: 422. No loaded package offers this unit for this dimension.\n- `tooManyAttempts`: 429. Too many failed logins, new accounts, new invitation links, invitation lookups or links back in; `retryAfter` seconds, also in `Retry-After`.\n- `tooManyRequests`: 429. Too many PDFs; see `Retry-After`.\n- `internal`: 500. A bug in the builder.\n- `packageRuleError`: 500. The package's rules could not be worked out (a bug in the package); `message` says where.\n- `mailFailed`: 502. The mail server refused the mail with a link back in; nothing was changed.\n- `mailNotConfigured`: 503. The server has no mail (or no `BASE_URL` for links) set up; no link back in can be mailed.\n- `baseUrlNotSet`: 503. The server has no public address configured (`BASE_URL`), so the MCP zip cannot say where the builder is.\n- `mcpPackageMissing`: 503. This build of the server has no `server.mjs` for the MCP zip.",
+        "description": "Every error code the API answers with. Stable and English; screens word them in the player's language.\n\n- `badJson`: 400. The body is not JSON.\n- `badRequest`: 400. The body has the wrong shape; `issues` lists `{ path, message }`.\n- `badQuery`: 400. A query parameter has a value the API does not know; `parameter` and `value` name it.\n- `designNotAvailable`: 400 (PDF) or 422 (settings). A planned sheet design that is not drawn yet; `designs` lists those that are.\n- `notLoggedIn`: 401. No session cookie and no `Authorization` header.\n- `keyNotValid`: 401. The `Authorization` header holds no valid access key (unknown, withdrawn, past its end, or not `Bearer <key>`).\n- `wrongLogin`: 401. No account fits this name or address and this password.\n- `crossSite`: 403. A change sent from another site (`Origin` or `Sec-Fetch-Site`).\n- `keyCannotMakeKeys`: 403. Access keys are made on the settings screen only, never with a key.\n- `keyCannotMakePasswords`: 403. Passwords are made on the settings screen only, never with a key.\n- `notFound`: 404. No such API path.\n- `draftNotFound`: 404. No draft with this id in this account.\n- `keyNotFound`: 404. No access key with this id in this account.\n- `passwordNotFound`: 404. No password with this id in this account.\n- `inviteNotFound`: 404. No campaign has this invitation link (unknown, or replaced by a new one).\n- `resetLinkInvalid`: 404. The link back in is unknown, used already or older than 30 minutes.\n- `packageNotFound`: 404. No loaded package with this id.\n- `languageNotFound`: 404. The package has no texts in this language.\n- `valueNotFound`: 404. The draft's package has no value with this id.\n- `versionNotFound`: 404. No such version of the sheet to print: neither `original` nor a kept copy of this character.\n- `methodNotAllowed`: 405. The path exists, the method does not.\n- `versionConflict`: 409. The draft moved on; `current` holds its state now.\n- `notFinished`: 409. The character is not finished (PDF) or not finished and not in a raise (level-up); `open` lists the open choices.\n- `packageUnavailable`: 409. The draft's package is not loaded right now; `packageId` names it.\n- `copyUnreadable`: 409. A kept copy stored in a shape this server no longer prints; `version` names it.\n- `bodyTooLarge`: 413. The body is larger than 64 KiB.\n- `jsonRequired`: 415. The body is not `application/json`.\n- `changeRejected`: 422. The rule core refused the change; `reason` says why (see `ChangeError`).\n- `incomplete`: 422. Finishing with open choices; `open` lists them.\n- `languageNotSupported`: 422. The account's language cannot be printed with this package; `languages` lists those that can.\n- `tooManyKeys`: 422. The account has the most access keys allowed (`max`).\n- `tooManyPasswords`: 422. The account has the most passwords allowed (`max`).\n- `lastPassword`: 422. The account's last password cannot be deleted.\n- `unknownUnit`: 422. No loaded package offers this unit for this dimension.\n- `tooManyAttempts`: 429. Too many failed logins, new accounts, new invitation links, invitation lookups or links back in; `retryAfter` seconds, also in `Retry-After`.\n- `tooManyRequests`: 429. Too many PDFs; see `Retry-After`.\n- `internal`: 500. A bug in the builder.\n- `packageRuleError`: 500. The package's rules could not be worked out (a bug in the package); `message` says where.\n- `mailFailed`: 502. The mail server refused the mail with a link back in; nothing was changed.\n- `mailNotConfigured`: 503. The server has no mail (or no `BASE_URL` for links) set up; no link back in can be mailed.\n- `baseUrlNotSet`: 503. The server has no public address configured (`BASE_URL`), so the MCP zip cannot say where the builder is.\n- `mcpPackageMissing`: 503. This build of the server has no `server.mjs` for the MCP zip.",
         "enum": [
           "badJson",
           "badQuery",
@@ -6426,8 +6324,7 @@
           "valueNotFound",
           "versionConflict",
           "versionNotFound",
-          "wrongMailOrPassword",
-          "wrongPassword"
+          "wrongLogin"
         ]
       },
       "JsonRpcError": {
@@ -6507,12 +6404,16 @@
           "print": {
             "$ref": "#/components/schemas/PrintChoice"
           },
+          "mailReminder": {
+            "type": "boolean",
+            "description": "Whether to remind the owner to add a mail address: none given, and not answered with \"Later\" (`mailReminder: false` in the settings)."
+          },
           "createdAt": {
             "type": "string",
             "format": "date-time"
           }
         },
-        "required": ["name", "email", "language", "units", "print", "createdAt"],
+        "required": ["name", "email", "language", "units", "print", "mailReminder", "createdAt"],
         "additionalProperties": false
       },
       "Password": {
