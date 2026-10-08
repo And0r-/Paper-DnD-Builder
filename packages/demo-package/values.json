@@ -238,57 +238,122 @@
     "formula": "practice + heartBonus"
   },
   {
+    "id": "lanternKnackTarget",
+    "source": "mistland",
+    "formula": "8 + practice + heartBonus"
+  },
+  {
+    "id": "lanternKnackHit",
+    "source": "mistland",
+    "formula": "practice + heartBonus"
+  },
+  {
+    "id": "currentKnackTarget",
+    "source": "mistland",
+    "formula": "8 + practice + graceBonus"
+  },
+  {
+    "id": "currentKnackHit",
+    "source": "mistland",
+    "formula": "practice + graceBonus"
+  },
+  {
+    "id": "rootKnackTarget",
+    "source": "mistland",
+    "formula": "8 + practice + witBonus"
+  },
+  {
+    "id": "rootKnackHit",
+    "source": "mistland",
+    "formula": "practice + witBonus"
+  },
+  {
     "id": "knackRank",
     "source": "mistland",
     "byLevel": [1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 5, 5, 5, 5]
   },
   {
+    "id": "glowLevel",
+    "source": "mistland",
+    "formula": "levelOf('calling.lantern-bearer') + ceil(levelOf('calling.herbalist') / 2)",
+    "max": 20
+  },
+  {
     "id": "bloomWardUses",
     "source": "mistland",
-    "byLevel": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3]
+    "default": 0
   },
   {
     "id": "lanternSlots1",
     "source": "mistland",
-    "default": 0
+    "byValue": "glowLevel",
+    "table": [0, 1, 2, 2, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3]
   },
   {
     "id": "lanternSlots2",
     "source": "mistland",
-    "default": 0
+    "byValue": "glowLevel",
+    "table": [0, 0, 0, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2]
   },
   {
     "id": "lanternSlots3",
     "source": "mistland",
-    "default": 0
+    "byValue": "glowLevel",
+    "table": [0, 0, 0, 0, 0, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2]
   },
   {
     "id": "lanternSlots4",
     "source": "mistland",
-    "default": 0
+    "byValue": "glowLevel",
+    "table": [0, 0, 0, 0, 0, 0, 0, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2]
   },
   {
     "id": "lanternSlots5",
     "source": "mistland",
-    "default": 0
+    "byValue": "glowLevel",
+    "table": [0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2]
   },
   {
     "id": "lanternSlots6",
     "source": "mistland",
-    "default": 0
+    "byValue": "glowLevel",
+    "table": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2]
   },
   {
     "id": "lanternSlots7",
     "source": "mistland",
-    "default": 0
+    "byValue": "glowLevel",
+    "table": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1]
   },
   {
     "id": "lanternSlots8",
     "source": "mistland",
-    "default": 0
+    "byValue": "glowLevel",
+    "table": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1]
   },
   {
     "id": "lanternSlots9",
+    "source": "mistland",
+    "byValue": "glowLevel",
+    "table": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 2]
+  },
+  {
+    "id": "lanternKnackRank",
+    "source": "mistland",
+    "default": 0
+  },
+  {
+    "id": "rootKnackRank",
+    "source": "mistland",
+    "default": 0
+  },
+  {
+    "id": "currentSlotRank",
+    "source": "mistland",
+    "default": 0
+  },
+  {
+    "id": "currentSlots",
     "source": "mistland",
     "default": 0
   },

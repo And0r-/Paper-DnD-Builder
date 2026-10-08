@@ -18,7 +18,7 @@
         },
         "variants": [
           {
-            "when": "level >= 5",
+            "when": "levelOf('calling.lantern-bearer') >= 5",
             "text": "stat-value.item.lantern-staff.harm.bright"
           }
         ]

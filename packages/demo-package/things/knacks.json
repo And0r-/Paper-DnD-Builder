@@ -114,7 +114,6 @@
     "rank": 2,
     "group": "helping",
     "tags": ["lantern", "steady"],
-    "requires": "level >= 3",
     "stats": {
       "reach": {
         "amount": 40,
@@ -266,7 +265,6 @@
     "rank": 2,
     "group": "daring",
     "tags": ["current", "steady"],
-    "requires": "level >= 3",
     "stats": {
       "reach": {
         "text": "stat-value.self"
@@ -439,7 +437,6 @@
     "rank": 3,
     "group": "daring",
     "tags": ["lantern"],
-    "requires": "knackRank >= 3",
     "stats": {
       "reach": { "amount": 60, "unit": "ft" },
       "duration": { "text": "stat-value.instant" },
@@ -455,7 +452,6 @@
     "rank": 4,
     "group": "helping",
     "tags": ["lantern"],
-    "requires": "knackRank >= 4",
     "stats": {
       "reach": { "amount": 30, "unit": "ft" },
       "duration": { "text": "stat-value.hour" },
@@ -471,7 +467,6 @@
     "rank": 5,
     "group": "daring",
     "tags": ["lantern", "steady"],
-    "requires": "knackRank >= 5",
     "stats": {
       "reach": { "amount": 120, "unit": "ft" },
       "duration": { "text": "stat-value.minute" },
@@ -487,7 +482,6 @@
     "rank": 3,
     "group": "daring",
     "tags": ["current", "steady"],
-    "requires": "knackRank >= 3",
     "stats": {
       "reach": { "amount": 60, "unit": "ft" },
       "duration": { "text": "stat-value.minute" },
@@ -503,7 +497,6 @@
     "rank": 4,
     "group": "helping",
     "tags": ["current"],
-    "requires": "knackRank >= 4",
     "stats": {
       "reach": { "amount": 30, "unit": "ft" },
       "duration": { "text": "stat-value.instant" },
@@ -519,7 +512,6 @@
     "rank": 5,
     "group": "daring",
     "tags": ["current", "steady"],
-    "requires": "knackRank >= 5",
     "stats": {
       "reach": { "amount": 120, "unit": "ft" },
       "duration": { "text": "stat-value.minute" },
@@ -535,7 +527,6 @@
     "rank": 3,
     "group": "helping",
     "tags": ["root"],
-    "requires": "knackRank >= 3",
     "stats": {
       "reach": { "amount": 30, "unit": "ft" },
       "duration": { "text": "stat-value.hour" },
@@ -551,7 +542,6 @@
     "rank": 4,
     "group": "helping",
     "tags": ["root"],
-    "requires": "knackRank >= 4",
     "stats": {
       "reach": { "amount": 5, "unit": "ft" },
       "duration": { "text": "stat-value.hour" },
@@ -567,7 +557,6 @@
     "rank": 5,
     "group": "daring",
     "tags": ["root", "steady"],
-    "requires": "knackRank >= 5",
     "stats": {
       "reach": { "amount": 120, "unit": "ft" },
       "duration": { "text": "stat-value.minute" },

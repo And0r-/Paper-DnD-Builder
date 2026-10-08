@@ -49,7 +49,12 @@ describe("demo package", () => {
     expect(count("upbringing")).toBe(2);
     expect(count("knack")).toBe(29);
     expect(count("boon")).toBe(6);
-    expect(p.flow.level).toEqual({ min: 1, max: 20, default: 1 });
+    expect(p.flow.level).toEqual({
+      min: 1,
+      max: 20,
+      default: 1,
+      tracks: { choice: "calling", addRequiresCurrent: true },
+    });
     expect(p.manifest.languages).toEqual(["de", "en"]);
     expect(new Set(p.flow.choices.map((c) => c.kind))).toEqual(
       new Set(["pickOne", "pickMany", "distribute", "number", "text", "info"]),

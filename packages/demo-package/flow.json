@@ -2,7 +2,11 @@
   "level": {
     "min": 1,
     "max": 20,
-    "default": 1
+    "default": 1,
+    "tracks": {
+      "choice": "calling",
+      "addRequiresCurrent": true
+    }
   },
   "steps": [
     {
@@ -229,14 +233,19 @@
       "source": "mistland",
       "options": {
         "kind": "knack",
-        "tags": ["lantern"]
+        "tags": ["lantern"],
+        "rankUpTo": "lanternKnackRank"
       },
       "count": {
         "byLevel": [2, 3, 3, 4, 4, 4, 5, 5, 5, 6, 6, 6, 7, 7, 7, 8, 8, 8, 8, 8]
       },
+      "cardValues": {
+        "knackTarget": "lanternKnackTarget",
+        "knackHit": "lanternKnackHit"
+      },
       "recommend": [
         {
-          "when": "level >= 2",
+          "when": "levelOf('calling.lantern-bearer') >= 2",
           "pick": ["knack.warm-glow", "knack.glow-thread", "knack.quiet-word"]
         },
         {
@@ -251,12 +260,17 @@
       "source": "mistland",
       "options": {
         "kind": "knack",
-        "tags": ["current"]
+        "tags": ["current"],
+        "rankUpTo": "currentSlotRank"
       },
-      "count": "min(8, if(level >= 2, 3 + floor((level - 2) / 3), 2))",
+      "count": "min(8, if(levelOf('calling.river-runner') >= 2, 3 + floor((levelOf('calling.river-runner') - 2) / 3), 2))",
+      "cardValues": {
+        "knackTarget": "currentKnackTarget",
+        "knackHit": "currentKnackHit"
+      },
       "recommend": [
         {
-          "when": "level >= 2",
+          "when": "levelOf('calling.river-runner') >= 2",
           "pick": ["knack.fog-hop", "knack.dew-breath", "knack.wave-push"]
         },
         {
@@ -271,14 +285,19 @@
       "source": "mistland",
       "options": {
         "kind": "knack",
-        "tags": ["root"]
+        "tags": ["root"],
+        "rankUpTo": "rootKnackRank"
       },
       "count": {
         "byLevel": [2, 3, 3, 4, 4, 4, 5, 5, 5, 6, 6, 6, 7, 7, 7, 8, 8, 8, 8, 8]
       },
+      "cardValues": {
+        "knackTarget": "rootKnackTarget",
+        "knackHit": "rootKnackHit"
+      },
       "recommend": [
         {
-          "when": "level >= 10",
+          "when": "levelOf('calling.herbalist') >= 10",
           "pick": [
             "knack.heartwood",
             "knack.bramble-wall",
@@ -288,7 +307,7 @@
           ]
         },
         {
-          "when": "level >= 2",
+          "when": "levelOf('calling.herbalist') >= 2",
           "pick": ["knack.herb-scent", "knack.root-grip", "knack.moss-bed"]
         },
         {
@@ -761,7 +780,7 @@
       "textVariants": [
         {
           "id": "late",
-          "when": "level >= 17"
+          "when": "levelOf('calling.lantern-bearer') >= 17"
         }
       ],
       "gather": "path"
@@ -813,6 +832,51 @@
         }
       ],
       "gather": "mastery"
+    },
+    {
+      "id": "added-talent-lantern-bearer",
+      "kind": "pickOne",
+      "source": "mistland",
+      "options": {
+        "kind": "talent",
+        "tags": ["for-lantern-bearer"]
+      },
+      "recommend": [
+        {
+          "pick": ["talent.mending"]
+        }
+      ],
+      "gather": "talents"
+    },
+    {
+      "id": "added-talent-river-runner",
+      "kind": "pickOne",
+      "source": "mistland",
+      "options": {
+        "kind": "talent",
+        "tags": ["for-river-runner"]
+      },
+      "recommend": [
+        {
+          "pick": ["talent.climbing"]
+        }
+      ],
+      "gather": "talents"
+    },
+    {
+      "id": "added-talent-herbalist",
+      "kind": "pickOne",
+      "source": "mistland",
+      "options": {
+        "kind": "talent",
+        "tags": ["for-herbalist"]
+      },
+      "recommend": [
+        {
+          "pick": ["talent.mending"]
+        }
+      ],
+      "gather": "talents"
     }
   ],
   "grants": ["talent.mist-signs"],

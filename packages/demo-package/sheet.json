@@ -224,7 +224,7 @@
       "kind": "statBoxes",
       "span": 12,
       "apart": true,
-      "when": "has('calling.lantern-bearer')",
+      "when": "lanternSlots1 > 0",
       "boxes": [
         {
           "value": "lanternSlots1",
@@ -339,6 +339,25 @@
       "kind": "notes",
       "span": 6,
       "lines": 6
+    },
+    {
+      "id": "current-slots",
+      "kind": "statBoxes",
+      "span": 12,
+      "apart": true,
+      "when": "currentSlots > 0",
+      "boxes": [
+        {
+          "value": "currentSlots",
+          "style": "circles",
+          "label": "sheet.current-slots.slots"
+        },
+        {
+          "value": "currentSlotRank",
+          "style": "number",
+          "label": "sheet.current-slots.rank"
+        }
+      ]
     }
   ],
   "cards": {
@@ -351,16 +370,35 @@
           "label": "card.knack.borrowed",
           "text": {
             "text": "card.knack.numbers",
-            "vars": { "target": "borrowedKnackTarget", "hit": "borrowedKnackHit" }
+            "vars": {
+              "target": "borrowedKnackTarget",
+              "hit": "borrowedKnackHit"
+            }
           }
         },
         {
-          "from": { "kind": "calling" },
-          "text": { "text": "card.knack.numbers", "vars": { "target": "knackTarget", "hit": "knackHit" } }
+          "from": {
+            "kind": "calling"
+          },
+          "text": {
+            "text": "card.knack.numbers",
+            "vars": {
+              "target": "knackTarget",
+              "hit": "knackHit"
+            }
+          }
         },
         {
-          "from": { "kind": "path" },
-          "text": { "text": "card.knack.numbers", "vars": { "target": "knackTarget", "hit": "knackHit" } }
+          "from": {
+            "kind": "path"
+          },
+          "text": {
+            "text": "card.knack.numbers",
+            "vars": {
+              "target": "knackTarget",
+              "hit": "knackHit"
+            }
+          }
         }
       ]
     }
