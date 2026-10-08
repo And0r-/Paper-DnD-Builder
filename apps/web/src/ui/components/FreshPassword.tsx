@@ -9,7 +9,10 @@
  * The button sends a form the player does not see: the account's name as
  * the user name and the password as a new one (AND-241). Browsers and
  * phones take a sent form with a new password as the moment to offer
- * saving it.
+ * saving it. Firefox only does so when the form is really sent, not when a
+ * script stops it, so the form goes to /form-sent: an empty answer that
+ * leaves the page as it is. The fields have no `name`, so nothing of them
+ * travels; the screen closes a moment later, once the form is on its way.
  *
  * `noMail`: the account has no mail address, so this password is the only
  * way back in; the screen says so plainly, before it is too late.
@@ -35,21 +38,16 @@ export function FreshPassword({
   return (
     <form
       className="fresh-password"
-      onSubmit={(e) => {
-        e.preventDefault();
-        onDone();
+      method="get"
+      action="/form-sent"
+      onSubmit={() => {
+        // Not now: removing the form before it is sent would cancel the sending.
+        setTimeout(onDone, 0);
       }}
     >
       <div className="visually-hidden" aria-hidden="true">
-        <input type="text" name="username" autoComplete="username" value={username} readOnly tabIndex={-1} />
-        <input
-          type="password"
-          name="password"
-          autoComplete="new-password"
-          value={secret}
-          readOnly
-          tabIndex={-1}
-        />
+        <input type="text" autoComplete="username" value={username} readOnly tabIndex={-1} />
+        <input type="password" autoComplete="new-password" value={secret} readOnly tabIndex={-1} />
       </div>
       <CopyText label={t("password.label")} value={secret} large />
       <p>{t("password.text")}</p>
