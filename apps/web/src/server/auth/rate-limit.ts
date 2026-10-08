@@ -93,4 +93,7 @@ export const LIMITS = {
   // Requests to the public MCP server, with or without a valid key. A language model
   // building a character makes a few calls a minute; a loop or a key guesser hits this.
   mcpRequestsPerIp: { max: 120, windowMs: MINUTE },
+  // Opening the live channel of a character. A browser reconnects every few seconds
+  // at worst; a loop that opens and drops connections hits this.
+  liveOpensPerAccount: { max: 60, windowMs: MINUTE },
 } as const satisfies Record<string, Limit>;

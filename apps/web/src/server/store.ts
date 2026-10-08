@@ -451,6 +451,20 @@ export class Store {
     return { key_id, account };
   }
 
+  /**
+   * The account a session (by id) or an access key (by id) still logs in,
+   * or undefined once it ended: for connections that outlive one request.
+   */
+  async loginAccount(via: "cookie" | "key", id: string, now: Date): Promise<string | undefined> {
+    const rows = await this.db.query<{ account_id: string }>(
+      via === "cookie"
+        ? "SELECT account_id FROM sessions WHERE id = $1 AND expires_at > $2"
+        : "SELECT account_id FROM access_keys WHERE id = $1 AND (expires_at IS NULL OR expires_at > $2)",
+      [id, now],
+    );
+    return rows[0]?.account_id;
+  }
+
   async deleteAccessKey(id: string, accountId: string): Promise<boolean> {
     const rows = await this.db.query(
       "DELETE FROM access_keys WHERE id = $1 AND account_id = $2 RETURNING id",

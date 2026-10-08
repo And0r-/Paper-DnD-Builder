@@ -8,29 +8,58 @@ import { RateLimiter } from "./auth/rate-limit.ts";
 import { readConfig, type Config } from "./config.ts";
 import { memoryDatabase, outboxMailer, PGLITE_MEMORY_URL } from "./local-backends.ts";
 import { createSmtpMailer, type Mailer } from "./mail.ts";
+import { LiveChannel, type Role, type Via } from "./live.ts";
 import { loadPackages, type PackageRegistry } from "./packages/loader.ts";
 import { Store } from "./store.ts";
 
-export interface DraftChanged {
-  draftId: string;
+/** Who made a change, as the live channel shows it (see live.ts). */
+export interface ChangeSource {
+  via: Via;
   accountId: string;
-  version: number;
+  accountName: string;
+  /** Their access to the character: its owner, or the game master of its campaign. */
+  role: Role;
+  /** The browser window that made it, if it said so: it skips its own changes. */
+  clientId: string | null;
 }
 
 /**
- * Notifies about every stored draft change. Nothing listens yet; the live
- * help (several people on one draft over WebSocket) will subscribe here and
- * forward changes, without touching how drafts are changed.
+ * Something stored about one character: what changed, by whom. The
+ * character itself is not in it; a client reads it again when it cares.
+ * `version` is the draft's version after the change (unchanged by the
+ * play state, copies and the campaign).
+ */
+export interface DraftEvent {
+  type: "created" | "changed" | "levelUp" | "finished" | "state" | "copies" | "campaign" | "deleted";
+  draftId: string;
+  version: number;
+  at: string;
+  source: ChangeSource;
+  /** What exactly, where it helps: the choice or step answered, the copy, the play state's version. */
+  change?: {
+    kind: string;
+    choice?: string;
+    step?: string;
+    level?: number;
+    copyId?: string;
+    stateVersion?: number;
+  };
+}
+
+/**
+ * Notifies about every stored change of a character, wherever the server
+ * stores it. The live channel (live.ts) subscribes here and tells everyone
+ * on the character, without touching how drafts are changed.
  */
 export class DraftEvents {
-  private readonly listeners = new Set<(e: DraftChanged) => void>();
+  private readonly listeners = new Set<(e: DraftEvent) => void>();
 
-  subscribe(listener: (e: DraftChanged) => void): () => void {
+  subscribe(listener: (e: DraftEvent) => void): () => void {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);
   }
 
-  publish(e: DraftChanged): void {
+  publish(e: DraftEvent): void {
     for (const l of this.listeners) {
       try {
         l(e);
@@ -48,6 +77,7 @@ export interface App {
   mailer: Mailer;
   limiter: RateLimiter;
   draftEvents: DraftEvents;
+  live: LiveChannel;
   now: () => Date;
 }
 
@@ -61,13 +91,16 @@ export interface AppParts {
 
 export function createApp(parts: AppParts): App {
   const now = parts.now ?? (() => new Date());
+  const store = new Store(parts.db);
+  const draftEvents = new DraftEvents();
   return {
     config: parts.config,
-    store: new Store(parts.db),
+    store,
     packages: parts.packages,
     mailer: parts.mailer,
     limiter: new RateLimiter(() => now().getTime()),
-    draftEvents: new DraftEvents(),
+    draftEvents,
+    live: new LiveChannel({ store, now, events: draftEvents }),
     now,
   };
 }

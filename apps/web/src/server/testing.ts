@@ -88,8 +88,14 @@ export class Client {
     return { status: res.status, json, headers: res.headers };
   }
 
-  /** The raw response, for answers that are not JSON (the PDF). */
-  async request(method: string, path: string, body?: unknown, headers: Record<string, string> = {}) {
+  /** The raw response, for answers that are not JSON (the PDF, the live channel's stream). */
+  async request(
+    method: string,
+    path: string,
+    body?: unknown,
+    headers: Record<string, string> = {},
+    signal?: AbortSignal,
+  ) {
     const h = new Headers({ "x-forwarded-for": this.ip, origin: "http://builder.test", ...headers });
     if (body !== undefined && !h.has("content-type")) h.set("content-type", "application/json");
     if (this.cookie) h.set("cookie", this.cookie);
@@ -97,6 +103,7 @@ export class Client {
       new Request(`http://builder.test${path}`, {
         method,
         headers: h,
+        ...(signal ? { signal } : {}),
         ...(body !== undefined ? { body: typeof body === "string" ? body : JSON.stringify(body) } : {}),
       }),
     );

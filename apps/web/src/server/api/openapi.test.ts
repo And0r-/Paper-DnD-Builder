@@ -464,6 +464,11 @@ async function walk(server: TestServer): Promise<void> {
   await call("GET", `/api/drafts/${id}/sheet`, undefined, k);
   await call("GET", `/api/drafts/${id}/explain/might`, undefined, k);
   await call("GET", `/api/drafts/${id}/explain/nothing`, undefined, k);
+  // The live channel streams until the client goes: leave it after a moment.
+  const leave = new AbortController();
+  setTimeout(() => leave.abort(), 50);
+  await c.request("GET", `/api/drafts/${id}/events`, undefined, k, leave.signal);
+  await call("GET", `/api/drafts/00000000-0000-4000-8000-000000000000/events`, undefined, k);
 
   for (let guard = 0; view.evaluation.open.length > 0; guard++) {
     if (guard > 80) throw new Error("walk does not end");

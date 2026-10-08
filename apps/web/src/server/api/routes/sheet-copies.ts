@@ -39,6 +39,7 @@ import type {
 import { HttpError, json, readJson } from "../http.ts";
 import type { RequestContext, Route } from "../router.ts";
 import { nameSchema } from "../../auth/accounts.ts";
+import { tell } from "../../live.ts";
 import { loadDraft } from "./drafts.ts";
 import { originalSheet } from "./print.ts";
 
@@ -255,6 +256,7 @@ export const sheetCopyRoutes: Route[] = [
       if (!made) throw new HttpError(409, "tooManyCopies", { max: MAX_COPIES_PER_CHARACTER });
       // Whoever made it is looking at it now: it opens next time.
       await ctx.app.store.putSheetView((await ctx.requireSession()).account.id, row.id, made.id, now);
+      await tell(ctx, row, row.access, { type: "copies", change: { kind: "copyCreated", copyId: made.id } });
       return json(201, copyView(made));
     },
   },
@@ -294,6 +296,7 @@ export const sheetCopyRoutes: Route[] = [
         // Changed or deleted between our read and our write.
         throw new HttpError(409, "versionConflict", { current: copyView(await loadCopy(ctx, row.id)) });
       }
+      await tell(ctx, row, row.access, { type: "copies", change: { kind: "copyChanged", copyId: copy.id } });
       return json(200, copyView(updated));
     },
   },
@@ -305,6 +308,7 @@ export const sheetCopyRoutes: Route[] = [
       const id = ctx.params["copyId"]!;
       const deleted = UUID.test(id) && (await ctx.app.store.deleteSheetCopy(row.id, id));
       if (!deleted) throw new HttpError(404, "copyNotFound");
+      await tell(ctx, row, row.access, { type: "copies", change: { kind: "copyDeleted", copyId: id } });
       return json(204, null);
     },
   },
@@ -358,6 +362,8 @@ export const sheetCopyRoutes: Route[] = [
           current: stateView(await ctx.app.store.findCharacterState(row.id)),
         });
       }
+      const kind = "state" in body ? "state" : "clearChecks";
+      await tell(ctx, row, row.access, { type: "state", change: { kind, stateVersion: stored.version } });
       return json(200, stateView(stored));
     },
   },

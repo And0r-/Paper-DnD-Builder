@@ -17,7 +17,10 @@ import {
 import type { ContentPackage } from "@builder/format";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
-import type { App } from "../../app.ts";
+import type { App, DraftEvent } from "../../app.ts";
+import { limited } from "../../auth/accounts.ts";
+import { LIMITS } from "../../auth/rate-limit.ts";
+import { CLIENT_ID_HEADER, clientIdOf, MAX_CONNECTIONS_PER_ACCOUNT, tell, viaOf } from "../../live.ts";
 import type { AccountRow, DraftRow, ReachableDraftRow } from "../../store.ts";
 import { HttpError, json, readJson } from "../http.ts";
 import type { RequestContext, Route } from "../router.ts";
@@ -107,6 +110,7 @@ function conflict(row: ReachableDraftRow, pkg: ContentPackage): HttpError {
 async function change(
   ctx: RequestContext,
   expectedVersion: number,
+  what: Pick<DraftEvent, "type" | "change">,
   edit: (
     pkg: ContentPackage,
     row: DraftRow,
@@ -136,7 +140,7 @@ async function change(
     if (!current) throw new HttpError(404, "draftNotFound");
     throw conflict(current, pkg);
   }
-  ctx.app.draftEvents.publish({ draftId: updated.id, accountId, version: updated.version });
+  await tell(ctx, updated, row.access, what);
   const who = { owner_name: row.owner_name, access: row.access };
   return json(200, draftView({ ...updated, ...who }, pkg, edited.raisedFrom));
 }
@@ -187,6 +191,7 @@ export async function createDraft(
     campaign_id: campaignId,
     created_at: ctx.app.now(),
   });
+  await tell(ctx, row, access, { type: "created" });
   return json(201, draftView({ ...row, owner_name: owner.name, access }, pkg));
 }
 
@@ -217,6 +222,34 @@ export const draftRoutes: Route[] = [
     },
   },
   {
+    // The live channel: a stream (Server-Sent Events) of every stored change to
+    // the character and of who has it open; see live.ts. Same access as reading it.
+    method: "GET",
+    path: "/api/drafts/:id/events",
+    handler: async (ctx) => {
+      const { row, viewer } = await loadDraft(ctx);
+      const session = (await ctx.session())!;
+      limited(ctx.app, `live:account:${viewer.id}`, LIMITS.liveOpensPerAccount, true);
+      if (ctx.app.live.count(viewer.id) >= MAX_CONNECTIONS_PER_ACCOUNT) {
+        throw new HttpError(429, "tooManyConnections", { max: MAX_CONNECTIONS_PER_ACCOUNT });
+      }
+      // EventSource cannot send headers: a window gives its id in the address.
+      const clientId = ctx.url.searchParams.get("clientId") ?? ctx.req.headers.get(CLIENT_ID_HEADER);
+      return ctx.app.live.open({
+        draftId: row.id,
+        accountId: viewer.id,
+        present: {
+          accountName: viewer.name,
+          role: row.access,
+          via: viaOf(session, ctx.req.headers),
+          clientId: clientIdOf(clientId),
+        },
+        login: { via: session.via, id: session.id },
+        signal: ctx.req.signal,
+      });
+    },
+  },
+  {
     // Where one number comes from: the parts the screen explains it with,
     // as data (ids, not words), so a tool reads the same answer.
     method: "GET",
@@ -238,7 +271,8 @@ export const draftRoutes: Route[] = [
     path: "/api/drafts/:id",
     handler: async (ctx) => {
       const body = await readJson(ctx.req, z.strictObject({ version, level: z.number().int() }));
-      return change(ctx, body.version, (pkg, row) =>
+      const what = { type: "changed", change: { kind: "level", level: body.level } } as const;
+      return change(ctx, body.version, what, (pkg, row) =>
         applyOrReject(pkg, row, { type: "setLevel", level: body.level }),
       );
     },
@@ -250,7 +284,8 @@ export const draftRoutes: Route[] = [
     handler: async (ctx) => {
       const body = await readJson(ctx.req, z.strictObject({ version, answer: z.unknown() }));
       const choice = ctx.params["choice"]!;
-      return change(ctx, body.version, (pkg, row) =>
+      const what = { type: "changed", change: { kind: "answer", choice } } as const;
+      return change(ctx, body.version, what, (pkg, row) =>
         applyOrReject(pkg, row, { type: "answer", choice, answer: body.answer ?? null }),
       );
     },
@@ -265,7 +300,8 @@ export const draftRoutes: Route[] = [
         z.strictObject({ version, picks: z.array(z.string().min(1).max(200)).max(200) }),
       );
       const step = ctx.params["step"]!;
-      return change(ctx, body.version, (pkg, row) =>
+      const what = { type: "changed", change: { kind: "pool", step } } as const;
+      return change(ctx, body.version, what, (pkg, row) =>
         applyOrReject(pkg, row, { type: "pool", step, picks: body.picks }),
       );
     },
@@ -278,7 +314,8 @@ export const draftRoutes: Route[] = [
     path: "/api/drafts/:id/level-up",
     handler: async (ctx) => {
       const body = await readJson(ctx.req, z.strictObject({ version, level: z.number().int() }));
-      return change(ctx, body.version, (pkg, row) => {
+      const what = { type: "levelUp", change: { kind: "levelUp", level: body.level } } as const;
+      return change(ctx, body.version, what, (pkg, row) => {
         // A raise that is not finished yet may go higher still; any other draft is built first.
         if (!row.finished_at && row.document.levelBefore === undefined) {
           throw new HttpError(409, "notFinished", { open: evaluateDraft(pkg, row.document).open });
@@ -298,7 +335,7 @@ export const draftRoutes: Route[] = [
     path: "/api/drafts/:id/finish",
     handler: async (ctx) => {
       const body = await readJson(ctx.req, z.strictObject({ version }));
-      return change(ctx, body.version, (pkg, row) => {
+      return change(ctx, body.version, { type: "finished" }, (pkg, row) => {
         const ev = evaluateDraft(pkg, row.document);
         if (!ev.complete) throw new HttpError(422, "incomplete", { open: ev.open });
         return { doc: row.document, finish: true };
@@ -316,6 +353,7 @@ export const draftRoutes: Route[] = [
       const body = await readJson(ctx.req, z.strictObject({ campaignId: z.string().regex(UUID).nullable() }));
       const set = await ctx.app.store.setDraftCampaign(row.id, viewer.id, body.campaignId);
       if (!set) throw new HttpError(404, "campaignNotFound");
+      await tell(ctx, row, row.access, { type: "campaign" });
       return json(
         200,
         draftView({ ...row, campaign_id: body.campaignId }, ctx.app.packages.get(row.package_id)),
@@ -330,6 +368,7 @@ export const draftRoutes: Route[] = [
       const { row } = await loadDraft(ctx);
       if (row.access !== "owner") throw new HttpError(403, "ownerOnly");
       await ctx.app.store.deleteDraft(row.id, row.account_id);
+      await tell(ctx, row, row.access, { type: "deleted" });
       return json(204, null);
     },
   },

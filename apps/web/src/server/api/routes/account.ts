@@ -192,6 +192,7 @@ export const accountRoutes: Route[] = [
       const deleted = UUID.test(id) && (await ctx.app.store.deleteAccessKey(id, account.id));
       // Someone else's key looks exactly like a missing one.
       if (!deleted) throw new HttpError(404, "keyNotFound");
+      ctx.app.live.close((c) => c.login.via === "key" && c.login.id === id);
       return json(204, null);
     },
   },
@@ -203,6 +204,9 @@ export const accountRoutes: Route[] = [
       const { account } = await ctx.requireSession();
       await readJson(ctx.req, z.strictObject({ confirm: z.literal(true) }));
       await ctx.app.store.deleteAccount(account.id);
+      // Their own connections, and everyone's on their characters (a game master's).
+      ctx.app.live.close((c) => c.accountId === account.id);
+      await ctx.app.live.recheck((c) => c.role === "gameMaster");
       if (account.email) ctx.app.limiter.reset(`login:account:${account.email}`);
       ctx.responseHeaders.delete("Set-Cookie");
       return json(204, null, { "Set-Cookie": clearSessionCookie(ctx.app.config.secureCookies) });

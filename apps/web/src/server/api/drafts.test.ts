@@ -166,7 +166,10 @@ describe("building a character over the API", () => {
     const created = await client.call("POST", "/api/drafts", { packageId: "demo" });
     const id = created.json.draft.id;
     await client.call("PATCH", `/api/drafts/${id}`, { version: 1, level: 2 });
-    expect(events).toEqual([expect.objectContaining({ draftId: id, version: 2 })]);
+    expect(events).toEqual([
+      expect.objectContaining({ type: "created", draftId: id, version: 1 }),
+      expect.objectContaining({ type: "changed", draftId: id, version: 2 }),
+    ]);
   });
 
   it("makes a finished character a draft again when a change leaves something open", async () => {
