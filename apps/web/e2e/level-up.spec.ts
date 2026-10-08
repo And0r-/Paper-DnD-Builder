@@ -90,9 +90,34 @@ test("a level-1 character goes up to 2, 3 and 5, asked only what is new each tim
   const id = await finished(page, 1);
   const level1 = await stepIds(page, id);
 
-  // The button on the character list.
+  // On the character list, raising sits in the "more" menu, after editing (AND-228).
   await page.goto("/characters");
-  await page.getByRole("link", { name: "Mira aufstufen" }).click();
+  await expect(page.getByRole("link", { name: `${m["characters.view"]}: Mira` })).toBeVisible();
+  await expect(page.getByRole("link", { name: `${m["characters.print"]}: Mira` })).toBeVisible();
+  await expect(page.getByRole("menuitem")).toHaveCount(0);
+  // By keyboard: open, down through Edit, Level up, Delete and round again, Enter follows the link.
+  const more = page.getByRole("button", { name: m["characters.more"].replace("{name}", "Mira") });
+  await more.focus();
+  await page.keyboard.press("Enter");
+  const entries = page.getByRole("menu").getByRole("menuitem");
+  await expect(entries).toHaveText([m["characters.edit"], m["raise.button"], m["characters.delete"]]);
+  await expect(entries.nth(0)).toHaveAttribute("href", `/c/${id}/overview`);
+  await expect(entries.nth(0)).toBeFocused();
+  await page.keyboard.press("ArrowDown");
+  await expect(page.getByRole("menuitem", { name: "Mira aufstufen" })).toBeFocused();
+  await page.keyboard.press("ArrowDown");
+  await expect(entries.nth(2)).toBeFocused();
+  await page.keyboard.press("ArrowDown");
+  await expect(entries.nth(0)).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(entries).toHaveCount(0);
+  await expect(more).toBeFocused();
+  await page.keyboard.press("ArrowUp");
+  await expect(entries.nth(2)).toBeFocused();
+  await page.keyboard.press("ArrowUp");
+  await expect(page.getByRole("menuitem", { name: "Mira aufstufen" })).toBeFocused();
+  await shot(page, "89-liste-menue");
+  await page.keyboard.press("Enter");
   await expect(page).toHaveURL(`/c/${id}/raise`);
   await expect(page.getByRole("heading", { level: 1, name: "Auf welche Stufe steigt Mira?" })).toBeVisible();
   await expect(page.getByText("Im Moment: Stufe 1.")).toBeVisible();
@@ -314,7 +339,8 @@ test.describe("in English, on a large screen", () => {
     await page.goto("/characters");
     await expectOneLanguage(page, "en");
     await shot(page, "95-level-up-list-desktop");
-    await page.getByRole("link", { name: "Level up Mira" }).click();
+    await page.getByRole("button", { name: en["characters.more"].replace("{name}", "Mira") }).click();
+    await page.getByRole("menuitem", { name: "Level up Mira" }).click();
     await expect(
       page.getByRole("heading", { level: 1, name: "Which level is Mira going up to?" }),
     ).toBeVisible();

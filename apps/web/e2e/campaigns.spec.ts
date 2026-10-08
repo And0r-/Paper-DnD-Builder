@@ -118,10 +118,10 @@ test("game master, player and a stranger: who sees which character", async ({ pa
   await expect(playerBlock.getByText("Laternenträgerin · Stufe 3")).toBeVisible();
   await expect(playerBlock.getByText(m["characters.finished"])).toBeVisible();
   await expect(playerBlock.getByRole("link", { name: `${m["characters.print"]}: Mira` })).toBeVisible();
-  // A game master may change a player's character, not delete it: no menu for that.
-  await expect(
-    playerBlock.getByRole("button", { name: m["characters.more"].replace("{name}", "Mira") }),
-  ).toHaveCount(0);
+  // A game master may change a player's character, not delete it: the menu has no "Delete".
+  await playerBlock.getByRole("button", { name: m["characters.more"].replace("{name}", "Mira") }).click();
+  await expect(playerBlock.getByRole("menuitem")).toHaveText([m["characters.edit"], m["raise.button"]]);
+  await page.keyboard.press("Escape");
   await shot(page, "96-kampagne-mit-charakter");
   await page.setViewportSize(DESKTOP);
   await shot(page, "96-kampagne-mit-charakter-desktop");
