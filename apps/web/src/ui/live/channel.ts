@@ -2,10 +2,10 @@
 /**
  * The live channel of one character (API.md "Live help"): who else is on
  * it, where they are and what they point at, the character's new state the
- * moment anyone changes it, and short hints. While the channel is open,
- * changes go over it too, so everyone learns who made them; while it is
- * not, they go over HTTP (draft-state.tsx), with the same answers and
- * errors. A lost connection loses nothing; it is opened again with the
+ * moment anyone changes it, and short hints. While someone else is on
+ * the character, changes go over the channel too, so everyone learns who
+ * made them; otherwise they go over HTTP (draft-state.tsx), with the same
+ * answers and errors. A lost connection loses nothing; it is opened again with the
  * same URL, and the server sends the current state on joining.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -67,8 +67,8 @@ export interface LiveChannel {
   /** False when the channel is not open: nothing was sent. */
   sendHint(text: string): boolean;
   /**
-   * Sends a change over the channel; null when it is not open (send it over
-   * HTTP then). Answers as the HTTP route would: the new state, or an
+   * Sends a change over the channel; null when it is not open or nobody
+   * else is there (send it over HTTP then). Answers as the HTTP route would: the new state, or an
    * ApiError (`versionConflict` with `current`, `changeRejected`, network).
    */
   sendChange(version: number, change: DraftChange): Promise<DraftView> | null;
@@ -122,6 +122,7 @@ export function useLiveChannel(
     new Map<string, { resolve: (v: DraftView) => void; reject: (e: ApiError) => void }>(),
   );
   const refs = useRef(0);
+  const company = useRef(false);
 
   const sendRaw = useCallback((m: object): boolean => {
     const s = socket.current;
@@ -162,9 +163,12 @@ export function useLiveChannel(
             if (step.current !== null) sendRaw({ type: "step", step: step.current });
             if (point.current !== null) sendRaw({ type: "point", target: point.current });
             break;
-          case "presence":
-            setPeople(m["people"] as Person[]);
+          case "presence": {
+            const all = m["people"] as Person[];
+            company.current = all.some((p) => p.id !== youRef.current?.id);
+            setPeople(all);
             break;
+          }
           case "state": {
             const state = m as unknown as StateMessage;
             const w = state.ref !== undefined ? waiting.current.get(state.ref) : undefined;
@@ -209,6 +213,7 @@ export function useLiveChannel(
         waiting.current.clear();
         if (stopped) return;
         setPeople([]);
+        company.current = false;
         if (GONE_CODES.has(e.code)) {
           setConnection("gone");
           on.current.onGone(e.code);
@@ -287,7 +292,7 @@ export function useLiveChannel(
           : change.type === "pool"
             ? { type: "pool", ref, version, step: change.step, picks: change.picks }
             : { type: "setLevel", ref, version, level: change.level };
-      if (!sendRaw(body)) return null;
+      if (!company.current || !sendRaw(body)) return null;
       return new Promise<DraftView>((resolve, reject) => {
         const timer = setTimeout(() => {
           waiting.current.delete(ref);
