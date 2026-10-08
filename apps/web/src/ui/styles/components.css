@@ -974,11 +974,19 @@ textarea.field__input {
   text-align: center;
 }
 
-.settings__identity {
+.settings__identity,
+.settings__reset-test {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
   max-width: 28rem;
+}
+
+/* "Test: send a link" under the saved address (AND-236). */
+.settings__reset-test .settings__hint {
+  font-size: var(--text-sm);
+  line-height: var(--text-sm-lh);
+  color: var(--color-ink-muted);
 }
 
 .fresh-password {

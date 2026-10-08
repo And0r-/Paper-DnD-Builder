@@ -212,9 +212,9 @@ describe("a link back in", () => {
 
     // The new password works elsewhere; the old one stays until its owner deletes it.
     const other = new Client(server, "198.51.100.51");
-    expect((await other.call("POST", "/api/auth/login", { password: used.json.password.secret })).status).toBe(
-      200,
-    );
+    expect(
+      (await other.call("POST", "/api/auth/login", { password: used.json.password.secret })).status,
+    ).toBe(200);
     expect((await other.call("POST", "/api/auth/login", { password: first })).status).toBe(200);
 
     // Once only.
@@ -246,7 +246,10 @@ describe("a link back in", () => {
       language: "en",
     });
     server.advance(1000);
-    await new Client(server, "198.51.100.61").call("POST", "/api/auth/signup", { name: "Mira", email: EMAIL });
+    await new Client(server, "198.51.100.61").call("POST", "/api/auth/signup", {
+      name: "Mira",
+      email: EMAIL,
+    });
     await ask(client, EMAIL, "de");
     expect(server.mails).toHaveLength(1);
     const text = server.mails[0]!.text;
