@@ -160,6 +160,41 @@ describe("building a character over the API", () => {
     });
   });
 
+  it("never lets a copy made before someone else's change overwrite it (AND-270)", async () => {
+    const created = await client.call("POST", "/api/drafts", { packageId: "demo" });
+    const id = created.json.draft.id;
+    const scores = (assign: Record<string, number>) => ({ method: 0, assign });
+    const start = { mightBase: 8, graceBase: 8, witBase: 10, heartBase: 8 };
+    const set = await client.call("PUT", `/api/drafts/${id}/answers/scores`, {
+      version: 1,
+      answer: scores(start),
+    });
+    expect(set.status).toBe(200);
+    // B raises might; A, offline on version 2, lowers wit and sends all four values when it is back.
+    const b = await client.call("PUT", `/api/drafts/${id}/answers/scores`, {
+      version: 2,
+      answer: scores({ ...start, mightBase: 9 }),
+    });
+    expect(b.status).toBe(200);
+    const stale = await client.call("PUT", `/api/drafts/${id}/answers/scores`, {
+      version: 2,
+      answer: scores({ ...start, witBase: 9 }),
+    });
+    expect(stale.status).toBe(409);
+    expect(stale.json.error.code).toBe("versionConflict");
+    expect(stale.json.error.current.draft.answers.scores).toEqual(scores({ ...start, mightBase: 9 }));
+    // A puts only its own change on top of what the server holds now (API.md "Changes from several places").
+    const merged = await client.call("PUT", `/api/drafts/${id}/answers/scores`, {
+      version: 3,
+      answer: scores({ ...stale.json.error.current.draft.answers.scores.assign, witBase: 9 }),
+    });
+    expect(merged.status).toBe(200);
+    expect(merged.json.draft.answers.scores).toEqual(scores({ ...start, mightBase: 9, witBase: 9 }));
+    // The same goes for a list step's picks.
+    const pool = await client.call("PUT", `/api/drafts/${id}/pools/scores`, { version: 3, picks: [] });
+    expect(pool.status).toBe(409);
+  });
+
   it("tells listeners about every stored change (the hook for live help)", async () => {
     const events: unknown[] = [];
     server.app.draftEvents.subscribe((e) => events.push(e));
