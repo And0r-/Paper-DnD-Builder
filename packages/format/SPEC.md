@@ -1741,8 +1741,8 @@ later adds the same key, the extension is not loaded until it is renamed.
   demo's `path` choice selects `{ "kind": "path" }`, each path `requires`
   its calling; the extension thing `path.tide-warden` of kind `path` with
   `"requires": "has('calling.river-runner')"` becomes a further path for
-  river runners. A choice that selects `{ "kind": "subclass", "tags":
-["subclass-fighter"] }` gets every extension thing of that kind with that
+  river runners. A choice that selects `{ "kind": "talent", "tags":
+["for-river-runner"] }` gets every extension thing of that kind with that
   tag. A choice that lists `ids` offers only those things; an extension
   cannot add to it.
 - **Counts and conditions.** `count('<tag>')` and `has()` of the base see
