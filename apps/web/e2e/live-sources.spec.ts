@@ -213,6 +213,87 @@ test("an unsaved change survives one to another question; to the same question t
   await gm.context().close();
 });
 
+for (const cut of [false, true])
+  test(`back online after a while${cut ? ", the channel broken too" : ""}: the window sends only what it changed, the other's change stays (AND-270)`, async ({
+    page,
+    browser,
+    foreign,
+  }) => {
+    void foreign;
+    await offlineRound(page, browser, cut);
+  });
+
+/**
+ * Lio is offline for a while; Vexa raises might, Lio lowers wit. With `cut`
+ * the live channel breaks too and joins again after: then nobody can say
+ * who made the change meanwhile.
+ */
+async function offlineRound(page: Page, browser: Browser, cut: boolean): Promise<void> {
+  let broken = false;
+  const sockets: { close(): Promise<void> }[] = [];
+  await page.routeWebSocket(/\/api\/live\//, (ws) => {
+    if (broken) return void ws.close();
+    ws.connectToServer();
+    sockets.push(ws);
+  });
+  const gm = await gameMasterBrowser(browser);
+  const id = await table(page, gm);
+  const start = { mightBase: 8, graceBase: 8, witBase: 10, heartBase: 8 };
+  const set = await page.request.put(`/api/drafts/${id}/answers/scores`, {
+    data: { version: await version(page.request, id), answer: { method: 0, assign: start } },
+  });
+  expect(set.status()).toBe(200);
+  const values = (p: Page) => p.locator(".stepper__value");
+  // The rows: might, grace, wit, heart; each with "−" and "+".
+  const step = (p: Page, row: number, button: 0 | 1) =>
+    p.locator(".pointbuy__row").nth(row).locator(".stepper__btn").nth(button).click();
+  await page.goto(`/c/${id}/step/scores`);
+  await gm.goto(`/c/${id}/step/scores`);
+  await expect(values(page)).toHaveText(["8", "8", "10", "8"]);
+  await expect(bar(page)).toContainText(fill(de["live.person.gameMaster"], { name: "Vexa" }));
+
+  // The owner has no network for a while. The game master raises might meanwhile,
+  // the owner lowers wit.
+  await page.context().setOffline(true);
+  if (cut) {
+    broken = true;
+    await Promise.all(sockets.map((ws) => ws.close()));
+  }
+  await step(gm, 0, 1);
+  await expect(values(gm)).toHaveText(["9", "8", "10", "8"]);
+  await expect(gm.locator(".save-status")).toHaveText(en["save.saved"]);
+  await step(page, 2, 0);
+  await expect(values(page)).toHaveText(["8", "8", "9", "8"]);
+  // A change over the live channel waits 10 seconds for its answer, then goes over HTTP, which fails.
+  await expect(page.locator(".save-status")).toHaveText(de["save.offline"], { timeout: 30_000 });
+  await shot(page, "270-offline-handy-de");
+
+  // Back online: both screens hold both changes, and the owner's line says what happened.
+  await page.context().setOffline(false);
+  broken = false;
+  // The channel tries again after up to 10 seconds.
+  await expect(page.locator(".save-status")).toHaveText(de["save.saved"], { timeout: 30_000 });
+  await expect(values(page)).toHaveText(["9", "8", "9", "8"]);
+  await expect(values(gm)).toHaveText(["9", "8", "9", "8"]);
+  // With the channel open it says who; after joining again nobody knows: "elsewhere".
+  const byGm = fill(de["live.from.person"], { who: fill(de["live.person.gameMaster"], { name: "Vexa" }) });
+  const from = cut ? de["live.from.unknown"] : byGm;
+  await expect(told(page)).toHaveText(
+    fill(de["live.told.alongside"], { line: line(de, from, "Grundwerte (Kraft 9)") }),
+  );
+  await expectOneLanguage(page, "de");
+  await shot(page, `270-wieder-online${cut ? "-getrennt" : ""}-handy-de`);
+  await shot(gm, `270-back-online${cut ? "-cut" : ""}-desk-en`);
+  const stored = (await (await page.request.get(`/api/drafts/${id}`)).json()) as {
+    draft: { answers: Record<string, unknown> };
+  };
+  expect(stored.draft.answers["scores"]).toEqual({
+    method: 0,
+    assign: { ...start, mightBase: 9, witBase: 9 },
+  });
+  await gm.context().close();
+}
+
 test("the sheet follows the play state and the character, changed by a program, MCP and another window", async ({
   page,
   baseURL,
