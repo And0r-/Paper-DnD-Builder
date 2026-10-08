@@ -57,7 +57,7 @@ test("every screen shows exactly one language, and switching swaps all texts", a
   await page.goto("/login");
   await expectOneLanguage(page, "de");
   await chooseLanguage(page, "en");
-  await expect(page.getByRole("heading", { name: en["login.title"] })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 2, name: en["login.registerTitle"] })).toBeVisible();
   await expectOneLanguage(page, "en");
   await shot(page, "21-login-en");
   await chooseLanguage(page, "de");

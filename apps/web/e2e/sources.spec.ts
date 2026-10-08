@@ -47,7 +47,7 @@ test.describe("phone", () => {
       const m = MESSAGES[lang];
       await page.goto("/login");
       if (lang === "en") await chooseLanguage(page, "en");
-      await expect(page.getByRole("heading", { name: m["login.title"] })).toBeVisible();
+      await expect(page.getByRole("heading", { level: 2, name: m["login.registerTitle"] })).toBeVisible();
       const brand = page.locator(".auth__brand");
       await expect(brand).toContainText(m["app.name"]);
       const info = brand.getByRole("button", { name: m["common.whatIsThis"] });
@@ -59,7 +59,7 @@ test.describe("phone", () => {
       await expectOneLanguage(page, lang);
       await page.screenshot({ path: `e2e/screenshots/90-anmeldung-handy-${lang}.png` });
       // A tap elsewhere closes it; the form works as before.
-      await page.getByRole("heading", { name: m["login.title"] }).tap();
+      await page.getByRole("heading", { level: 2, name: m["login.registerTitle"] }).tap();
       await expect(hint).toBeHidden();
     });
   }

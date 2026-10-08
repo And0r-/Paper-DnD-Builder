@@ -1,14 +1,19 @@
 "use client";
 /**
  * My characters (flow spec 4.2): unfinished first, each with where it
- * stands. Deleting asks first and can be undone for 10 seconds.
+ * stands and the campaign it is in. Deleting asks first and can be undone
+ * for 10 seconds.
+ *
+ * An account without a mail address is reminded to add one: it is the only
+ * way back in once every password is lost (AND-241). "Later" ends that for
+ * good, on the account, so no other device asks again.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useApp } from "../../src/ui/app-state.tsx";
-import { api, type DraftListEntry } from "../../src/ui/api.ts";
-import { ButtonLink } from "../../src/ui/components/Button.tsx";
+import { api, type Account, type Campaign, type DraftListEntry } from "../../src/ui/api.ts";
+import { Button, ButtonLink } from "../../src/ui/components/Button.tsx";
 import { ConfirmDialog } from "../../src/ui/components/Dialog.tsx";
-import { EmptyState, ErrorState, Loading } from "../../src/ui/components/Feedback.tsx";
+import { Callout, EmptyState, ErrorState, Loading } from "../../src/ui/components/Feedback.tsx";
 import { Toast } from "../../src/ui/components/Fields.tsx";
 import { AppShell } from "../../src/ui/components/Shell.tsx";
 import { CharacterCard, describeCharacter, packagesFor } from "../../src/ui/characters.tsx";
@@ -18,14 +23,21 @@ import type { LoadedPackage } from "../../src/ui/packages.ts";
 
 const UNDO_MS = 10_000;
 
-type Data = { lang: string; drafts: DraftListEntry[]; packages: Map<string, LoadedPackage> };
+type Data = {
+  lang: string;
+  drafts: DraftListEntry[];
+  packages: Map<string, LoadedPackage>;
+  /** Campaign names by id; empty if they could not be loaded (the cards then just do not say). */
+  campaigns: Map<string, string>;
+};
 
 export default function CharactersPage() {
   return <RequireAccount>{() => <Characters />}</RequireAccount>;
 }
 
 function Characters() {
-  const { t, lang } = useApp();
+  const app = useApp();
+  const { t, lang, account } = app;
   usePageTitle([t("characters.title")]);
   const [loaded, setData] = useState<Data | null>(null);
   // Never show package words of the previous language.
@@ -40,8 +52,14 @@ function Characters() {
   useEffect(() => {
     let live = true;
     (async () => {
-      const { drafts } = await api<{ drafts: DraftListEntry[] }>("GET", "/api/drafts");
-      return { lang, drafts, packages: await packagesFor(drafts, lang) };
+      const [{ drafts }, campaigns] = await Promise.all([
+        api<{ drafts: DraftListEntry[] }>("GET", "/api/drafts"),
+        api<{ campaigns: Campaign[] }>("GET", "/api/campaigns").then(
+          (r) => new Map(r.campaigns.map((c) => [c.id, c.name])),
+          () => new Map<string, string>(),
+        ),
+      ]);
+      return { lang, drafts, packages: await packagesFor(drafts, lang), campaigns };
     })().then(
       (d) => {
         if (!live) return;
@@ -95,7 +113,10 @@ function Characters() {
   } else {
     const items = data.drafts
       .filter((d) => !hidden.current.has(d.id))
-      .map((d) => describeCharacter(d, data.packages.get(d.packageId), t))
+      .map((d) => ({
+        ...describeCharacter(d, data.packages.get(d.packageId), t),
+        campaign: d.campaignId ? data.campaigns.get(d.campaignId) : undefined,
+      }))
       .sort((a, b) => Number(a.finished) - Number(b.finished));
     content =
       items.length === 0 ? (
@@ -126,6 +147,31 @@ function Characters() {
     <AppShell>
       <div className="page">
         <h1 className="page__title">{t("characters.title")}</h1>
+        {account?.mailReminder && (
+          <Callout tone="warning">
+            <p>{t("characters.mailReminder")}</p>
+            <div className="callout__actions">
+              <ButtonLink href="/settings" variant="secondary">
+                {t("characters.mailReminderAction")}
+              </ButtonLink>
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  // Gone at once; kept on the account, so it stays gone elsewhere too.
+                  app.setAccount({ ...account, mailReminder: false });
+                  void api<{ account: Account }>("PATCH", "/api/account/settings", {
+                    mailReminder: false,
+                  }).then(
+                    (r) => app.setAccount(r.account),
+                    () => undefined,
+                  );
+                }}
+              >
+                {t("characters.mailReminderLater")}
+              </Button>
+            </div>
+          </Callout>
+        )}
         {content}
       </div>
       <ConfirmDialog

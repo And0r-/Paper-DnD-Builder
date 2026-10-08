@@ -79,7 +79,7 @@ export async function signup(
   const m = lang === "de" ? de : en;
   await page.goto("/login");
   if (lang === "en") await chooseLanguage(page, "en");
-  await expect(page.getByRole("heading", { name: m["login.title"] })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 2, name: m["login.registerTitle"] })).toBeVisible();
   await page.getByLabel(m["login.nameLabel"]).fill(name);
   if (email) await page.getByLabel(m["login.emailLabel"]).fill(email);
   await page.getByRole("button", { name: m["login.start"] }).click();
@@ -90,13 +90,20 @@ export async function signup(
   return password;
 }
 
-/** Logs in through the screens with the password alone. Ends on "My characters". */
-export async function login(page: Page, password: string, lang: "de" | "en" = "de"): Promise<void> {
+/** Logs in through the screens with a name (or address) and a password. Ends on "My characters". */
+export async function login(
+  page: Page,
+  who: string,
+  password: string,
+  lang: "de" | "en" = "de",
+): Promise<void> {
   const m = lang === "de" ? de : en;
   await page.goto("/login");
   if (lang === "en") await chooseLanguage(page, "en");
-  await page.getByRole("button", { name: m["login.havePassword"] }).click();
-  await expect(page.getByRole("heading", { name: m["login.haveTitle"] })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { level: 2, name: m["login.haveTitle"], exact: true }),
+  ).toBeVisible();
+  await page.getByLabel(m["login.whoLabel"]).fill(who);
   await page.getByLabel(m["login.passwordLabel"]).fill(password);
   await page.getByRole("button", { name: m["login.submit"], exact: true }).click();
   await expect(page.getByRole("heading", { name: m["characters.title"], level: 1 })).toBeVisible();

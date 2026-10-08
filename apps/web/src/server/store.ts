@@ -22,6 +22,8 @@ export type AccountRow = {
   units: Record<string, string>;
   /** The last download's choice as stored; read through `printChoiceOf`. */
   print_choice: unknown;
+  /** Whether the owner answered "Later" to the reminder to add an address. */
+  mail_reminder_off: boolean;
   created_at: Date;
 };
 
@@ -131,7 +133,8 @@ export type CharacterStateRow = {
 };
 
 const ACCESS_KEY_COLUMNS = "id, name, hint, created_at";
-const ACCOUNT_COLUMNS = "id, name, email, password_hash, language, units, print_choice, created_at";
+const ACCOUNT_COLUMNS =
+  "id, name, email, password_hash, language, units, print_choice, mail_reminder_off, created_at";
 const ACCOUNT_COLUMNS_A = ACCOUNT_COLUMNS.split(", ")
   .map((c) => `a.${c}`)
   .join(", ");
@@ -234,6 +237,15 @@ export class Store {
     return rows[0]!;
   }
 
+  /** Turns the reminder to add an address off for good. */
+  async turnMailReminderOff(accountId: string): Promise<AccountRow> {
+    const rows = await this.db.query<AccountRow>(
+      `UPDATE accounts SET mail_reminder_off = true WHERE id = $1 RETURNING ${ACCOUNT_COLUMNS}`,
+      [accountId],
+    );
+    return rows[0]!;
+  }
+
   /**
    * Removes the account and, by cascade, its sessions, access keys and drafts,
    * the campaigns it leads (with their player lists; the players' characters
@@ -313,24 +325,18 @@ export class Store {
   // --------------------------------------------------------------- passwords
 
   /**
-   * Inserts a password; if the account already has `max`, its oldest one
-   * goes in the same statement. For a way back in, which must never fail.
+   * Makes `p` the account's only password: every other one goes, the old
+   * password of an account from before too, in the same statement. For a
+   * way back in: whoever lost a password ends every copy of it this way.
    */
-  async createPasswordReplacingOldest(
-    p: PasswordRow & { account_id: string; hash: string },
-    max: number,
-  ): Promise<PasswordRow> {
+  async replaceAllPasswords(p: PasswordRow & { account_id: string; hash: string }): Promise<PasswordRow> {
     const rows = await this.db.query<PasswordRow>(
-      `WITH oldest AS (
-         DELETE FROM passwords WHERE id IN (
-           SELECT id FROM passwords WHERE account_id = $2 ORDER BY created_at, id
-           LIMIT GREATEST(0, (SELECT count(*) FROM passwords WHERE account_id = $2) - $6 + 1)
-         )
-       )
+      `WITH gone AS (DELETE FROM passwords WHERE account_id = $2),
+       cleared AS (UPDATE accounts SET password_hash = NULL WHERE id = $2)
        INSERT INTO passwords (id, account_id, hash, name, origin, created_at)
-       VALUES ($1, $2, $3, $4, $7, $5)
+       VALUES ($1, $2, $3, $4, $6, $5)
        RETURNING ${PASSWORD_COLUMNS}`,
-      [p.id, p.account_id, p.hash, p.name, p.created_at, max, p.origin],
+      [p.id, p.account_id, p.hash, p.name, p.created_at, p.origin],
     );
     return rows[0]!;
   }
@@ -592,13 +598,37 @@ export class Store {
     return rows[0]!.invite_token;
   }
 
-  /** Replaces the invitation token; the old link stops working. Game master only. */
-  async replaceInviteToken(id: string, gameMasterId: string, token: string): Promise<void> {
-    await this.db.query("UPDATE campaigns SET invite_token = $3 WHERE id = $1 AND account_id = $2", [
-      id,
-      gameMasterId,
-      token,
-    ]);
+  /**
+   * Replaces the invitation token; the old link stops working. The old
+   * token's SHA-256 is kept, only to tell members which campaign it was
+   * (`findOldInvite`). In one statement. Game master only.
+   */
+  async replaceInviteToken(id: string, gameMasterId: string, token: string, now: Date): Promise<void> {
+    await this.db.query(
+      `WITH old AS (
+         SELECT invite_token FROM campaigns WHERE id = $1 AND account_id = $2 AND invite_token IS NOT NULL
+       ),
+       kept AS (
+         INSERT INTO campaign_old_invites (token_hash, campaign_id, replaced_at)
+         SELECT encode(sha256(convert_to(invite_token, 'UTF8')), 'hex'), $1, $4 FROM old
+         ON CONFLICT (token_hash) DO NOTHING
+       )
+       UPDATE campaigns SET invite_token = $3 WHERE id = $1 AND account_id = $2`,
+      [id, gameMasterId, token, now],
+    );
+  }
+
+  /** The campaign a replaced invitation token used to open (by the token's SHA-256), and who leads it. */
+  async findOldInvite(tokenHash: string): Promise<InviteRow | undefined> {
+    const rows = await this.db.query<InviteRow>(
+      `SELECT c.id AS campaign_id, c.name AS campaign_name,
+              gm.id AS game_master_id, gm.name AS game_master_name
+       FROM campaign_old_invites o JOIN campaigns c ON c.id = o.campaign_id
+       JOIN accounts gm ON gm.id = c.account_id
+       WHERE o.token_hash = $1`,
+      [tokenHash],
+    );
+    return rows[0];
   }
 
   /** The campaign an invitation token opens, and who leads it; undefined for an unknown token. */

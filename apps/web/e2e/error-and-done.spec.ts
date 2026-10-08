@@ -32,7 +32,7 @@ async function loseNewChunks(page: Page, stayLost = false): Promise<void> {
 /** Opens the settings through the menu: a screen whose code is not loaded yet. */
 async function openSettings(page: Page, m: typeof de) {
   await page.getByRole("button", { name: m["menu.open"] }).click();
-  await page.getByRole("link", { name: m["menu.settings"] }).click();
+  await page.getByRole("link", { name: m["menu.settings"], exact: true }).click();
 }
 
 for (const lang of ["de", "en"] as const) {

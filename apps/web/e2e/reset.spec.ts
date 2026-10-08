@@ -2,8 +2,9 @@
  * Lost password (AND-236): an account with an address asks for a link on
  * the login screen, the mail (read from the outbox) holds a link and no
  * password, the link shows a new password and logs in, the new password
- * works on another device, and the link works only once. The settings
- * send the same link as a test.
+ * works on another device and is the only one then (AND-241), and the
+ * link works only once. A link that meets no network says so and tries
+ * again. The settings send the same link as a test.
  */
 import type { Browser, Page } from "@playwright/test";
 import de from "../src/i18n/messages/de.json" with { type: "json" };
@@ -27,7 +28,6 @@ test("lost password: a link by mail shows a new password, once", async ({ page, 
   // A device with no session: "Lost your password?" under the password field.
   const lost = await otherDevice(browser, 1);
   await lost.goto("/login");
-  await lost.getByRole("button", { name: m["login.havePassword"] }).click();
   await lost.getByRole("button", { name: m["login.lost"] }).click();
   await expect(lost.getByRole("heading", { level: 1, name: m["login.lostTitle"] })).toBeVisible();
   await expect(lost.getByText(m["login.lostNoMail"])).toBeVisible();
@@ -48,21 +48,35 @@ test("lost password: a link by mail shows a new password, once", async ({ page, 
   expect(link).toBeTruthy();
   const path = new URL(link!).pathname;
 
-  // The link shows a new password and logs in.
+  // The link shows a new password and logs in. The first time, the network is gone: the link still works.
+  let cut = true;
+  await lost.route("**/api/auth/reset/use", (route) =>
+    cut ? ((cut = false), route.abort()) : route.continue(),
+  );
   await lost.goto(path);
+  await expect(lost.getByRole("heading", { level: 1, name: m["reset.failedTitle"] })).toBeVisible();
+  await expect(lost.getByText(m["reset.invalidTitle"])).toHaveCount(0);
+  await expectOneLanguage(lost, "de");
+  await shot(lost, `22-reset-failed-de`);
+  await lost.getByRole("button", { name: m["common.retry"] }).click();
   const shown = lost.getByRole("region", { name: m["password.welcomeBack"].replace("{name}", "Kim") });
   const fresh = (await shown.locator(".copy-text__value").textContent())!.trim();
   expect(fresh).toMatch(/^[a-zäöüß]+(?:-[a-zäöüß]+){4}-\d{4}$/);
   expect(fresh).not.toBe(first);
+  // It is the only password now.
+  await expect(shown.getByText(m["reset.oldGone"])).toBeVisible();
   await expectOneLanguage(lost, "de");
   await shot(lost, `22-reset-password-de`);
   await shown.getByRole("button", { name: m["password.done"] }).click();
   await expect(lost.getByRole("heading", { level: 1, name: m["characters.title"] })).toBeVisible();
 
-  // The new password works on a third device.
+  // The new password works on a third device, with the address; the old one does not anymore.
   const third = await otherDevice(browser, 2);
+  expect(
+    (await third.request.post("/api/auth/login", { data: { login: email, password: first } })).status(),
+  ).toBe(401);
   await third.goto("/login");
-  await third.getByRole("button", { name: m["login.havePassword"] }).click();
+  await third.getByLabel(m["login.whoLabel"]).fill(email);
   await third.getByLabel(m["login.passwordLabel"]).fill(fresh);
   await third.getByRole("button", { name: m["login.submit"], exact: true }).click();
   await expect(third.getByRole("heading", { level: 1, name: m["characters.title"] })).toBeVisible();

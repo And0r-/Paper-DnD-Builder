@@ -106,6 +106,7 @@ describe("invitation link", () => {
     expect(res.json).toEqual({
       campaign: { id: campaignId, name: "Die Nebelrunde" },
       gameMaster: { name: "lead" },
+      you: null,
     });
 
     for (const bad of ["AAAAAAAAAAAAAAAAAAAAAA", "short", `${token}x`]) {
@@ -113,6 +114,14 @@ describe("invitation link", () => {
       expect(missing.status, bad).toBe(404);
       expect(missing.json.error.code).toBe("inviteNotFound");
     }
+  });
+
+  it("tells whoever is logged in whether they lead the campaign or play in it already", async () => {
+    const token = await inviteToken(campaignId);
+    const you = async (c: Client) => (await c.call("GET", `/api/invites/${token}`)).json.you;
+    expect(await you(gm)).toBe("gameMaster");
+    expect(await you(player)).toBe("player");
+    expect(await you(stranger)).toBe(null);
   });
 
   it("joins: once is enough, again changes nothing, the game master stays game master", async () => {
@@ -149,6 +158,15 @@ describe("invitation link", () => {
     expect(await inviteToken(campaignId)).toBe(fresh);
     expect((await stranger.call("GET", `/api/invites/${old}`)).status).toBe(404);
     expect((await stranger.call("POST", `/api/invites/${old}/join`)).status).toBe(404);
+    expect((await new Client(server, "203.0.113.9").call("GET", `/api/invites/${old}`)).status).toBe(404);
+    // A member still learns where the old link led; it lets nobody in.
+    const asPlayer = await player.call("GET", `/api/invites/${old}`);
+    expect(asPlayer.json).toMatchObject({
+      campaign: { id: campaignId, name: "Die Nebelrunde" },
+      you: "player",
+    });
+    expect((await gm.call("GET", `/api/invites/${old}`)).json.you).toBe("gameMaster");
+    expect(JSON.stringify(await server.db.query("SELECT * FROM campaign_old_invites"))).not.toContain(old);
     expect((await gm.call("GET", `/api/campaigns/${campaignId}`)).json.players).toMatchObject([
       { id: playerId },
     ]);

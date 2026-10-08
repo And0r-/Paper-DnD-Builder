@@ -160,7 +160,12 @@ export function Passwords() {
         }
       >
         {fresh ? (
-          <FreshPassword secret={fresh} noMail={!account?.email} onDone={close} />
+          <FreshPassword
+            secret={fresh}
+            username={account?.name ?? ""}
+            noMail={!account?.email}
+            onDone={close}
+          />
         ) : (
           <form
             id="new-password"

@@ -69,7 +69,7 @@ test("before login: the switch offers the packages' languages, each named in its
   // Keyboard: focus the switch and pick the next language with an arrow key.
   await select.focus();
   await page.keyboard.press("ArrowDown");
-  await expect(page.getByRole("heading", { name: en["login.title"] })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 2, name: en["login.registerTitle"] })).toBeVisible();
   await expect(menu(page, "en")).toBeFocused();
   await expectOneLanguage(page, "en");
 

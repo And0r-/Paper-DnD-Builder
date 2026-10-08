@@ -74,26 +74,48 @@ describe("signing up", () => {
 });
 
 describe("login", () => {
-  it("logs in with the password alone, forgiving case and spaces, on another device", async () => {
+  it("logs in with name and password, forgiving case and spaces, on another device", async () => {
     const password = await signIn(client, EMAIL);
     const phone = new Client(server, "198.51.100.20");
     const typed = password.replace(/-/g, " ").replace(/^./, (c) => c.toUpperCase());
-    const res = await phone.call("POST", "/api/auth/login", { password: typed });
+    const res = await phone.call("POST", "/api/auth/login", { login: " Player ", password: typed });
     expect(res.status).toBe(200);
     expect(res.json.account).toMatchObject({ name: "player", email: EMAIL });
+    // An account of the new kind gets no new password at login.
+    expect(res.json.password).toBeUndefined();
     expect(res.headers.get("set-cookie")).toContain(`Max-Age=${SESSION_MS / 1000}`);
     expect((await phone.call("GET", "/api/account")).status).toBe(200);
   });
 
-  it("refuses a wrong password with 401", async () => {
-    await signIn(client, EMAIL);
+  it("logs in with the address instead of the name, in the same form", async () => {
+    const password = await signIn(client, EMAIL);
     const res = await new Client(server).call("POST", "/api/auth/login", {
+      login: " Player@Example.ORG ",
+      password,
+    });
+    expect(res.status).toBe(200);
+    expect(res.json.account.name).toBe("player");
+  });
+
+  it("refuses a wrong password, and a right one with someone else's name, with one answer", async () => {
+    const password = await signIn(client, EMAIL);
+    await signIn(new Client(server, "198.51.100.21"), "mira@example.org");
+    const other = new Client(server);
+    const wrong = await other.call("POST", "/api/auth/login", {
+      login: "player",
       password: "anker-falke-wiese-ofen-dach-1234",
     });
-    expect(res.status).toBe(401);
-    expect(res.json.error.code).toBe("wrongPassword");
-    // An address is no way in anymore.
-    expect((await client.call("POST", "/api/auth/login", { email: EMAIL, password: "x" })).status).toBe(400);
+    expect(wrong.status).toBe(401);
+    expect(wrong.json.error.code).toBe("wrongLogin");
+    for (const login of ["mira", "mira@example.org", "play"]) {
+      const res = await other.call("POST", "/api/auth/login", { login, password });
+      expect(res.status, login).toBe(401);
+      expect(res.json).toEqual(wrong.json);
+    }
+    expect(other.hasSession).toBe(false);
+    // Both parts are needed.
+    expect((await other.call("POST", "/api/auth/login", { password })).status).toBe(400);
+    expect((await other.call("POST", "/api/auth/login", { login: "  ", password })).status).toBe(400);
   });
 
   it("logs out and the session no longer works", async () => {
@@ -139,13 +161,19 @@ describe("own passwords", () => {
 
     expect((await client.call("DELETE", `/api/account/passwords/${list[0].id}`)).status).toBe(204);
     const other = new Client(server);
-    expect((await other.call("POST", "/api/auth/login", { password: first })).status).toBe(401);
-    expect((await other.call("POST", "/api/auth/login", { password: second })).status).toBe(200);
+    expect((await other.call("POST", "/api/auth/login", { login: "player", password: first })).status).toBe(
+      401,
+    );
+    expect((await other.call("POST", "/api/auth/login", { login: "player", password: second })).status).toBe(
+      200,
+    );
 
     const last = await client.call("DELETE", `/api/account/passwords/${list[1].id}`);
     expect(last.status).toBe(422);
     expect(last.json.error.code).toBe("lastPassword");
-    expect((await other.call("POST", "/api/auth/login", { password: second })).status).toBe(200);
+    expect((await other.call("POST", "/api/auth/login", { login: "player", password: second })).status).toBe(
+      200,
+    );
   });
 
   it("leaves a password without a name when none is given (the screen names it by its day), and keeps at most ten", async () => {
@@ -215,12 +243,15 @@ describe("a link back in", () => {
     expect(phone.hasSession).toBe(true);
     expect((await phone.call("GET", "/api/account")).status).toBe(200);
 
-    // The new password works elsewhere; the old one stays until its owner deletes it.
+    // The new password works elsewhere; the old one does not anymore.
     const other = new Client(server, "198.51.100.51");
     expect(
-      (await other.call("POST", "/api/auth/login", { password: used.json.password.secret })).status,
+      (await other.call("POST", "/api/auth/login", { login: "player", password: used.json.password.secret }))
+        .status,
     ).toBe(200);
-    expect((await other.call("POST", "/api/auth/login", { password: first })).status).toBe(200);
+    expect((await other.call("POST", "/api/auth/login", { login: "player", password: first })).status).toBe(
+      401,
+    );
 
     // Once only.
     const again = await new Client(server).call("POST", "/api/auth/reset/use", { token });
@@ -276,22 +307,45 @@ describe("a link back in", () => {
     expect((await ask(new Client(server), "not an address")).status).toBe(400);
   });
 
-  it("gives an account that has the most passwords a new one in place of the oldest", async () => {
-    await signIn(client, EMAIL);
+  it("ends every other password of the account, also with ten; logged-in devices stay", async () => {
+    const first = await signIn(client, EMAIL);
+    const laptop = new Client(server, "198.51.100.54");
+    expect((await laptop.call("POST", "/api/auth/login", { login: EMAIL, password: first })).status).toBe(
+      200,
+    );
     for (let i = 1; i < 10; i++) {
       server.advance(1000);
       await client.call("POST", "/api/account/passwords", { name: `P${i}` });
     }
     await ask(client);
-    // A second later than P9, so the order of the list does not hang on random ids.
-    server.advance(1000);
     const token = linksIn(server.mails[0]!.text)["player"]!;
-    const res = await client.call("POST", "/api/auth/reset/use", { token });
+    const phone = new Client(server, "198.51.100.55");
+    const res = await phone.call("POST", "/api/auth/reset/use", { token });
     expect(res.status).toBe(200);
-    const passwords = (await client.call("GET", "/api/account/passwords")).json.passwords;
-    expect(passwords).toHaveLength(10);
-    expect(passwords.map((p: { origin: string }) => p.origin)).not.toContain("first");
-    expect(passwords.at(-1)).toMatchObject({ name: null, origin: "reset" });
+    const passwords = (await phone.call("GET", "/api/account/passwords")).json.passwords;
+    expect(passwords).toEqual([expect.objectContaining({ name: null, origin: "reset" })]);
+    expect((await client.call("GET", "/api/account")).status).toBe(200);
+    expect((await laptop.call("GET", "/api/account")).status).toBe(200);
+    expect(
+      (await new Client(server).call("POST", "/api/auth/login", { login: EMAIL, password: first })).status,
+    ).toBe(401);
+  });
+
+  it("ends the old password of an account from before too", async () => {
+    await server.db.query(
+      `INSERT INTO accounts (id, name, email, password_hash, language, created_at)
+       VALUES ('00000000-0000-4000-8000-000000000003', 'player', $1, $2, 'de', now())`,
+      [EMAIL, await hashPassword("anker-falke-wiese-7320")],
+    );
+    await ask(client);
+    const token = linksIn(server.mails[0]!.text)["player"]!;
+    expect((await client.call("POST", "/api/auth/reset/use", { token })).status).toBe(200);
+    expect(await server.db.query("SELECT password_hash FROM accounts")).toEqual([{ password_hash: null }]);
+    const old = await new Client(server).call("POST", "/api/auth/login", {
+      login: EMAIL,
+      password: "anker-falke-wiese-7320",
+    });
+    expect(old.status).toBe(401);
   });
 
   it("gives an account a game master made by address (before invitation links), which has no password yet, its first", async () => {
@@ -348,10 +402,10 @@ describe("accounts from before", () => {
     );
   }
 
-  it("log in once with address and password and get a new password; only that works then", async () => {
+  it("log in once with address and old password in the usual form and get a new password; only that works then", async () => {
     await oldAccount();
-    const res = await client.call("POST", "/api/auth/legacy-login", {
-      email: EMAIL,
+    const res = await client.call("POST", "/api/auth/login", {
+      login: EMAIL,
       password: "Anker Falke wiese 7320",
     });
     expect(res.status).toBe(200);
@@ -362,29 +416,31 @@ describe("accounts from before", () => {
     expect(await server.db.query("SELECT password_hash FROM accounts")).toEqual([{ password_hash: null }]);
 
     const other = new Client(server);
-    expect((await other.call("POST", "/api/auth/legacy-login", { email: EMAIL, password: OLD })).status).toBe(
+    expect((await other.call("POST", "/api/auth/login", { login: EMAIL, password: OLD })).status).toBe(401);
+    expect((await other.call("POST", "/api/auth/login", { login: "player", password: OLD })).status).toBe(
       401,
     );
-    expect((await other.call("POST", "/api/auth/login", { password: OLD })).status).toBe(401);
-    expect((await other.call("POST", "/api/auth/login", { password: fresh })).status).toBe(200);
+    expect((await other.call("POST", "/api/auth/login", { login: "player", password: fresh })).status).toBe(
+      200,
+    );
   });
 
   it("gives the same answer for a wrong password and an unknown address", async () => {
     await oldAccount();
-    const wrong = await client.call("POST", "/api/auth/legacy-login", {
-      email: EMAIL,
+    const wrong = await client.call("POST", "/api/auth/login", {
+      login: EMAIL,
       password: "a-b-c-d-1234",
     });
-    const unknown = await client.call("POST", "/api/auth/legacy-login", {
-      email: "nobody@example.org",
+    const unknown = await client.call("POST", "/api/auth/login", {
+      login: "nobody@example.org",
       password: "a-b-c-d-1234",
     });
     expect(wrong.status).toBe(401);
     expect(unknown.json).toEqual(wrong.json);
     // A new account with the same address has no old password to log in with.
     await signIn(new Client(server), "new@example.org");
-    const fresh = await client.call("POST", "/api/auth/legacy-login", {
-      email: "new@example.org",
+    const fresh = await client.call("POST", "/api/auth/login", {
+      login: "new@example.org",
       password: "a-b-c-d-1234",
     });
     expect(fresh.status).toBe(401);
@@ -394,19 +450,17 @@ describe("accounts from before", () => {
     await oldAccount();
     for (let i = 0; i < 10; i++) {
       const guesser = new Client(server, `192.0.2.${i}`);
-      const r = await guesser.call("POST", "/api/auth/legacy-login", {
-        email: EMAIL,
+      const r = await guesser.call("POST", "/api/auth/login", {
+        login: EMAIL,
         password: `x-y-z-w-${i}000`,
       });
       expect(r.status).toBe(401);
     }
-    const blocked = await client.call("POST", "/api/auth/legacy-login", { email: EMAIL, password: OLD });
+    const blocked = await client.call("POST", "/api/auth/login", { login: EMAIL, password: OLD });
     expect(blocked.status).toBe(429);
     expect(Number(blocked.headers.get("retry-after"))).toBeGreaterThan(0);
     server.advance(15 * MINUTE + 1000);
-    expect(
-      (await client.call("POST", "/api/auth/legacy-login", { email: EMAIL, password: OLD })).status,
-    ).toBe(200);
+    expect((await client.call("POST", "/api/auth/login", { login: EMAIL, password: OLD })).status).toBe(200);
   });
 });
 
@@ -415,15 +469,20 @@ describe("rate limits", () => {
     const password = await signIn(client, EMAIL);
     const attacker = new Client(server, "192.0.2.66");
     for (let i = 0; i < 30; i++) {
-      const r = await attacker.call("POST", "/api/auth/login", { password: `a-b-c-d-e-${1000 + i}` });
+      const r = await attacker.call("POST", "/api/auth/login", {
+        login: "player",
+        password: `a-b-c-d-e-${1000 + i}`,
+      });
       expect(r.status).toBe(401);
     }
-    const res = await attacker.call("POST", "/api/auth/login", { password });
+    const res = await attacker.call("POST", "/api/auth/login", { login: "player", password });
     expect(res.status).toBe(429);
     expect(res.json.error.code).toBe("tooManyAttempts");
-    expect((await new Client(server).call("POST", "/api/auth/login", { password })).status).toBe(200);
+    expect(
+      (await new Client(server).call("POST", "/api/auth/login", { login: "player", password })).status,
+    ).toBe(200);
     server.advance(15 * MINUTE + 1000);
-    expect((await attacker.call("POST", "/api/auth/login", { password })).status).toBe(200);
+    expect((await attacker.call("POST", "/api/auth/login", { login: "player", password })).status).toBe(200);
   });
 });
 
@@ -440,6 +499,22 @@ describe("settings", () => {
     expect(removed.json.account).toMatchObject({ name: "Mira", email: null });
     expect((await client.call("PATCH", "/api/account/settings", { name: "" })).status).toBe(400);
     expect((await client.call("PATCH", "/api/account/settings", { email: "nope" })).status).toBe(400);
+  });
+
+  it('reminds an account without an address to add one until "Later", which holds on every device', async () => {
+    const signup = await client.call("POST", "/api/auth/signup", { name: "Mira" });
+    expect(signup.json.account.mailReminder).toBe(true);
+    const later = await client.call("PATCH", "/api/account/settings", { mailReminder: false });
+    expect(later.json.account.mailReminder).toBe(false);
+    const phone = new Client(server);
+    await phone.call("POST", "/api/auth/login", { login: "mira", password: signup.json.password.secret });
+    expect((await phone.call("GET", "/api/account")).json.account.mailReminder).toBe(false);
+    // Only "Later" is something to send: it does not come back.
+    expect((await client.call("PATCH", "/api/account/settings", { mailReminder: true })).status).toBe(400);
+    // With an address there is nothing to remind of.
+    const withMail = new Client(server, "198.51.100.70");
+    await signIn(withMail, EMAIL);
+    expect((await withMail.call("GET", "/api/account")).json.account.mailReminder).toBe(false);
   });
 
   it("stores language and units on the account; units follow the language until chosen", async () => {
@@ -526,7 +601,7 @@ describe("deleting the account", () => {
       expect(await server.db.query(`SELECT 1 FROM ${table}`), table).toEqual([]);
     }
     expect(client.hasSession).toBe(false);
-    expect((await client.call("POST", "/api/auth/login", { password })).status).toBe(401);
+    expect((await client.call("POST", "/api/auth/login", { login: "player", password })).status).toBe(401);
   });
 });
 

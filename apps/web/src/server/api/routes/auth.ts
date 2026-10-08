@@ -1,7 +1,6 @@
 import { z } from "zod";
 import {
   emailSchema,
-  legacyLogin,
   login,
   nameSchema,
   passwordInputSchema,
@@ -53,28 +52,19 @@ export const authRoutes: Route[] = [
     },
   },
   {
+    // Any account: a name or an address, and a password. An account from
+    // before, once: its old password is swapped for a new one, shown here.
     method: "POST",
     path: "/api/auth/login",
     handler: async ({ app, req }) => {
-      const body = await readJson(req, z.strictObject({ password: passwordInputSchema }));
-      const { account, token } = await login(app, body.password, clientIp(req));
-      return json(
-        200,
-        { account: publicAccount(account) },
-        { "Set-Cookie": sessionCookie(token, app.config.secureCookies) },
+      const body = await readJson(
+        req,
+        z.strictObject({ login: z.string().trim().min(1).max(254), password: passwordInputSchema }),
       );
-    },
-  },
-  {
-    // An account from before, once: its old password is swapped for a new one, shown here.
-    method: "POST",
-    path: "/api/auth/legacy-login",
-    handler: async ({ app, req }) => {
-      const body = await readJson(req, z.strictObject({ email: emailSchema, password: passwordInputSchema }));
-      const { account, password, token } = await legacyLogin(app, body.email, body.password, clientIp(req));
+      const { account, password, token } = await login(app, body.login, body.password, clientIp(req));
       return json(
         200,
-        { account: publicAccount(account), password: freshPassword(password) },
+        { account: publicAccount(account), ...(password && { password: freshPassword(password) }) },
         { "Set-Cookie": sessionCookie(token, app.config.secureCookies) },
       );
     },

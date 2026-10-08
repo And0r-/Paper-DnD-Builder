@@ -88,6 +88,8 @@ export interface Account {
   units: Record<string, string>;
   /** What the download dialog offers first: the last download's choice. */
   print: PrintChoice;
+  /** Whether "My characters" reminds to add a mail address: none given, and not put off with "Later". */
+  mailReminder: boolean;
   createdAt: string;
 }
 
@@ -172,6 +174,8 @@ export interface Campaign {
 export interface Invite {
   campaign: { id: string; name: string };
   gameMaster: { name: string };
+  /** Logged in: whether the viewer leads the campaign or plays in it already; null otherwise. */
+  you: "gameMaster" | "player" | null;
 }
 
 export interface CampaignPlayer {
