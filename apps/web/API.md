@@ -481,9 +481,14 @@ Tests: [`campaigns.test.ts`](src/server/api/campaigns.test.ts).
 ## Live help
 
 Several people build one character together, at the same time: everyone
-on it sees who else is there, on which step and pointing at what, and gets
-the character's new state the moment anyone changes it. Everyone on it may
-answer. Who may join:
+on it sees who else is there (and how: browser, program, MCP), on which
+step and pointing at what, and hears of every stored change of the
+character the moment it is made: whoever made it, in which role, and which
+way (over this channel, the HTTP API with the cookie or a key, or the MCP
+server). A change of the draft comes with the character's new state.
+Everyone on it may answer. This is the one live channel: a screen that
+only wants to know when something changed subscribes here, too. Who may
+join:
 
 - its **owner**;
 - the **game master** of the campaign it belongs to, without a link (the
@@ -502,27 +507,44 @@ before every change. The character is stored as always; the live channel
 keeps nothing but who is connected. A lost connection loses nothing:
 connect again with the same URL (and the same link while it works).
 
-| Method & path                         | Body | Who       | Result                                                                                                                                                                                                                                                                 |
-| ------------------------------------- | ---- | --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 🔒 `GET /api/drafts/:id/help-link`    | —    | owner     | `{ helpLink }`: `{ url, token, expiresAt, createdAt }` while it works, else `null`.                                                                                                                                                                                    |
-| 🔒 `POST /api/drafts/:id/help-link`   | —    | owner     | `201 { helpLink }`, a new link for 12 hours; the one before stops working. `429` (30 per hour).                                                                                                                                                                        |
-| 🔒 `DELETE /api/drafts/:id/help-link` | —    | owner     | `204`. The link stops working.                                                                                                                                                                                                                                         |
-| `GET /api/help/:token`                | —    | anyone    | `{ draftId, owner: { name }, expiresAt, yours, live }`, shown before helping; `yours` is true for the owner; `live` is the channel's path with the link. `404 helpLinkNotFound` (unknown, replaced, withdrawn, ended). `429`: 60 lookups per 15 minutes per IP.        |
-| 🔒 `GET /api/live/drafts/:id`         | —    | see above | The live channel, a **WebSocket** (`ws://` or `wss://`, same host and port). Login by the session cookie (the browser sends it itself) or `Authorization: Bearer cbk_...`; the handshake must come from this site (`Origin`, else `403`). Helpers add `?help=<token>`. |
+| Method & path                         | Body | Who       | Result                                                                                                                                                                                                                                                                                               |
+| ------------------------------------- | ---- | --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 🔒 `GET /api/drafts/:id/help-link`    | —    | owner     | `{ helpLink }`: `{ url, token, expiresAt, createdAt }` while it works, else `null`.                                                                                                                                                                                                                  |
+| 🔒 `POST /api/drafts/:id/help-link`   | —    | owner     | `201 { helpLink }`, a new link for 12 hours; the one before stops working. `429` (30 per hour).                                                                                                                                                                                                      |
+| 🔒 `DELETE /api/drafts/:id/help-link` | —    | owner     | `204`. The link stops working.                                                                                                                                                                                                                                                                       |
+| `GET /api/help/:token`                | —    | anyone    | `{ draftId, owner: { name }, expiresAt, yours, live }`, shown before helping; `yours` is true for the owner; `live` is the channel's path with the link. `404 helpLinkNotFound` (unknown, replaced, withdrawn, ended). `429`: 60 lookups per 15 minutes per IP.                                      |
+| 🔒 `GET /api/live/drafts/:id`         | —    | see above | The live channel, a **WebSocket** (`ws://` or `wss://`, same host and port). Login by the session cookie (the browser sends it itself) or `Authorization: Bearer cbk_...`; the handshake must come from this site (`Origin`, else `403`). Helpers add `?help=<token>`, a window its id `?clientId=`. |
 
 A game master gets `403 ownerOnly` on the help link routes; a helper and
 anyone else `404 draftNotFound`.
 
+### Where a change comes from
+
+Two request headers name the source of a change; both are labels for the
+screen, not a login:
+
+- `X-Builder-Client-Id: <id>`: a browser window's own id (1–64 characters
+  `A-Z a-z 0-9 _ -`, else ignored), on its HTTP changes and as
+  `?clientId=<id>` on the channel's address. It comes back as
+  `source.clientId`, so the window knows its own changes, and in
+  `presence`, so it finds itself.
+- `X-Builder-Client: mcp`: sent by the MCP server (`/mcp` and the zip) with
+  a key. Its changes show `via: "mcp"`; other key requests `via: "api"`,
+  cookie requests `via: "browser"`.
+
 ### In the browser
 
 ```js
+const clientId = crypto.randomUUID().replaceAll("-", "");
 const live = new WebSocket(
   `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/api/live/drafts/${id}` +
-    (token ? `?help=${token}` : ""),
+    `?clientId=${clientId}` +
+    (token ? `&help=${token}` : ""),
 );
 live.onmessage = (e) => {
   const m = JSON.parse(e.data);
   if (m.type === "state") show(m); // the same shape as GET /api/drafts/:id
+  if (m.source && m.source.clientId !== clientId) tell(m.source, m.event ?? m.type, m.change); // "Lio changed this over MCP"
 };
 live.onclose = (e) => {
   if (e.code === 4404 || e.code === 4401) return gone(e.code); // no reach (anymore), or not logged in
@@ -531,6 +553,12 @@ live.onclose = (e) => {
 live.send(
   JSON.stringify({ type: "answer", ref: "a1", version, choice: "folk", answer: { pick: "folk.hillfolk" } }),
 );
+// The same change over HTTP, labelled with the window:
+fetch(`/api/drafts/${id}/answers/folk`, {
+  method: "PUT",
+  headers: { "content-type": "application/json", "x-builder-client-id": clientId },
+  body: JSON.stringify({ version, answer: { pick: "folk.hillfolk" } }),
+});
 ```
 
 The CSP's `connect-src 'self'` allows this: same host, same port. Keep the
@@ -557,45 +585,64 @@ to that change, to the sender only.
 
 **From the server**
 
-| `type`     | Fields                                                                                                             | When                                                                                                                                                                                                                                                                                                                                 |
-| ---------- | ------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `welcome`  | `you: Person`                                                                                                      | First, once connected.                                                                                                                                                                                                                                                                                                               |
-| `presence` | `people: [Person]`                                                                                                 | When someone joins or leaves, or changes `step` or `point`; to everyone. In the order they joined.                                                                                                                                                                                                                                   |
-| `state`    | `draft`, `packageAvailable`, `evaluation`, `summary`, `levelUp` (as `GET /api/drafts/:id`), `by`, `ref?`, `stale?` | On joining, and after every change of the character, by anyone, live or over the HTTP API; to everyone. `by: { id, name }` is who changed it live, `null` on joining and for a change over HTTP. `ref` only to the one who sent the change.                                                                                          |
-| `hint`     | `from: { id, name }`, `text`                                                                                       | Someone sent a hint; to everyone, the sender too.                                                                                                                                                                                                                                                                                    |
-| `error`    | `code`, `ref?`, details as the HTTP error                                                                          | A change the rules refuse (`changeRejected`, `incomplete`, `notFinished`, `packageUnavailable`), a message of the wrong shape (`badJson`, `badRequest` with `issues`), too many messages (`tooManyRequests`: 60 per 10 seconds). To the sender only. Before a close: `notLoggedIn`, `keyNotValid`, `draftNotFound`, `tooManyPeople`. |
+Every message has `type` and `draftId`.
 
-`Person` is `{ id, name, role: "owner|gameMaster|helper", step, point }`.
+| `type`      | Fields                                                                                                                                                                                | When                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `welcome`   | `you: Person`                                                                                                                                                                         | First, once connected.                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| `presence`  | `people: [Person]`                                                                                                                                                                    | When someone joins or leaves, or changes `step` or `point`; to everyone. In the order they joined.                                                                                                                                                                                                                                                                                                                                                                   |
+| `state`     | `draft`, `packageAvailable`, `evaluation`, `summary`, `levelUp` (as `GET /api/drafts/:id`), `version`, `by`, `ref?`, `stale?`; after a change also `event`, `at`, `source`, `change?` | On joining; and after every change of the draft, by anyone, live, over the HTTP API or over MCP; to everyone. `event` is `changed` (`change`: `{ kind: "answer", choice }`, `{ kind: "pool", step }` or `{ kind: "level", level }`), `levelUp` (`change: { kind: "levelUp", level }`) or `finished`. `by: { id, name }` is the connection that changed it live, else `null`; `source` says who and how, for every change. `ref` only to the one who sent the change. |
+| `playState` | `version`, `at`, `source`, `change: { kind: "state" \| "clearChecks", stateVersion }`                                                                                                 | The play state was stored (`PUT /api/drafts/:id/state`); read it again if you show it.                                                                                                                                                                                                                                                                                                                                                                               |
+| `copies`    | `version`, `at`, `source`, `change: { kind: "copyCreated" \| "copyChanged" \| "copyDeleted", copyId }`                                                                                | A kept sheet was made, changed or deleted.                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| `campaign`  | `version`, `at`, `source`                                                                                                                                                             | The character moved into another campaign or none; a game master who lost it is closed with `4404` right after.                                                                                                                                                                                                                                                                                                                                                      |
+| `deleted`   | `version`, `at`, `source`                                                                                                                                                             | The owner deleted the character; everyone is closed with `4404` right after. Do not reconnect.                                                                                                                                                                                                                                                                                                                                                                       |
+| `hint`      | `from: { id, name }`, `text`                                                                                                                                                          | Someone sent a hint; to everyone, the sender too.                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| `error`     | `code`, `ref?`, details as the HTTP error                                                                                                                                             | A change the rules refuse (`changeRejected`, `incomplete`, `notFinished`, `packageUnavailable`), a message of the wrong shape (`badJson`, `badRequest` with `issues`), too many messages (`tooManyRequests`: 60 per 10 seconds). To the sender only. Before a close: `notLoggedIn`, `keyNotValid`, `draftNotFound`, `tooManyPeople`.                                                                                                                                 |
+
+`version` is the draft's version (`playState`, `copies` and `campaign`
+leave it as it was); `at` the time the change was stored. `source` is who
+made it:
+`{ via: "browser|api|mcp", name, role: "owner|gameMaster|helper", clientId, connectionId }`.
+`clientId` is the window's id (or `null`), `connectionId` the `id` of the
+connection that sent it over this channel (`null` over HTTP and MCP).
+Every change of a character is told, however it was made.
+
+`Person` is `{ id, name, role: "owner|gameMaster|helper", via, clientId, step, point }`.
 `id` is the connection's (one person in two tabs is there twice); `name`
-the account's name, never an address.
+the account's name, never an address; `via` and `clientId` as in `source`.
+No account ids go over the channel.
 
 **The server is the truth.** A change sent with an old `version` changes
 nothing and is no error: the sender gets the current `state` with
 `stale: true` (and its `ref`), and answers again on that.
 
-**Close codes**: `4401` not logged in or key not valid; `4404` no such
+**Close codes**: `4401` not logged in or key not valid (also once the
+login ends: logout, a withdrawn key, a deleted account); `4404` no such
 character, or no reach (anymore: a help link withdrawn, replaced or ended,
 the character deleted, or out of the game master's campaign);
-`4429` more than 20 connections on one character. Anything else
+`4429` more than 20 connections on one character. Access is checked again
+on every change of who may reach what, and every 30 seconds. Anything else
 (`1001`, `1006`, …) is the connection: connect again. The server pings
 every 30 seconds and drops a connection that does not answer.
 
 ### Example
 
-The owner (left) and a helper with the link (right):
+The owner (left) and a helper with the link (right); then the owner's
+MCP program changes the level:
 
 ```text
-helper → open  wss://builder.example/api/live/drafts/7b1e…?help=Qm9va3MgYXJlIGdyZWF0IQ
-helper ← { "type": "welcome", "you": { "id": "k3J…", "name": "Mara", "role": "helper", "step": null, "point": null } }
-both   ← { "type": "presence", "people": [ { "id": "a9x…", "name": "Lio", "role": "owner", … }, { "id": "k3J…", "name": "Mara", "role": "helper", … } ] }
-helper ← { "type": "state", "by": null, "draft": { "version": 4, "access": "helper", … }, "evaluation": { … }, … }
+helper → open  wss://builder.example/api/live/drafts/7b1e…?help=Qm9va3MgYXJlIGdyZWF0IQ&clientId=w2
+helper ← { "type": "welcome", "draftId": "7b1e…", "you": { "id": "k3J…", "name": "Mara", "role": "helper", "via": "browser", "clientId": "w2", "step": null, "point": null } }
+both   ← { "type": "presence", "draftId": "7b1e…", "people": [ { "id": "a9x…", "name": "Lio", "role": "owner", … }, { "id": "k3J…", "name": "Mara", "role": "helper", … } ] }
+helper ← { "type": "state", "draftId": "7b1e…", "version": 4, "by": null, "draft": { "version": 4, "access": "helper", … }, "evaluation": { … }, … }
 helper → { "type": "hint", "text": "Look at the spells step" }
-both   ← { "type": "hint", "from": { "id": "k3J…", "name": "Mara" }, "text": "Look at the spells step" }
+both   ← { "type": "hint", "draftId": "7b1e…", "from": { "id": "k3J…", "name": "Mara" }, "text": "Look at the spells step" }
 owner  → { "type": "answer", "ref": "r7", "version": 4, "choice": "folk", "answer": { "pick": "folk.hillfolk" } }
-owner  ← { "type": "state", "ref": "r7", "by": { "id": "a9x…", "name": "Lio" }, "draft": { "version": 5, … }, … }
-helper ← { "type": "state", "by": { "id": "a9x…", "name": "Lio" }, "draft": { "version": 5, … }, … }
+owner  ← { "type": "state", "ref": "r7", "version": 5, "event": "changed", "by": { "id": "a9x…", "name": "Lio" }, "source": { "via": "browser", "name": "Lio", "role": "owner", "clientId": "w1", "connectionId": "a9x…" }, "change": { "kind": "answer", "choice": "folk" }, "draft": { "version": 5, … }, … }
+helper ← { "type": "state", "version": 5, "event": "changed", "by": { "id": "a9x…", "name": "Lio" }, "source": { … the same … }, "change": { "kind": "answer", "choice": "folk" }, "draft": { "version": 5, … }, … }
 helper → { "type": "answer", "version": 4, "choice": "folk", "answer": { "pick": "folk.coastfolk" } }
 helper ← { "type": "state", "stale": true, "by": null, "draft": { "version": 5, … }, … }
+both   ← { "type": "state", "version": 6, "event": "changed", "by": null, "source": { "via": "mcp", "name": "Lio", "role": "owner", "clientId": null, "connectionId": null }, "change": { "kind": "level", "level": 3 }, "draft": { "version": 6, … }, … }
 ```
 
 ## Print

@@ -4,7 +4,9 @@
  * else. Login as for the API: the session cookie (a browser sends it on
  * its own) or `Authorization: Bearer <key>`. Whoever is neither the
  * draft's owner nor the game master of its campaign adds the draft's help
- * link: `?help=<token>`.
+ * link: `?help=<token>`. A browser window adds its own id, `?clientId=`,
+ * the same it sends as `X-Builder-Client-Id` on its HTTP changes; a
+ * program says it is the MCP server with `X-Builder-Client: mcp`.
  *
  * Why this is safe:
  * - A page of another site cannot open the channel with the player's
@@ -26,6 +28,7 @@ import type { App } from "../app.ts";
 import { loadSession } from "../api/router.ts";
 import { findDraftFor } from "../api/routes/drafts.ts";
 import { CLOSE, liveHub, type Authorize } from "./hub.ts";
+import { clientIdOf, viaOf } from "./source.ts";
 
 const PATH = /^\/api\/live\/drafts\/([^/]+)\/?$/;
 const MAX_MESSAGE_BYTES = 64 * 1024;
@@ -105,13 +108,16 @@ export function liveUpgradeHandler(getApp: () => Promise<App>): UpgradeHandler {
         return refuse(socket, 404, "Not Found");
       }
       const help = url.searchParams.get("help");
+      const clientId = clientIdOf(url.searchParams.get("clientId"));
       const request = asRequest(req);
       const authorize: Authorize = async () => {
         const session = await loadSession(app, request, new Headers());
         if (!session)
           return { ok: false, code: request.headers.has("authorization") ? "keyNotValid" : "notLoggedIn" };
         const row = await findDraftFor(app, draftId, session.account.id, help);
-        return row ? { ok: true, row, name: session.account.name } : { ok: false, code: "draftNotFound" };
+        return row
+          ? { ok: true, row, accountId: session.account.id, name: session.account.name, login: session.via }
+          : { ok: false, code: "draftNotFound" };
       };
       wss.handleUpgrade(req, socket, head, (ws) => {
         alive.add(ws);
@@ -138,7 +144,9 @@ export function liveUpgradeHandler(getApp: () => Promise<App>): UpgradeHandler {
               ws.send(JSON.stringify({ type: "error", code: auth.code }));
               return ws.close(CLOSE[auth.code], auth.code);
             }
-            joined = liveHub(app).join(auth.row, { name: auth.name }, ws, authorize);
+            const via = viaOf({ via: auth.login }, request.headers);
+            const who = { name: auth.name, via, clientId };
+            joined = liveHub(app).join(auth.row, who, ws, authorize);
             if (!joined) return;
             for (const text of early.splice(0)) joined.receive(text);
           } catch (error) {

@@ -9,37 +9,70 @@ import { readConfig, type Config } from "./config.ts";
 import { memoryDatabase, outboxMailer, PGLITE_MEMORY_URL } from "./local-backends.ts";
 import { createSmtpMailer, type Mailer } from "./mail.ts";
 import { loadPackages, type PackageRegistry } from "./packages/loader.ts";
-import { Store, type DraftRow } from "./store.ts";
+import { Store, type DraftRow, type ReachableDraftRow } from "./store.ts";
 
-/** Who made a change over the live channel, so their own answer can say so (see live/hub.ts). */
+/** How a change or a connection came in: the browser (cookie), a program with a key, or an MCP program with a key. */
+export type Via = "browser" | "api" | "mcp";
+
+/** Who made a change, as the live channel shows it (see live/source.ts). */
 export interface ChangeSource {
-  connectionId: string;
+  via: Via;
+  accountId: string;
+  accountName: string;
+  /** Their access to the character: its owner, the game master of its campaign, or a helper. */
+  role: ReachableDraftRow["access"];
+  /** The browser window that made it, if it said so (`X-Builder-Client-Id`): it knows its own changes. */
+  clientId: string | null;
+  /** Set when the change came over the live channel: that connection, and its message's `ref`. */
+  connectionId?: string | undefined;
   ref?: string | undefined;
 }
 
+/** What a draft change was, for the screen: the choice or step answered, the level. */
+export interface DraftCause {
+  type: "changed" | "levelUp" | "finished";
+  change?:
+    | { kind: "answer"; choice: string }
+    | { kind: "pool"; step: string }
+    | { kind: "level" | "levelUp"; level: number };
+}
+
 /** A stored draft changed; `row` is the draft as stored now. */
-export interface DraftChanged {
-  kind: "changed";
+export interface DraftChanged extends DraftCause {
+  kind: "draft";
   draftId: string;
   accountId: string;
   version: number;
   row: DraftRow;
   /** The level a raise started from, when the change finished it at once (see `draftView`). */
   raisedFrom?: number | undefined;
-  /** Set when the change came over the live channel. */
-  source?: ChangeSource | undefined;
+  source: ChangeSource;
 }
 
 /**
- * What happens to drafts that the live channel passes on: a change, a
- * deleted draft, or a change of who may reach drafts (a help link made
- * or withdrawn, a campaign left). `draftId` undefined: any draft.
+ * Something else stored about a character that does not change the draft
+ * itself: its play state, its sheet copies, its campaign, or it was deleted.
  */
-export type DraftEvent =
-  DraftChanged | { kind: "deleted"; draftId: string } | { kind: "access"; draftId?: string | undefined };
+export interface CharacterChanged {
+  kind: "character";
+  type: "state" | "copies" | "campaign" | "deleted";
+  draftId: string;
+  source: ChangeSource;
+  change?:
+    | { kind: "state" | "clearChecks"; stateVersion: number }
+    | { kind: "copyCreated" | "copyChanged" | "copyDeleted"; copyId: string };
+}
 
 /**
- * Notifies about every stored draft change. The live help (live/hub.ts)
+ * What happens to drafts that the live channel passes on: a change of the
+ * draft, another change of the character, or a change of who may reach
+ * drafts (a help link made or withdrawn, a campaign left, a login ended).
+ * `draftId` undefined: any draft.
+ */
+export type DraftEvent = DraftChanged | CharacterChanged | { kind: "access"; draftId?: string | undefined };
+
+/**
+ * Notifies about every stored change of a character, however it was made. The live help (live/hub.ts)
  * subscribes here and forwards changes to everyone on the draft, without
  * touching how drafts are changed.
  */
