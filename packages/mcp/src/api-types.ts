@@ -21,6 +21,14 @@ export interface PackageEntry {
   language: string;
   name: string | null;
   short: string | null;
+  /** Extensions a character of this package may switch on. */
+  extensions: Array<{
+    id: string;
+    version: string;
+    publishable: boolean;
+    name: string | null;
+    short: string | null;
+  }>;
 }
 
 export interface FlowChoice {
@@ -49,6 +57,8 @@ export interface Summary {
 export interface Draft {
   id: string;
   packageId: string;
+  /** Extensions of the package switched on for this character. */
+  extensions: string[];
   version: number;
   status: "draft" | "finished";
   level: number;

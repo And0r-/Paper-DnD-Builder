@@ -1,0 +1,18 @@
+{
+  "source": "tides",
+  "entries": {
+    "package.name": "Tides of Mistland",
+    "package.short": "One more path for river runners and one more talent. Invented, to try extensions.",
+    "path.tide-warden.name": "Tide Warden",
+    "path.tide-warden.short": "You feel the tide turn before anyone else does.",
+    "path.tide-warden.goodIf": "Good if you want to keep the group out of the flood.",
+    "path.tide-warden.explain.what": "You have watched the water rise and fall all your life.",
+    "path.tide-warden.explain.table": "Your guard goes up by 1. You learn the talent Tide Reading.",
+    "path.tide-warden.rules": "Tide Warden. When the water around you rises, you know it a moment early. Your guard rises by 1.",
+    "talent.tide-reading.name": "Tide Reading",
+    "talent.tide-reading.short": "You know when the water will come and when it will go.",
+    "talent.tide-reading.explain.what": "Shells, foam and birds tell you about the tide.",
+    "talent.tide-reading.explain.table": "When you guess what the water will do, add your roll.",
+    "value.tideReadingRoll.name": "Tide reading"
+  }
+}

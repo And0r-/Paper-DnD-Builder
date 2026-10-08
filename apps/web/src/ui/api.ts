@@ -120,6 +120,19 @@ export interface PackageListEntry {
   language: string;
   name: string | null;
   short: string | null;
+  /** Extensions a character of this package may switch on (SPEC 17), named in `language`. */
+  extensions: ExtensionListEntry[];
+}
+
+export interface ExtensionListEntry {
+  id: string;
+  version: string;
+  languages: string[];
+  dependsOn: { id: string; minVersion?: string }[];
+  /** False: content that may not be shared; the sheet says so. */
+  publishable: boolean;
+  name: string | null;
+  short: string | null;
 }
 
 /** Package structure without texts, as `GET /api/packages/:id` sends it. */
@@ -130,6 +143,8 @@ export interface DraftInfo {
   id: string;
   packageId: string;
   packageVersion: string;
+  /** Extensions of the package switched on for this character. */
+  extensions: string[];
   version: number;
   status: "draft" | "finished";
   level: number;

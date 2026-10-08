@@ -48,6 +48,11 @@ export interface TextOrigin {
   file: string;
   source: string;
   license: string;
+  /**
+   * Set when an extension's text is missing in this language and was taken
+   * from the extension's fallback language (SPEC 17.5): that language.
+   */
+  fallbackFrom?: string;
 }
 
 /** A fully validated package, ready for the loader. */
@@ -62,6 +67,24 @@ export interface ContentPackage {
   /** Texts by language, then key. `null` marks a text as known missing. */
   texts: Record<string, Record<string, TextValue>>;
   textOrigins: Record<string, Record<string, TextOrigin>>;
+  /** The extensions put together into this package, in order (SPEC 17); absent for a base alone. */
+  extensions?: ExtensionInfo[];
+}
+
+/** What a package put together with extensions keeps about each of them. */
+export interface ExtensionInfo {
+  id: string;
+  version: string;
+  /** The extension's own languages; the first is its fallback language. */
+  languages: string[];
+  /** False if any license of the extension is not publishable (SPEC 4, 17.7). */
+  publishable: boolean;
+  /** The extension's `package.name` and `package.short` per language of the base (fallback applied). */
+  name: Record<string, string | null>;
+  short: Record<string, string | null>;
+  /** Keys the extension declares; a character "has something from it" through them. */
+  things: string[];
+  choices: string[];
 }
 
 export interface ValidationResult {
@@ -70,6 +93,8 @@ export interface ValidationResult {
   warnings: Issue[];
   /** Present when there are no errors. */
   package?: ContentPackage;
+  /** The files the result was made from (for putting extensions together with this package). */
+  files?: PackageFiles;
 }
 
 /** Text key prefixes reserved for package-level texts; thing ids may not start with them. */
@@ -97,7 +122,7 @@ export async function validatePackageDir(dir: string): Promise<ValidationResult>
     path: "",
     message,
   }));
-  const result = validatePackageFiles(files);
+  const result = { ...validatePackageFiles(files), files };
   if (pre.length === 0) return result;
   return { ok: false, errors: [...pre, ...result.errors], warnings: result.warnings };
 }
@@ -172,6 +197,13 @@ export function validatePackageFiles(files: PackageFiles): ValidationResult {
   // ------------------------------------------------------------- 2. manifest
   const mismatch = formatVersionMismatch(manifest.formatVersion);
   if (mismatch) err("manifest.json", "formatVersion", mismatch);
+  if (manifest.dependsOn) {
+    err(
+      "manifest.json",
+      "dependsOn",
+      `this package extends ${lit(manifest.dependsOn[0]!.id)}; validate it together with that package`,
+    );
+  }
   duplicates(manifest.languages).forEach((l) =>
     err("manifest.json", "languages", `language ${lit(l)} listed twice`),
   );

@@ -5,6 +5,7 @@
  * helper on the same draft), the change is refused with the current state.
  */
 import {
+  answersFromExtension,
   applyChange,
   evaluateDraft,
   explainValue,
@@ -19,6 +20,7 @@ import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import type { App, ChangeSource, DraftCause } from "../../app.ts";
 import { requestSource } from "../../live/source.ts";
+import { packageKey } from "../../packages/loader.ts";
 import type { AccountRow, DraftRow, ReachableDraftRow } from "../../store.ts";
 import { HttpError, json, readJson } from "../http.ts";
 import type { RequestContext, Route } from "../router.ts";
@@ -39,6 +41,8 @@ export function draftView(row: ReachableDraftRow, pkg: ContentPackage | undefine
       id: row.id,
       packageId: row.package_id,
       packageVersion: row.package_version,
+      /** Extensions of the package switched on for this character (SPEC 17). */
+      extensions: row.extensions,
       version: row.version,
       status: row.finished_at ? "finished" : "draft",
       level: row.document.level,
@@ -55,7 +59,10 @@ export function draftView(row: ReachableDraftRow, pkg: ContentPackage | undefine
       /** Why the viewer may see it: their own, or a player's in a campaign they lead. */
       access: row.access,
     },
-    /** False if the draft's package is not loaded right now; the draft is kept and shown again once it is. */
+    /**
+     * False if the draft's package or one of its extensions is not loaded
+     * right now; the draft is kept and shown again once it is.
+     */
     packageAvailable: pkg !== undefined,
     evaluation,
     summary: pkg && evaluation ? summarize(pkg, row.document, evaluation) : null,
@@ -71,7 +78,7 @@ export function ownDraft(row: DraftRow, account: AccountRow): ReachableDraftRow 
 
 /** A draft in a list: the draft's fields with `packageAvailable` and `summary`. */
 export function listEntry(app: App, row: ReachableDraftRow) {
-  const { draft, packageAvailable, summary } = draftView(row, app.packages.get(row.package_id));
+  const { draft, packageAvailable, summary } = draftView(row, app.packages.get(packageKeyOf(row)));
   return { ...draft, packageAvailable, summary };
 }
 
@@ -112,17 +119,42 @@ export async function loadDraft(
   return { row, viewer: account };
 }
 
-export function packageOf(app: App, row: DraftRow): ContentPackage {
-  const pkg = app.packages.get(row.package_id);
-  if (!pkg) throw new HttpError(409, "packageUnavailable", { packageId: row.package_id });
+/** The key of the draft's package with its extensions, for `app.packages.get`. */
+export function packageKeyOf(row: Pick<DraftRow, "package_id" | "extensions">): string {
+  return packageKey(row.package_id, row.extensions);
+}
+
+export function packageOf(app: App, row: Pick<DraftRow, "package_id" | "extensions">): ContentPackage {
+  const pkg = app.packages.get(packageKeyOf(row));
+  if (!pkg) {
+    throw new HttpError(409, "packageUnavailable", { packageId: row.package_id, extensions: row.extensions });
+  }
   return pkg;
+}
+
+const extensionsSchema = z.array(z.string().max(100)).max(20);
+
+/** The extensions asked for, if each is a loaded extension of the package; sorted, each once. */
+function checkExtensions(app: App, packageId: string, ids: readonly string[]): string[] {
+  for (const id of ids) {
+    if (app.packages.extensions.get(id)?.base !== packageId) {
+      throw new HttpError(404, "extensionNotFound", { extension: id });
+    }
+  }
+  return [...new Set(ids)].sort();
 }
 
 /** What a change does to the draft: the new document, and whether that finishes the character. */
 export type DraftEdit = (
   pkg: ContentPackage,
   row: DraftRow,
-) => { doc: DraftRow["document"]; finish?: boolean; raisedFrom?: number | undefined };
+) => {
+  doc: DraftRow["document"];
+  finish?: boolean;
+  raisedFrom?: number | undefined;
+  /** New extensions for the character; the draft is then evaluated with them. */
+  extensions?: string[] | undefined;
+};
 
 /** A change of a draft: what it does, and what it is called on the live channel. */
 export interface Edit {
@@ -156,7 +188,8 @@ export async function commitChange(
   const pkg = packageOf(app, row);
   if (row.version !== expectedVersion) return { ok: false, current: row };
   const edited = edit.apply(pkg, row);
-  const complete = evaluateDraft(pkg, edited.doc).complete;
+  const next = edited.extensions ? packageOf(app, { ...row, extensions: edited.extensions }) : pkg;
+  const complete = evaluateDraft(next, edited.doc).complete;
   const now = app.now();
   const finishedAt = edited.finish ? now : complete ? row.finished_at : null;
   // A raise ends when the character is finished again.
@@ -167,6 +200,7 @@ export async function commitChange(
     finishedAt,
     packageVersion: pkg.manifest.version,
     now,
+    extensions: edited.extensions,
   });
   if (!updated) {
     // Changed between our read and our write.
@@ -202,9 +236,11 @@ async function change(ctx: RequestContext, expectedVersion: number, edit: Edit):
     () => findDraftFor(ctx.app, row.id, viewer.id, help),
     await requestSource(ctx, row.access),
   );
-  const pkg = packageOf(ctx.app, row);
-  if (!done.ok) throw new HttpError(409, "versionConflict", { current: draftView(done.current, pkg) });
-  return json(200, draftView(done.row, pkg, done.raisedFrom));
+  if (!done.ok) {
+    const current = done.current;
+    throw new HttpError(409, "versionConflict", { current: draftView(current, packageOf(ctx.app, current)) });
+  }
+  return json(200, draftView(done.row, packageOf(ctx.app, done.row), done.raisedFrom));
 }
 
 function applyOrReject(pkg: ContentPackage, row: DraftRow, c: DraftChange) {
@@ -268,6 +304,8 @@ export const changeBodies = {
 export const newDraftSchema = z.strictObject({
   packageId: z.string().max(100),
   level: z.number().int().optional(),
+  /** Extensions of the package to switch on; none if left out. */
+  extensions: extensionsSchema.optional(),
   /** A campaign the owner plays in or leads; none if left out or null. */
   campaignId: z.string().regex(UUID).nullable().optional(),
 });
@@ -291,8 +329,9 @@ export async function createDraft(
     // Only a campaign the owner plays in or leads; any other looks missing.
     throw new HttpError(404, "campaignNotFound");
   }
-  const pkg = ctx.app.packages.get(body.packageId);
-  if (!pkg) throw new HttpError(404, "packageNotFound");
+  if (!ctx.app.packages.packages.has(body.packageId)) throw new HttpError(404, "packageNotFound");
+  const extensions = checkExtensions(ctx.app, body.packageId, body.extensions ?? []);
+  const pkg = packageOf(ctx.app, { package_id: body.packageId, extensions });
   const r = newDraft(pkg, body.level);
   if (!r.ok) throw new HttpError(422, "changeRejected", { reason: r.error });
   const row = await ctx.app.store.createDraft({
@@ -300,6 +339,7 @@ export async function createDraft(
     account_id: owner.id,
     package_id: pkg.manifest.id,
     package_version: pkg.manifest.version,
+    extensions,
     version: 1,
     document: r.doc,
     campaign_id: campaignId,
@@ -331,7 +371,7 @@ export const draftRoutes: Route[] = [
     path: "/api/drafts/:id",
     handler: async (ctx) => {
       const { row } = await loadDraft(ctx, { helpers: true });
-      return json(200, draftView(row, ctx.app.packages.get(row.package_id)));
+      return json(200, draftView(row, ctx.app.packages.get(packageKeyOf(row))));
     },
   },
   {
@@ -351,12 +391,43 @@ export const draftRoutes: Route[] = [
     },
   },
   {
-    // Changes of the draft as a whole; for now the level.
+    // Changes of the draft as a whole: the level, the extensions switched on.
     method: "PATCH",
     path: "/api/drafts/:id",
     handler: async (ctx) => {
-      const body = await readJson(ctx.req, changeBodies.setLevel);
-      return change(ctx, body.version, edits.setLevel(body.level));
+      const body = await readJson(
+        ctx.req,
+        z
+          .strictObject({
+            version,
+            level: z.number().int().optional(),
+            extensions: extensionsSchema.optional(),
+          })
+          .refine((b) => b.level !== undefined || b.extensions !== undefined, "name level or extensions"),
+      );
+      return change(ctx, body.version, {
+        // Over HTTP only: the live channel changes the level, not the extensions.
+        cause:
+          body.level === undefined
+            ? { type: "changed" }
+            : { type: "changed", change: { kind: "level", level: body.level } },
+        apply: (pkg, row) => {
+          let extensions: string[] | undefined;
+          if (body.extensions !== undefined) {
+            extensions = checkExtensions(ctx.app, row.package_id, body.extensions);
+            // Off only while nothing of the character comes from it: an answer would silently stop counting.
+            for (const off of row.extensions.filter((e) => !extensions!.includes(e))) {
+              const info = ctx.app.packages.extensions.get(off)?.info;
+              const used = info ? answersFromExtension(info, row.document.answers) : [];
+              if (used.length > 0)
+                throw new HttpError(409, "extensionInUse", { extension: off, choices: used });
+            }
+          }
+          if (body.level === undefined) return { doc: row.document, extensions };
+          const target = extensions ? packageOf(ctx.app, { ...row, extensions }) : pkg;
+          return { ...applyOrReject(target, row, { type: "setLevel", level: body.level }), extensions };
+        },
+      });
     },
   },
   {
@@ -416,7 +487,7 @@ export const draftRoutes: Route[] = [
       });
       return json(
         200,
-        draftView({ ...row, campaign_id: body.campaignId }, ctx.app.packages.get(row.package_id)),
+        draftView({ ...row, campaign_id: body.campaignId }, ctx.app.packages.get(packageKeyOf(row))),
       );
     },
   },

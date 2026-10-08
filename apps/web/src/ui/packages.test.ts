@@ -10,6 +10,7 @@ const entry = (id: string, languages: string[]): PackageListEntry => ({
   version: "1.0.0",
   languages,
   language: languages[0]!,
+  extensions: [],
   name: null,
   short: null,
 });

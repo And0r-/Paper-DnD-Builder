@@ -14,6 +14,7 @@ import { ConfirmDialog } from "../../../../src/ui/components/Dialog.tsx";
 import { Callout, EmptyState } from "../../../../src/ui/components/Feedback.tsx";
 import { Icon } from "../../../../src/ui/components/Icon.tsx";
 import { useDraft } from "../../../../src/ui/flow/draft-state.tsx";
+import { ExtensionSwitches } from "../../../../src/ui/flow/extensions.tsx";
 import { usePageTitle } from "../../../../src/ui/flow/frame.tsx";
 import { firstOpen } from "../../../../src/ui/flow/model.ts";
 import { typedLevel } from "../../../../src/ui/flow/typed-level.ts";
@@ -242,6 +243,8 @@ export default function RaisePage() {
           )}
         </div>
       </fieldset>
+
+      <ExtensionSwitches />
 
       <div id={keepId}>
         <Callout tone="info">

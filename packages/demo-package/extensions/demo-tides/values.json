@@ -1,0 +1,7 @@
+[
+  {
+    "id": "tideReadingRoll",
+    "source": "tides",
+    "formula": "witBonus + if(has('talent.tide-reading'), practice, 0)"
+  }
+]

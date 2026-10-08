@@ -10,6 +10,7 @@ coverage/
 # Mounted content packages are never committed to this repository.
 packages-mount/*
 !packages-mount/.gitkeep
+!packages-mount/README.md
 # Local agent tooling
 .claude/
 next-env.d.ts

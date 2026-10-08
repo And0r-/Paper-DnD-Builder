@@ -38,8 +38,13 @@ async function database(): Promise<SqlExecutor> {
   return db;
 }
 
-/** A fresh app (empty database, empty mailbox, fresh limits, own clock) for one test. */
-export async function startTestServer(): Promise<TestServer> {
+/**
+ * A fresh app (empty database, empty mailbox, fresh limits, own clock) for
+ * one test. `packagesDir`: where the packages come from; the demo package
+ * (with its extension) by default. Apps share one database: a second one
+ * empties it again.
+ */
+export async function startTestServer(options: { packagesDir?: string } = {}): Promise<TestServer> {
   const db = await database();
   const mails: Mail[] = [];
   const failMail = { on: false };
@@ -53,7 +58,7 @@ export async function startTestServer(): Promise<TestServer> {
   const app = createApp({
     config: { secureCookies: false, baseUrl: new URL("http://builder.test") },
     db,
-    packages: await loadPackages(DEMO_PACKAGE_DIR, quietLog),
+    packages: await loadPackages(options.packagesDir ?? DEMO_PACKAGE_DIR, quietLog),
     mailer,
     now: () => new Date(time),
   });

@@ -14,7 +14,7 @@ import { Menu, MenuSeparator } from "./components/Menu.tsx";
 import { firstOpen, progressOf } from "./flow/model.ts";
 import { flowOf } from "./flow/raise.ts";
 import { levelWord, measureContext, plain, ptext, thingName } from "./package-text.ts";
-import { loadPackage, type LoadedPackage } from "./packages.ts";
+import { draftPackageKey, loadPackage, type LoadedPackage } from "./packages.ts";
 
 export interface CharacterItem {
   id: string;
@@ -34,7 +34,7 @@ export interface CharacterItem {
 /** The packages of every listed draft whose package is loaded, in the screen language. */
 export async function packagesFor(drafts: DraftListEntry[], lang: string) {
   const packages = new Map<string, LoadedPackage>();
-  for (const id of new Set(drafts.filter((d) => d.packageAvailable).map((d) => d.packageId))) {
+  for (const id of new Set(drafts.filter((d) => d.packageAvailable).map(draftPackageKey))) {
     packages.set(id, await loadPackage(id, lang));
   }
   return packages;

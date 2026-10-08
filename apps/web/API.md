@@ -143,11 +143,22 @@ works on a server without a screen. No key, nothing personal in it.
 
 ## Packages
 
-| Method & path                          | Result                                                                                                                                                            |
-| -------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `GET /api/packages?lang=de`            | Loaded packages with name and description in one language: the one asked for if the package has it, else English, else its first (`language` says which). Public. |
-| 🔒 `GET /api/packages/:id`             | Structure without texts: manifest, units, values, things, flow, sheet, glossary.                                                                                  |
-| 🔒 `GET /api/packages/:id/texts/:lang` | All texts of one language. Missing texts are `null`, never filled from another language.                                                                          |
+| Method & path                          | Result                                                                                                                                                                                                                                                                                              |
+| -------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /api/packages?lang=de`            | Loaded packages with name and description in one language (the one asked for if the package has it, else English, else its first; `language` says which), each with the `extensions` a character may switch on (`id`, `version`, `languages`, `dependsOn`, `publishable`, `name`, `short`). Public. |
+| 🔒 `GET /api/packages/:id`             | Structure without texts: manifest, units, values, things, flow, sheet, glossary, `extensions`.                                                                                                                                                                                                      |
+| 🔒 `GET /api/packages/:id/texts/:lang` | All texts of one language. Missing texts are `null`, never filled from another language, except an extension's (see below); `fallbacks` names those.                                                                                                                                                |
+
+**Extensions** (package format SPEC 17). An extension adds to a package:
+more options, things, choices. A character switches it on for itself
+(`extensions` of the draft); a new character has none. `:id` may name a
+package with extensions, `base+ext1+ext2` with the extensions sorted
+(`demo+demo-tides`): that is the package a draft with those extensions is
+evaluated with. An extension's text a language lacks comes from the
+extension's first language; `fallbacks` maps such keys to that language,
+so a screen can mark them ("only in English"). `publishable: false` means
+content that may not be shared; the sheet of a character with such
+content says so in its `attribution`.
 
 ## Drafts
 
@@ -156,7 +167,7 @@ else is derived by the rule core and returned with every response:
 
 ```json
 {
-  "draft": { "id", "packageId", "version", "status": "draft|finished", "level", "levelBefore", "answers", "owner": { "name" }, "access": "owner|gameMaster|helper", ... },
+  "draft": { "id", "packageId", "extensions", "version", "status": "draft|finished", "level", "levelBefore", "answers", "owner": { "name" }, "access": "owner|gameMaster|helper", ... },
   "packageAvailable": true,
   "evaluation": { "level", "steps", "choices", "things", "values", "inputs", "raises", "open", "complete", "inactiveAnswers" },
   "summary": { "name", "level", "complete", "line" },
@@ -169,19 +180,19 @@ the answer is `409 versionConflict` with the current state in
 `error.current` (optimistic locking). Opening and changing a draft also
 works for a [helper](#live-help) with `?help=<token>` (`access: "helper"`).
 
-| Method & path                            | Body                                 | Result                                                                                                                        |
-| ---------------------------------------- | ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------- |
-| 🔒 `GET /api/drafts`                     | —                                    | The account's own drafts with summaries (a game master finds the players' in the campaign).                                   |
-| 🔒 `POST /api/drafts`                    | `{ packageId, level?, campaignId? }` | `201`, new draft at version 1. `campaignId`: a campaign you play in or lead; else `404 campaignNotFound`.                     |
-| 🔒 `GET /api/drafts/:id`                 | —                                    | The draft.                                                                                                                    |
-| 🔒 `GET /api/drafts/:id/explain/:value`  | —                                    | Where one number comes from: its parts and their sources; see [Explaining a value](#explaining-a-value). `404 valueNotFound`. |
-| 🔒 `PATCH /api/drafts/:id`               | `{ version, level }`                 | Changes the level.                                                                                                            |
-| 🔒 `PUT /api/drafts/:id/pools/:step`     | `{ version, picks }`                 | All picks of a step with a shared list (`steps[].pool`); the core spreads them over the step's choices.                       |
-| 🔒 `PUT /api/drafts/:id/answers/:choice` | `{ version, answer }`                | Answers one choice; `answer: null` removes it. `422 changeRejected` with the reason if it does not fit now.                   |
-| 🔒 `POST /api/drafts/:id/level-up`       | `{ version, level }`                 | Raises a finished character; see [Raising a character](#raising-a-character).                                                 |
-| 🔒 `POST /api/drafts/:id/finish`         | `{ version }`                        | Marks the character finished; `422 incomplete` with the open choices.                                                         |
-| 🔒 `PUT /api/drafts/:id/campaign`        | `{ campaignId }`                     | Owner only. Puts the character into a campaign you play in or lead, or into none (`null`). The `version` stays.               |
-| 🔒 `DELETE /api/drafts/:id`              | —                                    | `204`.                                                                                                                        |
+| Method & path                            | Body                                              | Result                                                                                                                                                                                                    |
+| ---------------------------------------- | ------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 🔒 `GET /api/drafts`                     | —                                                 | The account's own drafts with summaries (a game master finds the players' in the campaign).                                                                                                               |
+| 🔒 `POST /api/drafts`                    | `{ packageId, level?, extensions?, campaignId? }` | `201`, new draft at version 1. `campaignId`: a campaign you play in or lead; else `404 campaignNotFound`. `extensions`: ids from `GET /api/packages`; else `404 extensionNotFound`.                       |
+| 🔒 `GET /api/drafts/:id`                 | —                                                 | The draft.                                                                                                                                                                                                |
+| 🔒 `GET /api/drafts/:id/explain/:value`  | —                                                 | Where one number comes from: its parts and their sources; see [Explaining a value](#explaining-a-value). `404 valueNotFound`.                                                                             |
+| 🔒 `PATCH /api/drafts/:id`               | `{ version, level?, extensions? }`                | Changes the level, or the extensions switched on (all of them, as a list). One goes off only while no answer comes from it: else `409 extensionInUse` with `extension` and the `choices` to change first. |
+| 🔒 `PUT /api/drafts/:id/pools/:step`     | `{ version, picks }`                              | All picks of a step with a shared list (`steps[].pool`); the core spreads them over the step's choices.                                                                                                   |
+| 🔒 `PUT /api/drafts/:id/answers/:choice` | `{ version, answer }`                             | Answers one choice; `answer: null` removes it. `422 changeRejected` with the reason if it does not fit now.                                                                                               |
+| 🔒 `POST /api/drafts/:id/level-up`       | `{ version, level }`                              | Raises a finished character; see [Raising a character](#raising-a-character).                                                                                                                             |
+| 🔒 `POST /api/drafts/:id/finish`         | `{ version }`                                     | Marks the character finished; `422 incomplete` with the open choices.                                                                                                                                     |
+| 🔒 `PUT /api/drafts/:id/campaign`        | `{ campaignId }`                                  | Owner only. Puts the character into a campaign you play in or lead, or into none (`null`). The `version` stays.                                                                                           |
+| 🔒 `DELETE /api/drafts/:id`              | —                                                 | `204`.                                                                                                                                                                                                    |
 
 Answer shapes by choice kind: `pickOne` `{ "pick": "thing.key" }`,
 `pickMany` `{ "picks": [...] }`, `distribute`
@@ -821,6 +832,7 @@ Tests: [`sheet-copies.test.ts`](src/server/api/sheet-copies.test.ts).
 | `404`  | `passwordNotFound`       | No password with this id in this account.                                                                                         |
 | `404`  | `resetLinkInvalid`       | The link back in is unknown, used already or older than 30 minutes.                                                               |
 | `404`  | `packageNotFound`        | No loaded package with this id.                                                                                                   |
+| `404`  | `extensionNotFound`      | No loaded extension of the draft's package with this id; `extension` names it.                                                    |
 | `404`  | `languageNotFound`       | The package has no texts in this language.                                                                                        |
 | `404`  | `helpLinkNotFound`       | No character has this help link (unknown, replaced, withdrawn or older than 12 hours).                                            |
 | `404`  | `inviteNotFound`         | No campaign has this invitation link (unknown, or replaced by a new one).                                                         |
@@ -832,7 +844,8 @@ Tests: [`sheet-copies.test.ts`](src/server/api/sheet-copies.test.ts).
 | `409`  | `tooManyCopies`          | The character has 10 kept copies (`max`); delete one first.                                                                       |
 | `409`  | `originalChanged`        | A copy made with `model` from an original that changed since; `original` says how it is now.                                      |
 | `409`  | `copyUnreadable`         | A kept copy stored in a shape this server no longer prints; `version` names it.                                                   |
-| `409`  | `packageUnavailable`     | The draft's package is not loaded right now; `packageId` names it.                                                                |
+| `409`  | `packageUnavailable`     | The draft's package or one of its extensions is not loaded right now; `packageId` and `extensions` name them.                     |
+| `409`  | `extensionInUse`         | Switching off an extension an answer still comes from; `extension`, and `choices` to change first.                                |
 | `413`  | `bodyTooLarge`           | Body over 64 KiB (516 KiB for a body with a sheet copy; `max`).                                                                   |
 | `413`  | `copyTooLarge`           | A sheet copy's model over 512 KiB (`max`).                                                                                        |
 | `415`  | `jsonRequired`           | Body not `application/json`.                                                                                                      |

@@ -69,13 +69,23 @@ export const sourceSchema = z.strictObject({
   license: id,
 });
 
+const packageId = z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'must be lowercase words joined by "-"');
+const semver = z.string().regex(/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/, 'must be semantic, e.g. "1.0.0"');
+
+/** The package an extension builds on (SPEC 17). */
+export const dependencySchema = z.strictObject({
+  id: packageId,
+  /** Lowest base version the extension is written for; the major version must match. */
+  minVersion: semver.optional(),
+});
+
 export const manifestSchema = z.strictObject({
   /** Format version this package is written against, "MAJOR.MINOR". */
   formatVersion: z.string().regex(/^\d+\.\d+$/, 'must be "MAJOR.MINOR", e.g. "0.1"'),
   /** Package key. Also the folder name when mounted. Never changes. */
-  id: z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'must be lowercase words joined by "-"'),
+  id: packageId,
   /** Version of the package content (semantic versioning). */
-  version: z.string().regex(/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/, 'must be semantic, e.g. "1.0.0"'),
+  version: semver,
   /** Languages this package ships texts for. Each needs texts/<lang>/. */
   languages: z.array(language).min(1),
   /** Categories of things. The builder does not interpret them; they group things and select cards. */
@@ -84,6 +94,14 @@ export const manifestSchema = z.strictObject({
   licenses: z
     .record(id, licenseSchema)
     .refine((r) => Object.keys(r).length > 0, "declare at least one license"),
+  /** Only in an extension: the one package it builds on. */
+  dependsOn: z.array(dependencySchema).length(1, "name exactly one base package").optional(),
+});
+
+/** An extension's manifest: `dependsOn` is required, `kinds` lists only new kinds and may be empty. */
+export const extensionManifestSchema = manifestSchema.extend({
+  kinds: z.array(id),
+  dependsOn: z.array(dependencySchema).length(1, "name exactly one base package"),
 });
 
 // --------------------------------------------------------------------- units
@@ -452,6 +470,9 @@ export const flowSchema = z.strictObject({
   }),
 });
 
+/** An extension's flow.json: only new choices; level, steps and summary are the base's. */
+export const extensionFlowSchema = z.strictObject({ choices: z.array(choiceSchema).min(1) });
+
 // --------------------------------------------------------------------- sheet
 
 const sectionBase = {
@@ -654,6 +675,12 @@ export const sheetSchema = z.strictObject({
   ),
 });
 
+/** An extension's sheet.json: sections printed after the base's, card layouts for new kinds. */
+export const extensionSheetSchema = z.strictObject({
+  sections: z.array(sectionSchema).min(1).optional(),
+  cards: sheetSchema.shape.cards.optional(),
+});
+
 // ------------------------------------------------------------------ glossary
 
 export const glossarySchema = z.array(z.strictObject({ id, source: id, license: id.optional() }));
@@ -675,6 +702,8 @@ export const textsFileSchema = z.strictObject({
 export type License = z.infer<typeof licenseSchema>;
 export type Source = z.infer<typeof sourceSchema>;
 export type Manifest = z.infer<typeof manifestSchema>;
+export type Dependency = z.infer<typeof dependencySchema>;
+export type ExtensionManifest = z.infer<typeof extensionManifestSchema>;
 export type Units = z.infer<typeof unitsSchema>;
 export type Quantity = z.infer<typeof quantitySchema>;
 export type Value = z.infer<typeof valueSchema>;

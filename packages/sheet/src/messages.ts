@@ -44,6 +44,8 @@ export interface Messages {
   rulesTextsTitle: string;
   /** The rules texts part of a character that has no thing with a text. */
   noRulesTexts: string;
+  /** After the package's attribution: the character has content of an extension that may not be shared (SPEC 17.7). */
+  notForSharing: (names: string) => string;
 }
 
 export const MESSAGES: Readonly<Record<string, Messages>> = {
@@ -73,6 +75,7 @@ export const MESSAGES: Readonly<Record<string, Messages>> = {
     rulesTexts: "Regeltexte",
     rulesTextsTitle: "Regeltexte zum Nachlesen",
     noRulesTexts: "Dieser Charakter hat nichts mit einem Regeltext.",
+    notForSharing: (names) => `Enthält Inhalt aus ${names}, nicht zur Weitergabe.`,
   },
   en: {
     playedBy: "Played by",
@@ -100,6 +103,7 @@ export const MESSAGES: Readonly<Record<string, Messages>> = {
     rulesTexts: "Rules texts",
     rulesTextsTitle: "Rules texts to read up on",
     noRulesTexts: "This character has nothing with a rules text.",
+    notForSharing: (names) => `Contains content from ${names}, not for sharing.`,
   },
   fr: {
     playedBy: "Joué par",
@@ -127,6 +131,7 @@ export const MESSAGES: Readonly<Record<string, Messages>> = {
     rulesTexts: "Textes de règles",
     rulesTextsTitle: "Textes de règles à relire",
     noRulesTexts: "Ce personnage n’a rien avec un texte de règle.",
+    notForSharing: (names) => `Contient du contenu de ${names}, pas pour le partage.`,
   },
   it: {
     playedBy: "Giocato da",
@@ -154,6 +159,7 @@ export const MESSAGES: Readonly<Record<string, Messages>> = {
     rulesTexts: "Testi delle regole",
     rulesTextsTitle: "Testi delle regole da rileggere",
     noRulesTexts: "Questo personaggio non ha niente con un testo delle regole.",
+    notForSharing: (names) => `Contiene contenuti da ${names}, non da condividere.`,
   },
   es: {
     playedBy: "Jugado por",
@@ -181,6 +187,7 @@ export const MESSAGES: Readonly<Record<string, Messages>> = {
     rulesTexts: "Textos de reglas",
     rulesTextsTitle: "Textos de reglas para consultar",
     noRulesTexts: "Este personaje no tiene nada con un texto de regla.",
+    notForSharing: (names) => `Contiene contenido de ${names}, no para compartir.`,
   },
 };
 

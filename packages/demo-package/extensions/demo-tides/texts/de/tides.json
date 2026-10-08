@@ -1,0 +1,17 @@
+{
+  "source": "tides",
+  "entries": {
+    "package.name": "Gezeiten im Nebelland",
+    "package.short": "Ein weiterer Pfad für Flussläufer und ein weiteres Talent. Erfunden, um Erweiterungen auszuprobieren.",
+    "path.tide-warden.name": "Gezeitenwächter",
+    "path.tide-warden.short": "Du spürst die Flut kommen, bevor es jemand anderes merkt.",
+    "path.tide-warden.goodIf": "Gut, wenn du die Gruppe vor der Flut bewahren willst.",
+    "path.tide-warden.explain.what": "Du hast dein Leben lang zugesehen, wie das Wasser steigt und fällt.",
+    "path.tide-warden.explain.table": "Dein Schutz steigt um 1. Du lernst das Talent Gezeitenkunde.",
+    "talent.tide-reading.name": "Gezeitenkunde",
+    "talent.tide-reading.short": "Du weisst, wann das Wasser kommt und wann es geht.",
+    "talent.tide-reading.explain.what": "Muscheln, Schaum und Vögel erzählen dir von der Flut.",
+    "talent.tide-reading.explain.table": "Wenn du errätst, was das Wasser tun wird, zählst du deinen Wurf dazu.",
+    "value.tideReadingRoll.name": "Gezeitenkunde"
+  }
+}

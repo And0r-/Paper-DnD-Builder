@@ -1857,3 +1857,10 @@ a.livebar__where {
     outline: 3px dashed Highlight;
   }
 }
+
+/* Extensions of the package (SPEC 17): switches under the level, on the level and raise screens. */
+.extensions {
+  display: grid;
+  gap: var(--space-3);
+  margin-top: var(--space-5);
+}

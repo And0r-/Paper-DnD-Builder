@@ -1361,7 +1361,7 @@
             "name": "id",
             "in": "path",
             "required": true,
-            "description": "Package id.",
+            "description": "Package id, or a package with extensions: `base+ext1+ext2` (extensions sorted).",
             "schema": {
               "type": "string"
             }
@@ -1424,7 +1424,7 @@
             "name": "id",
             "in": "path",
             "required": true,
-            "description": "Package id.",
+            "description": "Package id, or a package with extensions: `base+ext1+ext2` (extensions sorted).",
             "schema": {
               "type": "string"
             }
@@ -1468,9 +1468,16 @@
                           }
                         ]
                       }
+                    },
+                    "fallbacks": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string"
+                      },
+                      "description": "Texts of an extension this language does not have, taken from the extension's fallback language: key → that language. Show them marked as such."
                     }
                   },
-                  "required": ["language", "texts"],
+                  "required": ["language", "texts", "fallbacks"],
                   "additionalProperties": false
                 }
               }
@@ -1558,6 +1565,14 @@
                   "level": {
                     "type": "integer"
                   },
+                  "extensions": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "maxItems": 20,
+                    "description": "Extensions of the package to switch on; none if left out."
+                  },
                   "campaignId": {
                     "anyOf": [
                       {
@@ -1597,7 +1612,7 @@
             "$ref": "#/components/responses/CrossSite"
           },
           "404": {
-            "description": "`packageNotFound`, `campaignNotFound` (also a campaign you neither play in nor lead)",
+            "description": "`packageNotFound`, `campaignNotFound` (also a campaign you neither play in nor lead), `extensionNotFound` (not an extension of this package)",
             "content": {
               "application/json": {
                 "schema": {
@@ -1606,7 +1621,10 @@
                     "error": {
                       "properties": {
                         "code": {
-                          "enum": ["packageNotFound", "campaignNotFound"]
+                          "enum": ["packageNotFound", "campaignNotFound", "extensionNotFound"]
+                        },
+                        "extension": {
+                          "type": "string"
                         }
                       }
                     }
@@ -1715,9 +1733,9 @@
       },
       "patch": {
         "operationId": "setLevel",
-        "summary": "Change the level",
+        "summary": "Change the level or the extensions",
         "tags": ["Characters"],
-        "description": "Answers stay; what the level no longer asks is kept in `inactiveAnswers`. During a raise, a level at or below `levelBefore` ends the raise.",
+        "description": "Answers stay; what the level no longer asks is kept in `inactiveAnswers`. During a raise, a level at or below `levelBefore` ends the raise. `extensions` switches the package's extensions for this character (package format SPEC 17): the answer is evaluated with them. One goes off only while no answer comes from it, else `409 extensionInUse` with the choices to change first.",
         "parameters": [
           {
             "name": "id",
@@ -1752,10 +1770,19 @@
                   },
                   "level": {
                     "type": "integer"
+                  },
+                  "extensions": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "maxItems": 20,
+                    "description": "All extensions to have on afterwards."
                   }
                 },
-                "required": ["version", "level"],
-                "additionalProperties": false
+                "required": ["version"],
+                "additionalProperties": false,
+                "description": "At least one of `level` and `extensions`."
               }
             }
           }
@@ -1781,7 +1808,7 @@
             "$ref": "#/components/responses/CrossSite"
           },
           "404": {
-            "description": "`draftNotFound` (also someone else's character: it looks exactly like a missing one)",
+            "description": "`draftNotFound` (also someone else's character: it looks exactly like a missing one), `extensionNotFound`",
             "content": {
               "application/json": {
                 "schema": {
@@ -1790,7 +1817,10 @@
                     "error": {
                       "properties": {
                         "code": {
-                          "enum": ["draftNotFound"]
+                          "enum": ["draftNotFound", "extensionNotFound"]
+                        },
+                        "extension": {
+                          "type": "string"
                         }
                       }
                     }
@@ -1800,7 +1830,7 @@
             }
           },
           "409": {
-            "description": "`versionConflict`, `packageUnavailable`",
+            "description": "`versionConflict`, `packageUnavailable`, `extensionInUse`",
             "content": {
               "application/json": {
                 "schema": {
@@ -1809,13 +1839,23 @@
                     "error": {
                       "properties": {
                         "code": {
-                          "enum": ["versionConflict", "packageUnavailable"]
+                          "enum": ["versionConflict", "packageUnavailable", "extensionInUse"]
                         },
                         "current": {
                           "$ref": "#/components/schemas/DraftView"
                         },
                         "packageId": {
                           "type": "string"
+                        },
+                        "extension": {
+                          "type": "string"
+                        },
+                        "choices": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          },
+                          "description": "The choices whose answers come from the extension."
                         }
                       }
                     }
@@ -4648,6 +4688,14 @@
                   "level": {
                     "type": "integer"
                   },
+                  "extensions": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "maxItems": 20,
+                    "description": "Extensions of the package to switch on; none if left out."
+                  },
                   "campaignId": {
                     "anyOf": [
                       {
@@ -4703,7 +4751,7 @@
             }
           },
           "404": {
-            "description": "`campaignNotFound`, `playerNotFound`, `packageNotFound`",
+            "description": "`campaignNotFound`, `playerNotFound`, `packageNotFound`, `extensionNotFound` (not an extension of this package)",
             "content": {
               "application/json": {
                 "schema": {
@@ -4712,7 +4760,15 @@
                     "error": {
                       "properties": {
                         "code": {
-                          "enum": ["campaignNotFound", "playerNotFound", "packageNotFound"]
+                          "enum": [
+                            "campaignNotFound",
+                            "playerNotFound",
+                            "packageNotFound",
+                            "extensionNotFound"
+                          ]
+                        },
+                        "extension": {
+                          "type": "string"
                         }
                       }
                     }
@@ -6779,6 +6835,8 @@
           "crossSite",
           "designNotAvailable",
           "draftNotFound",
+          "extensionInUse",
+          "extensionNotFound",
           "gameMasterOnly",
           "incomplete",
           "internal",
@@ -7047,9 +7105,24 @@
                 "type": "null"
               }
             ]
+          },
+          "extensions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExtensionEntry"
+            }
           }
         },
-        "required": ["id", "version", "formatVersion", "languages", "language", "name", "short"],
+        "required": [
+          "id",
+          "version",
+          "formatVersion",
+          "languages",
+          "language",
+          "name",
+          "short",
+          "extensions"
+        ],
         "additionalProperties": false
       },
       "Package": {
@@ -7084,11 +7157,18 @@
             "items": {
               "type": "object"
             }
+          },
+          "extensions": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            },
+            "description": "The extensions this package is put together with (empty for a base alone): id, version, languages, publishable, names, and the keys of their things and choices."
           }
         },
-        "required": ["manifest", "units", "values", "things", "flow", "sheet", "glossary"],
+        "required": ["manifest", "units", "values", "things", "flow", "sheet", "glossary", "extensions"],
         "additionalProperties": false,
-        "description": "A loaded package without its texts. The shape of each part is the package format (SPEC.md sections 5 to 13)."
+        "description": "A loaded package without its texts. The shape of each part is the package format (SPEC.md sections 5 to 13). `GET /api/packages/demo+demo-tides` is the package `demo` with its extension `demo-tides`, as a draft with that extension uses it."
       },
       "Draft": {
         "type": "object",
@@ -7102,6 +7182,13 @@
           "packageVersion": {
             "type": "string",
             "description": "Package version the draft was last changed with."
+          },
+          "extensions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Extensions of the package switched on for this character (package format SPEC 17); empty for none."
           },
           "version": {
             "type": "integer",
@@ -7178,6 +7265,7 @@
           "id",
           "packageId",
           "packageVersion",
+          "extensions",
           "version",
           "status",
           "level",
@@ -7204,6 +7292,13 @@
           "packageVersion": {
             "type": "string",
             "description": "Package version the draft was last changed with."
+          },
+          "extensions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Extensions of the package switched on for this character (package format SPEC 17); empty for none."
           },
           "version": {
             "type": "integer",
@@ -7293,6 +7388,7 @@
           "id",
           "packageId",
           "packageVersion",
+          "extensions",
           "version",
           "status",
           "level",
@@ -8540,6 +8636,68 @@
         },
         "required": ["url", "token", "expiresAt", "createdAt"],
         "additionalProperties": false
+      },
+      "ExtensionEntry": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          },
+          "languages": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The extension's own languages; the first is its fallback language. A text missing in another language comes from it."
+          },
+          "dependsOn": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "minVersion": {
+                  "type": "string"
+                }
+              },
+              "required": ["id"],
+              "additionalProperties": false
+            },
+            "description": "The package it extends, as in its manifest."
+          },
+          "publishable": {
+            "type": "boolean",
+            "description": "False: content that may not be shared. A sheet with content from it says so."
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "short": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": ["id", "version", "languages", "dependsOn", "publishable", "name", "short"],
+        "additionalProperties": false,
+        "description": "An extension a character of the package may switch on (package format SPEC 17). `name` and `short` in the package entry's `language`."
       }
     }
   }

@@ -4,7 +4,7 @@
  * `ApiClient`. Every tool goes through the public HTTP API only.
  */
 import { z } from "zod";
-import { enc, ApiError, type ApiClient } from "../api-client.ts";
+import { draftPackage, enc, ApiError, type ApiClient } from "../api-client.ts";
 import type {
   ChoiceState,
   DraftListEntry,
@@ -46,7 +46,7 @@ const answer = z
 
 async function viewWithWords(client: ApiClient, id: string): Promise<[DraftView, Words]> {
   const view = await client.draft(id);
-  return [view, await client.words(view.draft.packageId)];
+  return [view, await client.words(draftPackage(view.draft))];
 }
 
 const listPackages = defineTool({
@@ -66,6 +66,12 @@ const listPackages = defineTool({
         description: p.short,
         version: p.version,
         languages: p.languages,
+        extensions: p.extensions.map((e) => ({
+          extensionId: e.id,
+          name: e.name,
+          description: e.short,
+          ...(e.publishable ? {} : { notForSharing: true }),
+        })),
       })),
     };
   },
@@ -79,7 +85,7 @@ const listCharacters = defineTool({
     const { drafts } = await client.json<{ drafts: DraftListEntry[] }>("GET", "/api/drafts");
     const characters = await Promise.all(
       drafts.map(async (d) => {
-        const words = d.packageAvailable ? await client.words(d.packageId) : null;
+        const words = d.packageAvailable ? await client.words(draftPackage(d)) : null;
         return {
           characterId: d.id,
           name: d.summary?.name ?? null,
@@ -128,6 +134,7 @@ const getCharacter = defineTool({
       data: {
         ...standing(view, words),
         packageId: view.draft.packageId,
+        ...(view.draft.extensions.length > 0 ? { extensions: view.draft.extensions } : {}),
         summary: view.summary ? words.summaryLine(view.summary.line) : null,
         ...(view.levelUp
           ? {
@@ -267,7 +274,7 @@ const listOptions = defineTool({
       case "pickMany":
         return { data: { ...head, ...pickDetails(words, c, ev.steps.find((s) => s.id === c.step)?.pool) } };
       case "distribute": {
-        const structure = await client.structure(view.draft.packageId);
+        const structure = await client.structure(draftPackage(view.draft));
         const f = flowChoice(structure.flow.choices, c);
         return {
           data: {
@@ -289,7 +296,7 @@ const listOptions = defineTool({
       case "number":
         return { data: { ...head, min: c.min, max: c.max, answerShape: '{"value": <number>}' } };
       case "text": {
-        const structure = await client.structure(view.draft.packageId);
+        const structure = await client.structure(draftPackage(view.draft));
         const f = flowChoice(structure.flow.choices, c);
         return {
           data: {
@@ -361,7 +368,7 @@ const setAnswer = defineTool({
       `/api/drafts/${enc(characterId)}/answers/${enc(choice)}`,
       { answer },
     );
-    const words = await client.words(result.view.draft.packageId);
+    const words = await client.words(draftPackage(result.view.draft));
     const c = result.view.evaluation?.choices[choice];
     return {
       data: {
@@ -398,7 +405,7 @@ const answerPool = defineTool({
         picks,
       },
     );
-    const words = await client.words(result.view.draft.packageId);
+    const words = await client.words(draftPackage(result.view.draft));
     return { data: changeOutcome(result, words) };
   },
 });
@@ -409,14 +416,16 @@ const startCharacter = defineTool({
   input: {
     packageId: z.string().min(1).describe(D.packageId),
     level: z.number().int().optional().describe(D.startLevel),
+    extensions: z.array(z.string().min(1)).max(20).optional().describe(D.extensions),
   },
-  async run(client, { packageId, level }) {
+  async run(client, { packageId, level, extensions }) {
     const view = await client.json<DraftView>("POST", "/api/drafts", {
       packageId,
       ...(level !== undefined ? { level } : {}),
+      ...(extensions !== undefined ? { extensions } : {}),
     });
     client.remember(view);
-    return { data: standing(view, await client.words(packageId)) };
+    return { data: standing(view, await client.words(draftPackage(view.draft))) };
   },
 });
 
@@ -426,7 +435,7 @@ const setLevel = defineTool({
   input: { characterId, level },
   async run(client, { characterId, level }) {
     const result = await client.change(characterId, "PATCH", `/api/drafts/${enc(characterId)}`, { level });
-    return { data: changeOutcome(result, await client.words(result.view.draft.packageId)) };
+    return { data: changeOutcome(result, await client.words(draftPackage(result.view.draft))) };
   },
 });
 
@@ -439,7 +448,7 @@ const levelUp = defineTool({
       const result = await client.change(characterId, "POST", `/api/drafts/${enc(characterId)}/level-up`, {
         level,
       });
-      const words = await client.words(result.view.draft.packageId);
+      const words = await client.words(draftPackage(result.view.draft));
       const outcome = changeOutcome(result, words);
       const up = result.view.levelUp;
       const ev = result.view.evaluation;
@@ -475,7 +484,7 @@ const finishCharacter = defineTool({
   async run(client, { characterId }) {
     try {
       const result = await client.change(characterId, "POST", `/api/drafts/${enc(characterId)}/finish`, {});
-      return { data: changeOutcome(result, await client.words(result.view.draft.packageId)) };
+      return { data: changeOutcome(result, await client.words(draftPackage(result.view.draft))) };
     } catch (e) {
       if (e instanceof ApiError && e.code === "incomplete") {
         const [view, words] = await viewWithWords(client, characterId);

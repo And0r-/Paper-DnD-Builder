@@ -1,6 +1,6 @@
 # Content package format — specification
 
-Format version **0.19**. This document describes everything a content
+Format version **0.20**. This document describes everything a content
 package contains and every rule a valid package follows. After reading it
 you should be able to write your own package. The demo package in
 [`packages/demo-package`](../demo-package) uses every feature and is the
@@ -28,7 +28,8 @@ document. If the two disagree, that is a bug; please report it.
 14. [Validation](#14-validation)
 15. [Versioning](#15-versioning)
 16. [A minimal package](#16-a-minimal-package)
-17. [Reserved for later versions](#17-reserved-for-later-versions)
+17. [Extensions](#17-extensions)
+18. [Reserved for later versions](#18-reserved-for-later-versions)
 
 ## 1. Ideas behind the format
 
@@ -71,7 +72,9 @@ All files except `glossary.json` are required. Any other file in the folder
 file per source.
 
 The builder reads packages from a mounted directory: each subfolder that
-contains a `manifest.json` is one package.
+contains a `manifest.json` is one package. A package whose manifest has
+`dependsOn` is an **extension** of another package; its layout and rules
+are in [17](#17-extensions).
 
 ## 3. Keys
 
@@ -115,14 +118,15 @@ text, so a check like "is every German rules text from the official
 translation?" is a simple query.
 
 `publishable` on a license says whether content under it may be
-distributed publicly. The builder does not act on it; it is there for the
-people who distribute packages.
+distributed publicly. It is there for the people who distribute packages.
+The builder acts on it in one place: the sheet of a character that uses
+an extension with such a license says so ([17.7](#177-characters-with-extensions)).
 
 ## 5. manifest.json
 
 ```json
 {
-  "formatVersion": "0.19",
+  "formatVersion": "0.20",
   "id": "demo",
   "version": "0.1.0",
   "languages": ["de", "en"],
@@ -150,6 +154,7 @@ people who distribute packages.
 | `kinds`         | yes      | Categories of things (see [6](#6-things)).                                            |
 | `sources`       | yes      | Source key → `{ title, url?, version?, retrieved? (YYYY-MM-DD), license }`.           |
 | `licenses`      | yes      | License key → `{ name, spdx?, url?, publishable }`.                                   |
+| `dependsOn`     | no       | Only in an extension: the package it extends, see [17](#17-extensions).               |
 
 The package's display name and description are texts: `package.name` and
 `package.short`.
@@ -893,7 +898,9 @@ A text is a string, a list of strings (only for `suggestions` keys), or
 `null`. **`null` means: known to be missing, not translated yet.** The
 validator warns about it (and fails with `--strict`). A builder shows only
 one language on screen; it must not fill a missing text from another
-language. It may hide a language that still has missing texts.
+language. It may hide a language that still has missing texts. The one
+exception is an extension's fallback language, which is marked as such
+([17.5](#175-texts-and-the-fallback-language)).
 
 A key may be defined in only one file per language.
 
@@ -1543,6 +1550,7 @@ are removed (saved characters may lose picks). Keys are never renamed.
 | 0.17    | 2026-10-07 | Optional `flow.grants`: things every character of the package has without a pick (with everything they grant; their choices come before the first step). The evaluation marks them `everyone: true` and gives them no `step`; the builder names their origin "everyone".                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | Set `formatVersion` to `"0.17"`. Nothing else has to change: `grants` is optional, so every valid 0.16 package is a valid 0.17 package. A package that gave such a thing through every option of a choice (a language through every folk) can list it in `flow.grants` and drop those grants.                                                                                                                                                                                                                                                        |
 | 0.18    | 2026-10-07 | Optional `apart` on every sheet section: the section belongs to a part of the sheet of its own. A design may set such parts apart (the "classic" design gives them a page of their own if one of them is a `statBoxes` section); the sheet model and `GET /api/drafts/:id/sheet` carry it as `apart` on the section.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | Set `formatVersion` to `"0.18"`. Nothing else has to change: `apart` is optional, so every valid 0.17 package is a valid 0.18 package.                                                                                                                                                                                                                                                                                                                                                                                                               |
 | 0.19    | 2026-10-07 | Optional `derivedLabel` on the scores of a `scoreColumn`: a text key that labels the `derived` circle instead of `value.<derived>.name` (one short word for every score). The sheet model and `GET /api/drafts/:id/sheet` carry the filled text as `derivedLabel`, as before.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | Set `formatVersion` to `"0.19"`. Nothing else has to change: `derivedLabel` is optional, so every valid 0.18 package is a valid 0.19 package.                                                                                                                                                                                                                                                                                                                                                                                                        |
+| 0.20    | 2026-10-08 | Extensions ([17](#17-extensions)): `manifest.dependsOn` names the base a package extends. An extension adds things, choices (`flow.json` with only `choices`), values, glossary entries, sheet sections and card layouts, and joins base choices whose `options` select its things; it never changes the base. Keys are shared with the base, without a package prefix (the `<package>:<key>` form reserved in 0.19 is dropped). Texts missing in a base language come from the extension's first language, marked. A character switches extensions on one by one; the sheet says when it holds content that is not `publishable`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | Set `formatVersion` to `"0.20"`. Nothing else has to change: `dependsOn` is new and optional, so every valid 0.19 package is a valid 0.20 package.                                                                                                                                                                                                                                                                                                                                                                                                   |
 | 0.8     | 2026-10-04 | Gather steps (`gather`, optional `together`: `sections` or one shared `list`) in `flow.steps`, optional `gather` on choices, optional text `choice.<id>.from`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           | Set `formatVersion` to `"0.8"`. Nothing else changes: a package without gather steps builds the same steps as before, so every valid 0.7 package is a valid 0.8 package.                                                                                                                                                                                                                                                                                                                                                                             |
 
 ## 16. A minimal package
@@ -1554,7 +1562,7 @@ language. The validator accepts it as is.
 
 ```json
 {
-  "formatVersion": "0.19",
+  "formatVersion": "0.20",
   "id": "tiny",
   "version": "1.0.0",
   "languages": ["en"],
@@ -1649,13 +1657,169 @@ language. The validator accepts it as is.
 }
 ```
 
-## 17. Reserved for later versions
+## 17. Extensions
 
-Not part of 0.11; listed so nobody builds on a different idea:
+An **extension** is a package that adds to another package, its **base**:
+new things, more options for the base's choices (another path for a
+calling), new choices, values, glossary entries, sheet sections and card
+layouts. It never changes or removes anything of the base. Each character
+decides for itself whether it uses an extension; a new character uses
+none.
 
-- **Packages that extend other packages** (an expansion adding things to a
-  base package). Planned: `manifest.dependsOn` and keys of the form
-  `<package>:<key>`.
+Typical use: content that may not be published together with the base
+(`"publishable": false`). It lives in a folder of its own, so the base
+stays free to share.
+
+### 17.1 manifest.json
+
+```json
+{
+  "formatVersion": "0.20",
+  "id": "demo-tides",
+  "version": "0.1.0",
+  "dependsOn": [{ "id": "demo", "minVersion": "0.1.0" }],
+  "languages": ["en", "de"],
+  "kinds": [],
+  "sources": { "tides": { "title": "Tides of Mistland", "license": "closed" } },
+  "licenses": { "closed": { "name": "All rights reserved", "publishable": false } }
+}
+```
+
+| Field           | Meaning in an extension                                                                                                                                                                        |
+| --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `dependsOn`     | Exactly one entry: the base, `{ id, minVersion? }`. The base is a package without `dependsOn` (an extension does not extend an extension).                                                     |
+| `minVersion`    | Optional. The lowest base version the extension is written for. A base is accepted if it has the same major version and is not lower (semantic versioning: a new major version may drop keys). |
+| `formatVersion` | As for every package. Base and extension are both read by the same builder, so both have its format version; `dependsOn` does not repeat it.                                                   |
+| `languages`     | Languages the extension has texts for: at least one, each one of the base's languages. The first is the **fallback language** ([17.5](#175-texts-and-the-fallback-language)).                  |
+| `kinds`         | Only new kinds; may be empty. Things of the extension may use every kind of the base.                                                                                                          |
+| `sources`       | The extension's own sources and licenses. Its entries may also name sources and licenses of the base. A key the base declares too must be declared exactly the same way, else it is an error.  |
+
+### 17.2 Files
+
+The same layout as a package ([2](#2-package-layout)), with every file
+optional except `manifest.json`:
+
+- `things/*.json`, `values.json`, `glossary.json`: new things, values and
+  glossary entries, as in a package.
+- `flow.json`: only `{ "choices": [ ... ] }`, the new choices. Level,
+  steps, `grants`, `characterName` and `summary` are the base's. A new
+  choice is asked when a thing grants it ([9.4](#94-building-the-list-of-steps));
+  its `gather` may name a gather group of the base.
+- `sheet.json`: `{ "sections": [ ... ], "cards": { ... } }`, both
+  optional. The sections are printed after the base's sections, in their
+  order; give them a `when` so only characters who need them get them.
+  `cards` adds layouts for kinds the base has none for.
+- `texts/<lang>/*.json`: one folder per language of `manifest.languages`.
+  `package.name` and `package.short` are the extension's own name and
+  description (required in its fallback language); they do not replace
+  the base's.
+- `units.json` is not allowed: an extension uses the base's units. Every
+  amount it states must be convertible with them.
+
+### 17.3 Keys
+
+Base and extension share one set of keys. An extension names things,
+choices, values, tags and texts of the base by their plain keys:
+`calling.herbalist`, `has('talent.mist-signs')`, `count('lantern')`.
+There is no package prefix. (Version 0.19 reserved `<package>:<key>` for
+this; it is dropped. A saved character's answers keep the same keys
+whether an extension is switched on or not, and expressions, option lists
+and text keys need no second syntax.)
+
+So every key an extension declares must be new. A thing, choice, value,
+glossary entry, kind, card layout, sheet section or text key that the
+base already has is an error: an extension adds, it never overwrites.
+Choose keys a later base version will not take, for example with a word
+of the extension's own source in them (`path.tide-warden`); if the base
+later adds the same key, the extension is not loaded until it is renamed.
+
+### 17.4 What an extension adds to the base
+
+- **Options of base choices.** A choice offers every thing its `options`
+  select by `kind`, `tags` and `ids` ([9.3](#93-choices)). A thing of the
+  extension that the selection matches is offered there too. Example: the
+  demo's `path` choice selects `{ "kind": "path" }`, each path `requires`
+  its calling; the extension thing `path.tide-warden` of kind `path` with
+  `"requires": "has('calling.river-runner')"` becomes a further path for
+  river runners. A choice that selects `{ "kind": "talent", "tags":
+["for-river-runner"] }` gets every extension thing of that kind with that
+  tag. A choice that lists `ids` offers only those things; an extension
+  cannot add to it.
+- **Counts and conditions.** `count('<tag>')` and `has()` of the base see
+  the extension's things the character has, like any other thing.
+- **Grants.** Things of the extension may grant base things, base choices
+  and add to base values. Things of the base keep their grants: an
+  extension cannot give a base thing anything new.
+- **Tables by level** in the extension have one entry per level of the
+  base's `flow.level`.
+
+Recommendations, steps and the summary stay the base's. An extension's
+option is never recommended by the base; "choose for me" may still pick
+it to fill a `pickMany`.
+
+### 17.5 Texts and the fallback language
+
+Every text key of the extension is new ([17.3](#173-keys)), and every
+required key ([10.2](#102-keys)) of what the extension declares exists in
+its fallback language, the first of `manifest.languages`.
+
+For each language of the base, a text key of the extension that this
+language does not have is taken from the fallback language and **marked**:
+the builder knows it is in another language and says so on screen ("only
+in English"). This is the one exception to [10.1](#101-files). It lets an
+extension ship a rules text in one language only, while its own
+plain-language texts exist in every language. A key that is `null` in a
+language stays missing; it is not filled from the fallback language.
+
+The validator warns once per language how many texts fall back.
+
+### 17.6 Validation
+
+```sh
+pnpm validate-package <extension-dir> [<base-dir>]
+```
+
+The validator finds the base among the other folders given, else in the
+folder next to the extension that is named like the base's `id`. It
+checks the extension's files on their own (shape, the rules of 17.1 to
+17.5), then puts base and extension together and checks the result as one
+package with every rule of [14](#14-validation): every reference resolves
+in base or extension, every table by level fits the base's levels, every
+required text exists. Problems in the extension's files are reported with
+those files; the base's own warnings are not repeated.
+
+### 17.7 Characters with extensions
+
+The builder loads every base first, then the extensions of each base,
+each put together with its base when it starts. An extension is a folder
+of its own next to its base, or inside the base's folder under
+`extensions/<extension>/` (the demo package carries its demo extension
+`demo-tides` there). An extension that does not
+fit (its base missing, invalid or of a version it does not accept, an
+error in the extension, a key another extension of the same base already
+has) is not loaded; the builder writes why into its log and the base and
+the other extensions run as before.
+
+A character stores its base and the extensions switched on for it, none
+by default. Without extensions it is exactly a character of the base: no
+option, step, text or sheet line of an extension reaches it. An extension
+can be switched on at any time, also when raising the level; switching it
+off is possible while no answer of the character names a thing or choice
+of the extension.
+
+If the character uses an extension with a license that is not
+`publishable` and has something from it, the sheet and the PDF print a
+line: "Contains content from <the extension's `package.name`>, not for
+sharing." The words are the builder's.
+
+## 18. Reserved for later versions
+
+Listed so nobody builds on a different idea:
+
+- **Extensions of extensions** and an extension for several bases: not in
+  0.20; `dependsOn` has exactly one entry and names a base.
+- **Extensions that change the base** (new grants of a base thing, other
+  recommendations): not planned; ask the base to change.
 - **Levelling up an existing character** needs no format change: it is
   "raise the level, ask the steps with a higher `atLevel`".
 - **Loading packages over HTTP** uses the same files.
