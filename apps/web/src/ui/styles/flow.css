@@ -1668,6 +1668,51 @@ a.livebar__where {
   color: var(--color-warning);
 }
 
+.livebar__show {
+  flex: none;
+  min-height: var(--target-min);
+  margin-left: auto;
+  padding: 0 var(--space-2);
+  border: 0;
+  background: none;
+  color: var(--color-primary);
+  font: inherit;
+  font-weight: var(--weight-semibold);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.livebar__show:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/*
+ * The spot a change made elsewhere landed on (spot.ts writes the rule): a
+ * ring in the primary colour that holds, then fades. Colour only, no
+ * movement, so it stays with reduced motion too. Two names, so a second
+ * "Show" starts it anew.
+ */
+@keyframes live-flash {
+  0%,
+  60% {
+    box-shadow: 0 0 0 4px var(--color-primary);
+  }
+  100% {
+    box-shadow: 0 0 0 4px transparent;
+  }
+}
+
+@keyframes live-flash-again {
+  0%,
+  60% {
+    box-shadow: 0 0 0 4px var(--color-primary);
+  }
+  100% {
+    box-shadow: 0 0 0 4px transparent;
+  }
+}
+
 /* The hint: a speech bubble with its tail towards the people above; a tap puts it away. */
 .hint-bubble {
   position: relative;

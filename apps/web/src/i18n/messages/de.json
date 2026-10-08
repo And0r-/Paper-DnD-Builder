@@ -627,6 +627,7 @@
   "live.from.personApi": "{who} hat mit einem Programm geändert",
   "live.told.line": "{from}: {what}",
   "live.told.overruled": "{line}. Deine Wahl dort gilt nicht mehr.",
+  "live.told.show": "Zeigen",
   "live.what.finished": "Charakter fertig",
   "live.what.play": "Bogen",
   "live.what.copy": "Fassung des Bogens",

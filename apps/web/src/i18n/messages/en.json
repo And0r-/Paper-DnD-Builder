@@ -627,6 +627,7 @@
   "live.from.personApi": "{who} made a change with a program",
   "live.told.line": "{from}: {what}",
   "live.told.overruled": "{line}. Your choice there no longer counts.",
+  "live.told.show": "Show",
   "live.what.finished": "character finished",
   "live.what.play": "sheet",
   "live.what.copy": "sheet version",

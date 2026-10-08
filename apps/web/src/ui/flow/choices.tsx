@@ -699,7 +699,11 @@ function PointBuy({
           // Too expensive is shown before the tap; tapping anyway explains why (the hint).
           const affordable = (costs[String(score + 1)] ?? Infinity) - (costs[String(score)] ?? 0) <= left;
           return (
-            <li className={badge ? "pointbuy__row pointbuy__row--key" : "pointbuy__row"} key={v}>
+            <li
+              className={badge ? "pointbuy__row pointbuy__row--key" : "pointbuy__row"}
+              key={v}
+              data-target={v}
+            >
               <div className="pointbuy__label">
                 <span className="pointbuy__name">
                   <span id={`pb-${v}`}>{name}</span>
@@ -812,7 +816,7 @@ function RaisePoints({
                 : undefined;
           const tipped = tip?.[v];
           return (
-            <li className={`pointbuy__row${most <= 0 ? " pointbuy__row--full" : ""}`} key={v}>
+            <li className={`pointbuy__row${most <= 0 ? " pointbuy__row--full" : ""}`} key={v} data-target={v}>
               <div className="pointbuy__label">
                 <span className="pointbuy__name" id={`ra-${v}`}>
                   {name}
@@ -997,6 +1001,7 @@ function ArrayAssign({
             <li
               key={v}
               className={rowClass}
+              data-target={v}
               onClick={(e) => {
                 if (fixed || (e.target as HTMLElement).closest("button, a")) return;
                 tap(v);

@@ -6,7 +6,9 @@
  * it never lies over an answer or the Back / Next bar (AND-90); the page
  * leaves room for it when it scrolls to a field (--livebar-height). Alone
  * on a character, nothing shows but, for a moment, a line about a change
- * made elsewhere: who made it and how, and what (AND-258).
+ * made elsewhere: who made it and how, and what (AND-258). The spot it
+ * changed lights up for a moment; on a phone it may be out of view, so the
+ * line takes you there with a tap (AND-271).
  */
 import Link from "next/link";
 import { useEffect, useRef, useState, type FormEvent } from "react";
@@ -16,9 +18,11 @@ import { Dialog } from "../components/Dialog.tsx";
 import { TextField } from "../components/Fields.tsx";
 import { Icon } from "../components/Icon.tsx";
 import { useDraft } from "../flow/draft-state.tsx";
+import { rowName } from "../flow/explain.ts";
 import { stepTitle } from "../flow/model.ts";
 import { ptext, thingName } from "../package-text.ts";
 import { HINT_MAX, type Person } from "./channel.ts";
+import { FLASH_MS, findSpot, flashCss, spotsOf } from "./spot.ts";
 import { hrefOfStep } from "./where.ts";
 import { personText, toldText, whatText, type Viewer } from "./words.ts";
 
@@ -26,6 +30,8 @@ import { personText, toldText, whatText, type Viewer } from "./words.ts";
 const LOST_AFTER_MS = 2500;
 /** How long "Mara made a change: Origin" stays. */
 const CHANGED_MS = 4000;
+/** How long it stays when it can take you to the change: long enough to find "Show". */
+const CHANGED_SHOW_MS = 8000;
 /** How long the sender sees their own hint. */
 const MINE_MS = 6000;
 /** A hint is one sentence; the server would take more. */
@@ -58,8 +64,8 @@ function usePersonName() {
 }
 
 /** The short line about the last change made elsewhere. */
-function useToldLine(): { seq: number; text: string } | null {
-  const { t } = useApp();
+function useToldLine(): { seq: number; text: string; spots: string[] } | null {
+  const { t, list } = useApp();
   const { told, lp, ev } = useDraft();
   const viewer = useViewer();
   if (!told) return null;
@@ -69,11 +75,14 @@ function useToldLine(): { seq: number; text: string } | null {
       step: (id) => stepTitle(lp, ev, id),
       // The question's own title ("Name"), as the step shows it.
       choice: (id) => stepTitle(lp, ev, id),
+      // A number handed out is named by its row ("Might"), as the question shows it.
+      part: (choice, id) => (ev.choices[choice]?.kind === "distribute" ? rowName(lp, id) : null),
+      list,
       level: ptext(lp, "level.name") ?? "",
     },
     t,
   );
-  return { seq: told.seq, text: toldText(told, viewer, what, t) };
+  return { seq: told.seq, text: toldText(told, viewer, what, t), spots: spotsOf(told) };
 }
 
 /** A step's title as the step list has it, or the screen's own word. */
@@ -88,12 +97,16 @@ function useStepTitle() {
   };
 }
 
-/** Moves the card someone points at into view, gently unless motion is reduced. */
+/** Moves an element into view, gently unless motion is reduced. */
+function scrollToCenter(el: Element) {
+  const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  el.scrollIntoView({ block: "center", behavior: still ? "auto" : "smooth" });
+}
+
+/** Moves the card someone points at into view. */
 export function showPointed(thing: string) {
   const card = document.querySelector<HTMLElement>(`[data-option="${CSS.escape(thing)}"]`);
-  if (!card) return;
-  const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  card.scrollIntoView({ block: "center", behavior: still ? "auto" : "smooth" });
+  if (card) scrollToCenter(card);
 }
 
 function PersonChip({ person }: { person: Person }) {
@@ -248,14 +261,33 @@ export function LiveBar() {
   const lost = useAfter(live.connection === "lost", LOST_AFTER_MS) && (hadCompany || helping);
 
   const [changed, setChanged] = useState<number | null>(null);
+  // The spot of the change on this screen, lit up for a moment; `round` counts each "Show".
+  const [spot, setSpot] = useState<string | null>(null);
+  const [flash, setFlash] = useState<{ round: number } | null>(null);
   const toldSeq = told?.seq;
+  const toldSpots = told?.spots.join("\n");
   useEffect(() => {
     if (toldSeq === undefined) return;
+    // The screen has the new state already: the change's spot is there now, if this screen shows it.
+    const found = toldSpots ? findSpot(toldSpots.split("\n")) : null;
     setChanged(toldSeq);
-    const timer = setTimeout(() => setChanged(null), CHANGED_MS);
+    setSpot(found);
+    setFlash(found ? { round: 0 } : null);
+    const timer = setTimeout(() => setChanged(null), found ? CHANGED_SHOW_MS : CHANGED_MS);
     return () => clearTimeout(timer);
-  }, [toldSeq]);
+  }, [toldSeq, toldSpots]);
+  useEffect(() => {
+    if (!flash) return;
+    const timer = setTimeout(() => setFlash(null), FLASH_MS);
+    return () => clearTimeout(timer);
+  }, [flash]);
   const changedLine = told && changed === told.seq ? told.text : null;
+  const showSpot = () => {
+    const el = spot ? document.querySelector(spot) : null;
+    if (!el) return;
+    scrollToCenter(el);
+    setFlash((f) => ({ round: (f?.round ?? 0) + 1 }));
+  };
 
   const shown = others.length > 0 || lost || live.hint !== null || changedLine !== null;
 
@@ -306,15 +338,21 @@ export function LiveBar() {
             </p>
           )}
           {changedLine && (
-            <p className="livebar__changed" data-told>
+            <p className="livebar__changed">
               <Icon name="pencil" size={16} />
-              <span>{changedLine}</span>
+              <span data-told>{changedLine}</span>
+              {spot && (
+                <button type="button" className="livebar__show" onClick={showSpot}>
+                  {t("live.told.show")}
+                </button>
+              )}
             </p>
           )}
           <HintBubble />
         </div>
       </div>
       <HintComposer open={composing} onClose={() => setComposing(false)} />
+      {spot && flash && <style data-live-flash>{flashCss(spot, flash.round % 2 === 1)}</style>}
     </>
   );
 }

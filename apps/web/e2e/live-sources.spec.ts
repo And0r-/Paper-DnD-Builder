@@ -10,10 +10,9 @@
 import type { APIRequestContext, Browser, Page, Route } from "@playwright/test";
 import de from "../src/i18n/messages/de.json" with { type: "json" };
 import en from "../src/i18n/messages/en.json" with { type: "json" };
-import { expect, expectOneLanguage, makeCharacter, shot, signup, test } from "./helpers.ts";
+import { accessKey, expect, expectOneLanguage, makeCharacter, mcp, shot, signup, test } from "./helpers.ts";
 
 const DESKTOP = { width: 1366, height: 900 };
-const ACCEPT = { accept: "application/json, text/event-stream" };
 
 const card = (page: Page, thing: string) => page.locator(`[data-option="${thing}"]`);
 const told = (page: Page) => page.locator("[data-told]");
@@ -52,25 +51,6 @@ async function table(page: Page, gm: Page, lang: "de" | "en" = "de"): Promise<st
 async function version(request: APIRequestContext, id: string): Promise<number> {
   return ((await (await request.get(`/api/drafts/${id}`)).json()) as { draft: { version: number } }).draft
     .version;
-}
-
-/** An access key of the account `page` is logged in with. */
-async function accessKey(page: Page, baseURL: string): Promise<string> {
-  const made = await page.request.post("/api/account/keys", {
-    headers: { origin: new URL(baseURL).origin },
-    data: { name: "Program" },
-  });
-  expect(made.status()).toBe(201);
-  return ((await made.json()) as { key: { secret: string } }).key.secret;
-}
-
-async function mcp(program: APIRequestContext, secret: string, name: string, args: object): Promise<void> {
-  const r = await program.post("/mcp", {
-    headers: { ...ACCEPT, authorization: `Bearer ${secret}` },
-    data: { jsonrpc: "2.0", id: 1, method: "tools/call", params: { name, arguments: args } },
-  });
-  expect(r.status()).toBe(200);
-  expect(((await r.json()) as { result: { isError?: boolean } }).result.isError ?? false).toBe(false);
 }
 
 test("the game master, a program with a key and MCP: each change shows at once and says where it came from", async ({

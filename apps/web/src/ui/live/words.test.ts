@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { translator } from "../../i18n/index.ts";
 import type { Source } from "./channel.ts";
-import { personText, toldText, whatText, type Told, type Viewer } from "./words.ts";
+import { changedParts, personText, toldText, whatText, type Told, type Viewer } from "./words.ts";
 
 const de = translator("de").t;
 const en = translator("en").t;
@@ -18,7 +18,12 @@ function told(over: Partial<Told>): Told {
 
 const words = {
   step: (id: string) => ({ folk: "Herkunft", spells: "Zauber" })[id] ?? null,
-  choice: (id: string) => ({ "folk.pick": "Herkunft" })[id] ?? null,
+  choice: (id: string) => ({ "folk.pick": "Herkunft", scores: "Grundwerte" })[id] ?? null,
+  part: (choice: string, id: string) =>
+    choice === "scores"
+      ? (({ mightBase: "Kraft", witBase: "Witz" } as Record<string, string>)[id] ?? null)
+      : null,
+  list: (names: string[]) => names.join(" und "),
   level: "Stufe",
 };
 
@@ -74,6 +79,34 @@ describe("the line about a change made elsewhere", () => {
     expect(whatText({ event: "finished" }, words, de)).toBe("Charakter fertig");
     expect(whatText({ event: "campaign" }, words, de)).toBe("Kampagne");
     expect(whatText({ event: "changed" }, words, de)).toBeNull();
+  });
+});
+
+describe("what in an answer changed", () => {
+  it("finds the numbers, the pick and the picks that changed", () => {
+    const before = { method: 0, assign: { mightBase: 8, witBase: 10 } };
+    expect(changedParts(before, { method: 0, assign: { mightBase: 12, witBase: 10 } })).toEqual([
+      "mightBase",
+    ]);
+    expect(changedParts(undefined, { method: 0, assign: { mightBase: 8 } })).toEqual(["mightBase"]);
+    expect(changedParts({ pick: "a" }, { pick: "b" })).toEqual(["b"]);
+    expect(changedParts({ picks: ["a"] }, { picks: ["a", "c"] })).toEqual(["c"]);
+    expect(changedParts({ picks: ["a", "c"] }, { picks: ["a"] })).toEqual(["c"]);
+    expect(changedParts({ text: "Oda" }, { text: "Brin" })).toEqual([]);
+    expect(changedParts({ pick: "a" }, null)).toEqual([]);
+  });
+
+  it("names one or two numbers themselves, else the question", () => {
+    const mcp = (parts: string[]) =>
+      told({ source: source({ via: "mcp" }), change: { kind: "answer", choice: "scores" }, parts });
+    const one = mcp(["mightBase"]);
+    expect(toldText(one, owner, whatText(one, words, de), de)).toBe("Über MCP geändert: Kraft");
+    expect(whatText(mcp(["mightBase", "witBase"]), words, de)).toBe("Kraft und Witz");
+    expect(whatText(mcp(["mightBase", "witBase", "graceBase"]), words, de)).toBe("Grundwerte");
+    expect(whatText(mcp([]), words, de)).toBe("Grundwerte");
+    // A pick is named by its question: "Origin", not the folk picked.
+    const pick = told({ change: { kind: "answer", choice: "folk.pick" }, parts: ["folk.moorfolk"] });
+    expect(whatText(pick, words, de)).toBe("Herkunft");
   });
 });
 

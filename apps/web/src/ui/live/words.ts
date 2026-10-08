@@ -26,6 +26,11 @@ export interface Told {
   source: Source;
   event: "changed" | "levelUp" | "finished" | "playState" | "copies" | "campaign";
   change?: Change | undefined;
+  /**
+   * For an answer: the parts of it that changed, as far as this window
+   * can tell from the answer before and after (see `changedParts`).
+   */
+  parts?: string[] | undefined;
   /** This window's own answer to the same question was not saved yet: the stored one counts. */
   overruled: boolean;
 }
@@ -47,10 +52,44 @@ export function fromText(source: Source, viewer: Viewer, t: T): string {
   return t("live.from.person", { who });
 }
 
+/**
+ * What in an answer changed, from the answer before and after: the picks
+ * that came in (or, if none did, those that went), the numbers handed out
+ * that differ ("mightBase"). Empty for a text or a number, and when the
+ * shapes do not say: the answer as a whole changed then.
+ */
+export function changedParts(before: unknown, after: unknown): string[] {
+  const b = (before ?? {}) as Record<string, unknown>;
+  const a = (after ?? {}) as Record<string, unknown>;
+  if (typeof a["pick"] === "string") return a["pick"] !== b["pick"] ? [a["pick"]] : [];
+  const picks = (x: unknown) => (Array.isArray(x) ? x.filter((p): p is string => typeof p === "string") : []);
+  if (Array.isArray(a["picks"]) || Array.isArray(b["picks"])) {
+    const was = picks(b["picks"]);
+    const now = picks(a["picks"]);
+    const came = now.filter((p) => !was.includes(p));
+    return came.length > 0 ? came : was.filter((p) => !now.includes(p));
+  }
+  const record = (x: unknown) =>
+    x && typeof x === "object" && !Array.isArray(x) ? (x as Record<string, unknown>) : {};
+  if (a["assign"] !== undefined || b["assign"] !== undefined) {
+    const was = record(b["assign"]);
+    const now = record(a["assign"]);
+    return [...new Set([...Object.keys(now), ...Object.keys(was)])].filter((k) => now[k] !== was[k]);
+  }
+  return [];
+}
+
 /** What it was about, in the screen's words; null when the channel did not say. */
 export function whatText(
-  told: Pick<Told, "event" | "change">,
-  words: { step(id: string): string | null; choice(id: string): string | null; level: string },
+  told: Pick<Told, "event" | "change" | "parts">,
+  words: {
+    step(id: string): string | null;
+    choice(id: string): string | null;
+    /** A number of a question that hands them out, by name ("Might"); null for anything else. */
+    part(choice: string, id: string): string | null;
+    list(names: string[]): string;
+    level: string;
+  },
   t: T,
 ): string | null {
   if (told.event === "finished") return t("live.what.finished");
@@ -58,8 +97,13 @@ export function whatText(
   const c = told.change;
   if (!c) return null;
   switch (c.kind) {
-    case "answer":
+    case "answer": {
+      // One or two numbers are named themselves ("Might"); more, or a pick, and the question's title says it.
+      const names = (told.parts ?? []).map((p) => words.part(c.choice, p));
+      if (names.length > 0 && names.length <= 2 && names.every((n) => n))
+        return words.list(names as string[]);
       return words.choice(c.choice);
+    }
     case "pool":
       return words.step(c.step);
     case "level":
