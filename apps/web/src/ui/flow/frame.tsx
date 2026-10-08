@@ -28,7 +28,7 @@ import { takeJoined } from "../joined.ts";
 import { HelpDialog } from "../live/help-dialog.tsx";
 import { LiveBar, useOthers } from "../live/live-bar.tsx";
 import { levelWord, ptext } from "../package-text.ts";
-import { useDraft } from "./draft-state.tsx";
+import { useDraft, type SaveState } from "./draft-state.tsx";
 import { levelHeading, levelSpan } from "./level-runs.ts";
 import { nextOpen, OVERVIEW_KEY, positionOf, progressFraction, type FlowEntry } from "./model.ts";
 import {
@@ -140,11 +140,27 @@ function goneAfter(gone: GoneEntry[], after: string | undefined, leaving: boolea
 // ----------------------------------------------------------------- frame
 
 export function SaveStatus() {
-  const { t } = useApp();
   const { saveState } = useDraft();
+  return <SaveLine state={saveState} />;
+}
+
+/** The save status in the top bar; the sheet shows nothing while there was nothing to save. */
+export function SaveLine({ state }: { state: SaveState | "idle" }) {
+  const { t } = useApp();
   return (
-    <p className={`save-status save-status--${saveState}`} aria-live="polite">
-      {t(`save.${saveState}`)}
+    <p className={`save-status save-status--${state}`} aria-live="polite">
+      {state !== "idle" && (
+        <>
+          {/* On a phone "saved" and "saving" are a mark alone; the words stay for screen readers.
+              A save that failed keeps its words: it is the one thing the player must read. */}
+          <Icon
+            name={state === "saved" ? "check" : state === "saving" ? "more" : "alert"}
+            size={20}
+            className="save-status__mark"
+          />
+          <span className="save-status__text">{t(`save.${state}`)}</span>
+        </>
+      )}
     </p>
   );
 }
@@ -403,10 +419,12 @@ export function FlowLayout({ current, children }: { current: string | undefined;
         <AppShell
           title={
             <span className="topbar__character">
-              <span className="topbar__name">{name || t("common.unnamed")}</span>
-              <span aria-hidden="true">·</span>
-              <span className="topbar__level">
-                {ptext(lp, "level.name")} {ev.level}
+              <span className="topbar__line">
+                <span className="topbar__name">{name || t("common.unnamed")}</span>
+                <span aria-hidden="true">·</span>
+                <span className="topbar__level">
+                  {ptext(lp, "level.name")} {ev.level}
+                </span>
               </span>
               {/* A game master or a helper building for someone always sees whose character it is. */}
               {draft.access !== "owner" && (

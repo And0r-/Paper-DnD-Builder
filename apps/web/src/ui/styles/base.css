@@ -158,6 +158,20 @@ h1[tabindex="-1"]:focus,
   background: var(--color-surface-sunk);
 }
 
+/* On a small phone the three lines alone (AND-267): the name needs the room. The word stays the
+   button's name for screen readers. */
+@media (max-width: 399px) {
+  .topbar__menu-word {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+}
+
 /* Steps that came or went while the menu is shut (AND-96); wide screens show the list itself. */
 .menu-mark {
   display: inline-flex;
