@@ -143,11 +143,11 @@ works on a server without a screen. No key, nothing personal in it.
 
 ## Packages
 
-| Method & path                          | Result                                                                                   |
-| -------------------------------------- | ---------------------------------------------------------------------------------------- |
-| `GET /api/packages?lang=de`            | Loaded packages with name and description in one language. Public.                       |
-| 🔒 `GET /api/packages/:id`             | Structure without texts: manifest, units, values, things, flow, sheet, glossary.         |
-| 🔒 `GET /api/packages/:id/texts/:lang` | All texts of one language. Missing texts are `null`, never filled from another language. |
+| Method & path                          | Result                                                                                                                                                            |
+| -------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /api/packages?lang=de`            | Loaded packages with name and description in one language: the one asked for if the package has it, else English, else its first (`language` says which). Public. |
+| 🔒 `GET /api/packages/:id`             | Structure without texts: manifest, units, values, things, flow, sheet, glossary.                                                                                  |
+| 🔒 `GET /api/packages/:id/texts/:lang` | All texts of one language. Missing texts are `null`, never filled from another language.                                                                          |
 
 ## Drafts
 
@@ -659,11 +659,11 @@ both   ← { "type": "state", "version": 6, "event": "changed", "by": null, "sou
 
 ## Print
 
-| Method & path                  | Result                                                                                                                                                                                                                                                                                                                                                      |
-| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 🔒 `GET /api/drafts/:id/sheet` | The finished character's sheet as data (see below). Language and units from the settings of whoever asks, like the PDF. `409 notFinished` (with `open`), `422 languageNotSupported` (with the package's printable `languages`).                                                                                                                             |
-| 🔒 `GET /api/drafts/:id/pdf`   | The finished character as one A4 PDF with the parts asked for (below); without `parts`, the sheet and then the cards. Language and units from the settings of whoever asks (a game master prints in theirs). `409 notFinished` (with `open`), `422 languageNotSupported` (with the package's printable `languages`), `429 tooManyRequests` (`Retry-After`). |
-| `GET /api/sheet-designs`       | `{ designs: [{ id, name, description }], default }`: the designs the server draws, `name` and `description` per screen language (`{ de, en }`). Public. Two today: `verbose` ("Detailed") and `classic` ("Classic").                                                                                                                                        |
+| Method & path                  | Result                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 🔒 `GET /api/drafts/:id/sheet` | The finished character's sheet as data (see below). Language and units from the settings of whoever asks, like the PDF; a language the package lacks gives English (else its first), one language per document. `409 notFinished` (with `open`), `422 languageNotSupported` (with the package's printable `languages`).                                                                                                  |
+| 🔒 `GET /api/drafts/:id/pdf`   | The finished character as one A4 PDF with the parts asked for (below); without `parts`, the sheet and then the cards. Language and units from the settings of whoever asks (a game master prints in theirs); a language the package lacks gives English (else its first). `409 notFinished` (with `open`), `422 languageNotSupported` (with the package's printable `languages`), `429 tooManyRequests` (`Retry-After`). |
+| `GET /api/sheet-designs`       | `{ designs: [{ id, name, description }], default }`: the designs the server draws, `name` and `description` per screen language (`{ de, en, fr, it, es }`). Public. Two today: `verbose` ("Detailed") and `classic` ("Classic").                                                                                                                                                                                         |
 
 It is a plain `GET` so the screen can offer it as an ordinary download
 link. The PDF is made on every request and never stored.

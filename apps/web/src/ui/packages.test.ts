@@ -23,7 +23,10 @@ describe("languages offered by the language switch", () => {
 
   it("leave out a language one installed package has neither itself nor in English", () => {
     expect(offeredLanguages(UI_LANGUAGES, [entry("a", ["de", "en"]), entry("b", ["de"])])).toEqual(["de"]);
-    expect(offeredLanguages(UI_LANGUAGES, [entry("a", ["fr", "en"]), entry("b", ["fr", "de"])])).toEqual(["de", "fr"]);
+    expect(offeredLanguages(UI_LANGUAGES, [entry("a", ["fr", "en"]), entry("b", ["fr", "de"])])).toEqual([
+      "de",
+      "fr",
+    ]);
   });
 
   it("leave out a package language the builder has no screen texts for", () => {

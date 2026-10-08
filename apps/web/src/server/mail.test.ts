@@ -20,6 +20,8 @@ describe("the mail with the link back in", () => {
   });
 
   it("falls back to English for a language it has no words for", () => {
-    expect(resetMail("xx", "a@example.test", [link], 30)).toEqual(resetMail("en", "a@example.test", [link], 30));
+    expect(resetMail("xx", "a@example.test", [link], 30)).toEqual(
+      resetMail("en", "a@example.test", [link], 30),
+    );
   });
 });

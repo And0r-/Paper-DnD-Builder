@@ -30,6 +30,12 @@ describe("screen texts", () => {
     expect(fill("{n} ft", "en", { n: 1.5 })).toBe("1.5 ft");
   });
 
+  it("starts a text that opens with a placeholder with a capital", () => {
+    expect(fill("{levelName} : monter", "fr", { levelName: "niveau" })).toBe("Niveau : monter");
+    expect(fill("Monter de {levelName}", "fr", { levelName: "niveau" })).toBe("Monter de niveau");
+    expect(fill("{levelName} {level}", "en", { levelName: "level", level: 3 })).toBe("Level 3");
+  });
+
   it("counts and lists", () => {
     const de = translator("de");
     expect(de.tc("dist.left", 1)).toBe("Noch 1 Punkt übrig");

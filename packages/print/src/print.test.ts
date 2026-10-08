@@ -1416,7 +1416,17 @@ describe("printed in French, Italian and Spanish: accents and ñ in every box an
   /** Letters the three languages write, and their punctuation; the fonts must have a glyph for each. */
   const LETTERS = "àâäæçéèêëîïôœùûüÿÀÂÄÆÇÉÈÊËÎÏÔŒÙÛÜŸáíóúñÁÍÓÚÑìòÌÒ¿¡«»’“”–—…";
   /** Accents on every vowel and on c and n, outside placeholders and glossary ids. */
-  const ACCENTS: Record<string, string> = { a: "à", e: "é", i: "ï", o: "ô", u: "ù", c: "ç", n: "ñ", E: "É", A: "À" };
+  const ACCENTS: Record<string, string> = {
+    a: "à",
+    e: "é",
+    i: "ï",
+    o: "ô",
+    u: "ù",
+    c: "ç",
+    n: "ñ",
+    E: "É",
+    A: "À",
+  };
   const accented = (s: string) =>
     s
       .split(/(\{\{[^}]*\}\}|\[\[glossary:[^|\]]*\|)/u)
@@ -1453,20 +1463,23 @@ describe("printed in French, Italian and Spanish: accents and ñ in every box an
     ["fr", "Page 1 sur", "Unités : "],
     ["it", "Pagina 1 di", "Unità: "],
     ["es", "Página 1 de", "Unidades: "],
-  ])("%s: the page words and the package's accented texts come out of the PDF whole", async (language, page, units) => {
-    const p = inLanguage(language);
-    for (const design of ["verbose", "classic"]) {
-      const model = buildSheetModel(p, doc, { language, units: { length: "m" }, createdAt });
-      expect(model.cards.length).toBeGreaterThan(0);
-      const { text } = await extract(await renderPdf(model, { design }));
-      expect(text, design).toContain(page);
-      expect(text, design).toContain(units);
-      for (const c of model.cards) expect(text, `${design}: card ${c.name}`).toContain(c.name);
-      // Every box and every card: the accents are there, nothing fell back to a plain letter.
-      expect(text, design).toMatch(/[àéïôùçñ]/u);
-      expect(text, design).not.toContain("\uFFFD");
-    }
-  });
+  ])(
+    "%s: the page words and the package's accented texts come out of the PDF whole",
+    async (language, page, units) => {
+      const p = inLanguage(language);
+      for (const design of ["verbose", "classic"]) {
+        const model = buildSheetModel(p, doc, { language, units: { length: "m" }, createdAt });
+        expect(model.cards.length).toBeGreaterThan(0);
+        const { text } = await extract(await renderPdf(model, { design }));
+        expect(text, design).toContain(page);
+        expect(text, design).toContain(units);
+        for (const c of model.cards) expect(text, `${design}: card ${c.name}`).toContain(c.name);
+        // Every box and every card: the accents are there, nothing fell back to a plain letter.
+        expect(text, design).toMatch(/[àéïôùçñ]/u);
+        expect(text, design).not.toContain("\uFFFD");
+      }
+    },
+  );
 });
 
 describe("what a game master would otherwise write on the sheet by hand (demo package)", () => {

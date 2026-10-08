@@ -793,7 +793,7 @@
                     ]
                   },
                   "language": {
-                    "enum": ["de", "en"]
+                    "enum": ["de", "en", "fr", "it", "es"]
                   },
                   "units": {
                     "type": "object",
