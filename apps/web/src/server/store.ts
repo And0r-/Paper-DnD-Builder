@@ -267,7 +267,59 @@ export class Store {
     await this.db.query("DELETE FROM sessions WHERE expires_at <= $1", [now]);
   }
 
+  // ------------------------------------------------------------- reset links
+
+  async createResetLinks(links: { id: string; account_id: string }[], expiresAt: Date, now: Date) {
+    for (const l of links) {
+      await this.db.query(
+        "INSERT INTO reset_links (id, account_id, expires_at, created_at) VALUES ($1, $2, $3, $4)",
+        [l.id, l.account_id, expiresAt, now],
+      );
+    }
+  }
+
+  /**
+   * Takes a reset link: deletes it and returns its account if it had not
+   * expired. In one statement, so two clicks at once cannot both use it.
+   */
+  async takeResetLink(id: string, now: Date): Promise<AccountRow | undefined> {
+    const rows = await this.db.query<AccountRow>(
+      `WITH taken AS (DELETE FROM reset_links WHERE id = $1 RETURNING account_id, expires_at)
+       SELECT ${ACCOUNT_COLUMNS_A} FROM taken t JOIN accounts a ON a.id = t.account_id
+       WHERE t.expires_at > $2`,
+      [id, now],
+    );
+    return rows[0];
+  }
+
+  async deleteExpiredResetLinks(now: Date): Promise<void> {
+    await this.db.query("DELETE FROM reset_links WHERE expires_at <= $1", [now]);
+  }
+
   // --------------------------------------------------------------- passwords
+
+  /**
+   * Inserts a password; if the account already has `max`, its oldest one
+   * goes in the same statement. For a way back in, which must never fail.
+   */
+  async createPasswordReplacingOldest(
+    p: PasswordRow & { account_id: string; hash: string },
+    max: number,
+  ): Promise<PasswordRow> {
+    const rows = await this.db.query<PasswordRow>(
+      `WITH oldest AS (
+         DELETE FROM passwords WHERE id IN (
+           SELECT id FROM passwords WHERE account_id = $2 ORDER BY created_at, id
+           LIMIT GREATEST(0, (SELECT count(*) FROM passwords WHERE account_id = $2) - $6 + 1)
+         )
+       )
+       INSERT INTO passwords (id, account_id, hash, name, created_at)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING ${PASSWORD_COLUMNS}`,
+      [p.id, p.account_id, p.hash, p.name, p.created_at, max],
+    );
+    return rows[0]!;
+  }
 
   /** Inserts a password unless the account already has `max`; returns undefined then. */
   async createPassword(

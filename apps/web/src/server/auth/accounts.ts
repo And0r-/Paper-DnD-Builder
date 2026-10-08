@@ -12,16 +12,26 @@
  * A plain password appears in exactly one answer, the one that made it. It
  * is never stored (only its hash, see password.ts) and never logged.
  *
+ * Whoever loses every password and gave an address asks for a link back in
+ * (`requestReset`): a mail with a one-time link per account, valid 30
+ * minutes, which shows a new password on the screen (`useReset`).
+ *
  * Accounts from before had one password, mailed to them, and are found by
  * their address. Their owner logs in once with address and password
  * (`legacyLogin`) and gets a password of the new kind in exchange.
  */
-import { randomUUID } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import { printChoiceOf } from "@builder/sheet/printouts";
 import { z } from "zod";
 import type { App } from "../app.ts";
 import { HttpError } from "../api/http.ts";
-import { addedToCampaignMail, MailNotConfiguredError, type Invitation, type Mail } from "../mail.ts";
+import {
+  addedToCampaignMail,
+  MailNotConfiguredError,
+  resetMail,
+  type Invitation,
+  type Mail,
+} from "../mail.ts";
 import type { AccountRow } from "../store.ts";
 import {
   dummyPasswordHash,
@@ -206,6 +216,78 @@ export async function legacyLogin(app: App, email: string, password: string, ip:
   app.limiter.reset(accountKey);
   const token = await openSession(app, account.id);
   return { account: { ...account, password_hash: null }, password: { row, secret }, token };
+}
+
+/** How long a link back in works. */
+export const RESET_LINK_MINUTES = 30;
+
+/** The stored form of a reset token, like a session's: its SHA-256. */
+const resetLinkId = sessionId;
+
+/**
+ * Mails a link back in to every account with this address, in one mail,
+ * each with the account's name. Answers the same whether the address has
+ * an account or not, so nobody learns who has one; limited per address and
+ * per IP either way. The mail goes out before the links are stored: if
+ * sending fails, no link exists that nobody got.
+ *
+ * Needs BASE_URL for the links: taken from the request instead, a forged
+ * Host header could send a working link to someone else's server.
+ */
+export async function requestReset(
+  app: App,
+  email: string,
+  language: string | undefined,
+  ip: string,
+): Promise<void> {
+  limited(app, `reset:ip:${ip}`, LIMITS.resetMailsPerIp, true);
+  limited(app, `reset:address:${email}`, LIMITS.resetMailsPerAddress, true);
+  const accounts = await app.store.findAccountsByEmail(email);
+  if (accounts.length === 0) return;
+  const base = app.config.baseUrl;
+  if (!base) throw new HttpError(503, "mailNotConfigured");
+
+  const links = accounts.map((account) => ({ account, token: randomBytes(32).toString("base64url") }));
+  await deliver(
+    app,
+    resetMail(
+      accounts[0]!.language || uiLanguage(language),
+      email,
+      links.map((l) => ({ name: l.account.name, url: new URL(`/login/reset/${l.token}`, base).href })),
+      RESET_LINK_MINUTES,
+    ),
+  );
+  const now = app.now();
+  await app.store.deleteExpiredResetLinks(now);
+  await app.store.createResetLinks(
+    links.map((l) => ({ id: resetLinkId(l.token), account_id: l.account.id })),
+    new Date(now.getTime() + RESET_LINK_MINUTES * 60_000),
+    now,
+  );
+}
+
+/**
+ * Uses a link back in, once: logs its account in and makes a new password,
+ * named "Reset" and the day. The account's other passwords stay; its owner
+ * deletes them in the settings if one is lost. If the account already has
+ * the most passwords it may, the oldest goes, so this never fails.
+ */
+export async function useReset(app: App, token: string, ip: string) {
+  limited(app, `reset-use:ip:${ip}`, LIMITS.resetUsesPerIp, true);
+  const account = await app.store.takeResetLink(resetLinkId(token), app.now());
+  if (!account) throw new HttpError(404, "resetLinkInvalid");
+  const secret = generatePassword(account.language);
+  const row = await app.store.createPasswordReplacingOldest(
+    {
+      id: randomUUID(),
+      account_id: account.id,
+      hash: passwordHash(secret),
+      name: `Reset ${defaultPasswordName(app.now())}`,
+      created_at: app.now(),
+    },
+    MAX_PASSWORDS_PER_ACCOUNT,
+  );
+  return { account, password: { row, secret }, session: await openSession(app, account.id) };
 }
 
 /**
