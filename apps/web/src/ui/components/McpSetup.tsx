@@ -17,6 +17,8 @@ import { AppShell, GuestShell } from "./Shell.tsx";
 
 /** The public zip (GET, the same for everyone, no key in it). */
 export const MCP_ZIP_PATH = "/downloads/builder-mcp.zip";
+/** The API reference (app/api/docs/route.ts): a plain page, not part of the app. */
+export const API_DOCS_PATH = "/api/docs";
 /** Where the settings open the form for a new key. */
 export const NEW_KEY_ANCHOR = "new-key";
 
@@ -83,6 +85,9 @@ export function McpSetup({ origin }: { origin: string }) {
         <Program title={t("mcp.otherPrograms")}>
           <p>{t("mcp.otherText")}</p>
           <CopyText label={t("mcp.otherLabel")} value={`Authorization: Bearer ${key}`} />
+          <p>
+            {t("mcp.otherApi")} <a href={API_DOCS_PATH}>{t("menu.api")}</a>.
+          </p>
         </Program>
         <Program title={t("mcp.local")}>
           <p>{t("mcp.localText")}</p>

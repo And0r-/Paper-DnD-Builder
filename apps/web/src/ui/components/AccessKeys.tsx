@@ -15,7 +15,7 @@ import { ConfirmDialog } from "./Dialog.tsx";
 import { Callout, ErrorState, Loading } from "./Feedback.tsx";
 import { TextField, Toast } from "./Fields.tsx";
 import { FreshKey } from "./FreshKey.tsx";
-import { NEW_KEY_ANCHOR } from "./McpSetup.tsx";
+import { API_DOCS_PATH, NEW_KEY_ANCHOR } from "./McpSetup.tsx";
 
 /** The server's limit for a name (see API.md). */
 const MAX_NAME = 80;
@@ -95,6 +95,10 @@ export function AccessKeys() {
       <p>{t("settings.keysText")}</p>
       <p>
         {t("settings.keysMcp")} <Link href="/mcp/setup">{t("menu.mcp")}</Link>.
+      </p>
+      <p>
+        {/* Not a Next.js Link: the reference is a page of its own, outside the app. */}
+        {t("settings.keysApi")} <a href={API_DOCS_PATH}>{t("menu.api")}</a>.
       </p>
       <div aria-live="polite">
         {error && (
