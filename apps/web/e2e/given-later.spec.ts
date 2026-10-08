@@ -6,7 +6,7 @@
  */
 import type { Page } from "@playwright/test";
 import m from "../src/i18n/messages/de.json" with { type: "json" };
-import { expect, login, shot, test, uniqueEmail } from "./helpers.ts";
+import { expect, shot, signup, test } from "./helpers.ts";
 
 const DESKTOP = { isMobile: false, hasTouch: false, deviceScaleFactor: 1 };
 
@@ -34,7 +34,7 @@ test.use({ ...DESKTOP, viewport: { width: 1366, height: 900 } });
 
 test("a flair the upbringing grants later is asked again on the folk's step", async ({ page, foreign }) => {
   void foreign;
-  await login(page, uniqueEmail("given-later"));
+  await signup(page, "given-later");
   const id = await newDraft(page);
 
   await page.goto(`/c/${id}/step/folk`);

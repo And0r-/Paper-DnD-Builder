@@ -14,7 +14,7 @@ import type { Locator, Page } from "@playwright/test";
 import de from "../src/i18n/messages/de.json" with { type: "json" };
 import en from "../src/i18n/messages/en.json" with { type: "json" };
 import { join } from "node:path";
-import { expect, login, SHOTS, test, uniqueEmail } from "./helpers.ts";
+import { expect, SHOTS, signup, test } from "./helpers.ts";
 
 const DESKTOP = {
   isMobile: false,
@@ -137,7 +137,7 @@ for (const lang of ["de", "en"] as const) {
 
       test("a step of the first level never stands under a higher level", async ({ page, foreign }) => {
         void foreign;
-        await login(page, uniqueEmail(`order-${lang}`), lang);
+        await signup(page, `order-${lang}`, lang);
         const id = await herbalist(page);
         await page.goto(`/c/${id}/step/path`);
         if (device === "phone") await openMenu(page, m);
@@ -165,7 +165,7 @@ for (const lang of ["de", "en"] as const) {
 
       test("the overview names nothing twice in one line", async ({ page, foreign }) => {
         void foreign;
-        await login(page, uniqueEmail(`twice-${lang}`), lang);
+        await signup(page, `twice-${lang}`, lang);
         const id = await herbalist(page);
         await page.goto(`/c/${id}/overview`);
         const lines = page.locator(".origins__things");
@@ -180,7 +180,7 @@ for (const lang of ["de", "en"] as const) {
 
       test("the last card of a long list is not under the Back / Next bar", async ({ page, foreign }) => {
         void foreign;
-        await login(page, uniqueEmail(`dock-${lang}`), lang);
+        await signup(page, `dock-${lang}`, lang);
         const id = await herbalist(page);
         await page.goto(`/c/${id}/step/knacks`);
         const cards = page.locator(".step__content .option");

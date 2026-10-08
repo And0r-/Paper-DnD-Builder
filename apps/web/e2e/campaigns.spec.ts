@@ -1,23 +1,21 @@
 /**
- * Campaigns (plan 4.3, done criterion 6): a game master makes a campaign,
- * adds a player by mail address, builds a character for them. The player
- * takes the password from the mail folder, logs in and finds the
- * character in their own list. A third account sees nothing of it.
+ * Campaigns (plan 4.3, done criterion 6): a player gets started with a mail
+ * address; a game master makes a campaign, adds the player by that
+ * address and builds a character for them. The player finds it in their
+ * own list. Everyone sees names, never addresses. A third account sees
+ * nothing of it.
  */
 import AxeBuilder from "@axe-core/playwright";
 import type { Browser, Page } from "@playwright/test";
-import { readdir, readFile } from "node:fs/promises";
-import { join } from "node:path";
 import de from "../src/i18n/messages/de.json" with { type: "json" };
 import en from "../src/i18n/messages/en.json" with { type: "json" };
 import {
   answerCharacter,
   expect,
   expectOneLanguage,
-  login,
-  OUTBOX,
-  passwordFor,
+  mailTo,
   shot,
+  signup,
   test,
   uniqueEmail,
 } from "./helpers.ts";
@@ -32,11 +30,6 @@ async function newPage(browser: Browser, tag: string): Promise<Page> {
   return context.newPage();
 }
 
-async function mailTo(email: string): Promise<string> {
-  const files = (await readdir(OUTBOX)).filter((f) => f.includes(email)).sort();
-  return readFile(join(OUTBOX, files.at(-1)!), "utf8");
-}
-
 async function noAxeViolations(page: Page) {
   const a11y = await new AxeBuilder({ page })
     .withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"])
@@ -49,10 +42,15 @@ test("game master, player and a stranger: who sees which character", async ({ pa
   const m = de;
   const gm = uniqueEmail("leitung");
   const player = uniqueEmail("spieler");
+  const [gmName, playerName] = ["Kim", `Robin ${Date.now() % 10_000}`];
   const campaignName = "Donnerstagsrunde";
 
+  // The player gets started first, with the address the game master will type.
+  const p2 = await newPage(browser, "player");
+  await signup(p2, playerName, "de", player);
+
   // ---------------------------------------------------- the game master
-  await login(page, gm);
+  await signup(page, gmName, "de", gm);
   await page.getByRole("button", { name: m["menu.open"] }).click();
   await page
     .getByRole("dialog", { name: m["menu.title"] })
@@ -72,10 +70,10 @@ test("game master, player and a stranger: who sees which character", async ({ pa
   const campaignUrl = page.url();
   const campaignId = /\/campaigns\/([0-9a-f-]+)$/.exec(campaignUrl)![1]!;
 
-  // The hint says who gets a mail and who invites them.
+  // The hint says whose address to type, who gets a mail and who adds them.
   const field = page.getByLabel(m["campaign.addLabel"]);
   await expect(
-    page.getByText(m["campaign.addHelp"].replace("{email}", gm).replace("{name}", campaignName)),
+    page.getByText(m["campaign.addHelp"].replace("{gameMaster}", gmName).replace("{name}", campaignName)),
   ).toBeVisible();
   await field.fill("kein-at-zeichen");
   await page.getByRole("button", { name: m["campaign.add"] }).click();
@@ -85,10 +83,12 @@ test("game master, player and a stranger: who sees which character", async ({ pa
   await expect(page.getByText(m["campaign.cannotAddYourself"])).toBeVisible();
   await field.fill(player);
   await page.getByRole("button", { name: m["campaign.add"] }).click();
-  await expect(page.getByText(m["campaign.added"].replace("{email}", player))).toBeVisible();
+  await expect(page.getByText(m["campaign.added"].replace("{name}", playerName))).toBeVisible();
   const playerBlock = page
     .getByRole("listitem")
-    .filter({ has: page.getByRole("heading", { level: 3, name: player }) });
+    .filter({ has: page.getByRole("heading", { level: 3, name: playerName }) });
+  // The player's address is not on the screen; the game master typed it, the server does not repeat it.
+  await expect(page.getByRole("main")).not.toContainText(player);
   await expect(playerBlock.getByText(m["campaign.noCharacters"])).toBeVisible();
   await expectOneLanguage(page, "de");
   await noAxeViolations(page);
@@ -101,15 +101,15 @@ test("game master, player and a stranger: who sees which character", async ({ pa
   await field.fill("");
 
   // Build for the player: the same flow, the top bar says for whom.
-  await playerBlock.getByRole("link", { name: m["campaign.buildFor"].replace("{email}", player) }).click();
+  await playerBlock.getByRole("link", { name: m["campaign.buildFor"].replace("{name}", playerName) }).click();
   await page.waitForURL(/\/c\/[0-9a-f-]+\/level$/);
   const draftId = /\/c\/([0-9a-f-]+)\//.exec(page.url())![1]!;
-  await expect(page.locator(".topbar")).toContainText(m["flow.forPlayer"].replace("{email}", player));
+  await expect(page.locator(".topbar")).toContainText(m["flow.forPlayer"].replace("{name}", playerName));
   await expectOneLanguage(page, "de");
   await shot(page, "95-bauen-fuer-spieler");
   await answerCharacter(page, draftId);
   await page.goto(`/c/${draftId}/done`);
-  await expect(page.getByText(m["done.forPlayer"].replace("{email}", player))).toBeVisible();
+  await expect(page.getByText(m["done.forPlayer"].replace("{name}", playerName))).toBeVisible();
   await expect(page.getByRole("link", { name: m["done.another"] })).toHaveCount(0);
 
   // The campaign shows the character as a card under its player.
@@ -127,18 +127,13 @@ test("game master, player and a stranger: who sees which character", async ({ pa
   await shot(page, "96-kampagne-mit-charakter-desktop");
 
   // ----------------------------------------------------------- the player
-  // The invitation made the account; the mail names the game master and holds the password.
+  // The mail names the game master by name and the campaign; it holds no password.
   const mail = await mailTo(player);
-  expect(mail).toContain(gm);
+  expect(mail).toContain(gmName);
+  expect(mail).not.toContain(gm);
   expect(mail).toContain(campaignName);
-  const password = await passwordFor(player);
-  const p2 = await newPage(browser, "player");
-  await p2.goto("/login");
-  await p2.getByRole("button", { name: m["login.havePassword"] }).click();
-  await p2.getByLabel(m["login.emailLabel"]).fill(player);
-  await p2.getByLabel(m["login.passwordLabel"]).fill(password);
-  await p2.getByRole("button", { name: m["login.submit"], exact: true }).click();
-  await expect(p2.getByRole("heading", { name: m["characters.title"], level: 1 })).toBeVisible();
+  expect(mail).not.toMatch(/Passwort:/);
+  await p2.goto("/characters");
   await expect(p2.getByRole("heading", { level: 2, name: "Mira" })).toBeVisible();
   await expect(p2.getByText("Laternenträgerin · Stufe 3")).toBeVisible();
   await shot(p2, "97-spieler-sieht-charakter");
@@ -146,18 +141,18 @@ test("game master, player and a stranger: who sees which character", async ({ pa
   // The player sees the campaign and who leads it, nothing of other players.
   await p2.goto("/campaigns");
   await expect(p2.getByRole("heading", { level: 2, name: m["campaigns.playing"] })).toBeVisible();
-  await expect(p2.getByText(m["campaigns.ledBy"].replace("{email}", gm))).toBeVisible();
+  await expect(p2.getByText(m["campaigns.ledBy"].replace("{name}", gmName))).toBeVisible();
   await expectOneLanguage(p2, "de");
   await shot(p2, "97-spieler-kampagnen");
   await p2.getByRole("link", { name: m["campaigns.openLabel"].replace("{name}", campaignName) }).click();
-  await expect(p2.getByText(m["campaign.playerTitle"].replace("{email}", gm))).toBeVisible();
+  await expect(p2.getByText(m["campaign.playerTitle"].replace("{name}", gmName))).toBeVisible();
   await expect(p2.getByLabel(m["campaign.addLabel"])).toHaveCount(0);
   await noAxeViolations(p2);
   await p2.context().close();
 
   // ---------------------------------------------------------- a stranger
   const p3 = await newPage(browser, "stranger");
-  await login(p3, uniqueEmail("fremd"));
+  await signup(p3, "fremd");
   await expect(p3.getByText(m["characters.emptyTitle"])).toBeVisible();
   await p3.goto("/campaigns");
   await expect(p3.getByText(m["campaigns.emptyTitle"])).toBeVisible();
@@ -176,18 +171,17 @@ test("en: campaigns in English only, phone and desktop", async ({ page, foreign 
   void foreign;
   const m = en;
   const player = uniqueEmail("player-en");
-  await login(page, uniqueEmail("gm-en"), "en");
+  await signup(page, "Sam", "en", player.replace("player-en", "gm-en"));
+  // An address nobody gave yet: an account without a password, named after the address, no mail.
   await page.goto("/campaigns");
   await page.getByLabel(m["campaigns.newLabel"]).fill("Thursday group");
   await page.getByRole("button", { name: m["campaigns.create"] }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Thursday group" })).toBeVisible();
   await page.getByLabel(m["campaign.addLabel"]).fill(player);
   await page.getByRole("button", { name: m["campaign.add"] }).click();
-  await expect(page.getByRole("heading", { level: 3, name: player })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 3, name: player.split("@")[0]! })).toBeVisible();
   await expectOneLanguage(page, "en");
   await shot(page, "95-campaign-en");
-  // The new account speaks the game master's language.
-  expect(await mailTo(player)).toContain("Your password");
   await page.goto("/campaigns");
   await expect(page.getByText(m["campaigns.players.one"])).toBeVisible();
   await expectOneLanguage(page, "en");
@@ -201,7 +195,7 @@ test("en: campaigns in English only, phone and desktop", async ({ page, foreign 
 test("privacy and account deletion name campaigns in plain words", async ({ page, foreign }) => {
   void foreign;
   const m = de;
-  await login(page, uniqueEmail("datenschutz"));
+  await signup(page, "datenschutz");
   await page.goto("/privacy");
   for (const key of [
     "privacy.campaigns",

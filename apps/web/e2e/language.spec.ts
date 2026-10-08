@@ -7,16 +7,7 @@ import de from "../src/i18n/messages/de.json" with { type: "json" };
 import en from "../src/i18n/messages/en.json" with { type: "json" };
 import pde from "../../../packages/demo-package/texts/de/core.json" with { type: "json" };
 import pen from "../../../packages/demo-package/texts/en/core.json" with { type: "json" };
-import {
-  chooseLanguage,
-  expect,
-  expectOneLanguage,
-  login,
-  makeCharacter,
-  shot,
-  test,
-  uniqueEmail,
-} from "./helpers.ts";
+import { chooseLanguage, expect, expectOneLanguage, makeCharacter, shot, signup, test } from "./helpers.ts";
 
 type Lang = "de" | "en";
 
@@ -72,7 +63,7 @@ test("every screen shows exactly one language, and switching swaps all texts", a
   await chooseLanguage(page, "de");
   await expectOneLanguage(page, "de");
 
-  await login(page, uniqueEmail("lang"));
+  await signup(page, "lang");
   const id = await makeCharacter(page);
   await visitAll(page, id, "de");
 

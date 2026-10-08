@@ -8,16 +8,7 @@
 import type { Locator, Page } from "@playwright/test";
 import de from "../src/i18n/messages/de.json" with { type: "json" };
 import en from "../src/i18n/messages/en.json" with { type: "json" };
-import {
-  chooseLanguage,
-  expect,
-  expectOneLanguage,
-  login,
-  makeCharacter,
-  shot,
-  test,
-  uniqueEmail,
-} from "./helpers.ts";
+import { chooseLanguage, expect, expectOneLanguage, makeCharacter, shot, signup, test } from "./helpers.ts";
 
 const MESSAGES = { de, en };
 
@@ -78,7 +69,7 @@ test.describe("phone", () => {
     foreign,
   }) => {
     void foreign;
-    await login(page, uniqueEmail("sources-overview"));
+    await signup(page, "sources-overview");
     const id = await makeCharacter(page);
     await page.goto(`/c/${id}/overview`);
     const term = page.locator(".summary .term", { hasText: "Laternenträgerin" }).first();
@@ -109,7 +100,7 @@ test.describe("phone", () => {
 
   test("what the character already has explains itself like the options", async ({ page, foreign }) => {
     void foreign;
-    await login(page, uniqueEmail("sources-held"));
+    await signup(page, "sources-held");
     const id = await makeCharacter(page, false);
     await page.goto(`/c/${id}/step/talents`);
     const held = page.locator("[data-pool-held]");
@@ -131,7 +122,7 @@ test.describe("phone", () => {
 
   test("a choice another choice brought says where it comes from", async ({ page, foreign }) => {
     void foreign;
-    await login(page, uniqueEmail("sources-from"));
+    await signup(page, "sources-from");
     const id = await makeCharacter(page, false);
     // Grown up in the bell tower: its gift is a choice of its own.
     const view = (await (await page.request.get(`/api/drafts/${id}`)).json()) as {

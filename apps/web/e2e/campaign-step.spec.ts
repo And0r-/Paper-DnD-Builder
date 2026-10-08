@@ -9,7 +9,7 @@
 import type { Browser, Page } from "@playwright/test";
 import de from "../src/i18n/messages/de.json" with { type: "json" };
 import en from "../src/i18n/messages/en.json" with { type: "json" };
-import { expect, expectOneLanguage, login, shot, test, uniqueEmail } from "./helpers.ts";
+import { expect, expectOneLanguage, shot, signup, test, uniqueEmail } from "./helpers.ts";
 
 /** A game master in a browser of their own, who makes a campaign and adds the player. */
 async function invite(browser: Browser, name: string, player: string, language = "de"): Promise<string> {
@@ -17,7 +17,7 @@ async function invite(browser: Browser, name: string, player: string, language =
     extraHTTPHeaders: { "x-forwarded-for": `203.0.113.${(Date.now() + name.length) % 250}` },
   });
   const page = await context.newPage();
-  await login(page, uniqueEmail("leitung"));
+  await signup(page, "leitung");
   const made = await page.request.post("/api/campaigns", { data: { name } });
   expect(made.status()).toBe(201);
   const id = ((await made.json()) as { campaign: { id: string } }).campaign.id;
@@ -38,7 +38,7 @@ async function campaignOf(page: Page, draftId: string): Promise<string | null> {
 
 test("no campaign: the question is skipped", async ({ page, foreign }) => {
   void foreign;
-  await login(page, uniqueEmail("allein"));
+  await signup(page, "allein");
   await page.goto("/new");
   await page.waitForURL(/\/c\/[0-9a-f-]+\/level$/);
   const draftId = /\/c\/([0-9a-f-]+)\//.exec(page.url())![1]!;
@@ -53,10 +53,10 @@ test("in campaigns: the one joined last is chosen, and can be changed later", as
   void foreign;
   const m = de;
   const player = uniqueEmail("spieler");
+  await signup(page, "Robin", "de", player);
   const first = await invite(browser, "Montagsrunde", player);
   const last = await invite(browser, "Donnerstagsrunde", player);
 
-  await login(page, player);
   await page.goto("/new");
   await expect(page.getByRole("heading", { level: 1, name: m["new.campaignQuestion"] })).toBeVisible();
   const field = page.getByLabel(m["new.campaignLabel"]);
@@ -95,7 +95,7 @@ test("game master in no other campaign: their own one is chosen, and the charact
 }) => {
   void foreign;
   const m = de;
-  await login(page, uniqueEmail("leitet"));
+  await signup(page, "leitet");
   const made = await page.request.post("/api/campaigns", { data: { name: "Nebelrunde" } });
   const id = ((await made.json()) as { campaign: { id: string } }).campaign.id;
 
@@ -132,7 +132,7 @@ test("leads one, joined another later: the one joined later is chosen", async ({
   void foreign;
   const m = de;
   const player = uniqueEmail("beides");
-  await login(page, player);
+  await signup(page, "Robin", "de", player);
   const made = await page.request.post("/api/campaigns", { data: { name: "Eigene Runde" } });
   expect(made.status()).toBe(201);
   const joined = await invite(browser, "Spätere Runde", player);
@@ -147,8 +147,8 @@ test("en: the campaign question in English only", async ({ page, browser, foreig
   void foreign;
   const m = en;
   const player = uniqueEmail("player-en");
+  await signup(page, "Robin", "en", player);
   const id = await invite(browser, "Thursday group", player, "en");
-  await login(page, player, "en");
   await page.goto("/new");
   await expect(page.getByRole("heading", { level: 1, name: m["new.campaignQuestion"] })).toBeVisible();
   await expect(page.getByLabel(m["new.campaignLabel"])).toHaveValue(id);

@@ -12,7 +12,7 @@
 import type { Locator, Page } from "@playwright/test";
 import de from "../src/i18n/messages/de.json" with { type: "json" };
 import { join } from "node:path";
-import { expect, login, SHOTS, test, uniqueEmail } from "./helpers.ts";
+import { expect, SHOTS, signup, test } from "./helpers.ts";
 
 const SIZES = {
   phone: { viewport: { width: 390, height: 844 } },
@@ -65,7 +65,7 @@ for (const device of ["phone", "desktop"] as const) {
 
     test("a step that fits the window has no card under the bar", async ({ page, foreign }) => {
       void foreign;
-      await login(page, uniqueEmail(`fits-${device}`));
+      await signup(page, `fits-${device}`);
       const id = await herbalist(page);
       await page.goto(`/c/${id}/step/herb-craft`);
       const cards = page.locator(".step__content .option");
@@ -94,7 +94,7 @@ for (const device of ["phone", "desktop"] as const) {
     test("a card the bar cuts off takes a tap and comes into view", async ({ page, foreign }) => {
       void foreign;
       await page.emulateMedia({ reducedMotion: "reduce" });
-      await login(page, uniqueEmail(`cut-${device}`));
+      await signup(page, `cut-${device}`);
       const id = await herbalist(page);
       await page.goto(`/c/${id}/step/knacks`);
       const cards = page.locator(".step__content .option");
@@ -131,7 +131,7 @@ for (const device of ["phone", "desktop"] as const) {
 
     test("the steps of a group stand from the lowest level up", async ({ page, foreign }) => {
       void foreign;
-      await login(page, uniqueEmail(`up-${device}`));
+      await signup(page, `up-${device}`);
       const id = await herbalist(page);
       await page.goto(`/c/${id}/step/path`);
       if (device === "phone") {

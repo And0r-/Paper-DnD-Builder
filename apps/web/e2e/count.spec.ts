@@ -9,7 +9,7 @@
 import type { Page } from "@playwright/test";
 import de from "../src/i18n/messages/de.json" with { type: "json" };
 import en from "../src/i18n/messages/en.json" with { type: "json" };
-import { expect, expectOneLanguage, login, shot, test, uniqueEmail } from "./helpers.ts";
+import { expect, expectOneLanguage, shot, signup, test } from "./helpers.ts";
 
 type Messages = typeof de;
 
@@ -119,7 +119,7 @@ function expectHonest(screens: { before: Screen; after: Screen }[]) {
 for (const level of [1, 5, 20]) {
   test(`level ${level}: the count stands from the first screen on`, async ({ page, foreign }) => {
     void foreign;
-    await login(page, uniqueEmail(`count-${level}`));
+    await signup(page, `count-${level}`);
     const id = await newDraft(page, level);
     await page.goto(`/c/${id}/step/character`);
     const screens = await walk(page, de, {}, async (s, i) => {
@@ -147,7 +147,7 @@ for (const level of [1, 5, 20]) {
 
 test("a pick that brings a step says so, and the total holds from then on", async ({ page, foreign }) => {
   void foreign;
-  await login(page, uniqueEmail("count-more"));
+  await signup(page, "count-more");
   const id = await newDraft(page, 1);
   await page.goto(`/c/${id}/step/character`);
   const first = await read(page, de);
@@ -168,7 +168,7 @@ test("a pick that brings a step says so, and the total holds from then on", asyn
 
 test("in English: the same count and the same note", async ({ page, foreign }) => {
   void foreign;
-  await login(page, uniqueEmail("count-en"), "en");
+  await signup(page, "count-en", "en");
   const id = await newDraft(page, 1);
   await page.goto(`/c/${id}/step/character`);
   const screens = await walk(page, en, { "How does your character earn a living?": "River Runner" });
@@ -183,7 +183,7 @@ test("a pick that takes a part away says so, and the parts hold from then on (AN
   foreign,
 }) => {
   void foreign;
-  await login(page, uniqueEmail("count-fewer-parts"));
+  await signup(page, "count-fewer-parts");
   const id = await newDraft(page, 20);
   await page.goto(`/c/${id}/step/character`);
   // A boon without a raise of its own: the boons lose one part.

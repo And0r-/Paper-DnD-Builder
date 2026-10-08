@@ -7,7 +7,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import type { Page } from "@playwright/test";
 import m from "../src/i18n/messages/de.json" with { type: "json" };
-import { animationsDone, expect, expectOneLanguage, login, shot, test, uniqueEmail } from "./helpers.ts";
+import { animationsDone, expect, expectOneLanguage, shot, signup, test } from "./helpers.ts";
 
 async function axe(page: Page) {
   await animationsDone(page);
@@ -48,7 +48,7 @@ const option = (page: Page, id: string) => page.locator(`[data-option="${id}"]`)
 
 test("one list for the talents of three sources", async ({ page, foreign }) => {
   void foreign;
-  await login(page, uniqueEmail("gather"));
+  await signup(page, "gather");
   const id = await coastfolk(page, "calling.lantern-bearer");
 
   await page.goto(`/c/${id}/step/talents`);
@@ -117,7 +117,7 @@ test("one list for the talents of three sources", async ({ page, foreign }) => {
 
 test("the knacks of two sources on one screen", async ({ page, foreign }) => {
   void foreign;
-  await login(page, uniqueEmail("gather-knacks"));
+  await signup(page, "gather-knacks");
   const id = await coastfolk(page, "calling.herbalist");
 
   await page.goto(`/c/${id}/step/knacks`);
@@ -142,7 +142,7 @@ test("the knacks of two sources on one screen", async ({ page, foreign }) => {
 
 test("the calling's gifts name the choices that come later", async ({ page, foreign }) => {
   void foreign;
-  await login(page, uniqueEmail("gather-later"));
+  await signup(page, "gather-later");
   const id = await coastfolk(page, "calling.lantern-bearer");
 
   await page.goto(`/c/${id}/step/calling-gifts`);

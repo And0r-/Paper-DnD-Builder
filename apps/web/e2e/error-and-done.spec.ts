@@ -6,7 +6,7 @@
 import type { Page } from "@playwright/test";
 import de from "../src/i18n/messages/de.json" with { type: "json" };
 import en from "../src/i18n/messages/en.json" with { type: "json" };
-import { expect, expectOneLanguage, login, makeCharacter, shot, test, uniqueEmail } from "./helpers.ts";
+import { expect, expectOneLanguage, makeCharacter, shot, signup, test } from "./helpers.ts";
 
 const MESSAGES = { de, en };
 
@@ -39,7 +39,7 @@ for (const lang of ["de", "en"] as const) {
   test(`a failed load reloads by itself, else explains in ${lang} only`, async ({ page, foreign }) => {
     void foreign;
     const m = MESSAGES[lang];
-    await login(page, uniqueEmail(`chunk-${lang}`), lang);
+    await signup(page, `chunk-${lang}`, lang);
     await page.waitForLoadState("networkidle");
 
     // Usually one automatic reload fetches the new code and the screen just opens.
@@ -75,7 +75,7 @@ for (const lang of ["de", "en"] as const) {
   }) => {
     void foreign;
     const m = MESSAGES[lang];
-    await login(page, uniqueEmail(`done-${lang}`), lang);
+    await signup(page, `done-${lang}`, lang);
     const id = await makeCharacter(page);
     const title = m["done.title"].replace("{name}", "Mira");
 

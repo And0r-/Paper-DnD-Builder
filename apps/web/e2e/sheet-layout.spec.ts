@@ -8,13 +8,13 @@
  */
 import { devices, type Locator, type Page } from "@playwright/test";
 import m from "../src/i18n/messages/de.json" with { type: "json" };
-import { expect, login, makeCharacter, makeLeveled, test, uniqueEmail } from "./helpers.ts";
+import { expect, makeCharacter, makeLeveled, signup, test } from "./helpers.ts";
 
 const DESIGNS = ["classic", "verbose"] as const;
 const { defaultBrowserType: _desk, ...desk } = devices["Desktop Chrome"];
 
 async function level20(page: Page): Promise<string> {
-  await login(page, uniqueEmail("sheet-layout"));
+  await signup(page, "sheet-layout");
   const id = await makeLeveled(page, 20);
   const view = (await (await page.request.get(`/api/drafts/${id}`)).json()) as { draft: { version: number } };
   const r = await page.request.post(`/api/drafts/${id}/finish`, { data: { version: view.draft.version } });
@@ -231,7 +231,7 @@ test.describe("on a phone", () => {
 
   for (const lang of ["de", "en"] as const) {
     test(`a kept copy's footer wraps: no page wider than the phone (${lang})`, async ({ page }) => {
-      await login(page, uniqueEmail("sheet-copy-phone"), lang);
+      await signup(page, "sheet-copy-phone", lang);
       const id = await makeCharacter(page);
       expect((await page.request.post(`/api/drafts/${id}/sheet-copies`, { data: {} })).status()).toBe(201);
       for (const design of DESIGNS) {
@@ -249,7 +249,7 @@ test.describe("on a phone", () => {
   }
 
   test("the menu: inside the drawer, in the sketch's order; stamina with − and +", async ({ page }) => {
-    await login(page, uniqueEmail("sheet-menu"));
+    await signup(page, "sheet-menu");
     // Level 3: one that can still go up, so "level up" is in the menu.
     const sheet = await openSheet(page, await makeCharacter(page), "classic");
     // 12: − and + count from the start value and are kept.

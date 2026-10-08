@@ -7,7 +7,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import type { Page } from "@playwright/test";
 import m from "../src/i18n/messages/de.json" with { type: "json" };
-import { animationsDone, expect, expectOneLanguage, login, shot, test, uniqueEmail } from "./helpers.ts";
+import { animationsDone, expect, expectOneLanguage, shot, signup, test } from "./helpers.ts";
 
 async function axe(page: Page) {
   await animationsDone(page);
@@ -34,13 +34,12 @@ async function question(page: Page, text: string) {
 
 test("a newcomer builds a level-3 character from login to finished", async ({ page, foreign }) => {
   void foreign;
-  const email = uniqueEmail("flow");
 
   await page.goto("/login");
   await expectOneLanguage(page, "de");
   await shot(page, "01-anmelden");
   await axe(page);
-  await login(page, email);
+  await signup(page, "flow");
 
   // Empty list, one clear action.
   await expect(page.getByText(m["characters.emptyTitle"])).toBeVisible();

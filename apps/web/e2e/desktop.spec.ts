@@ -9,7 +9,7 @@ import { devices, type Locator, type Page } from "@playwright/test";
 import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import m from "../src/i18n/messages/de.json" with { type: "json" };
-import { expect, login, makeCharacter, SHOTS, shot, test, uniqueEmail } from "./helpers.ts";
+import { expect, makeCharacter, shot, SHOTS, signup, test } from "./helpers.ts";
 
 test.use({ ...devices["Desktop Chrome"], viewport: { width: 1366, height: 900 } });
 
@@ -21,7 +21,7 @@ test("three columns, keyboard only, and only requests to the builder itself", as
   const requests: string[] = [];
   page.on("request", (r) => requests.push(`${r.method()} ${r.url()}`));
 
-  await login(page, uniqueEmail("desk"));
+  await signup(page, "desk");
   const id = await makeCharacter(page, false);
 
   await page.goto(`/c/${id}/step/calling`);
@@ -101,7 +101,7 @@ async function expectFocusSeen(page: Page) {
 
 test("Next pressed too early: reason, Choose for me and focus are all in view", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
-  await login(page, uniqueEmail("early"));
+  await signup(page, "early");
   // A level-3 herbalist: every kind of step, and a list long enough for a search box.
   const created = await page.request.post("/api/drafts", { data: { packageId: "demo" } });
   let view = (await created.json()) as { draft: { id: string; version: number } };

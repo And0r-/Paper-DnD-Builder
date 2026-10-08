@@ -3,11 +3,11 @@
  * and "choose for me" picks the options about those things.
  */
 import m from "../src/i18n/messages/de.json" with { type: "json" };
-import { expect, expectOneLanguage, login, shot, test, uniqueEmail } from "./helpers.ts";
+import { expect, expectOneLanguage, shot, signup, test } from "./helpers.ts";
 
 test("a step names what the character carries and recommends it", async ({ page, foreign }) => {
   void foreign;
-  await login(page, uniqueEmail("held"));
+  await signup(page, "held");
   const req = page.request;
   const created = await req.post("/api/drafts", { data: { packageId: "demo" } });
   let view = (await created.json()) as { draft: { id: string; version: number } };

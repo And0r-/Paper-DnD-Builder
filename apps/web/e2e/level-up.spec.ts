@@ -8,16 +8,7 @@ import AxeBuilder from "@axe-core/playwright";
 import { devices, type Page } from "@playwright/test";
 import de from "../src/i18n/messages/de.json" with { type: "json" };
 import en from "../src/i18n/messages/en.json" with { type: "json" };
-import {
-  answerRecommended,
-  expect,
-  expectOneLanguage,
-  login,
-  makeLeveled,
-  shot,
-  test,
-  uniqueEmail,
-} from "./helpers.ts";
+import { answerRecommended, expect, expectOneLanguage, makeLeveled, shot, signup, test } from "./helpers.ts";
 
 const m = de;
 
@@ -86,7 +77,7 @@ test("a level-1 character goes up to 2, 3 and 5, asked only what is new each tim
   foreign,
 }) => {
   void foreign;
-  await login(page, uniqueEmail("level-up"));
+  await signup(page, "level-up");
   const id = await finished(page, 1);
   const level1 = await stepIds(page, id);
 
@@ -191,7 +182,7 @@ test("a level-1 character goes up to 2, 3 and 5, asked only what is new each tim
 
 test("from level 1 to 20 in one go: exactly the questions of levels 2 to 20", async ({ page, foreign }) => {
   void foreign;
-  await login(page, uniqueEmail("level-up-20"));
+  await signup(page, "level-up-20");
   const id = await finished(page, 1);
   const level1 = await stepIds(page, id);
   const direct = await stepIds(page, await makeLeveled(page, 20));
@@ -224,7 +215,7 @@ test("choose for me on a step that grew keeps the old picks, takes nothing twice
   foreign,
 }) => {
   void foreign;
-  await login(page, uniqueEmail("level-up-keep"));
+  await signup(page, "level-up-keep");
   // A level-2 herbalist: three root knacks picked by hand, and a borrowed
   // knack that the root knacks offer too (a second source of the same thing).
   const created = await page.request.post("/api/drafts", { data: { packageId: "demo" } });
@@ -291,7 +282,7 @@ test("choose for me on a step that grew keeps the old picks, takes nothing twice
 
 test("a level with no new questions goes straight to the end", async ({ page, foreign }) => {
   void foreign;
-  await login(page, uniqueEmail("level-up-quiet"));
+  await signup(page, "level-up-quiet");
   const id = await finished(page, 4);
   await page.goto(`/c/${id}/raise`);
   await page.getByRole("button", { name: "Weiter zu Stufe 5" }).click();
@@ -303,7 +294,7 @@ test("a level with no new questions goes straight to the end", async ({ page, fo
 
 test("a level up can be stopped: the character stays where it was", async ({ page, foreign }) => {
   void foreign;
-  await login(page, uniqueEmail("level-up-stop"));
+  await signup(page, "level-up-stop");
   const id = await finished(page, 1);
   await page.goto(`/c/${id}/raise`);
   await page.getByRole("button", { name: "Weiter zu Stufe 2" }).click();
@@ -334,7 +325,7 @@ test.describe("in English, on a large screen", () => {
 
   test("the level-up question and the first new step", async ({ page, foreign }) => {
     void foreign;
-    await login(page, uniqueEmail("level-up-en"), "en");
+    await signup(page, "level-up-en", "en");
     await finished(page, 1);
     await page.goto("/characters");
     await expectOneLanguage(page, "en");

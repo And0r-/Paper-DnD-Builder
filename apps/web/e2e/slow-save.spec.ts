@@ -7,7 +7,7 @@
  */
 import type { Page, Route } from "@playwright/test";
 import m from "../src/i18n/messages/de.json" with { type: "json" };
-import { expect, login, shot, test, uniqueEmail } from "./helpers.ts";
+import { expect, shot, signup, test } from "./helpers.ts";
 
 const SAVE_MS = 4000;
 const PAGE_MS = 4000;
@@ -45,7 +45,7 @@ async function slowServer(page: Page): Promise<{ saves: number }> {
 
 test("phone: Next pressed while saving goes on once saved, one tap is enough", async ({ page, foreign }) => {
   void foreign;
-  await login(page, uniqueEmail("slow-save"));
+  await signup(page, "slow-save");
   const id = await openScores(page);
   await page.goto(`/c/${id}/step/scores`);
   await expect(
@@ -85,7 +85,7 @@ test("phone: Next pressed while saving goes on once saved, one tap is enough", a
 
 test("phone: Back while Next waits for saving: Back wins, nothing is lost", async ({ page, foreign }) => {
   void foreign;
-  await login(page, uniqueEmail("slow-save-back"));
+  await signup(page, "slow-save-back");
   const id = await openScores(page);
   await page.goto(`/c/${id}/step/scores`);
   await expect(

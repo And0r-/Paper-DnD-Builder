@@ -7,7 +7,7 @@ import { devices, type Locator, type Page } from "@playwright/test";
 import de from "../src/i18n/messages/de.json" with { type: "json" };
 import en from "../src/i18n/messages/en.json" with { type: "json" };
 import { join } from "node:path";
-import { expect, expectOneLanguage, login, makeCharacter, SHOTS, test, uniqueEmail } from "./helpers.ts";
+import { expect, expectOneLanguage, makeCharacter, SHOTS, signup, test } from "./helpers.ts";
 
 const MESSAGES = { de, en };
 const CALLING = {
@@ -65,7 +65,7 @@ test.describe("phone", () => {
     }) => {
       void foreign;
       const m = MESSAGES[lang];
-      await login(page, uniqueEmail(`names-${lang}`), lang);
+      await signup(page, `names-${lang}`, lang);
       const id = await makeCharacter(page);
 
       // The top bar: the name stays a link, the info button next to it explains it.
@@ -133,7 +133,7 @@ test.describe("mouse and keyboard", () => {
 
   test("hover and keyboard focus show the sentence, Escape hides it", async ({ page, foreign }) => {
     void foreign;
-    await login(page, uniqueEmail("names-desk"));
+    await signup(page, "names-desk");
     const id = await makeCharacter(page);
 
     await page.goto("/settings");

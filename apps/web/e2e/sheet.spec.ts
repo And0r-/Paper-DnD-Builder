@@ -5,15 +5,7 @@
  */
 import de from "../src/i18n/messages/de.json" with { type: "json" };
 import en from "../src/i18n/messages/en.json" with { type: "json" };
-import {
-  chooseLanguage,
-  expect,
-  expectOneLanguage,
-  login,
-  makeCharacter,
-  test,
-  uniqueEmail,
-} from "./helpers.ts";
+import { chooseLanguage, expect, expectOneLanguage, makeCharacter, signup, test } from "./helpers.ts";
 import { sheetTests } from "./sheet-tests.ts";
 
 const m = de;
@@ -22,7 +14,7 @@ sheetTests("phone");
 
 test("a character that is not finished has no original yet", async ({ page, foreign }) => {
   void foreign;
-  await login(page, uniqueEmail("sheet-open"));
+  await signup(page, "sheet-open");
   const id = await makeCharacter(page, false);
   await page.goto(`/c/${id}/bogen`);
   await expect(page.getByText(m["sheet.notFinishedTitle"])).toBeVisible();
@@ -32,7 +24,7 @@ test("a character that is not finished has no original yet", async ({ page, fore
 
 test("the sheet in English, and its language from the top bar", async ({ page, foreign }) => {
   void foreign;
-  await login(page, uniqueEmail("sheet-en"), "en");
+  await signup(page, "sheet-en", "en");
   const id = await makeCharacter(page);
   await page.goto(`/c/${id}/bogen`);
   await expect(page.getByRole("heading", { level: 1, name: "Mira" })).toBeVisible();

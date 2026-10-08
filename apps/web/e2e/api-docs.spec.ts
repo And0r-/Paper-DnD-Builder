@@ -9,7 +9,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import de from "../src/i18n/messages/de.json" with { type: "json" };
 import en from "../src/i18n/messages/en.json" with { type: "json" };
-import { expect, login, SHOTS, test, uniqueEmail } from "./helpers.ts";
+import { expect, SHOTS, signup, test } from "./helpers.ts";
 
 const spec = JSON.parse(readFileSync(new URL("../openapi.json", import.meta.url), "utf8")) as {
   paths: Record<string, Record<string, { summary: string }>>;
@@ -66,7 +66,7 @@ test.describe("API reference", () => {
 
   test("Try it with an access key answers from this server", async ({ page, foreign }) => {
     void foreign;
-    await login(page, uniqueEmail("api-docs"), "en");
+    await signup(page, "api-docs", "en");
     const made = await page.request.post("/api/account/keys", { data: { name: "API page" } });
     const secret = ((await made.json()) as { key: { secret: string } }).key.secret;
     expect(secret).toMatch(/^cbk_/);
@@ -104,7 +104,7 @@ for (const lang of ["de", "en"] as const) {
     foreign,
   }) => {
     void foreign;
-    await login(page, uniqueEmail(`api-link-${lang}`), lang);
+    await signup(page, `api-link-${lang}`, lang);
     await page.goto("/settings");
 
     // The menu: "API" right after "MCP".

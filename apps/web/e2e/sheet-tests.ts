@@ -10,16 +10,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import type { APIResponse, Page } from "@playwright/test";
 import de from "../src/i18n/messages/de.json" with { type: "json" };
-import {
-  animationsDone,
-  expect,
-  expectOneLanguage,
-  login,
-  makeCharacter,
-  shot,
-  test,
-  uniqueEmail,
-} from "./helpers.ts";
+import { animationsDone, expect, expectOneLanguage, makeCharacter, shot, signup, test } from "./helpers.ts";
 
 const m = de;
 
@@ -166,7 +157,7 @@ export function sheetTests(device: "phone" | "desk"): void {
 
     test(`original, first change makes a copy, rows, versions (${device})`, async ({ page, foreign }) => {
       void foreign;
-      await login(page, uniqueEmail(`sheet-${device}`));
+      await signup(page, `sheet-${device}`);
       const id = await makeCharacter(page);
       const model = await original(page, id);
 
@@ -263,7 +254,7 @@ export function sheetTests(device: "phone" | "desk"): void {
       foreign,
     }) => {
       void foreign;
-      await login(page, uniqueEmail(`sheet-play-${device}`));
+      await signup(page, `sheet-play-${device}`);
       const id = await makeCharacter(page);
       const model = await original(page, id);
       const boxes = model.sections.flatMap((s) => s.boxes ?? []);
@@ -381,7 +372,7 @@ export function sheetTests(device: "phone" | "desk"): void {
       foreign,
     }) => {
       void foreign;
-      await login(page, uniqueEmail(`sheet-look-${device}`));
+      await signup(page, `sheet-look-${device}`);
       const id = await makeCharacter(page);
       const model = await original(page, id);
       await page.goto(`/c/${id}/bogen`);

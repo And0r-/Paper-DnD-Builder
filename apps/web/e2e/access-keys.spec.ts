@@ -4,7 +4,7 @@
  */
 import de from "../src/i18n/messages/de.json" with { type: "json" };
 import en from "../src/i18n/messages/en.json" with { type: "json" };
-import { expect, expectOneLanguage, login, shot, test, uniqueEmail } from "./helpers.ts";
+import { expect, expectOneLanguage, shot, signup, test } from "./helpers.ts";
 
 for (const lang of ["de", "en"] as const) {
   const m = lang === "de" ? de : en;
@@ -13,7 +13,7 @@ for (const lang of ["de", "en"] as const) {
   test(`${lang}: make, show once, use and withdraw an access key`, async ({ page, context, foreign }) => {
     void foreign;
     await context.grantPermissions(["clipboard-read", "clipboard-write"]);
-    await login(page, uniqueEmail(`keys-${lang}`), lang);
+    await signup(page, `keys-${lang}`, lang);
     await page.goto("/settings");
     const section = page.getByRole("region", { name: m["settings.keys"] });
     await expect(section).toBeVisible();

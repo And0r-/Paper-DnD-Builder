@@ -8,7 +8,7 @@
 import type { Page } from "@playwright/test";
 import m from "../src/i18n/messages/de.json" with { type: "json" };
 import { join } from "node:path";
-import { expect, login, SHOTS, test, uniqueEmail } from "./helpers.ts";
+import { expect, SHOTS, signup, test } from "./helpers.ts";
 
 /** A desktop window: wide enough for the step list beside the question. */
 const DESKTOP = { isMobile: false, hasTouch: false, deviceScaleFactor: 1 };
@@ -44,7 +44,7 @@ test.describe("large screens", () => {
 
   test("a step that comes is green, a step that goes is red and then gone", async ({ page, foreign }) => {
     void foreign;
-    await login(page, uniqueEmail("steps-come-go"));
+    await signup(page, "steps-come-go");
     const id = await newDraft(page);
     await page.goto(`/c/${id}/step/calling`);
     const list = page.getByRole("navigation", { name: m["flow.steps"] });
@@ -85,7 +85,7 @@ test.describe("large screens", () => {
     foreign,
   }) => {
     void foreign;
-    await login(page, uniqueEmail("steps-same-name"));
+    await signup(page, "steps-same-name");
     const id = await newDraft(page);
     await page.goto(`/c/${id}/step/calling`);
     const list = page.getByRole("navigation", { name: m["flow.steps"] });
@@ -112,7 +112,7 @@ test.describe("large screens", () => {
 
 test("phones: the shut menu and the count show it, a screen reader hears it", async ({ page, foreign }) => {
   void foreign;
-  await login(page, uniqueEmail("steps-phone"));
+  await signup(page, "steps-phone");
   const id = await newDraft(page);
   await page.goto(`/c/${id}/step/calling`);
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
@@ -148,7 +148,7 @@ test.describe("reduced motion", () => {
 
   test("the colours without movement", async ({ page, foreign }) => {
     void foreign;
-    await login(page, uniqueEmail("steps-still"));
+    await signup(page, "steps-still");
     const id = await newDraft(page);
     await page.goto(`/c/${id}/step/calling`);
     const list = page.getByRole("navigation", { name: m["flow.steps"] });
