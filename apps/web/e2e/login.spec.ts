@@ -157,7 +157,9 @@ test("settings: a second password, the first deleted, the last one stays", async
   await identity.getByLabel(m["settings.emailLabel"]).fill("");
   await identity.getByRole("button", { name: m["settings.identitySave"] }).click();
   await expect
-    .poll(async () => ((await (await page.request.get("/api/account")).json()) as { account: object }).account)
+    .poll(
+      async () => ((await (await page.request.get("/api/account")).json()) as { account: object }).account,
+    )
     .toMatchObject({ name: "Kim Nord", email: null });
 });
 

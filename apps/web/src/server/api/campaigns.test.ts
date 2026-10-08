@@ -111,6 +111,7 @@ describe("adding players", () => {
   it("adds the oldest account when two give the same address", async () => {
     const twin = new Client(server, "203.0.113.4");
     await twin.call("POST", "/api/auth/signup", { name: "Twin", email: "same@example.org" });
+    server.advance(60_000);
     await new Client(server, "203.0.113.5").call("POST", "/api/auth/signup", {
       name: "Later",
       email: "same@example.org",
