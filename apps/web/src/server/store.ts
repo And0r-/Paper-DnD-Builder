@@ -134,6 +134,15 @@ const CAMPAIGN_SELECT = `SELECT c.id, c.name, c.created_at, gm.email AS game_mas
 const VISIBLE_CAMPAIGN = `(c.account_id = $1 OR EXISTS (
   SELECT 1 FROM campaign_players p WHERE p.campaign_id = c.id AND p.account_id = $1))`;
 
+/**
+ * Whether `account` is a member of `campaign`: it plays in it, or leads it.
+ * The game master is a member through `campaigns.account_id`, without a row
+ * in `campaign_players`, so they never count as a player.
+ */
+const member = (campaign: string, account: string) => `(EXISTS (
+  SELECT 1 FROM campaign_players p WHERE p.campaign_id = ${campaign} AND p.account_id = ${account})
+  OR EXISTS (SELECT 1 FROM campaigns g WHERE g.id = ${campaign} AND g.account_id = ${account}))`;
+
 export class Store {
   private readonly db: SqlExecutor;
 
@@ -339,16 +348,15 @@ export class Store {
   }
 
   /**
-   * Puts the owner's character into a campaign they play in, or into none
-   * (`campaignId` null). Returns false if the draft is not theirs or they
-   * do not play in that campaign. Not a change of the character itself:
-   * its version stays.
+   * Puts the owner's character into a campaign they play in or lead, or into
+   * none (`campaignId` null). Returns false if the draft is not theirs or
+   * they are no member of that campaign. Not a change of the character
+   * itself: its version stays.
    */
   async setDraftCampaign(id: string, accountId: string, campaignId: string | null): Promise<boolean> {
     const rows = await this.db.query(
       `UPDATE drafts SET campaign_id = $3
-       WHERE id = $1 AND account_id = $2 AND ($3::uuid IS NULL OR EXISTS (
-         SELECT 1 FROM campaign_players p WHERE p.campaign_id = $3 AND p.account_id = $2))
+       WHERE id = $1 AND account_id = $2 AND ($3::uuid IS NULL OR ${member("$3", "$2")})
        RETURNING id`,
       [id, accountId, campaignId],
     );
@@ -405,7 +413,7 @@ export class Store {
     ]);
   }
 
-  /** Removes the campaign and its player list; the players' characters stay. */
+  /** Removes the campaign and its player list; every character stays, in no campaign. */
   async deleteCampaign(id: string, gameMasterId: string): Promise<void> {
     await this.db.query("DELETE FROM campaigns WHERE id = $1 AND account_id = $2", [id, gameMasterId]);
   }
@@ -417,6 +425,15 @@ export class Store {
        WHERE p.campaign_id = $1 ORDER BY p.added_at, a.email`,
       [campaignId],
     );
+  }
+
+  /** Whether the account plays in the campaign or leads it. */
+  async isMember(campaignId: string, accountId: string): Promise<boolean> {
+    const rows = await this.db.query(`SELECT 1 WHERE ${member("$1::uuid", "$2::uuid")}`, [
+      campaignId,
+      accountId,
+    ]);
+    return rows.length > 0;
   }
 
   async findPlayer(campaignId: string, accountId: string): Promise<PlayerRow | undefined> {
@@ -463,13 +480,18 @@ export class Store {
     return rows.length > 0;
   }
 
-  /** The players' characters that belong to the campaign, newest first. */
+  /**
+   * The characters that belong to the campaign, newest first: the players'
+   * and the game master's own (`access` "owner").
+   */
   async listCampaignDrafts(campaignId: string): Promise<ReachableDraftRow[]> {
     return this.db.query<ReachableDraftRow>(
-      `SELECT ${DRAFT_COLUMNS_D}, o.email AS owner_email, 'gameMaster' AS access
-       FROM drafts d JOIN campaign_players p ON p.account_id = d.account_id AND p.campaign_id = d.campaign_id
+      `SELECT ${DRAFT_COLUMNS_D}, o.email AS owner_email,
+         CASE WHEN d.account_id = c.account_id THEN 'owner' ELSE 'gameMaster' END AS access
+       FROM drafts d JOIN campaigns c ON c.id = d.campaign_id
        JOIN accounts o ON o.id = d.account_id
-       WHERE d.campaign_id = $1 ORDER BY d.updated_at DESC, d.id`,
+       WHERE d.campaign_id = $1 AND ${member("d.campaign_id", "d.account_id")}
+       ORDER BY d.updated_at DESC, d.id`,
       [campaignId],
     );
   }
