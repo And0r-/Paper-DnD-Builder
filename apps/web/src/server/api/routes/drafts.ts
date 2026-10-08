@@ -17,7 +17,8 @@ import {
 import type { ContentPackage } from "@builder/format";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
-import type { App, ChangeSource } from "../../app.ts";
+import type { App, ChangeSource, DraftCause } from "../../app.ts";
+import { requestSource } from "../../live/source.ts";
 import type { AccountRow, DraftRow, ReachableDraftRow } from "../../store.ts";
 import { HttpError, json, readJson } from "../http.ts";
 import type { RequestContext, Route } from "../router.ts";
@@ -123,6 +124,12 @@ export type DraftEdit = (
   row: DraftRow,
 ) => { doc: DraftRow["document"]; finish?: boolean; raisedFrom?: number | undefined };
 
+/** A change of a draft: what it does, and what it is called on the live channel. */
+export interface Edit {
+  apply: DraftEdit;
+  cause: DraftCause;
+}
+
 export type Committed =
   | { ok: true; row: ReachableDraftRow; raisedFrom?: number | undefined }
   | { ok: false; current: ReachableDraftRow };
@@ -134,20 +141,21 @@ export type Committed =
  * If the draft is no longer at `expectedVersion`, nothing changes and the
  * current state comes back. `reload` reads the draft again as the viewer
  * may see it, for when it changed between our read and our write.
+ * `source` is who made it, for everyone on the live channel.
  */
 export async function commitChange(
   app: App,
   row: ReachableDraftRow,
   expectedVersion: number,
-  edit: DraftEdit,
+  edit: Edit,
   reload: () => Promise<ReachableDraftRow | undefined>,
-  source?: ChangeSource,
+  source: ChangeSource,
 ): Promise<Committed> {
   // The draft stays its owner's, whoever changes it.
   const accountId = row.account_id;
   const pkg = packageOf(app, row);
   if (row.version !== expectedVersion) return { ok: false, current: row };
-  const edited = edit(pkg, row);
+  const edited = edit.apply(pkg, row);
   const complete = evaluateDraft(pkg, edited.doc).complete;
   const now = app.now();
   const finishedAt = edited.finish ? now : complete ? row.finished_at : null;
@@ -167,7 +175,8 @@ export async function commitChange(
     return { ok: false, current };
   }
   app.draftEvents.publish({
-    kind: "changed",
+    kind: "draft",
+    ...edit.cause,
     draftId: updated.id,
     accountId,
     version: updated.version,
@@ -182,11 +191,16 @@ export async function commitChange(
   };
 }
 
-async function change(ctx: RequestContext, expectedVersion: number, edit: DraftEdit): Promise<Response> {
+async function change(ctx: RequestContext, expectedVersion: number, edit: Edit): Promise<Response> {
   const { row, viewer } = await loadDraft(ctx, { helpers: true });
   const help = ctx.url.searchParams.get("help");
-  const done = await commitChange(ctx.app, row, expectedVersion, edit, () =>
-    findDraftFor(ctx.app, row.id, viewer.id, help),
+  const done = await commitChange(
+    ctx.app,
+    row,
+    expectedVersion,
+    edit,
+    () => findDraftFor(ctx.app, row.id, viewer.id, help),
+    await requestSource(ctx, row.access),
   );
   const pkg = packageOf(ctx.app, row);
   if (!done.ok) throw new HttpError(409, "versionConflict", { current: draftView(done.current, pkg) });
@@ -204,21 +218,20 @@ function applyOrReject(pkg: ContentPackage, row: DraftRow, c: DraftChange) {
  * messages alike. Each throws an HttpError when the change is refused.
  */
 export const edits = {
-  setLevel:
-    (level: number): DraftEdit =>
-    (pkg, row) =>
-      applyOrReject(pkg, row, { type: "setLevel", level }),
-  answer:
-    (choice: string, answer: unknown): DraftEdit =>
-    (pkg, row) =>
-      applyOrReject(pkg, row, { type: "answer", choice, answer: answer ?? null }),
-  pool:
-    (step: string, picks: string[]): DraftEdit =>
-    (pkg, row) =>
-      applyOrReject(pkg, row, { type: "pool", step, picks }),
-  levelUp:
-    (level: number): DraftEdit =>
-    (pkg, row) => {
+  setLevel: (level: number): Edit => ({
+    apply: (pkg, row) => applyOrReject(pkg, row, { type: "setLevel", level }),
+    cause: { type: "changed", change: { kind: "level", level } },
+  }),
+  answer: (choice: string, answer: unknown): Edit => ({
+    apply: (pkg, row) => applyOrReject(pkg, row, { type: "answer", choice, answer: answer ?? null }),
+    cause: { type: "changed", change: { kind: "answer", choice } },
+  }),
+  pool: (step: string, picks: string[]): Edit => ({
+    apply: (pkg, row) => applyOrReject(pkg, row, { type: "pool", step, picks }),
+    cause: { type: "changed", change: { kind: "pool", step } },
+  }),
+  levelUp: (level: number): Edit => ({
+    apply: (pkg, row) => {
       // A raise that is not finished yet may go higher still; any other draft is built first.
       if (!row.finished_at && row.document.levelBefore === undefined) {
         throw new HttpError(409, "notFinished", { open: evaluateDraft(pkg, row.document).open });
@@ -231,11 +244,16 @@ export const edits = {
         raisedFrom: r.doc.levelBefore,
       };
     },
-  finish: (): DraftEdit => (pkg, row) => {
-    const ev = evaluateDraft(pkg, row.document);
-    if (!ev.complete) throw new HttpError(422, "incomplete", { open: ev.open });
-    return { doc: row.document, finish: true };
-  },
+    cause: { type: "levelUp", change: { kind: "levelUp", level } },
+  }),
+  finish: (): Edit => ({
+    apply: (pkg, row) => {
+      const ev = evaluateDraft(pkg, row.document);
+      if (!ev.complete) throw new HttpError(422, "incomplete", { open: ev.open });
+      return { doc: row.document, finish: true };
+    },
+    cause: { type: "finished" },
+  }),
 };
 
 /** The bodies of the changing routes; the live channel's messages carry the same fields. */
@@ -389,8 +407,13 @@ export const draftRoutes: Route[] = [
       const body = await readJson(ctx.req, z.strictObject({ campaignId: z.string().regex(UUID).nullable() }));
       const set = await ctx.app.store.setDraftCampaign(row.id, viewer.id, body.campaignId);
       if (!set) throw new HttpError(404, "campaignNotFound");
-      // A game master may have lost the character, or gained it.
-      ctx.app.draftEvents.publish({ kind: "access", draftId: row.id });
+      // Everyone on it hears of it; a game master may have lost the character, or gained it.
+      ctx.app.draftEvents.publish({
+        kind: "character",
+        type: "campaign",
+        draftId: row.id,
+        source: await requestSource(ctx, row.access),
+      });
       return json(
         200,
         draftView({ ...row, campaign_id: body.campaignId }, ctx.app.packages.get(row.package_id)),
@@ -405,7 +428,12 @@ export const draftRoutes: Route[] = [
       const { row } = await loadDraft(ctx);
       if (row.access !== "owner") throw new HttpError(403, "ownerOnly");
       await ctx.app.store.deleteDraft(row.id, row.account_id);
-      ctx.app.draftEvents.publish({ kind: "deleted", draftId: row.id });
+      ctx.app.draftEvents.publish({
+        kind: "character",
+        type: "deleted",
+        draftId: row.id,
+        source: await requestSource(ctx, row.access),
+      });
       return json(204, null);
     },
   },
