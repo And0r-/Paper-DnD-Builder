@@ -46,7 +46,8 @@
 }
 
 .save-status--error,
-.save-status--offline {
+.save-status--offline,
+.save-status--unsaved {
   color: var(--color-warning);
   font-size: var(--text-xs);
   line-height: var(--text-xs-lh);
@@ -1824,4 +1825,9 @@ a.livebar__where {
   .option--pointed {
     outline: 3px dashed Highlight;
   }
+}
+
+/* A text someone else saved while you were in the field (AND-268). */
+.text-theirs {
+  margin-top: var(--space-3);
 }
