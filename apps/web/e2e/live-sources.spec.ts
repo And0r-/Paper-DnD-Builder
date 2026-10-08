@@ -10,7 +10,7 @@
 import type { APIRequestContext, Browser, Page, Route } from "@playwright/test";
 import de from "../src/i18n/messages/de.json" with { type: "json" };
 import en from "../src/i18n/messages/en.json" with { type: "json" };
-import { expect, expectOneLanguage, makeCharacter, shot, signup, test } from "./helpers.ts";
+import { answerCharacter, expect, expectOneLanguage, makeCharacter, shot, signup, test } from "./helpers.ts";
 
 const DESKTOP = { width: 1366, height: 900 };
 const ACCEPT = { accept: "application/json, text/event-stream" };
@@ -247,7 +247,8 @@ test("the sheet follows the play state and the character, changed by a program, 
   // The play state, written by a program with a key.
   await putState(program, 7, { authorization: `Bearer ${secret}` });
   await expect(field).toHaveValue("7");
-  await expect(told(page)).toHaveText(line(de, de["live.from.api"], de["live.what.play"]));
+  // The line names the field as the sheet calls it (AND-269).
+  await expect(told(page)).toHaveText(line(de, de["live.from.api"], pencil.label));
   await expectOneLanguage(page, "de");
   await shot(page, "258-bogen-programm-handy-de");
 
@@ -260,5 +261,74 @@ test("the sheet follows the play state and the character, changed by a program, 
   // Another window of the same account.
   await putState(page.request, 9);
   await expect(field).toHaveValue("9");
-  await expect(told(page)).toHaveText(line(de, de["live.from.window"], de["live.what.play"]));
+  await expect(told(page)).toHaveText(line(de, de["live.from.window"], pencil.label));
+});
+
+test("two people on the sheet: stamina typed by one shows on the other's, and the character changed over MCP too", async ({
+  page,
+  browser,
+  baseURL,
+  playwright,
+  foreign,
+}) => {
+  void foreign;
+  const gm = await gameMasterBrowser(browser);
+  const id = await table(page, gm);
+  await answerCharacter(page, id);
+  // The sheet comes in the language of whoever asks: Lio German, Vexa English.
+  const sheetOf = async (p: Page) =>
+    (await (await p.request.get(`/api/drafts/${id}/sheet`)).json()) as {
+      sections: { boxes?: { label: string; field?: string }[] }[];
+    };
+  const box = (m: Awaited<ReturnType<typeof sheetOf>>) =>
+    m.sections.flatMap((s) => s.boxes ?? []).find((b) => b.field === "sheet/primary/stamina")!;
+  const [mineDe, theirsEn] = [box(await sheetOf(page)), box(await sheetOf(gm))];
+
+  await page.goto(`/c/${id}/bogen`);
+  await gm.goto(`/c/${id}/bogen`);
+  const stamina = (p: Page, label: string) => p.getByRole("textbox", { name: label });
+  await expect(stamina(page, mineDe.label)).toBeVisible();
+  await expect(stamina(gm, theirsEn.label)).toBeVisible();
+  // "Here now" on the sheet as on the steps, both ways.
+  await expect(bar(page)).toContainText(de["live.with"]);
+  await expect(bar(page)).toContainText(fill(de["live.person.gameMaster"], { name: "Vexa" }));
+  await expect(bar(gm)).toContainText("Lio");
+
+  // The game master writes the stamina: the owner sees it without reloading, and from whom.
+  await stamina(gm, theirsEn.label).fill("15");
+  await expect(stamina(page, mineDe.label)).toHaveValue("15");
+  const vexa = fill(de["live.person.gameMaster"], { name: "Vexa" });
+  await expect(told(page)).toHaveText(line(de, fill(de["live.from.person"], { who: vexa }), mineDe.label));
+  await expectOneLanguage(page, "de");
+  await shot(page, "269-bogen-spielleitung-handy-de");
+
+  // And back: the owner changes it, the game master sees it.
+  await stamina(page, mineDe.label).fill("12");
+  await expect(stamina(gm, theirsEn.label)).toHaveValue("12");
+  await expect(told(gm)).toHaveText(
+    line(
+      en,
+      fill(en["live.from.person"], { who: fill(en["live.person.owner"], { name: "Lio" }) }),
+      theirsEn.label,
+    ),
+  );
+  await shot(gm, "269-bogen-besitzer-desktop-en");
+
+  // The owner's language model changes the character over MCP: both open sheets follow it.
+  const secret = await accessKey(page, baseURL!);
+  const program = await playwright.request.newContext({ baseURL: baseURL! });
+  await mcp(program, secret, "set_answer", { characterId: id, choice: "name", answer: { text: "Oda" } });
+  await expect(told(page)).toHaveText(line(de, de["live.from.mcp"], "Name"));
+  await expect(page.locator(".sheet-screen").getByText("Oda").first()).toBeVisible();
+  await expect(gm.locator(".sheet-screen").getByText("Oda").first()).toBeVisible();
+  // The play state stays what was written.
+  await expect(stamina(page, mineDe.label)).toHaveValue("12");
+  // A new level opens new choices: the sheet says to finish the builder first, without reloading.
+  await mcp(program, secret, "set_level", { characterId: id, level: 4 });
+  await expect(told(page)).toHaveText(line(de, de["live.from.mcp"], "Stufe"));
+  await expect(page.getByText(de["sheet.notFinishedTitle"])).toBeVisible();
+  await expect(gm.getByText(en["sheet.notFinishedTitle"])).toBeVisible();
+  await shot(page, "269-bogen-mcp-stufe-handy-de");
+  await program.dispose();
+  await gm.context().close();
 });

@@ -35,7 +35,13 @@ export type Change =
   | { kind: "pool"; step: string }
   | { kind: "level"; level: number }
   | { kind: "levelUp"; level: number }
-  | { kind: "state" | "clearChecks"; stateVersion: number }
+  | {
+      kind: "state" | "clearChecks";
+      stateVersion: number;
+      /** The play state fields that changed, at most a few; `more`: others did too. */
+      fields?: string[];
+      more?: boolean;
+    }
   | { kind: "copyCreated" | "copyChanged" | "copyDeleted"; copyId: string };
 
 /** A change of the character the channel tells, other than of the draft itself. */

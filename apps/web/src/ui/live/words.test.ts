@@ -68,6 +68,22 @@ describe("the line about a change made elsewhere", () => {
     expect(whatText({ event: "playState", change: { kind: "state", stateVersion: 2 } }, words, de)).toBe(
       "Bogen",
     );
+    // The sheet names the field: "Ausdauer", not "Bogen".
+    const sheetWords = {
+      ...words,
+      field: (id: string) => ({ "s/stamina": "Ausdauer", "s/luck": "Glück" })[id] ?? null,
+    };
+    const play = (fields: string[], more = false) =>
+      whatText(
+        { event: "playState", change: { kind: "state", stateVersion: 2, fields, more } },
+        sheetWords,
+        de,
+      );
+    expect(play(["s/stamina"])).toBe("Ausdauer");
+    expect(play(["s/luck", "s/stamina"])).toBe("Glück, Ausdauer");
+    expect(play(["s/stamina"], true)).toBe("Ausdauer und mehr");
+    // A field the shown sheet does not have: the sheet as a whole.
+    expect(play(["cards/gone/uses"])).toBe("Bogen");
     expect(whatText({ event: "copies", change: { kind: "copyDeleted", copyId: "c" } }, words, en)).toBe(
       "sheet version",
     );

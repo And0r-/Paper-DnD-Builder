@@ -57,8 +57,8 @@ function usePersonName() {
   return (p: Person) => personText(p, viewer, t);
 }
 
-/** The short line about the last change made elsewhere. */
-function useToldLine(): { seq: number; text: string } | null {
+/** The short line about the last change made elsewhere; `fieldName` names play state fields (the sheet). */
+function useToldLine(fieldName?: (id: string) => string | null): { seq: number; text: string } | null {
   const { t } = useApp();
   const { told, lp, ev } = useDraft();
   const viewer = useViewer();
@@ -70,6 +70,7 @@ function useToldLine(): { seq: number; text: string } | null {
       // The question's own title ("Name"), as the step shows it.
       choice: (id) => stepTitle(lp, ev, id),
       level: ptext(lp, "level.name") ?? "",
+      ...(fieldName ? { field: fieldName } : {}),
     },
     t,
   );
@@ -232,10 +233,11 @@ function useAfter(on: boolean, ms: number): boolean {
   return on && late;
 }
 
-export function LiveBar() {
+/** `fieldName`: on the sheet, what a field of the play state is called, so a change says "Stamina". */
+export function LiveBar({ fieldName }: { fieldName?: (id: string) => string | null } = {}) {
   const { t } = useApp();
   const { live } = useDraft();
-  const told = useToldLine();
+  const told = useToldLine(fieldName);
   const others = useOthers();
   const canGuide = useCanGuide();
   const [composing, setComposing] = useState(false);
