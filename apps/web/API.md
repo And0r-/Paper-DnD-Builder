@@ -641,7 +641,9 @@ the character deleted, or out of the game master's campaign);
 `4429` more than 20 connections on one character. Access is checked again
 on every change of who may reach what, and every 30 seconds. Anything else
 (`1001`, `1006`, …) is the connection: connect again. The server pings
-every 30 seconds and drops a connection that does not answer.
+every 10 seconds and drops a connection that does not answer the next
+one, so the others see someone who lost their network gone within 20
+seconds.
 
 ### Example
 

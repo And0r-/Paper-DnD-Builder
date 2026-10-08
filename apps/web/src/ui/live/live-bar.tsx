@@ -96,7 +96,34 @@ export function showPointed(thing: string) {
   card.scrollIntoView({ block: "center", behavior: still ? "auto" : "smooth" });
 }
 
-function PersonChip({ person }: { person: Person }) {
+/** Whether the browser has a network; true where it cannot tell. */
+function useOnline(): boolean {
+  const [online, setOnline] = useState(true);
+  useEffect(() => {
+    const update = () => setOnline(navigator.onLine);
+    update();
+    window.addEventListener("online", update);
+    window.addEventListener("offline", update);
+    return () => {
+      window.removeEventListener("online", update);
+      window.removeEventListener("offline", update);
+    };
+  }, []);
+  return online;
+}
+
+/**
+ * Whether this window is cut off: the channel is down, the browser has no
+ * network, or saving just failed for want of one. The channel learns of a
+ * dead network only after a while; until then it still looks open (AND-272).
+ */
+function useCutOff(): boolean {
+  const { live, saveState } = useDraft();
+  const online = useOnline();
+  return live.connection === "lost" || !online || saveState === "offline";
+}
+
+function PersonChip({ person, stale }: { person: Person; stale: boolean }) {
   const { t } = useApp();
   const { lp, draft } = useDraft();
   const nameOf = usePersonName();
@@ -107,9 +134,10 @@ function PersonChip({ person }: { person: Person }) {
   const pointed = person.point ? thingName(lp, person.point) : "";
   return (
     <li className="livebar__person">
-      <span className="livebar__dot" aria-hidden="true" />
+      {/* Grey while this window is cut off: whether they are still there is not known (AND-272). */}
+      <span className={`livebar__dot${stale ? " livebar__dot--stale" : ""}`} aria-hidden="true" />
       <span className="livebar__name">{nameOf(person)}</span>
-      <span className="visually-hidden">, {t("live.connected")}</span>
+      <span className="visually-hidden">, {stale ? t("live.unknown") : t("live.connected")}</span>
       {step &&
         (href ? (
           <Link
@@ -236,16 +264,25 @@ export function LiveBar() {
   const { t } = useApp();
   const { live } = useDraft();
   const told = useToldLine();
-  const others = useOthers();
+  const current = useOthers();
   const canGuide = useCanGuide();
+  const cutOff = useCutOff();
   const [composing, setComposing] = useState(false);
+
+  // Cut off, the people last seen stay, in grey: a green dot would claim a connection there is none of.
+  const [lastSeen, setLastSeen] = useState<Person[]>([]);
+  const { people } = live;
+  useEffect(() => {
+    if (!cutOff) setLastSeen(people.filter((p) => p.id !== live.you?.id));
+  }, [cutOff, people, live.you]);
+  const others = cutOff && current.length === 0 ? lastSeen : current;
   const ref = useRef<HTMLDivElement>(null);
 
   // The line about a lost connection matters only where someone else builds along.
   const [hadCompany, setHadCompany] = useState(false);
   if (others.length > 0 && !hadCompany) setHadCompany(true);
   const helping = live.you !== null && live.you.role !== "owner";
-  const lost = useAfter(live.connection === "lost", LOST_AFTER_MS) && (hadCompany || helping);
+  const lost = useAfter(cutOff, LOST_AFTER_MS) && (hadCompany || helping);
 
   const [changed, setChanged] = useState<number | null>(null);
   const toldSeq = told?.seq;
@@ -282,7 +319,7 @@ export function LiveBar() {
             <p className="livebar__label">{t("live.with")}</p>
             <ul className="livebar__people">
               {others.map((p) => (
-                <PersonChip key={p.id} person={p} />
+                <PersonChip key={p.id} person={p} stale={cutOff} />
               ))}
             </ul>
             {canGuide && (

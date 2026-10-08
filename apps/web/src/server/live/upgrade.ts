@@ -32,8 +32,12 @@ import { clientIdOf, viaOf } from "./source.ts";
 
 const PATH = /^\/api\/live\/drafts\/([^/]+)\/?$/;
 const MAX_MESSAGE_BYTES = 64 * 1024;
-/** Proxies close quiet connections after a minute or so; a ping keeps them open and finds dead ones. */
-const PING_MS = 30_000;
+/**
+ * Proxies close quiet connections after a minute or so; a ping keeps them
+ * open and finds dead ones. Often enough that the others see someone whose
+ * network went gone within 20 seconds, not still "connected" (AND-272).
+ */
+const PING_MS = 10_000;
 
 /** The standard Request the API's login check reads, from the handshake's headers. */
 function asRequest(req: IncomingMessage): Request {
