@@ -117,7 +117,7 @@ function Campaigns() {
                 <li key={c.id} className="campaign">
                   <div className="campaign__main">
                     <h3 className="campaign__name">{c.name}</h3>
-                    <p className="campaign__meta">{t("campaigns.ledBy", { email: c.gameMaster.email })}</p>
+                    <p className="campaign__meta">{t("campaigns.ledBy", { name: c.gameMaster.name })}</p>
                   </div>
                   <div className="campaign__actions">
                     <ButtonLink

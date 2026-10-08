@@ -26,6 +26,12 @@
   cursor: progress;
 }
 
+/* Not possible right now; a note next to it says why. */
+.btn:disabled {
+  color: var(--color-ink-muted);
+  cursor: not-allowed;
+}
+
 .btn--primary {
   background: var(--color-primary);
   color: var(--color-on-primary);
@@ -968,30 +974,17 @@ textarea.field__input {
   text-align: center;
 }
 
-.auth__help summary {
-  min-height: var(--target-min);
+.settings__identity {
   display: flex;
-  align-items: center;
-  color: var(--color-primary);
-  font-weight: var(--weight-semibold);
-  cursor: pointer;
+  flex-direction: column;
+  gap: var(--space-4);
+  max-width: 28rem;
 }
 
-.auth__help > p {
-  margin-bottom: var(--space-3);
-}
-
-.auth__help-actions {
+.fresh-password {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-3);
-}
-
-.auth__resent {
-  color: var(--color-success);
-  font-size: var(--text-sm);
-  margin-top: var(--space-2);
+  flex-direction: column;
+  gap: var(--space-4);
 }
 
 /* ------------------------------------------------------------ characters */
@@ -1341,6 +1334,12 @@ textarea.field__input {
   line-height: var(--text-sm-lh);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
+
+.copy-text--large .copy-text__value {
+  font-size: var(--text-lg);
+  line-height: var(--text-lg-lh);
+  font-weight: var(--weight-semibold);
 }
 
 .copy-text__value:focus-visible {

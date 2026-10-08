@@ -372,7 +372,7 @@ export function FlowLayout({ current, children }: { current: string | undefined;
               </span>
               {/* A game master building for a player always sees whose character it is. */}
               {draft.access === "gameMaster" && (
-                <span className="topbar__owner">{t("flow.forPlayer", { email: draft.owner.email })}</span>
+                <span className="topbar__owner">{t("flow.forPlayer", { name: draft.owner.name })}</span>
               )}
             </span>
           }

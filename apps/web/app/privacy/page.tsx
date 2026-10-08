@@ -18,6 +18,7 @@ export default function PrivacyPage() {
           <p className="auth__intro">{t("privacy.intro")}</p>
           <h2 className="section-title">{t("privacy.stored")}</h2>
           <ul>
+            <li>{t("privacy.name")}</li>
             <li>{t("privacy.email")}</li>
             <li>{t("privacy.password")}</li>
             <li>{t("privacy.settings")}</li>

@@ -41,7 +41,7 @@ export default function NewPage() {
 }
 
 /** Whom a game master builds for; `null` while loading, `"missing"` if not a player of a campaign they lead. */
-type ForPlayer = { campaignId: string; playerId: string; email: string };
+type ForPlayer = { campaignId: string; playerId: string; name: string };
 
 function useForPlayer(): ForPlayer | null | "missing" | undefined {
   const params = useSearchParams();
@@ -55,7 +55,7 @@ function useForPlayer(): ForPlayer | null | "missing" | undefined {
     api<CampaignView>("GET", `/api/campaigns/${encodeURIComponent(campaignId)}`).then(
       (v) => {
         const p = v.players?.find((x) => x.id === playerId);
-        if (live) setFound({ key, value: p ? { campaignId, playerId, email: p.email } : "missing" });
+        if (live) setFound({ key, value: p ? { campaignId, playerId, name: p.name } : "missing" });
       },
       (e) => {
         if (live && e instanceof ApiError && e.status < 500 && !e.isNetwork)
@@ -224,7 +224,7 @@ function NewCharacter() {
         }}
       >
         <QuestionHeader id={headingId} question={t("new.question")} intro={t("new.intro")} />
-        {forPlayer && <Callout tone="info">{t("new.forPlayer", { email: forPlayer.email })}</Callout>}
+        {forPlayer && <Callout tone="info">{t("new.forPlayer", { name: forPlayer.name })}</Callout>}
         <fieldset className="options" aria-labelledby={headingId}>
           <div className="options__list">
             {list.map((p) => (

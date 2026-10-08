@@ -8,13 +8,14 @@ import { useId, useRef, useState } from "react";
 import { useApp } from "../app-state.tsx";
 import { Button } from "./Button.tsx";
 
-export function CopyText({ label, value }: { label: string; value: string }) {
+/** `large`: a password to write down, big enough to read letter by letter. */
+export function CopyText({ label, value, large }: { label: string; value: string; large?: boolean }) {
   const { t } = useApp();
   const labelId = useId();
   const ref = useRef<HTMLElement>(null);
   const [copied, setCopied] = useState(false);
   return (
-    <div className="copy-text">
+    <div className={large ? "copy-text copy-text--large" : "copy-text"}>
       <p className="field__label" id={labelId}>
         {label}
       </p>

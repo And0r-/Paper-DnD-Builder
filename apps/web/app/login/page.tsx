@@ -1,31 +1,40 @@
 "use client";
 /**
- * Login (flow spec 4.1): mail address → password from the mail → in.
- * There is no "sign up": a new address gets an account, a known one a new
- * password. For the player both are the same path.
+ * Login (AND-235): no mail on the way in.
+ *
+ * - "Get started": a name and, if wanted, a mail address (only a way back
+ *   in). The server makes the account and its password; the player sees
+ *   the password once and is in.
+ * - "Log in": the password alone.
+ * - "Account from before": mail address and the password that used to be
+ *   mailed, once; it is swapped for a new password, shown like a new one.
  */
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useApp } from "../../src/ui/app-state.tsx";
-import { api, ApiError, type Account } from "../../src/ui/api.ts";
+import { api, ApiError, type Account, type FreshPasswordInfo } from "../../src/ui/api.ts";
 import { Button } from "../../src/ui/components/Button.tsx";
 import { Callout } from "../../src/ui/components/Feedback.tsx";
 import { Explained } from "../../src/ui/components/Explained.tsx";
 import { TextField } from "../../src/ui/components/Fields.tsx";
+import { FreshPassword } from "../../src/ui/components/FreshPassword.tsx";
 import { GuestShell } from "../../src/ui/components/Shell.tsx";
 import { usePageTitle } from "../../src/ui/flow/frame.tsx";
 
-type Mode = "email" | "check" | "have";
+type Mode = "start" | "login" | "legacy";
 
 const MAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const RESEND_AFTER_S = 60;
+/** The server's limit for a name (see API.md). */
+const MAX_NAME = 80;
 
 export default function LoginPage() {
   const app = useApp();
   const { t, tc, lang, account } = app;
   const router = useRouter();
-  const [mode, setMode] = useState<Mode>("email");
+  const [mode, setMode] = useState<Mode>("start");
+  const [name, setName] = useState("");
+  const [nameError, setNameError] = useState<string>();
   const [email, setEmail] = useState("");
   const [emailError, setEmailError] = useState<string>();
   const [password, setPassword] = useState("");
@@ -33,95 +42,105 @@ export default function LoginPage() {
   const [visible, setVisible] = useState(true);
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState<string>();
-  const [sentAt, setSentAt] = useState<number>(0);
-  const [now, setNow] = useState(() => Date.now());
-  const [resent, setResent] = useState(false);
+  // A password just made: shown until the player says they have it. The
+  // account is taken over only then, so nothing moves on before.
+  const [fresh, setFresh] = useState<{ account: Account; secret: string }>();
+  const nameRef = useRef<HTMLInputElement & HTMLTextAreaElement>(null);
   const emailRef = useRef<HTMLInputElement & HTMLTextAreaElement>(null);
   const passwordRef = useRef<HTMLInputElement & HTMLTextAreaElement>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
 
   usePageTitle([
-    mode === "check" ? t("login.checkTitle") : mode === "have" ? t("login.haveTitle") : t("login.title"),
+    fresh
+      ? t("password.title")
+      : mode === "login"
+        ? t("login.haveTitle")
+        : mode === "legacy"
+          ? t("login.legacyTitle")
+          : t("login.title"),
   ]);
 
   useEffect(() => {
-    if (account) router.replace("/characters");
-  }, [account, router]);
+    if (account && !fresh) router.replace("/characters");
+  }, [account, fresh, router]);
 
-  useEffect(() => {
-    if (mode !== "check") return;
-    const id = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(id);
-  }, [mode]);
+  const focusHeading = () => requestAnimationFrame(() => headingRef.current?.focus());
 
   const go = (m: Mode) => {
     setMode(m);
     setFormError(undefined);
     setPasswordError(undefined);
-    requestAnimationFrame(() => headingRef.current?.focus());
+    setEmailError(undefined);
+    setNameError(undefined);
+    setPassword("");
+    focusHeading();
   };
 
   const minutes = (e: ApiError) => Math.max(1, Math.ceil((e.retryAfter ?? 300) / 60));
 
-  const checkEmail = (): boolean => {
-    const ok = MAIL.test(email.trim());
+  const failure = (error: unknown) => (error instanceof ApiError ? error : new ApiError(0, "network"));
+
+  const checkEmail = (required: boolean): boolean => {
+    const value = email.trim();
+    const ok = value ? MAIL.test(value) : !required;
     setEmailError(ok ? undefined : t("login.emailInvalid"));
     if (!ok) emailRef.current?.focus();
     return ok;
   };
 
-  const requestPassword = async (): Promise<boolean> => {
+  const checkPassword = (): boolean => {
+    if (password.trim()) return true;
+    setPasswordError(t("login.passwordMissing"));
+    passwordRef.current?.focus();
+    return false;
+  };
+
+  const showFresh = (r: { account: Account; password: FreshPasswordInfo }) => {
+    setFresh({ account: r.account, secret: r.password.secret });
+    setPassword("");
+    focusHeading();
+  };
+
+  const onStart = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!name.trim()) {
+      setNameError(t("login.nameMissing"));
+      nameRef.current?.focus();
+      return;
+    }
+    if (!checkEmail(false)) return;
     setFormError(undefined);
     setBusy(true);
     try {
-      await api("POST", "/api/auth/password", { email: email.trim(), language: lang });
-      setSentAt(Date.now());
-      setNow(Date.now());
-      return true;
+      showFresh(
+        await api<{ account: Account; password: FreshPasswordInfo }>("POST", "/api/auth/signup", {
+          name: name.trim(),
+          ...(email.trim() ? { email: email.trim() } : {}),
+          language: lang,
+        }),
+      );
     } catch (error) {
-      const e = error instanceof ApiError ? error : new ApiError(0, "network");
-      if (e.status === 400) {
-        setEmailError(t("login.emailInvalid"));
-        emailRef.current?.focus();
-      } else if (e.status === 429) setFormError(tc("login.tooManyMails", minutes(e)));
-      else if (e.code === "mailNotConfigured") setFormError(t("login.mailNotConfigured"));
-      else if (e.isNetwork) setFormError(t("common.offline"));
-      else setFormError(t("login.mailFailed"));
-      return false;
+      const err = failure(error);
+      if (err.status === 429) setFormError(tc("login.tooManySignups", minutes(err)));
+      else if (err.isNetwork) setFormError(t("common.offline"));
+      else setFormError(t("common.loadError"));
     } finally {
       setBusy(false);
     }
   };
 
-  const onSend = async (e: FormEvent) => {
-    e.preventDefault();
-    if (!checkEmail()) return;
-    if (await requestPassword()) {
-      setPassword("");
-      go("check");
-    }
-  };
-
   const onLogin = async (e: FormEvent) => {
     e.preventDefault();
-    if (mode === "have" && !checkEmail()) return;
-    if (!password.trim()) {
-      setPasswordError(t("login.passwordMissing"));
-      passwordRef.current?.focus();
-      return;
-    }
+    if (!checkPassword()) return;
     setFormError(undefined);
     setPasswordError(undefined);
     setBusy(true);
     try {
-      const r = await api<{ account: Account }>("POST", "/api/auth/login", {
-        email: email.trim(),
-        password: password.trim(),
-      });
+      const r = await api<{ account: Account }>("POST", "/api/auth/login", { password: password.trim() });
       app.setAccount(r.account);
       router.replace("/characters");
     } catch (error) {
-      const err = error instanceof ApiError ? error : new ApiError(0, "network");
+      const err = failure(error);
       if (err.status === 401 || err.status === 400) {
         setPasswordError(t("login.wrongPassword"));
         passwordRef.current?.focus();
@@ -133,12 +152,36 @@ export default function LoginPage() {
     }
   };
 
-  const wait = Math.max(0, RESEND_AFTER_S - Math.floor((now - sentAt) / 1000));
+  const onLegacy = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!checkEmail(true) || !checkPassword()) return;
+    setFormError(undefined);
+    setPasswordError(undefined);
+    setBusy(true);
+    try {
+      showFresh(
+        await api<{ account: Account; password: FreshPasswordInfo }>("POST", "/api/auth/legacy-login", {
+          email: email.trim(),
+          password: password.trim(),
+        }),
+      );
+    } catch (error) {
+      const err = failure(error);
+      if (err.status === 401 || err.status === 400) {
+        setPasswordError(t("login.legacyWrong"));
+        passwordRef.current?.focus();
+      } else if (err.status === 429) setFormError(tc("login.tooMany", minutes(err)));
+      else if (err.isNetwork) setFormError(t("common.offline"));
+      else setFormError(t("common.loadError"));
+    } finally {
+      setBusy(false);
+    }
+  };
 
-  const passwordField = (
+  const passwordField = (label: string) => (
     <TextField
       ref={passwordRef}
-      label={t("login.passwordLabel")}
+      label={label}
       type={visible ? "text" : "password"}
       autoComplete="current-password"
       autoCapitalize="none"
@@ -159,6 +202,12 @@ export default function LoginPage() {
     />
   );
 
+  const errorBox = formError && (
+    <Callout tone="danger" role="alert">
+      {formError}
+    </Callout>
+  );
+
   return (
     <GuestShell>
       <div className="auth">
@@ -168,15 +217,43 @@ export default function LoginPage() {
             <span>{t("app.name")}</span>
           </Explained>
         </p>
-        {mode === "email" && (
-          <form className="auth__card" onSubmit={onSend} noValidate>
+
+        {fresh ? (
+          <section className="auth__card" aria-labelledby="fresh-title">
+            <h1 className="auth__title" id="fresh-title" tabIndex={-1} ref={headingRef}>
+              {t("password.welcome", { name: fresh.account.name })}
+            </h1>
+            <FreshPassword
+              secret={fresh.secret}
+              onDone={() => {
+                app.setAccount(fresh.account);
+                router.replace("/characters");
+              }}
+            />
+          </section>
+        ) : mode === "start" ? (
+          <form className="auth__card" onSubmit={onStart} noValidate>
             <h1 className="auth__title" tabIndex={-1} ref={headingRef}>
               {t("login.title")}
             </h1>
             <p className="auth__intro">{t("login.intro")}</p>
             <TextField
+              ref={nameRef}
+              label={t("login.nameLabel")}
+              help={t("login.nameHelp")}
+              autoComplete="nickname"
+              maxLength={MAX_NAME}
+              value={name}
+              error={nameError}
+              onChange={(e) => {
+                setName(e.target.value);
+                setNameError(undefined);
+              }}
+            />
+            <TextField
               ref={emailRef}
               label={t("login.emailLabel")}
+              help={t("login.emailHelp")}
               type="email"
               inputMode="email"
               autoComplete="email"
@@ -192,79 +269,50 @@ export default function LoginPage() {
                 email.trim() && !MAIL.test(email.trim()) && setEmailError(t("login.emailInvalid"))
               }
             />
-            {formError && (
-              <Callout tone="danger" role="alert">
-                {formError}
-              </Callout>
-            )}
-            <Button type="submit" block busy={busy} busyLabel={t("login.sending")} icon="mail">
-              {t("login.send")}
+            {errorBox}
+            <Button type="submit" block busy={busy} busyLabel={t("login.starting")}>
+              {t("login.start")}
             </Button>
             <p className="auth__small">
               {t("login.privacyNote")} <Link href="/privacy">{t("login.privacyLink")}</Link>
             </p>
             <p className="auth__switch">
-              <button type="button" className="link-button" onClick={() => go("have")}>
+              <button type="button" className="link-button" onClick={() => go("login")}>
                 {t("login.havePassword")}
               </button>
             </p>
           </form>
-        )}
-
-        {mode === "check" && (
-          <form className="auth__card" onSubmit={onLogin} noValidate>
-            <h1 className="auth__title" tabIndex={-1} ref={headingRef}>
-              {t("login.checkTitle")}
-            </h1>
-            <p className="auth__intro">
-              {t("login.checkIntro", { email: "\u0000" })
-                .split("\u0000")
-                .flatMap((part, i) => (i === 0 ? [part] : [<strong key={i}>{email.trim()}</strong>, part]))}
-            </p>
-            {passwordField}
-            {formError && (
-              <Callout tone="danger" role="alert">
-                {formError}
-              </Callout>
-            )}
-            <Button type="submit" block busy={busy} busyLabel={t("login.submitting")}>
-              {t("login.submit")}
-            </Button>
-            <details className="auth__help">
-              <summary>{t("login.noMail")}</summary>
-              <p>{t("login.noMailHelp")}</p>
-              <div className="auth__help-actions">
-                <Button
-                  variant="secondary"
-                  aria-disabled={wait > 0 || undefined}
-                  onClick={async () => {
-                    if (wait > 0) return;
-                    setResent(false);
-                    if (await requestPassword()) setResent(true);
-                  }}
-                >
-                  {wait > 0 ? t("login.resendIn", { seconds: wait }) : t("login.resend")}
-                </Button>
-                <button type="button" className="link-button" onClick={() => go("email")}>
-                  {t("login.otherEmail")}
-                </button>
-              </div>
-              <p aria-live="polite" className="auth__resent">
-                {resent ? t("login.resent") : ""}
-              </p>
-            </details>
-          </form>
-        )}
-
-        {mode === "have" && (
+        ) : mode === "login" ? (
           <form className="auth__card" onSubmit={onLogin} noValidate>
             <h1 className="auth__title" tabIndex={-1} ref={headingRef}>
               {t("login.haveTitle")}
             </h1>
             <p className="auth__intro">{t("login.haveIntro")}</p>
+            {passwordField(t("login.passwordLabel"))}
+            {errorBox}
+            <Button type="submit" block busy={busy} busyLabel={t("login.submitting")}>
+              {t("login.submit")}
+            </Button>
+            <p className="auth__switch">
+              <button type="button" className="link-button" onClick={() => go("start")}>
+                {t("login.needPassword")}
+              </button>
+            </p>
+            <p className="auth__switch auth__small">
+              <button type="button" className="link-button" onClick={() => go("legacy")}>
+                {t("login.legacy")}
+              </button>
+            </p>
+          </form>
+        ) : (
+          <form className="auth__card" onSubmit={onLegacy} noValidate>
+            <h1 className="auth__title" tabIndex={-1} ref={headingRef}>
+              {t("login.legacyTitle")}
+            </h1>
+            <p className="auth__intro">{t("login.legacyIntro")}</p>
             <TextField
               ref={emailRef}
-              label={t("login.emailLabel")}
+              label={t("login.legacyEmailLabel")}
               type="email"
               inputMode="email"
               autoComplete="email"
@@ -277,18 +325,14 @@ export default function LoginPage() {
                 if (emailError) setEmailError(undefined);
               }}
             />
-            {passwordField}
-            {formError && (
-              <Callout tone="danger" role="alert">
-                {formError}
-              </Callout>
-            )}
+            {passwordField(t("login.legacyPasswordLabel"))}
+            {errorBox}
             <Button type="submit" block busy={busy} busyLabel={t("login.submitting")}>
               {t("login.submit")}
             </Button>
             <p className="auth__switch">
-              <button type="button" className="link-button" onClick={() => go("email")}>
-                {t("login.needPassword")}
+              <button type="button" className="link-button" onClick={() => go("login")}>
+                {t("login.toLogin")}
               </button>
             </p>
           </form>
