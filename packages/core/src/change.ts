@@ -114,7 +114,8 @@ function firstTrack(pkg: ContentPackage, doc: DraftDocument): string | undefined
 }
 
 function checkTracks(pkg: ContentPackage, tracks: readonly string[], most: number): ChangeError | undefined {
-  if (!pkg.flow.level.tracks) return { code: "noTracks" };
+  // Without tracks every level is the character's: only "none" fits.
+  if (!pkg.flow.level.tracks) return tracks.length > 0 ? { code: "noTracks" } : undefined;
   const things = trackThings(pkg);
   const unknown = tracks.find((t) => !things.has(t));
   if (unknown !== undefined) return { code: "unknownTrack", thing: unknown };

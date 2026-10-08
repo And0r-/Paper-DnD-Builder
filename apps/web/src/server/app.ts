@@ -34,6 +34,7 @@ export interface DraftCause {
   change?:
     | { kind: "answer"; choice: string }
     | { kind: "pool"; step: string }
+    | { kind: "tracks" }
     | { kind: "level" | "levelUp"; level: number };
 }
 

@@ -73,6 +73,7 @@ export const clientMessage = z.discriminatedUnion("type", [
   z.strictObject({ type: z.literal("hint"), text: z.string().trim().min(1).max(500) }),
   changeBodies.answer.extend({ type: z.literal("answer"), ref, choice: short }),
   changeBodies.pool.extend({ type: z.literal("pool"), ref, step: short }),
+  changeBodies.tracks.extend({ type: z.literal("tracks"), ref }),
   changeBodies.setLevel.extend({ type: z.literal("setLevel"), ref }),
   changeBodies.levelUp.extend({ type: z.literal("levelUp"), ref }),
   changeBodies.finish.extend({ type: z.literal("finish"), ref }),
@@ -86,10 +87,12 @@ function editOf(m: ChangeMessage): Edit {
       return edits.answer(m.choice, m.answer);
     case "pool":
       return edits.pool(m.step, m.picks);
+    case "tracks":
+      return edits.tracks(m.tracks);
     case "setLevel":
       return edits.setLevel(m.level);
     case "levelUp":
-      return edits.levelUp(m.level);
+      return edits.levelUp(m.level, m.tracks);
     case "finish":
       return edits.finish();
   }

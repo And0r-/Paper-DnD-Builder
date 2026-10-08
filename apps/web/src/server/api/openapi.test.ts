@@ -461,6 +461,14 @@ async function walk(server: TestServer): Promise<void> {
     { version: view.draft.version, answer: { pick: "x" } },
     k,
   );
+  // The demo package has no tracks: only "every level in the first" fits.
+  view = (await call("PUT", `/api/drafts/${id}/tracks`, { version: view.draft.version, tracks: [] }, k)).json;
+  await call(
+    "PUT",
+    `/api/drafts/${id}/tracks`,
+    { version: view.draft.version, tracks: ["calling.herbalist"] },
+    k,
+  );
   await call("POST", `/api/drafts/${id}/finish`, { version: view.draft.version }, k);
   await call("POST", `/api/drafts/${id}/level-up`, { version: view.draft.version, level: 4 }, k);
   await call("GET", `/api/drafts/${id}/pdf`, undefined, k);

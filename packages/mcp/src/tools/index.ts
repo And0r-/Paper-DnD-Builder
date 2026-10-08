@@ -8,6 +8,7 @@ import { draftPackage, enc, ApiError, type ApiClient } from "../api-client.ts";
 import type {
   ChoiceState,
   DraftListEntry,
+  Evaluation,
   DraftView,
   PackageEntry,
   ValueExplanation,
@@ -136,6 +137,7 @@ const getCharacter = defineTool({
         packageId: view.draft.packageId,
         ...(view.draft.extensions.length > 0 ? { extensions: view.draft.extensions } : {}),
         summary: view.summary ? words.summaryLine(view.summary.line) : null,
+        ...(ev.tracks ? { tracks: tracksInWords(ev.tracks, words) } : {}),
         ...(view.levelUp
           ? {
               raise: {
@@ -439,14 +441,60 @@ const setLevel = defineTool({
   },
 });
 
+/**
+ * The tracks of a character in words: each with its levels, and for the
+ * next level which may be added, with the package's reason where not.
+ */
+function tracksInWords(tracks: NonNullable<Evaluation["tracks"]>, words: Words) {
+  const reason = (id: string) => words.text(`${id}.addReason`) ?? words.name(id);
+  return {
+    choice: tracks.choice,
+    levels: tracks.list.map((t) => ({
+      thing: t.thing,
+      name: words.name(t.thing),
+      levels: t.levels,
+      fromLevel: t.from,
+      ...(t.added ? { added: true } : { first: true }),
+    })),
+    nextLevel: tracks.options.map((o) => ({
+      thing: o.thing,
+      name: words.name(o.thing),
+      allowed: o.allowed,
+      ...(o.notMet ? { because: o.notMet.map(reason) } : {}),
+    })),
+    ...(tracks.unfit.length > 0
+      ? {
+          noLongerFits: tracks.unfit.map((id) => ({ thing: id, name: words.name(id), because: reason(id) })),
+        }
+      : {}),
+  };
+}
+
+const setTracks = defineTool({
+  name: "set_tracks",
+  description: T.set_tracks,
+  input: { characterId, tracks: z.array(z.string().min(1)).max(1000).describe(D.tracks) },
+  async run(client, { characterId, tracks }) {
+    const result = await client.change(characterId, "PUT", `/api/drafts/${enc(characterId)}/tracks`, {
+      tracks,
+    });
+    return { data: changeOutcome(result, await client.words(draftPackage(result.view.draft))) };
+  },
+});
+
 const levelUp = defineTool({
   name: "level_up",
   description: T.level_up,
-  input: { characterId, level: z.number().int().describe(D.raiseLevel) },
-  async run(client, { characterId, level }) {
+  input: {
+    characterId,
+    level: z.number().int().describe(D.raiseLevel),
+    tracks: z.array(z.string().min(1)).max(1000).optional().describe(D.raiseTracks),
+  },
+  async run(client, { characterId, level, tracks }) {
     try {
       const result = await client.change(characterId, "POST", `/api/drafts/${enc(characterId)}/level-up`, {
         level,
+        ...(tracks !== undefined ? { tracks } : {}),
       });
       const words = await client.words(draftPackage(result.view.draft));
       const outcome = changeOutcome(result, words);
@@ -471,6 +519,24 @@ const levelUp = defineTool({
           "Only a finished character can be raised. Finish it first, or change the level of an open " +
             "character with set_level.",
         );
+      }
+      const reason =
+        e instanceof ApiError ? (e.details["reason"] as Record<string, unknown> | undefined) : undefined;
+      if (reason?.["code"] === "trackNotAllowed") {
+        // The package's own sentence for each condition not met, in the player's language.
+        const [view, words] = await viewWithWords(client, characterId);
+        const thing = String(reason["thing"]);
+        const notMet = Array.isArray(reason["notMet"]) ? reason["notMet"].map(String) : [];
+        return {
+          isError: true,
+          data: {
+            message: `Nothing was saved: ${words.name(thing)} cannot be added at level ${String(reason["level"])}.`,
+            because: notMet.map((id) => words.text(`${id}.addReason`) ?? words.name(id)),
+            ...(evaluationOf(view).tracks
+              ? { tracks: tracksInWords(evaluationOf(view).tracks!, words) }
+              : {}),
+          },
+        };
       }
       throw e;
     }
@@ -557,6 +623,7 @@ export const TOOLS: readonly Tool[] = [
   answerPool,
   startCharacter,
   setLevel,
+  setTracks,
   levelUp,
   finishCharacter,
   getSheet,

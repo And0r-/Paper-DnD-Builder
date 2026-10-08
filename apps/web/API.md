@@ -189,7 +189,8 @@ works for a [helper](#live-help) with `?help=<token>` (`access: "helper"`).
 | 🔒 `PATCH /api/drafts/:id`               | `{ version, level?, extensions? }`                | Changes the level, or the extensions switched on (all of them, as a list). One goes off only while no answer comes from it: else `409 extensionInUse` with `extension` and the `choices` to change first. |
 | 🔒 `PUT /api/drafts/:id/pools/:step`     | `{ version, picks }`                              | All picks of a step with a shared list (`steps[].pool`); the core spreads them over the step's choices.                                                                                                   |
 | 🔒 `PUT /api/drafts/:id/answers/:choice` | `{ version, answer }`                             | Answers one choice; `answer: null` removes it. `422 changeRejected` with the reason if it does not fit now.                                                                                               |
-| 🔒 `POST /api/drafts/:id/level-up`       | `{ version, level }`                              | Raises a finished character; see [Raising a character](#raising-a-character).                                                                                                                             |
+| 🔒 `PUT /api/drafts/:id/tracks`          | `{ version, tracks }`                             | With tracks only: the track of each level from 2 on; see [Tracks](#tracks-levels-in-more-than-one-thing).                                                                                                 |
+| 🔒 `POST /api/drafts/:id/level-up`       | `{ version, level, tracks? }`                     | Raises a finished character; see [Raising a character](#raising-a-character).                                                                                                                             |
 | 🔒 `POST /api/drafts/:id/finish`         | `{ version }`                                     | Marks the character finished; `422 incomplete` with the open choices.                                                                                                                                     |
 | 🔒 `PUT /api/drafts/:id/campaign`        | `{ campaignId }`                                  | Owner only. Puts the character into a campaign you play in or lead, or into none (`null`). The `version` stays.                                                                                           |
 | 🔒 `DELETE /api/drafts/:id`              | —                                                 | `204`.                                                                                                                                                                                                    |
@@ -292,6 +293,78 @@ Errors:
 | `422`  | `changeRejected`, `reason: { code: "levelOutOfRange", min, max }` | Above the package's `flow.level.max` (or not a level at all).                                        |
 | `409`  | `versionConflict`                                                 | The draft moved on (see above).                                                                      |
 | `400`  | `badRequest`                                                      | `level` is not a whole number.                                                                       |
+
+### Tracks: levels in more than one thing
+
+Since format 0.21 a package may let a character split its levels between
+several things of one choice (`flow.level.tracks`, package format SPEC
+9.7), for example two callings. Without it nothing here applies. The draft
+keeps `draft.tracks`: the track (a thing id) of each level from 2 on, in
+level order; level 1 always goes to the answer of the tracks choice, and
+a level left out goes there too. An empty list means one track, as before.
+
+`evaluation.tracks` says how it stands:
+
+```json
+"tracks": {
+  "choice": "calling",
+  "first": "calling.lantern-bearer",
+  "levels": ["calling.lantern-bearer", "calling.lantern-bearer", "calling.lantern-bearer", "calling.herbalist", "calling.herbalist"],
+  "list": [
+    { "thing": "calling.lantern-bearer", "levels": 3, "from": 1, "added": false },
+    { "thing": "calling.herbalist", "levels": 2, "from": 4, "added": true }
+  ],
+  "options": [
+    { "thing": "calling.lantern-bearer", "allowed": true },
+    { "thing": "calling.river-runner", "allowed": false, "notMet": ["calling.river-runner"] },
+    { "thing": "calling.herbalist", "allowed": true }
+  ],
+  "unfit": []
+}
+```
+
+| Field     | Meaning                                                                                                                                                                                                                  |
+| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `options` | For the next level (a raise): every thing of the tracks choice. A track the character has is always allowed. A new one needs its `addRequires` (with `addRequiresCurrent`, also those of the tracks it has) to hold now. |
+| `notMet`  | The things whose condition does not hold, the track itself first. The package's sentence for each is the text `<thing>.addReason`.                                                                                       |
+| `unfit`   | Added tracks whose condition no longer holds, checked as the character was before the level that added them. They still count; the character is not complete until the player resolves it.                               |
+
+What else changes with more than one track:
+
+- A thing that came through a track (the track itself, what it grants,
+  what is picked in a choice it grants, and so on) has `track` in
+  `evaluation.things`. Its grants with `atLevel` and its tables by level
+  count the levels in that track: a track added at level 4 gives its
+  level-2 grants at character level 5. `level` stays the character level.
+- A choice that comes through an added track is a copy
+  `<choice>@<track>` with an answer of its own; the first track keeps the
+  plain ids. Steps and choices carry `track`, steps also `trackLevel`.
+- `explain` names the track and the level in it for a part from a thing in a track.
+- `summary.line` gives a `{ tracks }` argument as a list
+  `[{ "thing": "calling.lantern-bearer", "levels": 3 }, …]`, most levels
+  first; the screens write it "Lantern bearer 3 / Herbalist 2".
+
+**Setting the levels while building:** `PUT /api/drafts/:id/tracks` with
+`{ "version": 7, "tracks": ["calling.lantern-bearer", "calling.herbalist"] }`.
+Every entry must be a thing of the tracks choice, at most `level - 1` of
+them. A track whose condition does not hold is still taken and shows in
+`unfit`, so the levels can be set before the numbers that decide it.
+Answers of a track taken away stay and count again once it is back.
+Changing the answer of the tracks choice moves the levels that named the
+old first track to the new one.
+
+**Raising into a track:** `POST /api/drafts/:id/level-up` with
+`{ "version": 7, "level": 6, "tracks": ["calling.herbalist"] }`: one entry
+per new level, in order; a level left out goes to the track of the level
+before. Here the condition is checked for the character as it is before
+each new level.
+
+| Status | Code                                                                          | When                                                                               |
+| ------ | ----------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| `422`  | `changeRejected`, `reason: { code: "noTracks" }`                              | The package has no tracks.                                                         |
+| `422`  | `changeRejected`, `reason: { code: "unknownTrack", thing }`                   | Not a thing of the tracks choice.                                                  |
+| `422`  | `changeRejected`, `reason: { code: "tooManyTracks", most }`                   | More entries than levels to give them to.                                          |
+| `422`  | `changeRejected`, `reason: { code: "trackNotAllowed", thing, level, notMet }` | Raising only: the track may not be added at that level (`notMet` as in `options`). |
 
 ### Explaining a value
 
@@ -599,8 +672,9 @@ to that change, to the sender only.
 | ---------- | ------------------------------------- | ----------------------------------------------------------------------------------------- |
 | `answer`   | `version`, `choice`, `answer`, `ref?` | As `PUT /api/drafts/:id/answers/:choice`; `answer: null` removes it.                      |
 | `pool`     | `version`, `step`, `picks`, `ref?`    | As `PUT /api/drafts/:id/pools/:step`.                                                     |
+| `tracks`   | `version`, `tracks`, `ref?`           | As `PUT /api/drafts/:id/tracks`.                                                          |
 | `setLevel` | `version`, `level`, `ref?`            | As `PATCH /api/drafts/:id`.                                                               |
-| `levelUp`  | `version`, `level`, `ref?`            | As `POST /api/drafts/:id/level-up`.                                                       |
+| `levelUp`  | `version`, `level`, `tracks?`, `ref?` | As `POST /api/drafts/:id/level-up`.                                                       |
 | `finish`   | `version`, `ref?`                     | As `POST /api/drafts/:id/finish`.                                                         |
 | `step`     | `step`: string (≤ 200) or `null`      | Where you are now (a step id, `overview`, …: the screen's own words). Goes to `presence`. |
 | `point`    | `target`: string (≤ 200) or `null`    | What you point at ("this card": a thing, choice or value id). Goes to `presence`.         |
@@ -610,17 +684,17 @@ to that change, to the sender only.
 
 Every message has `type` and `draftId`.
 
-| `type`      | Fields                                                                                                                                                                                | When                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `welcome`   | `you: Person`                                                                                                                                                                         | First, once connected.                                                                                                                                                                                                                                                                                                                                                                                                                                               |
-| `presence`  | `people: [Person]`                                                                                                                                                                    | When someone joins or leaves, or changes `step` or `point`; to everyone. In the order they joined.                                                                                                                                                                                                                                                                                                                                                                   |
-| `state`     | `draft`, `packageAvailable`, `evaluation`, `summary`, `levelUp` (as `GET /api/drafts/:id`), `version`, `by`, `ref?`, `stale?`; after a change also `event`, `at`, `source`, `change?` | On joining; and after every change of the draft, by anyone, live, over the HTTP API or over MCP; to everyone. `event` is `changed` (`change`: `{ kind: "answer", choice }`, `{ kind: "pool", step }` or `{ kind: "level", level }`), `levelUp` (`change: { kind: "levelUp", level }`) or `finished`. `by: { id, name }` is the connection that changed it live, else `null`; `source` says who and how, for every change. `ref` only to the one who sent the change. |
-| `playState` | `version`, `at`, `source`, `change: { kind: "state" \| "clearChecks", stateVersion }`                                                                                                 | The play state was stored (`PUT /api/drafts/:id/state`); read it again if you show it.                                                                                                                                                                                                                                                                                                                                                                               |
-| `copies`    | `version`, `at`, `source`, `change: { kind: "copyCreated" \| "copyChanged" \| "copyDeleted", copyId }`                                                                                | A kept sheet was made, changed or deleted.                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| `campaign`  | `version`, `at`, `source`                                                                                                                                                             | The character moved into another campaign or none; a game master who lost it is closed with `4404` right after.                                                                                                                                                                                                                                                                                                                                                      |
-| `deleted`   | `version`, `at`, `source`                                                                                                                                                             | The owner deleted the character; everyone is closed with `4404` right after. Do not reconnect.                                                                                                                                                                                                                                                                                                                                                                       |
-| `hint`      | `from: { id, name }`, `text`                                                                                                                                                          | Someone sent a hint; to everyone, the sender too.                                                                                                                                                                                                                                                                                                                                                                                                                    |
-| `error`     | `code`, `ref?`, details as the HTTP error                                                                                                                                             | A change the rules refuse (`changeRejected`, `incomplete`, `notFinished`, `packageUnavailable`), a message of the wrong shape (`badJson`, `badRequest` with `issues`), too many messages (`tooManyRequests`: 60 per 10 seconds). To the sender only. Before a close: `notLoggedIn`, `keyNotValid`, `draftNotFound`, `tooManyPeople`.                                                                                                                                 |
+| `type`      | Fields                                                                                                                                                                                | When                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `welcome`   | `you: Person`                                                                                                                                                                         | First, once connected.                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| `presence`  | `people: [Person]`                                                                                                                                                                    | When someone joins or leaves, or changes `step` or `point`; to everyone. In the order they joined.                                                                                                                                                                                                                                                                                                                                                                                         |
+| `state`     | `draft`, `packageAvailable`, `evaluation`, `summary`, `levelUp` (as `GET /api/drafts/:id`), `version`, `by`, `ref?`, `stale?`; after a change also `event`, `at`, `source`, `change?` | On joining; and after every change of the draft, by anyone, live, over the HTTP API or over MCP; to everyone. `event` is `changed` (`change`: `{ kind: "answer", choice }`, `{ kind: "pool", step }`, `{ kind: "tracks" }` or `{ kind: "level", level }`), `levelUp` (`change: { kind: "levelUp", level }`) or `finished`. `by: { id, name }` is the connection that changed it live, else `null`; `source` says who and how, for every change. `ref` only to the one who sent the change. |
+| `playState` | `version`, `at`, `source`, `change: { kind: "state" \| "clearChecks", stateVersion }`                                                                                                 | The play state was stored (`PUT /api/drafts/:id/state`); read it again if you show it.                                                                                                                                                                                                                                                                                                                                                                                                     |
+| `copies`    | `version`, `at`, `source`, `change: { kind: "copyCreated" \| "copyChanged" \| "copyDeleted", copyId }`                                                                                | A kept sheet was made, changed or deleted.                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| `campaign`  | `version`, `at`, `source`                                                                                                                                                             | The character moved into another campaign or none; a game master who lost it is closed with `4404` right after.                                                                                                                                                                                                                                                                                                                                                                            |
+| `deleted`   | `version`, `at`, `source`                                                                                                                                                             | The owner deleted the character; everyone is closed with `4404` right after. Do not reconnect.                                                                                                                                                                                                                                                                                                                                                                                             |
+| `hint`      | `from: { id, name }`, `text`                                                                                                                                                          | Someone sent a hint; to everyone, the sender too.                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| `error`     | `code`, `ref?`, details as the HTTP error                                                                                                                                             | A change the rules refuse (`changeRejected`, `incomplete`, `notFinished`, `packageUnavailable`), a message of the wrong shape (`badJson`, `badRequest` with `issues`), too many messages (`tooManyRequests`: 60 per 10 seconds). To the sender only. Before a close: `notLoggedIn`, `keyNotValid`, `draftNotFound`, `tooManyPeople`.                                                                                                                                                       |
 
 `version` is the draft's version (`playState`, `copies` and `campaign`
 leave it as it was); `at` the time the change was stored. `source` is who

@@ -377,10 +377,12 @@ describe("changing the levels", () => {
       ok: false,
       error: { code: "tooManyTracks", most: 1 },
     });
-    expect(applyChange(demo, doc, { type: "tracks", tracks: [] })).toEqual({
+    expect(applyChange(demo, doc, { type: "tracks", tracks: [H] })).toEqual({
       ok: false,
       error: { code: "noTracks" },
     });
+    // Without tracks, "every level in the first" is all there is.
+    expect(applyChange(demo, doc, { type: "tracks", tracks: [] }).ok).toBe(true);
   });
 
   it("puts the tracks into the summary line", () => {

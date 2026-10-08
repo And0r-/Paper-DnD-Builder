@@ -51,6 +51,8 @@ export function draftView(row: ReachableDraftRow, pkg: ContentPackage | undefine
       /** The campaign the character belongs to; null for none. */
       campaignId: row.campaign_id,
       answers: row.document.answers,
+      /** With tracks (SPEC 9.7): the track of each level from 2 on; empty means all in the first. */
+      tracks: row.document.tracks ?? [],
       createdAt: row.created_at.toISOString(),
       updatedAt: row.updated_at.toISOString(),
       finishedAt: row.finished_at?.toISOString() ?? null,
@@ -266,13 +268,17 @@ export const edits = {
     apply: (pkg, row) => applyOrReject(pkg, row, { type: "pool", step, picks }),
     cause: { type: "changed", change: { kind: "pool", step } },
   }),
-  levelUp: (level: number): Edit => ({
+  tracks: (tracks: string[]): Edit => ({
+    apply: (pkg, row) => applyOrReject(pkg, row, { type: "tracks", tracks }),
+    cause: { type: "changed", change: { kind: "tracks" } },
+  }),
+  levelUp: (level: number, tracks?: string[]): Edit => ({
     apply: (pkg, row) => {
       // A raise that is not finished yet may go higher still; any other draft is built first.
       if (!row.finished_at && row.document.levelBefore === undefined) {
         throw new HttpError(409, "notFinished", { open: evaluateDraft(pkg, row.document).open });
       }
-      const r = levelUp(pkg, row.document, level);
+      const r = levelUp(pkg, row.document, level, tracks);
       if (!r.ok) throw new HttpError(422, "changeRejected", { reason: r.error });
       return {
         doc: r.doc,
@@ -297,7 +303,13 @@ export const changeBodies = {
   setLevel: z.strictObject({ version, level: z.number().int() }),
   answer: z.strictObject({ version, answer: z.unknown() }),
   pool: z.strictObject({ version, picks: z.array(z.string().min(1).max(200)).max(200) }),
-  levelUp: z.strictObject({ version, level: z.number().int() }),
+  tracks: z.strictObject({ version, tracks: z.array(z.string().min(1).max(200)).max(1000) }),
+  levelUp: z.strictObject({
+    version,
+    level: z.number().int(),
+    /** With tracks: the track of each new level, in order; left out, the track of the level before. */
+    tracks: z.array(z.string().min(1).max(200)).max(1000).optional(),
+  }),
   finish: z.strictObject({ version }),
 };
 
@@ -449,6 +461,15 @@ export const draftRoutes: Route[] = [
     },
   },
   {
+    // The track of each level from 2 on (SPEC 9.7): the builder's step for the levels.
+    method: "PUT",
+    path: "/api/drafts/:id/tracks",
+    handler: async (ctx) => {
+      const body = await readJson(ctx.req, changeBodies.tracks);
+      return change(ctx, body.version, edits.tracks(body.tracks));
+    },
+  },
+  {
     // Raise a finished character to a higher level. Every answer stays; only
     // what the new levels add is open. With nothing to answer, the character
     // is finished again at once.
@@ -456,7 +477,7 @@ export const draftRoutes: Route[] = [
     path: "/api/drafts/:id/level-up",
     handler: async (ctx) => {
       const body = await readJson(ctx.req, changeBodies.levelUp);
-      return change(ctx, body.version, edits.levelUp(body.level));
+      return change(ctx, body.version, edits.levelUp(body.level, body.tracks));
     },
   },
   {

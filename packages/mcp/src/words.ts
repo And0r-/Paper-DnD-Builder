@@ -5,7 +5,7 @@
  * tool shows comes from here; nothing is filled from another language.
  */
 import { convertAmount, parseTemplate, type Units } from "@builder/format/pure";
-import type { ChoiceState, TextValue } from "./api-types.ts";
+import type { ChoiceState, TextValue, TrackLevels } from "./api-types.ts";
 
 export interface WordsContext {
   texts: Readonly<Record<string, TextValue>>;
@@ -77,13 +77,21 @@ export class Words {
    * The character list's one-line summary: thing keys become names. Null
    * while something it names is not chosen yet, as in the web app.
    */
-  summaryLine(line: Readonly<Record<string, string | number | null>>): string | null {
+  summaryLine(
+    line: Readonly<Record<string, string | number | readonly TrackLevels[] | null>>,
+  ): string | null {
     const vars: Record<string, string | number> = {};
     for (const [k, v] of Object.entries(line)) {
       if (v === null) return null;
-      vars[k] = typeof v === "number" ? v : this.name(v);
+      vars[k] = typeof v === "number" ? v : typeof v === "string" ? this.name(v) : this.tracks(v);
     }
     return this.text("summary.line", vars);
+  }
+
+  /** Tracks with their levels, "A 3 / B 2"; one track alone is just its name. */
+  tracks(list: readonly TrackLevels[]): string {
+    if (list.length === 1) return this.name(list[0]!.thing);
+    return list.map((t) => `${this.name(t.thing)} ${this.number(t.levels)}`).join(" / ");
   }
 
   /** How the package writes a value ("d8" for a die), if it says; else the number. */

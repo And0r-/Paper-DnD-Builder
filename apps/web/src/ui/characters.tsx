@@ -4,7 +4,7 @@
  * its level), where it stands, and what one can do with it. Shared by
  * "My characters" and the campaign page of a game master.
  */
-import { evaluateDraft } from "@builder/core";
+import { evaluateDraft, tracksText } from "@builder/core";
 import type { Translator } from "../i18n/index.ts";
 import { useApp } from "./app-state.tsx";
 import type { DraftListEntry } from "./api.ts";
@@ -61,7 +61,13 @@ export function describeCharacter(
   let whole = true;
   for (const [k, v] of Object.entries(d.summary?.line ?? {})) {
     if (v === null) whole = false;
-    else vars[k] = typeof v === "string" ? thingName(lp, v) : v;
+    else
+      vars[k] =
+        typeof v === "string"
+          ? thingName(lp, v)
+          : typeof v === "number"
+            ? v
+            : tracksText(v, (id) => thingName(lp, id));
   }
   const ctx = measureContext(lp, undefined);
   const p = progressOf(entries);
