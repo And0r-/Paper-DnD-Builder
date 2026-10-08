@@ -630,6 +630,7 @@
   "live.what.finished": "character finished",
   "live.what.play": "sheet",
   "live.what.copy": "sheet version",
+  "live.what.andMore": "{list} and more",
   "live.what.campaign": "campaign",
   "live.person.window": "You, in another window",
   "live.person.mcp": "Connected over MCP",

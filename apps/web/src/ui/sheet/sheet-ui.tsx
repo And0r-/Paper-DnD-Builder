@@ -193,17 +193,18 @@ function WrittenField({
   const { t } = useApp();
   const { setField } = useSheetCtx();
   const [text, setText] = useState(value);
-  // What another device or a reload brings, unless it is being written in.
+  // What another device or a reload brings, unless something written here is not kept yet.
+  // A field that still has the cursor but nothing pending takes it too (AND-269).
   const focused = useRef(false);
+  const pause = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(() => {
-    if (!focused.current) setText(value);
+    if (!focused.current || pause.current === undefined) setText(value);
   }, [value]);
   // The latest text and stored value, for a save from a timer or a page event.
   const latest = useRef({ text, value });
   useEffect(() => {
     latest.current = { text, value };
   }, [text, value]);
-  const pause = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const keep = useCallback(() => {
     clearTimeout(pause.current);
     pause.current = undefined;

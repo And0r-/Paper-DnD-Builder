@@ -50,7 +50,13 @@ export function fromText(source: Source, viewer: Viewer, t: T): string {
 /** What it was about, in the screen's words; null when the channel did not say. */
 export function whatText(
   told: Pick<Told, "event" | "change">,
-  words: { step(id: string): string | null; choice(id: string): string | null; level: string },
+  words: {
+    step(id: string): string | null;
+    choice(id: string): string | null;
+    level: string;
+    /** A play state field's name on the shown sheet; only the sheet knows them. */
+    field?(id: string): string | null;
+  },
   t: T,
 ): string | null {
   if (told.event === "finished") return t("live.what.finished");
@@ -67,12 +73,29 @@ export function whatText(
       return words.level;
     case "state":
     case "clearChecks":
-      return t("live.what.play");
+      return fieldsText(c.fields ?? [], c.more ?? false, words.field, t) ?? t("live.what.play");
     case "copyCreated":
     case "copyChanged":
     case "copyDeleted":
       return t("live.what.copy");
   }
+}
+
+/** How many field names one line says; the rest is "and more". */
+const FIELDS_SHOWN = 3;
+
+/** "Stamina", "Stamina, Luck and more": the changed fields the sheet has a name for; null for none. */
+function fieldsText(
+  fields: string[],
+  more: boolean,
+  nameOf: ((id: string) => string | null) | undefined,
+  t: T,
+): string | null {
+  if (!nameOf) return null;
+  const names = [...new Set(fields.map(nameOf).filter((n): n is string => !!n))];
+  if (names.length === 0) return null;
+  const list = names.slice(0, FIELDS_SHOWN).join(", ");
+  return names.length > FIELDS_SHOWN || more ? t("live.what.andMore", { list }) : list;
 }
 
 /** The whole line: who and how, what, and whether this window's own choice there gave way. */
