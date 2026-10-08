@@ -1,18 +1,22 @@
 "use client";
 /**
- * Login (AND-235): no mail on the way in.
+ * Login (AND-235, AND-241): no mail on the way in. One page, two forms:
  *
- * - "Get started": a name and, if wanted, a mail address (only a way back
+ * - "Log in": name or mail address, and a password, for every account.
+ *   An account from before logs in with its address and its old password,
+ *   once; it gets a new password then, shown like a new one.
+ * - "Register": a name and, if wanted, a mail address (only a way back
  *   in). The server makes the account and its password; the player sees
  *   the password once and is in.
- * - "Log in": the password alone.
- * - "Account from before": mail address and the password that used to be
- *   mailed, once; it is swapped for a new password, shown like a new one.
- * - "Lost your password?" (AND-236): a link by mail to the address of the
- *   account, which shows a new password (`login/reset/[token]`). Opened
- *   with `?lost`, from a link that no longer works.
  *
- * `?login` opens "Log in" first. `?next=/join/<token>`: where to go once logged in, instead of the
+ * Side by side on a wide screen, "Log in" first on a phone. Logging out
+ * lands here, and so does a new device.
+ *
+ * "Lost your password?" (AND-236): a link by mail to the address of the
+ * account, which shows a new password (`login/reset/[token]`). Opened
+ * with `?lost`, from a link that no longer works.
+ *
+ * `?next=/join/<token>`: where to go once logged in, instead of the
  * character list (from an invitation, AND-237). Only a path on this site.
  */
 import { useRouter } from "next/navigation";
@@ -29,7 +33,7 @@ import { GuestShell } from "../../src/ui/components/Shell.tsx";
 import { usePageTitle } from "../../src/ui/flow/frame.tsx";
 import { RESEND_AFTER_S, resetLinkError, sendResetLink } from "../../src/ui/reset-link.ts";
 
-type Mode = "start" | "login" | "legacy" | "lost" | "sent";
+type Mode = "pair" | "lost" | "sent";
 
 /** `?next`, if it is a path on this site (not `//elsewhere`), else the character list. */
 function nextPath(): string {
@@ -41,12 +45,15 @@ export default function LoginPage() {
   const app = useApp();
   const { t, tc, lang, account } = app;
   const router = useRouter();
-  const [mode, setMode] = useState<Mode>("start");
+  const [mode, setMode] = useState<Mode>("pair");
+  const [who, setWho] = useState("");
+  const [whoError, setWhoError] = useState<string>();
   const [email, setEmail] = useState("");
   const [emailError, setEmailError] = useState<string>();
   const [password, setPassword] = useState("");
   const [passwordError, setPasswordError] = useState<string>();
-  const [visible, setVisible] = useState(true);
+  // Starts hidden, so the browser's password manager fills it in.
+  const [visible, setVisible] = useState(false);
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState<string>();
   // When the last link was sent, and a clock for the wait before "Send again".
@@ -57,6 +64,7 @@ export default function LoginPage() {
   // account is taken over only then, so nothing moves on before.
   // `back`: an account from before, not a new one.
   const [fresh, setFresh] = useState<{ account: Account; secret: string; back: boolean }>();
+  const whoRef = useRef<HTMLInputElement & HTMLTextAreaElement>(null);
   const emailRef = useRef<HTMLInputElement & HTMLTextAreaElement>(null);
   const passwordRef = useRef<HTMLInputElement & HTMLTextAreaElement>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
@@ -64,22 +72,16 @@ export default function LoginPage() {
   usePageTitle([
     fresh
       ? t("password.title")
-      : mode === "login"
-        ? t("login.haveTitle")
-        : mode === "legacy"
-          ? t("login.legacyTitle")
-          : mode === "lost"
-            ? t("login.lostTitle")
-            : mode === "sent"
-              ? t("login.sentTitle")
-              : t("login.title"),
+      : mode === "lost"
+        ? t("login.lostTitle")
+        : mode === "sent"
+          ? t("login.sentTitle")
+          : t("login.haveTitle"),
   ]);
 
-  // From "Ask for a new link" on a link that no longer works; from "I already have a password" on an invitation.
+  // From "Ask for a new link" on a link that no longer works.
   useEffect(() => {
-    const query = new URLSearchParams(window.location.search);
-    if (query.has("lost")) setMode("lost");
-    else if (query.has("login")) setMode("login");
+    if (new URLSearchParams(window.location.search).has("lost")) setMode("lost");
   }, []);
 
   useEffect(() => {
@@ -98,6 +100,7 @@ export default function LoginPage() {
     setMode(m);
     setFormError(undefined);
     setPasswordError(undefined);
+    setWhoError(undefined);
     setEmailError(undefined);
     setPassword("");
     setResent(false);
@@ -108,68 +111,46 @@ export default function LoginPage() {
 
   const failure = (error: unknown) => (error instanceof ApiError ? error : new ApiError(0, "network"));
 
-  const checkEmail = (required: boolean): boolean => {
-    const value = email.trim();
-    const ok = value ? MAIL.test(value) : !required;
+  const checkEmail = (): boolean => {
+    const ok = MAIL.test(email.trim());
     setEmailError(ok ? undefined : t("login.emailInvalid"));
     if (!ok) emailRef.current?.focus();
     return ok;
   };
 
-  const checkPassword = (): boolean => {
-    if (password.trim()) return true;
-    setPasswordError(t("login.passwordMissing"));
-    passwordRef.current?.focus();
-    return false;
-  };
-
-  const showFresh = (r: { account: Account; password: FreshPasswordInfo }, back = false) => {
-    setFresh({ account: r.account, secret: r.password.secret, back });
-    setPassword("");
-    focusHeading();
-  };
-
   const onLogin = async (e: FormEvent) => {
     e.preventDefault();
-    if (!checkPassword()) return;
-    setFormError(undefined);
-    setPasswordError(undefined);
-    setBusy(true);
-    try {
-      const r = await api<{ account: Account }>("POST", "/api/auth/login", { password: password.trim() });
-      app.setAccount(r.account);
-      router.replace(nextPath());
-    } catch (error) {
-      const err = failure(error);
-      if (err.status === 401 || err.status === 400) {
-        setPasswordError(t("login.wrongPassword"));
-        passwordRef.current?.focus();
-      } else if (err.status === 429) setFormError(tc("login.tooMany", minutes(err)));
-      else if (err.isNetwork) setFormError(t("common.offline"));
-      else setFormError(t("common.loadError"));
-    } finally {
-      setBusy(false);
+    if (!who.trim()) {
+      setWhoError(t("login.whoMissing"));
+      whoRef.current?.focus();
+      return;
     }
-  };
-
-  const onLegacy = async (e: FormEvent) => {
-    e.preventDefault();
-    if (!checkEmail(true) || !checkPassword()) return;
+    if (!password.trim()) {
+      setPasswordError(t("login.passwordMissing"));
+      passwordRef.current?.focus();
+      return;
+    }
     setFormError(undefined);
     setPasswordError(undefined);
     setBusy(true);
     try {
-      showFresh(
-        await api<{ account: Account; password: FreshPasswordInfo }>("POST", "/api/auth/legacy-login", {
-          email: email.trim(),
-          password: password.trim(),
-        }),
-        true,
-      );
+      const r = await api<{ account: Account; password?: FreshPasswordInfo }>("POST", "/api/auth/login", {
+        login: who.trim(),
+        password: password.trim(),
+      });
+      if (r.password) {
+        // An account from before: its old password was swapped for this one.
+        setFresh({ account: r.account, secret: r.password.secret, back: true });
+        setPassword("");
+        focusHeading();
+      } else {
+        app.setAccount(r.account);
+        router.replace(nextPath());
+      }
     } catch (error) {
       const err = failure(error);
       if (err.status === 401 || err.status === 400) {
-        setPasswordError(t("login.legacyWrong"));
+        setPasswordError(t("login.wrong"));
         passwordRef.current?.focus();
       } else if (err.status === 429) setFormError(tc("login.tooMany", minutes(err)));
       else if (err.isNetwork) setFormError(t("common.offline"));
@@ -200,55 +181,11 @@ export default function LoginPage() {
 
   const onLost = async (e: FormEvent) => {
     e.preventDefault();
-    if (!checkEmail(true)) return;
+    if (!checkEmail()) return;
     if (await requestLink()) go("sent");
   };
 
   const wait = Math.max(0, RESEND_AFTER_S - Math.floor((now - sentAt) / 1000));
-
-  const emailField = (label: string, help?: string) => (
-    <TextField
-      ref={emailRef}
-      label={label}
-      help={help}
-      type="email"
-      inputMode="email"
-      autoComplete="email"
-      autoCapitalize="none"
-      spellCheck={false}
-      value={email}
-      error={emailError}
-      onChange={(e) => {
-        setEmail(e.target.value);
-        if (emailError) setEmailError(undefined);
-      }}
-      onBlur={() => email.trim() && !MAIL.test(email.trim()) && setEmailError(t("login.emailInvalid"))}
-    />
-  );
-
-  const passwordField = (label: string) => (
-    <TextField
-      ref={passwordRef}
-      label={label}
-      type={visible ? "text" : "password"}
-      autoComplete="current-password"
-      autoCapitalize="none"
-      autoCorrect="off"
-      spellCheck={false}
-      className="field--password"
-      value={password}
-      error={passwordError}
-      onChange={(e) => {
-        setPassword(e.target.value);
-        setPasswordError(undefined);
-      }}
-      trailing={
-        <Button variant="ghost" onClick={() => setVisible((v) => !v)} aria-pressed={!visible}>
-          {visible ? t("login.hide") : t("login.show")}
-        </Button>
-      }
-    />
-  );
 
   const errorBox = formError && (
     <Callout tone="danger" role="alert">
@@ -256,9 +193,68 @@ export default function LoginPage() {
     </Callout>
   );
 
+  const loginForm = (
+    <form className="auth__card" onSubmit={onLogin} noValidate aria-labelledby="login-title">
+      <h2 className="auth__title" id="login-title">
+        {t("login.haveTitle")}
+      </h2>
+      <TextField
+        ref={whoRef}
+        label={t("login.whoLabel")}
+        autoComplete="username"
+        autoCapitalize="none"
+        autoCorrect="off"
+        spellCheck={false}
+        value={who}
+        error={whoError}
+        onChange={(e) => {
+          setWho(e.target.value);
+          setWhoError(undefined);
+          setPasswordError(undefined);
+        }}
+      />
+      <TextField
+        ref={passwordRef}
+        label={t("login.passwordLabel")}
+        help={t("login.passwordHelp")}
+        type={visible ? "text" : "password"}
+        autoComplete="current-password"
+        autoCapitalize="none"
+        autoCorrect="off"
+        spellCheck={false}
+        className="field--password"
+        value={password}
+        error={passwordError}
+        onChange={(e) => {
+          setPassword(e.target.value);
+          setPasswordError(undefined);
+        }}
+      />
+      <p className="auth__small auth__toggle">
+        <button
+          type="button"
+          className="link-button"
+          onClick={() => setVisible((v) => !v)}
+          aria-pressed={visible}
+        >
+          {visible ? t("login.hide") : t("login.show")}
+        </button>
+      </p>
+      {errorBox}
+      <Button type="submit" block busy={busy} busyLabel={t("login.submitting")}>
+        {t("login.submit")}
+      </Button>
+      <p className="auth__switch auth__small">
+        <button type="button" className="link-button" onClick={() => go("lost")}>
+          {t("login.lost")}
+        </button>
+      </p>
+    </form>
+  );
+
   return (
     <GuestShell>
-      <div className="auth">
+      <div className={`auth${!fresh && mode === "pair" ? " auth--pair" : ""}`}>
         {/* The name explains itself where it is seen first, as in the top bar after login (AND-90). */}
         <p className="auth__brand">
           <Explained hint={t("app.about")}>
@@ -273,6 +269,7 @@ export default function LoginPage() {
             </h1>
             <FreshPassword
               secret={fresh.secret}
+              username={fresh.account.name}
               noMail={!fresh.account.email}
               onDone={() => {
                 app.setAccount(fresh.account);
@@ -280,47 +277,24 @@ export default function LoginPage() {
               }}
             />
           </section>
-        ) : mode === "start" ? (
-          <GetStarted
-            title={t("login.title")}
-            intro={t("login.intro")}
-            headingRef={headingRef}
-            onStarted={(r) => showFresh(r)}
-            footer={
-              <p className="auth__switch">
-                <button type="button" className="link-button" onClick={() => go("login")}>
-                  {t("login.havePassword")}
-                </button>
-              </p>
-            }
-          />
-        ) : mode === "login" ? (
-          <form className="auth__card" onSubmit={onLogin} noValidate>
-            <h1 className="auth__title" tabIndex={-1} ref={headingRef}>
-              {t("login.haveTitle")}
+        ) : mode === "pair" ? (
+          <>
+            <h1 className="visually-hidden" tabIndex={-1} ref={headingRef}>
+              {t("login.haveTitle")} · {t("login.registerTitle")}
             </h1>
-            <p className="auth__intro">{t("login.haveIntro")}</p>
-            {passwordField(t("login.passwordLabel"))}
-            <p className="auth__small">
-              <button type="button" className="link-button" onClick={() => go("lost")}>
-                {t("login.lost")}
-              </button>
-            </p>
-            {errorBox}
-            <Button type="submit" block busy={busy} busyLabel={t("login.submitting")}>
-              {t("login.submit")}
-            </Button>
-            <p className="auth__switch">
-              <button type="button" className="link-button" onClick={() => go("start")}>
-                {t("login.needPassword")}
-              </button>
-            </p>
-            <p className="auth__switch auth__small">
-              <button type="button" className="link-button" onClick={() => go("legacy")}>
-                {t("login.legacy")}
-              </button>
-            </p>
-          </form>
+            <div className="auth__pair">
+              {loginForm}
+              <GetStarted
+                title={t("login.registerTitle")}
+                heading="h2"
+                intro={t("login.intro")}
+                onStarted={(r) => {
+                  setFresh({ account: r.account, secret: r.password.secret, back: false });
+                  focusHeading();
+                }}
+              />
+            </div>
+          </>
         ) : mode === "lost" ? (
           <form className="auth__card" onSubmit={onLost} noValidate>
             <h1 className="auth__title" tabIndex={-1} ref={headingRef}>
@@ -329,18 +303,35 @@ export default function LoginPage() {
             <p className="auth__intro">{t("login.lostIntro")}</p>
             {/* Before the field: the server always answers "on its way", so after sending it is too late to learn this. */}
             <Callout tone="info">{t("login.lostNoMail")}</Callout>
-            {emailField(t("login.lostEmailLabel"))}
+            <TextField
+              ref={emailRef}
+              label={t("login.lostEmailLabel")}
+              type="email"
+              inputMode="email"
+              autoComplete="email"
+              autoCapitalize="none"
+              spellCheck={false}
+              value={email}
+              error={emailError}
+              onChange={(e) => {
+                setEmail(e.target.value);
+                if (emailError) setEmailError(undefined);
+              }}
+              onBlur={() =>
+                email.trim() && !MAIL.test(email.trim()) && setEmailError(t("login.emailInvalid"))
+              }
+            />
             {errorBox}
             <Button type="submit" block busy={busy} busyLabel={t("login.lostSending")}>
               {t("login.lostSend")}
             </Button>
             <p className="auth__switch">
-              <button type="button" className="link-button" onClick={() => go("login")}>
+              <button type="button" className="link-button" onClick={() => go("pair")}>
                 {t("login.toLogin")}
               </button>
             </p>
           </form>
-        ) : mode === "sent" ? (
+        ) : (
           <section className="auth__card" aria-labelledby="sent-title">
             <h1 className="auth__title" id="sent-title" tabIndex={-1} ref={headingRef}>
               {t("login.sentTitle")}
@@ -366,29 +357,11 @@ export default function LoginPage() {
             </p>
             <p className="auth__small">{t("login.lostNoMail")}</p>
             <p className="auth__switch">
-              <button type="button" className="link-button" onClick={() => go("login")}>
+              <button type="button" className="link-button" onClick={() => go("pair")}>
                 {t("login.toLogin")}
               </button>
             </p>
           </section>
-        ) : (
-          <form className="auth__card" onSubmit={onLegacy} noValidate>
-            <h1 className="auth__title" tabIndex={-1} ref={headingRef}>
-              {t("login.legacyTitle")}
-            </h1>
-            <p className="auth__intro">{t("login.legacyIntro")}</p>
-            {emailField(t("login.legacyEmailLabel"))}
-            {passwordField(t("login.legacyPasswordLabel"))}
-            {errorBox}
-            <Button type="submit" block busy={busy} busyLabel={t("login.submitting")}>
-              {t("login.submit")}
-            </Button>
-            <p className="auth__switch">
-              <button type="button" className="link-button" onClick={() => go("login")}>
-                {t("login.toLogin")}
-              </button>
-            </p>
-          </form>
         )}
       </div>
     </GuestShell>

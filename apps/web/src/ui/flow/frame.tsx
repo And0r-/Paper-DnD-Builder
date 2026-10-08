@@ -24,6 +24,7 @@ import { Callout } from "../components/Feedback.tsx";
 import { Icon } from "../components/Icon.tsx";
 import { RichText } from "../components/RichText.tsx";
 import { AppShell } from "../components/Shell.tsx";
+import { takeJoined } from "../joined.ts";
 import { levelWord, ptext } from "../package-text.ts";
 import { useDraft } from "./draft-state.tsx";
 import { levelHeading, levelSpan } from "./level-runs.ts";
@@ -600,13 +601,24 @@ export function StepFrame({
   laterLink?: ReactNode;
 }) {
   const { t } = useApp();
-  const { lp, entries, rejected } = useDraft();
+  const { lp, draft, entries, rejected } = useDraft();
   const autoId = useId();
   const headingId = givenHeadingId ?? autoId;
+  // Right after joining from an invitation, once (src/ui/joined.ts).
+  const [joined, setJoined] = useState<string | null>(null);
+  useEffect(() => {
+    const name = takeJoined(draft.id);
+    if (name) setJoined(name);
+  }, [draft.id]);
   const inFlow = entries.some((e) => e.key === entry.key);
   usePageTitle(inFlow ? [question, t("flow.progress", positionOf(entries, entry))] : [question]);
   return (
     <div className="step" aria-labelledby={headingId}>
+      {joined && (
+        <Callout tone="success" role="status">
+          {t("new.joined", { name: joined })}
+        </Callout>
+      )}
       <ProgressHeader entry={entry} />
       <QuestionHeader
         id={headingId}

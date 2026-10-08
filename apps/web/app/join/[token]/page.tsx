@@ -8,6 +8,10 @@
  * through the login screen: on a phone, a newcomer types a name, keeps the
  * password and is in the campaign, building. "I already have a password"
  * goes to the login and comes back here.
+ *
+ * Whoever leads the campaign, or plays in it already (also from an old
+ * link that was replaced), is told so instead of being asked to join
+ * (AND-241).
  */
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -16,6 +20,7 @@ import { api, ApiError, type Account, type Invite } from "../../../src/ui/api.ts
 import { Button, ButtonLink } from "../../../src/ui/components/Button.tsx";
 import { Callout, Loading } from "../../../src/ui/components/Feedback.tsx";
 import { FreshPassword } from "../../../src/ui/components/FreshPassword.tsx";
+import { Explained } from "../../../src/ui/components/Explained.tsx";
 import { GetStarted } from "../../../src/ui/components/GetStarted.tsx";
 import { GuestShell } from "../../../src/ui/components/Shell.tsx";
 import { usePageTitle } from "../../../src/ui/flow/frame.tsx";
@@ -66,7 +71,7 @@ export default function JoinPage() {
         "POST",
         `/api/invites/${encodeURIComponent(token)}/join`,
       );
-      router.replace(`/new?campaign=${encodeURIComponent(campaignId)}`);
+      router.replace(`/new?campaign=${encodeURIComponent(campaignId)}&joined`);
     } catch (e) {
       const err = e instanceof ApiError ? e : new ApiError(0, "network");
       if (err.status === 404) setState({ kind: "notFound" });
@@ -88,6 +93,7 @@ export default function JoinPage() {
         </h1>
         <FreshPassword
           secret={fresh.secret}
+          username={fresh.account.name}
           noMail={!fresh.account.email}
           onDone={() => {
             app.setAccount(fresh.account);
@@ -120,6 +126,32 @@ export default function JoinPage() {
     );
   } else if (state.kind === "loading" || account === undefined) {
     content = <Loading shape="page" count={2} />;
+  } else if (account && state.invite.you === "gameMaster") {
+    content = (
+      <section className="auth__card" aria-labelledby="join-title">
+        <h1 className="auth__title" id="join-title">
+          {t("join.ownTitle")}
+        </h1>
+        <p className="auth__intro">{t("join.ownText")}</p>
+        <ButtonLink href={`/campaigns/${encodeURIComponent(state.invite.campaign.id)}`} block>
+          {t("join.toCampaign")}
+        </ButtonLink>
+      </section>
+    );
+  } else if (account && state.invite.you === "player") {
+    content = (
+      <section className="auth__card" aria-labelledby="join-title">
+        <h1 className="auth__title" id="join-title">
+          {t("join.alreadyTitle", { name: state.invite.campaign.name })}
+        </h1>
+        <ButtonLink href={`/new?campaign=${encodeURIComponent(state.invite.campaign.id)}`} icon="plus" block>
+          {t("characters.new")}
+        </ButtonLink>
+        <ButtonLink href="/characters" variant="ghost">
+          {t("menu.characters")}
+        </ButtonLink>
+      </section>
+    );
   } else {
     const { invite } = state;
     const errorBox = error && (
@@ -159,7 +191,7 @@ export default function JoinPage() {
               }}
               footer={
                 <p className="auth__switch">
-                  <ButtonLink href={`/login?login&next=${encodeURIComponent(path)}`} variant="ghost">
+                  <ButtonLink href={`/login?next=${encodeURIComponent(path)}`} variant="ghost">
                     {t("login.havePassword")}
                   </ButtonLink>
                 </p>
@@ -174,7 +206,12 @@ export default function JoinPage() {
   return (
     <GuestShell>
       <div className="auth">
-        <p className="auth__brand">{t("app.name")}</p>
+        {/* As on the login page: the name explains itself where a newcomer sees it first. */}
+        <p className="auth__brand">
+          <Explained hint={t("app.about")}>
+            <span>{t("app.name")}</span>
+          </Explained>
+        </p>
         {content}
       </div>
     </GuestShell>

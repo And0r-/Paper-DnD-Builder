@@ -27,6 +27,8 @@ export interface CharacterItem {
   /** Back into the builder, for a finished character (the sheet's "To the builder"). */
   editHref?: string | undefined;
   raiseHref?: string | undefined;
+  /** The campaign it belongs to, by name, where the list mixes campaigns ("My characters"). */
+  campaign?: string | undefined;
 }
 
 /** The packages of every listed draft whose package is loaded, in the screen language. */
@@ -102,6 +104,9 @@ export function CharacterCard({
       <div className="character__main">
         <Heading className="character__name">{item.name}</Heading>
         {item.line && <p className="character__line">{item.line}</p>}
+        {item.campaign && (
+          <p className="character__campaign">{t("characters.campaign", { name: item.campaign })}</p>
+        )}
         <p className={`character__status${item.finished ? " character__status--done" : ""}`}>
           {item.finished && <Icon name="check" size={18} />}
           <span>{item.status}</span>

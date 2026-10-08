@@ -8,7 +8,10 @@
  * the character is for (AND-231, AND-234), with the campaign they joined last chosen: most come here
  * straight from the invitation. Without a campaign the question is skipped.
  * `?campaign=<id>` alone chooses that campaign instead (from the invitation
- * page, AND-237); "no campaign" stays a choice.
+ * page, AND-237) and counts as the answer: the question is skipped, "Back"
+ * still leads to it, and "no campaign" stays a choice there (AND-241).
+ * With `&joined` (just joined from the invitation) the first screen says
+ * once that one plays in that campaign now.
  *
  * `?campaign=<id>&player=<id>`: a game master builds for a player of their
  * campaign. The character is the player's from the start and belongs to
@@ -32,6 +35,7 @@ import { SelectField } from "../../src/ui/components/Fields.tsx";
 import { AppShell } from "../../src/ui/components/Shell.tsx";
 import { QuestionHeader, usePageTitle } from "../../src/ui/flow/frame.tsx";
 import { RequireAccount } from "../../src/ui/guards.tsx";
+import { rememberJoined } from "../../src/ui/joined.ts";
 import { loadPackageList } from "../../src/ui/packages.ts";
 
 export default function NewPage() {
@@ -76,7 +80,9 @@ function NewCharacter() {
   const { t, lang } = useApp();
   const router = useRouter();
   const forPlayer = useForPlayer();
-  const preferred = useSearchParams().get("campaign");
+  const params = useSearchParams();
+  const preferred = params.get("campaign");
+  const justJoined = params.has("joined");
   const [list, setList] = useState<PackageListEntry[] | null>(null);
   const [failed, setFailed] = useState(false);
   // The campaigns the viewer plays in or leads; not asked when a game master builds for a player.
@@ -84,6 +90,9 @@ function NewCharacter() {
   const [campaignPick, setCampaignPick] = useState<string>();
   /** The campaign the character is for once decided; NO_CAMPAIGN for none. */
   const [campaign, setCampaign] = useState<string>();
+  /** The campaign just joined, while it is the one chosen: "You now play in …". */
+  const [joinedName, setJoinedName] = useState<string>();
+  const joined = joinedName !== undefined && campaign === preferred ? joinedName : undefined;
   const [attempt, setAttempt] = useState(0);
   const [picked, setPicked] = useState<string>();
   const [busy, setBusy] = useState(false);
@@ -104,6 +113,7 @@ function NewCharacter() {
                 { packageId },
               )
             : await api<DraftView>("POST", "/api/drafts", { packageId, campaignId: campaign || null });
+        if (joined) rememberJoined(r.draft.id, joined);
         router.replace(`/c/${r.draft.id}/level`);
       } catch {
         setProblem(t("common.loadError"));
@@ -111,7 +121,7 @@ function NewCharacter() {
         started.current = false;
       }
     },
-    [router, t, forPlayer, campaign],
+    [router, t, forPlayer, campaign, joined],
   );
   // Building for a player waits until the player is known; one's own waits for the campaign.
   const own = forPlayer === undefined;
@@ -137,16 +147,21 @@ function NewCharacter() {
       (c) => {
         if (!live) return;
         setCampaigns(c);
-        setCampaignPick((c.find((x) => x.id === preferred) ?? c[0])?.id ?? NO_CAMPAIGN);
-        // Nothing to ask: the character is in no campaign.
+        const named = c.find((x) => x.id === preferred);
+        setCampaignPick((named ?? c[0])?.id ?? NO_CAMPAIGN);
+        // Nothing to ask: the character is in no campaign. From an invitation: answered already.
         if (c.length === 0) setCampaign(NO_CAMPAIGN);
+        else if (named) {
+          setCampaign(named.id);
+          if (justJoined) setJoinedName(named.name);
+        }
       },
       () => live && setFailed(true),
     );
     return () => {
       live = false;
     };
-  }, [forPlayer, preferred, attempt]);
+  }, [forPlayer, preferred, justJoined, attempt]);
 
   useEffect(() => {
     if (list?.length === 1 && ready && !started.current) {
@@ -226,6 +241,11 @@ function NewCharacter() {
           else void create(picked);
         }}
       >
+        {joined && (
+          <Callout tone="success" role="status">
+            {t("new.joined", { name: joined })}
+          </Callout>
+        )}
         <QuestionHeader id={headingId} question={t("new.question")} intro={t("new.intro")} />
         {forPlayer && <Callout tone="info">{t("new.forPlayer", { name: forPlayer.name })}</Callout>}
         <fieldset className="options" aria-labelledby={headingId}>

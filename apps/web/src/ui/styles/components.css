@@ -156,6 +156,12 @@
   gap: var(--space-2);
 }
 
+.callout__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
 .callout--info {
   background: var(--color-primary-soft);
   color: var(--color-primary);
@@ -931,6 +937,29 @@ textarea.field__input {
   max-width: var(--content-max);
 }
 
+/* "Log in" and "Register" on one page (AND-241): side by side on a wide
+   screen, one under the other on a phone, "Log in" first. */
+.auth--pair {
+  max-width: 60rem;
+}
+
+.auth__pair {
+  display: grid;
+  gap: var(--space-5);
+  align-items: start;
+}
+
+@media (min-width: 760px) {
+  .auth__pair {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+/* Show or hide the password: a text button under the field, so the field keeps the full width. */
+.auth__toggle {
+  margin-top: calc(-1 * var(--space-3));
+}
+
 .auth__brand {
   font-size: var(--text-sm);
   font-weight: var(--weight-semibold);
@@ -1028,6 +1057,12 @@ textarea.field__input {
 }
 
 .character__line {
+  color: var(--color-ink-muted);
+}
+
+.character__campaign {
+  font-size: var(--text-sm);
+  line-height: var(--text-sm-lh);
   color: var(--color-ink-muted);
 }
 

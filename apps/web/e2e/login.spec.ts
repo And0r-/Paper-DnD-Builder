@@ -1,8 +1,9 @@
 /**
- * Login without mail (AND-235): get started with a name alone, see the
- * password once, log in on a second device with the password alone (typed
- * the way people type it), manage passwords in the settings. Nothing waits
- * for a mail and nothing is mailed.
+ * Login without mail (AND-235, AND-241): "Log in" and "Register" on one
+ * page; register with a name alone, see the password once, log in on a
+ * second device with name and password (typed the way people type it),
+ * manage passwords in the settings. Nothing waits for a mail and nothing
+ * is mailed.
  */
 import AxeBuilder from "@axe-core/playwright";
 import type { Browser, Page } from "@playwright/test";
@@ -41,11 +42,36 @@ for (const lang of ["de", "en"] as const) {
     const name = lang === "de" ? "Mira" : "Robin";
     await page.goto("/login");
     if (lang === "en") await chooseLanguage(page, "en");
-    await expect(page.getByRole("heading", { level: 1, name: m["login.title"] })).toBeVisible();
+    // Both forms, each under its own heading; on the phone "Log in" comes first.
+    const loginHeading = page.getByRole("heading", { level: 2, name: m["login.haveTitle"], exact: true });
+    const registerHeading = page.getByRole("heading", { level: 2, name: m["login.registerTitle"] });
+    await expect(loginHeading).toBeVisible();
+    await expect(registerHeading).toBeVisible();
+    const [up, down] = [(await loginHeading.boundingBox())!, (await registerHeading.boundingBox())!];
+    expect(up.y).toBeLessThan(down.y);
+    await expect(page.getByText(m["login.intro"])).toBeVisible();
     await expect(page.getByText(m["login.emailHelp"])).toBeVisible();
+    await expect(page.getByText(m["login.passwordHelp"])).toBeVisible();
+    await expect(page.getByRole("button", { name: m["login.havePassword"] })).toHaveCount(0);
+    // The password field starts hidden, so a password manager fills it, and keeps the whole width.
+    const field = page.getByLabel(m["login.passwordLabel"]);
+    await expect(field).toHaveAttribute("type", "password");
+    const who = (await page.getByLabel(m["login.whoLabel"]).boundingBox())!;
+    expect((await field.boundingBox())!.width).toBeCloseTo(who.width, 0);
+    await page.getByRole("button", { name: m["login.show"] }).click();
+    await expect(field).toHaveAttribute("type", "text");
+    await page.getByRole("button", { name: m["login.hide"] }).click();
+    await expect(field).toHaveAttribute("type", "password");
     await expectOneLanguage(page, lang);
     await noAxeViolations(page);
     await shot(page, `21-login-start-${lang}`);
+    // On a wide screen side by side, "Log in" on the left.
+    await page.setViewportSize({ width: 1280, height: 860 });
+    const [left, right] = [(await loginHeading.boundingBox())!, (await registerHeading.boundingBox())!];
+    expect(left.x).toBeLessThan(right.x);
+    expect(Math.abs(left.y - right.y)).toBeLessThan(2);
+    await shot(page, `21-login-start-desktop-${lang}`);
+    await page.setViewportSize({ width: 412, height: 839 });
 
     // A name is needed; the address is not.
     await page.getByRole("button", { name: m["login.start"] }).click();
@@ -97,18 +123,18 @@ for (const lang of ["de", "en"] as const) {
     await page.waitForURL(/\/c\/[0-9a-f-]+\/level$/);
     expect(await mails()).toBe(before);
 
-    // Another device: the password alone, typed with spaces and a capital, finds the account.
+    // Another device: the name and the password, typed with spaces and capitals, find the account.
     const other = await secondDevice(browser, `second-${lang}`);
     await other.goto("/login");
     if (lang === "en") await chooseLanguage(other, "en");
-    await other.getByRole("button", { name: m["login.havePassword"] }).click();
-    await expect(other.getByRole("heading", { level: 1, name: m["login.haveTitle"] })).toBeVisible();
+    await other.getByLabel(m["login.whoLabel"]).fill(name.toLowerCase());
     await other.getByLabel(m["login.passwordLabel"]).fill("x-y-z-v-w-1234");
     await other.getByRole("button", { name: m["login.submit"], exact: true }).click();
-    await expect(other.getByText(m["login.wrongPassword"])).toBeVisible();
+    await expect(other.getByText(m["login.wrong"])).toBeVisible();
     await expectOneLanguage(other, lang);
     await shot(other, `21-login-have-${lang}`);
     const typed = password.replace(/-/g, " ").replace(/^./, (c) => c.toUpperCase());
+    await other.getByLabel(m["login.whoLabel"]).fill(` ${name.toUpperCase()} `);
     await other.getByLabel(m["login.passwordLabel"]).fill(typed);
     await other.getByRole("button", { name: m["login.submit"], exact: true }).click();
     await expect(other.getByRole("heading", { level: 1, name: m["characters.title"] })).toBeVisible();
@@ -173,8 +199,10 @@ test("settings: a second password, the first deleted, the last one stays", async
   await shot(page, "21-login-settings-passwords");
 
   const other = await secondDevice(browser, "second-settings");
-  expect((await other.request.post("/api/auth/login", { data: { password: first } })).status()).toBe(401);
-  await login(other, second);
+  expect(
+    (await other.request.post("/api/auth/login", { data: { login: "Kim", password: first } })).status(),
+  ).toBe(401);
+  await login(other, "Kim", second);
   await other.context().close();
 
   // Name and address: the address is optional and can be removed again.
@@ -193,23 +221,19 @@ test("settings: a second password, the first deleted, the last one stays", async
     .toMatchObject({ name: "Kim Nord", email: null });
 });
 
-test("an account from before: a wrong address or password is refused in plain words", async ({
+test("an account from before logs in in the same form; a wrong address or password is refused in plain words", async ({
   page,
   foreign,
 }) => {
   void foreign;
   const m = de;
   await page.goto("/login");
-  await page.getByRole("button", { name: m["login.havePassword"] }).click();
-  await page.getByRole("button", { name: m["login.legacy"] }).click();
-  await expect(page.getByRole("heading", { level: 1, name: m["login.legacyTitle"] })).toBeVisible();
-  await page.getByLabel(m["login.legacyEmailLabel"]).fill("niemand@example.test");
-  await page.getByLabel(m["login.legacyPasswordLabel"]).fill("anker-falke-wiese-7320");
+  await expect(page.getByRole("button", { name: /früher/ })).toHaveCount(0);
+  await page.getByLabel(m["login.whoLabel"]).fill("niemand@example.test");
+  await page.getByLabel(m["login.passwordLabel"]).fill("anker-falke-wiese-7320");
   await page.getByRole("button", { name: m["login.submit"], exact: true }).click();
-  await expect(page.getByText(m["login.legacyWrong"])).toBeVisible();
+  await expect(page.getByText(m["login.wrong"])).toBeVisible();
   await expectOneLanguage(page, "de");
   await noAxeViolations(page);
-  await shot(page, "21-login-legacy");
-  await page.getByRole("button", { name: m["login.toLogin"] }).click();
-  await expect(page.getByRole("heading", { level: 1, name: m["login.haveTitle"] })).toBeVisible();
+  await shot(page, "21-login-wrong");
 });

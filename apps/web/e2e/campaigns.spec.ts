@@ -4,9 +4,11 @@
  * off the page. A newcomer on a phone opens the link, gets started with a
  * name, keeps the password, is in the campaign and builds a character for
  * it, which the game master then sees. Someone with an account joins with
- * one button; opening the link again changes nothing. A new link stops the
- * old one, the players stay. Everyone sees names, never addresses. A
- * stranger sees nothing of it. No mail is sent for any of it.
+ * one button; opening the link again says they play there already, also
+ * with the old link once a new one is made (AND-241). The game master's
+ * own link says so. A new link stops the old one for everyone else, the
+ * players stay. Everyone sees names, never addresses. A stranger sees
+ * nothing of it. No mail is sent for any of it.
  */
 import AxeBuilder from "@axe-core/playwright";
 import type { Browser, Page } from "@playwright/test";
@@ -115,16 +117,42 @@ test("game master, newcomer, player with an account and a stranger", async ({ pa
   const shown = p2.getByRole("region", { name: m["password.welcome"].replace("{name}", newcomer) });
   await expect(shown.locator(".copy-text__value")).not.toBeEmpty();
   await shown.getByRole("button", { name: m["password.done"] }).click();
-  // Straight on to a new character, with the campaign chosen and "no campaign" still there.
-  await p2.waitForURL(`**/new?campaign=${campaignId}`);
-  const pick = p2.getByLabel(m["new.campaignLabel"]);
-  await expect(pick).toHaveValue(campaignId);
-  await expect(pick.locator("option")).toHaveText([campaignName, m["new.noCampaign"]]);
-  await shot(p2, "94-einladung-kampagne-gewaehlt");
-  await p2.getByRole("button", { name: m["common.next"] }).click();
+  // Straight on to a new character: the campaign question is answered by the invitation, and the
+  // first step says once where one plays now.
   await p2.waitForURL(/\/c\/[0-9a-f-]+\/level$/);
+  const joinedNote = p2
+    .getByRole("status")
+    .filter({ hasText: m["new.joined"].replace("{name}", campaignName) });
+  await expect(joinedNote).toBeVisible();
+  await expectOneLanguage(p2, "de");
+  await shot(p2, "94-einladung-kampagne-gewaehlt");
   const draftId = /\/c\/([0-9a-f-]+)\//.exec(p2.url())![1]!;
+  expect(
+    ((await (await p2.request.get(`/api/drafts/${draftId}`)).json()) as { draft: { campaignId: string } })
+      .draft.campaignId,
+  ).toBe(campaignId);
+  await p2.reload();
+  await expect(p2.getByText(m["new.joined"].replace("{name}", campaignName))).toHaveCount(0);
   await answerCharacter(p2, draftId);
+
+  // "My characters": the card names the campaign. No address given: a reminder, until "Later".
+  await p2.goto("/characters");
+  const card = p2.getByRole("article").filter({ has: p2.getByRole("heading", { name: "Mira" }) });
+  await expect(card.getByText(m["characters.campaign"].replace("{name}", campaignName))).toBeVisible();
+  const reminder = p2.getByText(m["characters.mailReminder"]);
+  await expect(reminder).toBeVisible();
+  await expect(p2.getByRole("link", { name: m["characters.mailReminderAction"] })).toHaveAttribute(
+    "href",
+    "/settings",
+  );
+  await expectOneLanguage(p2, "de");
+  await noAxeViolations(p2);
+  await shot(p2, "96-meine-charaktere-erinnerung");
+  await p2.getByRole("button", { name: m["characters.mailReminderLater"] }).click();
+  await expect(reminder).toHaveCount(0);
+  await p2.reload();
+  await expect(p2.getByRole("heading", { level: 2, name: "Mira" })).toBeVisible();
+  await expect(reminder).toHaveCount(0);
 
   // The game master sees the newcomer and their character, as a card.
   await page.setViewportSize({ width: 412, height: 915 });
@@ -168,17 +196,35 @@ test("game master, newcomer, player with an account and a stranger", async ({ pa
   await p3.goto(invite.path);
   await expect(p3.getByLabel(m["login.nameLabel"])).toHaveCount(0);
   await shot(p3, "95-einladung-mit-konto");
-  await p3.getByRole("button", { name: m["join.join"] }).click();
-  await p3.waitForURL(`**/new?campaign=${campaignId}`);
-  await expect(p3.getByLabel(m["new.campaignLabel"])).toHaveValue(campaignId);
-  // Opening it again changes nothing.
-  await p3.goto(invite.path);
-  await p3.getByRole("button", { name: m["join.join"] }).click();
-  await p3.waitForURL(`**/new?campaign=${campaignId}`);
   // "Not now" goes to the character list without joining anything.
-  await p3.goto(invite.path);
   await p3.getByRole("link", { name: m["join.notNow"] }).click();
   await expect(p3.getByRole("heading", { level: 1, name: m["characters.title"] })).toBeVisible();
+  await p3.goto(invite.path);
+  await p3.getByRole("button", { name: m["join.join"] }).click();
+  await p3.waitForURL(/\/c\/[0-9a-f-]+\/level$/);
+  await expect(p3.getByText(m["new.joined"].replace("{name}", campaignName))).toBeVisible();
+  // Opening it again: already in, with a way to build another character for it.
+  await p3.goto(invite.path);
+  const already = p3.getByRole("heading", {
+    level: 1,
+    name: m["join.alreadyTitle"].replace("{name}", campaignName),
+  });
+  await expect(already).toBeVisible();
+  await expect(p3.getByRole("button", { name: m["join.join"] })).toHaveCount(0);
+  await expectOneLanguage(p3, "de");
+  await noAxeViolations(p3);
+  await shot(p3, "95-einladung-schon-dabei");
+  await p3.getByRole("link", { name: m["characters.new"] }).click();
+  await p3.waitForURL(/\/c\/[0-9a-f-]+\/level$/);
+
+  // The game master's own link says so, and leads to the campaign.
+  await page.goto(invite.path);
+  await expect(page.getByRole("heading", { level: 1, name: m["join.ownTitle"] })).toBeVisible();
+  await expect(page.getByText(m["join.ownText"])).toBeVisible();
+  await expectOneLanguage(page, "de");
+  await shot(page, "95-einladung-eigener-link");
+  await page.getByRole("link", { name: m["join.toCampaign"] }).click();
+  await page.waitForURL(campaignUrl);
 
   await page.goto(campaignUrl);
   await expect(page.locator(".player__name")).toHaveText([newcomer, member]);
@@ -192,10 +238,10 @@ test("game master, newcomer, player with an account and a stranger", async ({ pa
   const renewed = await readInvite(page);
   expect(renewed.link).not.toBe(invite.link);
   expect(renewed.qr).toBe(renewed.link);
+  // A player opening the old link is told they play there already, not that it is gone.
   await p3.goto(invite.path);
-  await expect(p3.getByText(m["join.notFound"])).toBeVisible();
-  await shot(p3, "95-einladung-alt");
-  expect((await p3.request.get(`/api${invite.path.replace("/join/", "/invites/")}`)).status()).toBe(404);
+  await expect(already).toBeVisible();
+  await shot(p3, "95-einladung-alt-mitglied");
   await page.reload();
   await expect(page.locator(".player__name")).toHaveText([newcomer, member]);
   await p3.context().close();
@@ -204,6 +250,14 @@ test("game master, newcomer, player with an account and a stranger", async ({ pa
   const p4 = await newPage(browser, "stranger");
   await signup(p4, "fremd");
   await expect(p4.getByText(m["characters.emptyTitle"])).toBeVisible();
+  // The old link opens nothing for anyone else.
+  await p4.goto(invite.path);
+  await expect(p4.getByText(m["join.notFound"])).toBeVisible();
+  await shot(p4, "95-einladung-alt");
+  expect((await p4.request.get(`/api${invite.path.replace("/join/", "/invites/")}`)).status()).toBe(404);
+  expect((await p4.request.post(`/api${invite.path.replace("/join/", "/invites/")}/join`)).status()).toBe(
+    404,
+  );
   await p4.goto("/campaigns");
   await expect(p4.getByText(m["campaigns.emptyTitle"])).toBeVisible();
   await p4.goto(`/campaigns/${campaignId}`);
@@ -256,8 +310,9 @@ test("en: campaigns in English only, phone and desktop", async ({ page, foreign 
   await p2.getByLabel(m["login.nameLabel"]).fill("Jo");
   await p2.getByRole("button", { name: m["login.start"] }).click();
   await p2.getByRole("button", { name: m["password.done"] }).click();
-  await p2.waitForURL(/\/new\?campaign=/);
-  await expect(p2.getByRole("heading", { level: 1, name: m["new.campaignQuestion"] })).toBeVisible();
+  await p2.waitForURL(/\/c\/[0-9a-f-]+\/level$/);
+  await expect(p2.getByText(m["new.joined"].replace("{name}", "Thursday group"))).toBeVisible();
+  await expectOneLanguage(p2, "en");
   await guest.close();
 
   await page.reload();
