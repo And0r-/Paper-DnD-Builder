@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
+import { UI_LANGUAGES } from "../auth/accounts.ts";
 import { SESSION_MS } from "../auth/session.ts";
 import { hashPassword } from "../auth/password.ts";
 import { Client, signIn, startTestServer, type TestServer } from "../testing.ts";
@@ -530,6 +531,13 @@ describe("settings", () => {
     expect(stored).toEqual([{ t: "object" }]);
     const back = await client.call("PATCH", "/api/account/settings", { units: { length: null } });
     expect(back.json.account.units).toEqual({});
+  });
+
+  it.each(UI_LANGUAGES)("stores %s as the language", async (language) => {
+    await signIn(client, EMAIL);
+    const set = await client.call("PATCH", "/api/account/settings", { language });
+    expect(set.status).toBe(200);
+    expect((await client.call("GET", "/api/account")).json.account.language).toBe(language);
   });
 
   it("accepts only units a loaded package offers for that dimension, and only known languages", async () => {

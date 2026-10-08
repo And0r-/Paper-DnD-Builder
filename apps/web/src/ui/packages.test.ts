@@ -22,6 +22,18 @@ describe("languages offered by the language switch", () => {
     expect(offeredLanguages(UI_LANGUAGES, [demo])).toEqual(["de", "en", "fr", "it", "es"]);
   });
 
+  it("offer every language of a package that has all five", () => {
+    const five = entry("five", ["de", "en", "es", "fr", "it"]);
+    expect(offeredLanguages(UI_LANGUAGES, [five])).toEqual(["de", "en", "fr", "it", "es"]);
+    expect(offeredLanguages(UI_LANGUAGES, [five, entry("demo", ["de", "en"])])).toEqual([
+      "de",
+      "en",
+      "fr",
+      "it",
+      "es",
+    ]);
+  });
+
   it("leave out a language one installed package has neither itself nor in English", () => {
     expect(offeredLanguages(UI_LANGUAGES, [entry("a", ["de", "en"]), entry("b", ["de"])])).toEqual(["de"]);
     expect(offeredLanguages(UI_LANGUAGES, [entry("a", ["fr", "en"]), entry("b", ["fr", "de"])])).toEqual([
