@@ -117,7 +117,10 @@ for (const lang of ["de", "en"] as const) {
     await shot(page, `21-login-password-${lang}`);
     await page.waitForTimeout(500);
     await expect(page).toHaveURL(/\/login$/);
+    // The button really sends the form, so browsers offer to save the password; the request carries nothing.
+    const sent = page.waitForRequest((r) => new URL(r.url()).pathname === "/form-sent");
     await shown.getByRole("button", { name: m["password.done"] }).click();
+    expect(new URL((await sent).url()).search).toBe("");
     await expect(page.getByRole("heading", { level: 1, name: m["characters.title"] })).toBeVisible();
     await page.getByRole("link", { name: m["characters.emptyAction"] }).click();
     await page.waitForURL(/\/c\/[0-9a-f-]+\/level$/);

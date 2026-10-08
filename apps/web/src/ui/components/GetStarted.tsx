@@ -91,7 +91,6 @@ export function GetStarted({
       <TextField
         ref={nameRef}
         label={t("login.nameLabel")}
-        help={t("login.nameHelp")}
         autoComplete="nickname"
         maxLength={MAX_NAME}
         value={name}
