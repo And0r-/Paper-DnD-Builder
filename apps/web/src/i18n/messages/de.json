@@ -643,6 +643,7 @@
   "live.told.line": "{from}: {what}",
   "live.told.overruled": "{line}. Deine Wahl dort gilt nicht mehr.",
   "live.told.alongside": "{line}. Deine Wahl ist auch gespeichert.",
+  "live.told.show": "Zeigen",
   "live.what.finished": "Charakter fertig",
   "live.what.values": "{what} ({values})",
   "live.what.play": "Bogen",

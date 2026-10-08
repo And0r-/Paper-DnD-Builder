@@ -7,7 +7,7 @@
  *   from the screen that shows it once,
  * - the one-language check: no text of the other language on screen.
  */
-import { expect, test as base, type APIResponse, type Page } from "@playwright/test";
+import { expect, test as base, type APIRequestContext, type APIResponse, type Page } from "@playwright/test";
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -357,4 +357,29 @@ export async function answerRecommended(
       open.id,
     );
   }
+}
+
+/** An access key of the account `page` is logged in with. */
+export async function accessKey(page: Page, baseURL: string): Promise<string> {
+  const made = await page.request.post("/api/account/keys", {
+    headers: { origin: new URL(baseURL).origin },
+    data: { name: "Program" },
+  });
+  expect(made.status()).toBe(201);
+  return ((await made.json()) as { key: { secret: string } }).key.secret;
+}
+
+/** Calls a tool over /mcp with an access key, as a language model would. */
+export async function mcp(
+  program: APIRequestContext,
+  secret: string,
+  name: string,
+  args: object,
+): Promise<void> {
+  const r = await program.post("/mcp", {
+    headers: { accept: "application/json, text/event-stream", authorization: `Bearer ${secret}` },
+    data: { jsonrpc: "2.0", id: 1, method: "tools/call", params: { name, arguments: args } },
+  });
+  expect(r.status()).toBe(200);
+  expect(((await r.json()) as { result: { isError?: boolean } }).result.isError ?? false).toBe(false);
 }

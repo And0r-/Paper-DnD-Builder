@@ -53,7 +53,7 @@ import {
 import { setFlash } from "../live/flash.ts";
 import { draftPath, forgetHelpToken, helpTokenFor } from "../live/help-token.ts";
 import { stepOfPath } from "../live/where.ts";
-import type { Told } from "../live/words.ts";
+import { changedParts, type Told } from "../live/words.ts";
 import { draftPackageKey, usePackage, type LoadedPackage } from "../packages.ts";
 import { buildFlow, stepDiff, stepTitle, type FlowEntry } from "./model.ts";
 import { planDiff, plannedDraft } from "./plan.ts";
@@ -359,6 +359,11 @@ function ReadyDraft({
       const foreign = !isOwn(m.source) && !(m.by && m.by.id === youId.current);
       const elsewhere = m.event !== undefined && foreign;
       let news: QueueRebased | null = null;
+      // What in the answer changed, against what this window had: "Might", the card picked.
+      const parts =
+        elsewhere && m.change?.kind === "answer"
+          ? changedParts(serverRef.current.draft.answers[m.change.choice], m.draft.answers[m.change.choice])
+          : undefined;
       // Keep the highest version: an answer of ours may have brought it already.
       if (m.draft.version > serverRef.current.draft.version) {
         const v = viewOf(m);
@@ -379,7 +384,7 @@ function ReadyDraft({
         setDoc(onTop(pkg, docOf(v), queue.current));
       }
       if (elsewhere && m.source) {
-        tell(toldOf(m.source, m.event!, m.change, news, unsaid.current));
+        tell({ ...toldOf(m.source, m.event!, m.change, news, unsaid.current), parts });
         unsaid.current = null;
       } else if (news) say(news, null);
     },

@@ -643,6 +643,7 @@
   "live.told.line": "{from}: {what}",
   "live.told.overruled": "{line}. Your choice there no longer counts.",
   "live.told.alongside": "{line}. Your choice is saved too.",
+  "live.told.show": "Show",
   "live.what.finished": "character finished",
   "live.what.values": "{what} ({values})",
   "live.what.play": "sheet",
