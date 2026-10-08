@@ -380,6 +380,15 @@ textarea.field__input {
   grid-template-columns: repeat(auto-fill, minmax(3.5rem, 1fr));
 }
 
+/* Five language names do not fit one phone row: they wrap, each as wide as its name needs. */
+.language-select .segmented__track {
+  flex-wrap: wrap;
+}
+
+.language-select .segmented__item {
+  flex: 1 1 auto;
+}
+
 .segmented__input {
   position: absolute;
   opacity: 0;

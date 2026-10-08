@@ -15,7 +15,13 @@ import pde from "../../../packages/demo-package/texts/de/core.json" with { type:
 import pen from "../../../packages/demo-package/texts/en/core.json" with { type: "json" };
 import { animationsDone, expect, expectOneLanguage, makeCharacter, shot, signup, test } from "./helpers.ts";
 
-const NAMES: Record<string, string> = { de: "Deutsch", en: "English" };
+const NAMES: Record<string, string> = {
+  de: "Deutsch",
+  en: "English",
+  fr: "Français",
+  it: "Italiano",
+  es: "Español",
+};
 
 /** The switch in the top bar, named in the screen language. */
 const menu = (page: Page, lang: "de" | "en") =>
@@ -54,7 +60,10 @@ test("before login: the switch offers the packages' languages, each named in its
   const listed = (await (await page.request.get("/api/packages")).json()) as {
     packages: { languages: string[] }[];
   };
-  const expected = Object.keys(NAMES).filter((l) => listed.packages.every((p) => p.languages.includes(l)));
+  // A package without a language is shown in English, so English counts, too.
+  const expected = Object.keys(NAMES).filter((l) =>
+    listed.packages.every((p) => p.languages.includes(l) || p.languages.includes("en")),
+  );
 
   await page.goto("/login");
   const select = menu(page, "de");
