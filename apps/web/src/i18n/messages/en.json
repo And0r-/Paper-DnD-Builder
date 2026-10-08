@@ -72,6 +72,7 @@
   "characters.progress": "Step {current} of {total}",
   "characters.continue": "Keep building",
   "characters.view": "View",
+  "characters.edit": "Edit",
   "characters.print": "Print",
   "characters.more": "More for {name}",
   "characters.delete": "Delete",

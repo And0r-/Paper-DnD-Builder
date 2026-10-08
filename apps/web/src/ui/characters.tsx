@@ -5,12 +5,12 @@
  * "My characters" and the campaign page of a game master.
  */
 import { evaluateDraft } from "@builder/core";
-import { useState } from "react";
 import type { Translator } from "../i18n/index.ts";
 import { useApp } from "./app-state.tsx";
 import type { DraftListEntry } from "./api.ts";
 import { Button, ButtonLink } from "./components/Button.tsx";
 import { Icon } from "./components/Icon.tsx";
+import { Menu, MenuSeparator } from "./components/Menu.tsx";
 import { firstOpen, progressOf } from "./flow/model.ts";
 import { flowOf } from "./flow/raise.ts";
 import { levelWord, measureContext, plain, ptext, thingName } from "./package-text.ts";
@@ -24,6 +24,8 @@ export interface CharacterItem {
   status: string;
   href: string;
   doneHref?: string;
+  /** Back into the builder, for a finished character (the sheet's "To the builder"). */
+  editHref?: string | undefined;
   raiseHref?: string | undefined;
 }
 
@@ -73,12 +75,17 @@ export function describeCharacter(
         : t("characters.progress", p),
     href: finished ? `/c/${d.id}/bogen` : firstOpen(entries).href,
     doneHref: `/c/${d.id}/done`,
+    editHref: finished ? `/c/${d.id}/overview` : undefined,
     // A finished character below the highest level can go up.
     raiseHref: finished && ev.level < lp.pkg.flow.level.max ? `/c/${d.id}/raise` : undefined,
   };
 }
 
-/** Without `onDelete` there is no "more" menu: a game master may change a player's character, not delete it. */
+/**
+ * A finished character shows "View" and "Print"; editing and raising sit in
+ * the "more" menu (AND-228). Without `onDelete` the menu has no "Delete": a
+ * game master may change a player's character, not delete it.
+ */
 export function CharacterCard({
   item,
   onDelete,
@@ -90,7 +97,6 @@ export function CharacterCard({
   heading?: "h2" | "h3" | "h4";
 }) {
   const { t } = useApp();
-  const [menu, setMenu] = useState(false);
   return (
     <article className="character">
       <div className="character__main">
@@ -121,42 +127,38 @@ export function CharacterCard({
             {t("characters.print")}
           </ButtonLink>
         )}
-        {item.raiseHref && (
-          <ButtonLink
-            href={item.raiseHref}
-            variant="secondary"
-            icon="arrowUp"
-            aria-label={t("raise.buttonLabel", { name: item.name })}
-          >
-            {t("raise.button")}
-          </ButtonLink>
-        )}
-        {onDelete && (
-          <div className="character__more">
-            <button
-              type="button"
-              className="icon-button"
-              aria-expanded={menu}
-              aria-label={t("characters.more", { name: item.name })}
-              onClick={() => setMenu((m) => !m)}
-            >
-              <Icon name="more" />
-            </button>
-            {menu && (
-              <div className="popover">
-                <Button
-                  variant="ghost"
-                  className="btn--danger-text"
-                  onClick={() => {
-                    setMenu(false);
-                    onDelete();
-                  }}
-                >
-                  {t("characters.delete")}
-                </Button>
-              </div>
+        {(item.editHref || item.raiseHref || onDelete) && (
+          <Menu label={t("characters.more", { name: item.name })}>
+            {item.editHref && (
+              <ButtonLink href={item.editHref} variant="ghost" icon="pencil" role="menuitem" tabIndex={-1}>
+                {t("characters.edit")}
+              </ButtonLink>
             )}
-          </div>
+            {item.raiseHref && (
+              <ButtonLink
+                href={item.raiseHref}
+                variant="ghost"
+                icon="arrowUp"
+                role="menuitem"
+                tabIndex={-1}
+                aria-label={t("raise.buttonLabel", { name: item.name })}
+              >
+                {t("raise.button")}
+              </ButtonLink>
+            )}
+            {onDelete && (item.editHref || item.raiseHref) && <MenuSeparator />}
+            {onDelete && (
+              <Button
+                variant="ghost"
+                className="btn--danger-text"
+                role="menuitem"
+                tabIndex={-1}
+                onClick={onDelete}
+              >
+                {t("characters.delete")}
+              </Button>
+            )}
+          </Menu>
         )}
       </div>
     </article>

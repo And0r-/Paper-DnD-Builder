@@ -69,7 +69,7 @@ export function ButtonLink({
   children,
   className,
   ...rest
-}: Common & { href: string; className?: string; "aria-label"?: string }) {
+}: Common & { href: string; className?: string; "aria-label"?: string; role?: string; tabIndex?: number }) {
   return (
     <Link href={href} className={classes(variant, block, className)} {...rest}>
       {icon && <Icon name={icon} />}

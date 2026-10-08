@@ -72,6 +72,7 @@
   "characters.progress": "Schritt {current} von {total}",
   "characters.continue": "Weiterbauen",
   "characters.view": "Ansehen",
+  "characters.edit": "Bearbeiten",
   "characters.print": "Drucken",
   "characters.more": "Mehr zu {name}",
   "characters.delete": "Löschen",

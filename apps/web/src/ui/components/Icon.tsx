@@ -16,6 +16,8 @@ const PATHS = {
   arrowUp: "M12 19V5M6 11l6-6 6 6",
   arrowRight: "M5 12h14M13 6l6 6-6 6",
   more: "M5 12h.01M12 12h.01M19 12h.01",
+  /** A pencil: change what is there. */
+  pencil: "M4 20h4L18.5 9.5a2.1 2.1 0 00-3-3L5 17v3zM13.5 8.5l3 3",
   dice: "M5 4h14a1 1 0 011 1v14a1 1 0 01-1 1H5a1 1 0 01-1-1V5a1 1 0 011-1zM8.5 8.5h.01M15.5 15.5h.01M12 12h.01",
   sparkle: "M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5L18 18M6 18l2.5-2.5M15.5 8.5L18 6",
   mail: "M4 6h16v12H4zM4 7l8 6 8-6",
