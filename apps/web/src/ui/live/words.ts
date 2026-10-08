@@ -23,11 +23,14 @@ export interface Viewer {
 export interface Told {
   /** Counts up: the same words again are still a new line. */
   seq: number;
-  source: Source;
+  /** Null when nobody said: the change came while this window was away. */
+  source: Source | null;
   event: "changed" | "levelUp" | "finished" | "playState" | "copies" | "campaign";
   change?: Change | undefined;
   /** This window's own answer to the same question was not saved yet: the stored one counts. */
   overruled: boolean;
+  /** Values of the same question someone else set while ours were on their way; ours are saved too. */
+  alongside?: Record<string, number>;
 }
 
 function sameAccount(p: { role: Role; name: string }, viewer: Viewer): boolean {
@@ -100,9 +103,21 @@ function fieldsText(
 
 /** The whole line: who and how, what, and whether this window's own choice there gave way. */
 export function toldText(told: Told, viewer: Viewer, what: string | null, t: T): string {
-  const from = fromText(told.source, viewer, t);
+  const from = told.source ? fromText(told.source, viewer, t) : t("live.from.unknown");
   const line = what ? t("live.told.line", { from, what }) : from;
-  return told.overruled ? t("live.told.overruled", { line }) : line;
+  if (told.overruled) return t("live.told.overruled", { line });
+  return told.alongside ? t("live.told.alongside", { line }) : line;
+}
+
+/** What it was about, with the values someone else set next to ours: "Scores (Brawn 9)". */
+export function withValues(
+  what: string | null,
+  values: string[],
+  t: T,
+  list: (items: string[]) => string,
+): string | null {
+  if (!what || values.length === 0) return what;
+  return t("live.what.values", { what, values: list(values) });
 }
 
 /** How someone else on the character is named in "Here now". */
