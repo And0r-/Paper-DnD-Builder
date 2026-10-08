@@ -1434,3 +1434,8 @@ textarea.field__input {
   outline: var(--focus-ring);
   outline-offset: 2px;
 }
+
+/* A game shown in another language than the screen (PackageLanguageNote). */
+.package-language-note {
+  margin-bottom: var(--space-4);
+}

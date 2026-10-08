@@ -40,7 +40,7 @@ import { LIMITS, type Limit } from "./rate-limit.ts";
 import { newSessionToken, SESSION_MS, sessionId } from "./session.ts";
 
 /** Languages the builder's own screens and mails exist in. */
-export const UI_LANGUAGES = ["de", "en"] as const;
+export const UI_LANGUAGES = ["de", "en", "fr", "it", "es"] as const;
 export const DEFAULT_LANGUAGE = "de";
 
 /** Enough for every device and a copy on paper; stops a loop from filling the table. */

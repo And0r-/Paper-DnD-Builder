@@ -4,7 +4,7 @@
  * once per package and language. Kept for the whole visit; packages only
  * change when the server restarts.
  */
-import type { ContentPackage } from "@builder/format/pure";
+import { FALLBACK_LANGUAGE, shownLanguage, type ContentPackage } from "@builder/format/pure";
 import { useEffect, useState } from "react";
 import { api, type PackageListEntry, type PackageStructure, type PackageTexts } from "./api.ts";
 
@@ -55,9 +55,9 @@ export interface LoadedPackage {
   texts: PackageTexts;
 }
 
-/** The language a package is shown in: the screen language if the package has it, else its first. */
+/** The language a package is shown in: the screen language if the package has it, else English, else its first. */
 export function packageLanguage(structure: PackageStructure, lang: string): string {
-  return structure.manifest.languages.includes(lang) ? lang : structure.manifest.languages[0]!;
+  return shownLanguage(structure.manifest.languages, lang);
 }
 
 /** Packages already loaded, by id and screen language: a screen can show them without waiting a render. */
@@ -89,14 +89,17 @@ export async function preloadLanguage(lang: string): Promise<void> {
 
 /**
  * The languages offered to switch to: those the builder has screen texts
- * for and every installed package has, too. The packages decide; the
- * builder's own list only rules out languages it cannot show.
+ * for, as long as every installed package has the language or English. A
+ * package without the language is shown in English and says so in a
+ * sentence; one with neither would mix two other languages on one screen.
  */
 export function offeredLanguages<L extends string>(
   builder: readonly L[],
   packages: readonly PackageListEntry[],
 ): L[] {
-  return builder.filter((l) => packages.every((p) => p.languages.includes(l)));
+  return builder.filter((l) =>
+    packages.every((p) => p.languages.includes(l) || p.languages.includes(FALLBACK_LANGUAGE)),
+  );
 }
 
 /** {@link offeredLanguages} for the installed packages; the builder's list until they are known. */

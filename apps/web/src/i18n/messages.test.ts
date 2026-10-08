@@ -36,12 +36,31 @@ describe("screen texts", () => {
     expect(de.tc("dist.left", 4)).toBe("Noch 4 Punkte übrig");
     expect(de.list(["A", "B", "C"])).toBe("A, B und C");
     expect(translator("en").list(["A", "B"])).toBe("A and B");
+    expect(translator("fr").list(["A", "B", "C"])).toBe("A, B et C");
+    expect(translator("it").list(["A", "B"])).toBe("A e B");
+    expect(translator("es").list(["A", "B"])).toBe("A y B");
+  });
+
+  it("has all five languages", () => {
+    expect([...UI_LANGUAGES].sort()).toEqual(["de", "en", "es", "fr", "it"]);
   });
 
   it("picks the language from Accept-Language", () => {
     expect(pickLanguage("en-GB,en;q=0.9,de;q=0.8")).toBe("en");
-    expect(pickLanguage("fr-FR,de;q=0.5")).toBe("de");
-    expect(pickLanguage("fr")).toBe("de");
+    expect(pickLanguage("fr-FR,de;q=0.5")).toBe("fr");
+    expect(pickLanguage("it-CH,it;q=0.9")).toBe("it");
+    expect(pickLanguage("es-419,es;q=0.9,en;q=0.5")).toBe("es");
+    expect(pickLanguage("pt-BR,es;q=0.7")).toBe("es");
+    expect(pickLanguage("pt")).toBe("de");
     expect(pickLanguage(null)).toBe("de");
+  });
+
+  it.each(UI_LANGUAGES)("%s: no word of English left where another language is meant", (lang) => {
+    if (lang === "en") return;
+    // A text the same as in English is fine only when it is a name or a short technical word.
+    const same = Object.entries(MESSAGES[lang]).filter(
+      ([key, text]) => text === MESSAGES.en[key as keyof typeof base] && /\p{L}{5,}\s\p{L}{3,}/u.test(text),
+    );
+    expect(same.map(([k]) => k)).toEqual([]);
   });
 });

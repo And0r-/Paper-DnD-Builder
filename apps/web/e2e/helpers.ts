@@ -13,6 +13,13 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import de from "../src/i18n/messages/de.json" with { type: "json" };
 import en from "../src/i18n/messages/en.json" with { type: "json" };
+import es from "../src/i18n/messages/es.json" with { type: "json" };
+import fr from "../src/i18n/messages/fr.json" with { type: "json" };
+import it from "../src/i18n/messages/it.json" with { type: "json" };
+
+/** The screen texts of every language, for tests that run in more than German and English. */
+export const SCREEN = { de, en, fr, it, es };
+export type ScreenLanguage = keyof typeof SCREEN;
 
 export const OUTBOX = fileURLToPath(new URL("./.outbox/", import.meta.url));
 const DEMO_TEXTS = fileURLToPath(new URL("../../../packages/demo-package/texts/", import.meta.url));
@@ -58,9 +65,10 @@ export async function mailTo(email: string): Promise<string> {
 }
 
 /** Switches the language with the switch in the top bar, which every screen has (AND-153). */
-export async function chooseLanguage(page: Page, lang: "de" | "en"): Promise<void> {
+export async function chooseLanguage(page: Page, lang: ScreenLanguage): Promise<void> {
   // On the sheet at a desk the top bar has the sheet's lists too (AND-227): the language by its name.
-  const name = new RegExp(`^(${de["language.label"]}|${en["language.label"]})$`, "u");
+  const labels = [...new Set(Object.values(SCREEN).map((m) => m["language.label"]))];
+  const name = new RegExp(`^(${labels.join("|")})$`, "u");
   await page.getByRole("banner").getByRole("combobox", { name }).selectOption(lang);
   await expect(page.locator("html")).toHaveAttribute("lang", lang);
 }
@@ -73,12 +81,12 @@ export async function chooseLanguage(page: Page, lang: "de" | "en"): Promise<voi
 export async function signup(
   page: Page,
   name: string,
-  lang: "de" | "en" = "de",
+  lang: ScreenLanguage = "de",
   email?: string,
 ): Promise<string> {
-  const m = lang === "de" ? de : en;
+  const m = SCREEN[lang];
   await page.goto("/login");
-  if (lang === "en") await chooseLanguage(page, "en");
+  if (lang !== "de") await chooseLanguage(page, lang);
   await expect(page.getByRole("heading", { level: 2, name: m["login.registerTitle"] })).toBeVisible();
   await page.getByLabel(m["login.nameLabel"]).fill(name);
   if (email) await page.getByLabel(m["login.emailLabel"]).fill(email);

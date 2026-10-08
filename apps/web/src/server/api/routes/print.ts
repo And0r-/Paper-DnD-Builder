@@ -6,6 +6,7 @@
  * a sheet with holes the player cannot explain.
  */
 import { evaluateDraft, type Evaluation } from "@builder/core";
+import { shownLanguage } from "@builder/format";
 import { renderPdf, sheetPlaces } from "@builder/print";
 import {
   buildSheetModel,
@@ -130,15 +131,16 @@ function buildOriginal(
   const ev: Evaluation = evaluateDraft(pkg, row.document);
   if (!row.finished_at || !ev.complete) throw new HttpError(409, "notFinished", { open: ev.open });
 
+  // A package without the language prints in English (else its first): one language per document.
   const languages = sheetLanguages(pkg);
-  if (!languages.includes(settings.language)) {
+  if (languages.length === 0) {
     throw new HttpError(422, "languageNotSupported", { language: settings.language, languages });
   }
   return buildSheetModel(
     pkg,
     row.document,
     {
-      language: settings.language,
+      language: shownLanguage(languages, settings.language),
       units: settings.units,
       createdAt: ctx.app.now(),
       changedAt: row.updated_at,

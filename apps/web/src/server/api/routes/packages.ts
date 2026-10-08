@@ -1,4 +1,4 @@
-import type { ContentPackage } from "@builder/format";
+import { shownLanguage, type ContentPackage } from "@builder/format";
 import { HttpError, json } from "../http.ts";
 import type { RequestContext, Route } from "../router.ts";
 
@@ -22,8 +22,8 @@ export const packageRoutes: Route[] = [
       const wanted = ctx.url.searchParams.get("lang") ?? (await ctx.session())?.account.language;
       const packages = [...ctx.app.packages.packages.values()].map(({ pkg }) => {
         const m = pkg.manifest;
-        // One language on screen: the wanted one if the package has it, else its first.
-        const lang = wanted && m.languages.includes(wanted) ? wanted : m.languages[0]!;
+        // One language on screen: the wanted one if the package has it, else English, else its first.
+        const lang = shownLanguage(m.languages, wanted);
         return {
           id: m.id,
           version: m.version,

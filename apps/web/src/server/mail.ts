@@ -55,39 +55,66 @@ export interface ResetLink {
   url: string;
 }
 
+interface ResetWords {
+  subject: string;
+  one: string;
+  many: string;
+  rules: (minutes: number) => string;
+  notYou: string;
+}
+
+const RESET_WORDS: Readonly<Record<string, ResetWords>> = {
+  de: {
+    subject: "Dein Link zum Anmelden",
+    one: "Mit diesem Link kommst du wieder in dein Konto:",
+    many: "Mit diesen Links kommst du wieder in deine Konten, je einer pro Konto:",
+    rules: (m) => `Der Link gilt ${m} Minuten und geht nur einmal. Er zeigt dir ein neues Passwort.`,
+    notYou: "Hast du das nicht angefordert? Dann lösche die Mail, es passiert nichts.",
+  },
+  en: {
+    subject: "Your link to log in",
+    one: "This link takes you back into your account:",
+    many: "These links take you back into your accounts, one for each:",
+    rules: (m) => `The link works for ${m} minutes and only once. It shows you a new password.`,
+    notYou: "You did not ask for this? Then delete this email. Nothing will happen.",
+  },
+  fr: {
+    subject: "Ton lien pour te connecter",
+    one: "Avec ce lien, tu reviens dans ton compte :",
+    many: "Avec ces liens, tu reviens dans tes comptes, un lien par compte :",
+    rules: (m) => `Le lien marche ${m} minutes et une seule fois. Il te montre un nouveau mot de passe.`,
+    notYou: "Tu n'as rien demandé ? Alors efface ce message. Il ne se passe rien.",
+  },
+  it: {
+    subject: "Il tuo link per accedere",
+    one: "Con questo link torni nel tuo account:",
+    many: "Con questi link torni nei tuoi account, uno per ogni account:",
+    rules: (m) => `Il link vale ${m} minuti e funziona una volta sola. Ti mostra una nuova password.`,
+    notYou: "Non l'hai chiesto tu? Allora cancella questa e-mail. Non succede niente.",
+  },
+  es: {
+    subject: "Tu enlace para entrar",
+    one: "Con este enlace vuelves a entrar en tu cuenta:",
+    many: "Con estos enlaces vuelves a entrar en tus cuentas, uno por cuenta:",
+    rules: (m) => `El enlace vale ${m} minutos y solo funciona una vez. Te muestra una contraseña nueva.`,
+    notYou: "¿No lo has pedido tú? Entonces borra este correo. No pasa nada.",
+  },
+};
+
 /** The link (or links: one per account with the address) back in. No password: the link shows one. */
 export function resetMail(language: string, to: string, links: ResetLink[], minutes: number): Mail {
-  const lines = links.map((l) => `${l.name}: ${l.url}`);
-  if (language === "de") {
-    return {
-      to,
-      subject: "Dein Link zum Anmelden",
-      text: [
-        links.length > 1
-          ? "Mit diesen Links kommst du wieder in deine Konten, je einer pro Konto:"
-          : "Mit diesem Link kommst du wieder in dein Konto:",
-        "",
-        ...lines,
-        "",
-        `Der Link gilt ${minutes} Minuten und geht nur einmal. Er zeigt dir ein neues Passwort.`,
-        "",
-        "Hast du das nicht angefordert? Dann lösche die Mail, es passiert nichts.",
-      ].join("\n"),
-    };
-  }
+  const w = RESET_WORDS[language] ?? RESET_WORDS["en"]!;
   return {
     to,
-    subject: "Your link to log in",
+    subject: w.subject,
     text: [
-      links.length > 1
-        ? "These links take you back into your accounts, one for each:"
-        : "This link takes you back into your account:",
+      links.length > 1 ? w.many : w.one,
       "",
-      ...lines,
+      ...links.map((l) => `${l.name}: ${l.url}`),
       "",
-      `The link works for ${minutes} minutes and only once. It shows you a new password.`,
+      w.rules(minutes),
       "",
-      "You did not ask for this? Then delete this email. Nothing will happen.",
+      w.notYou,
     ].join("\n"),
   };
 }
