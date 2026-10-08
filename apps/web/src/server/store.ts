@@ -32,6 +32,8 @@ export type DraftRow = {
   account_id: string;
   package_id: string;
   package_version: string;
+  /** Ids of the extensions of the package switched on for this character; empty for none. */
+  extensions: string[];
   version: number;
   document: DraftDocument;
   /** The campaign the character belongs to; null for none. */
@@ -154,7 +156,7 @@ const ACCOUNT_COLUMNS_A = ACCOUNT_COLUMNS.split(", ")
   .join(", ");
 const PASSWORD_COLUMNS = "id, name, origin, created_at";
 const DRAFT_COLUMNS =
-  "id, account_id, package_id, package_version, version, document, campaign_id, finished_at, created_at, updated_at";
+  "id, account_id, package_id, package_version, extensions, version, document, campaign_id, finished_at, created_at, updated_at";
 const COPY_ENTRY_COLUMNS =
   "id, draft_id, name, created_at, updated_at, from_level, from_changed_at, from_package_version, language, units, version";
 const COPY_COLUMNS = `${COPY_ENTRY_COLUMNS}, model`;
@@ -477,8 +479,8 @@ export class Store {
 
   async createDraft(d: Omit<DraftRow, "finished_at" | "updated_at">): Promise<DraftRow> {
     const rows = await this.db.query<DraftRow>(
-      `INSERT INTO drafts (id, account_id, package_id, package_version, version, document, campaign_id, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8, $8)
+      `INSERT INTO drafts (id, account_id, package_id, package_version, version, document, campaign_id, created_at, updated_at, extensions)
+       VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8, $8, $9::text[])
        RETURNING ${DRAFT_COLUMNS}`,
       [
         d.id,
@@ -489,6 +491,7 @@ export class Store {
         d.document,
         d.campaign_id,
         d.created_at,
+        d.extensions,
       ],
     );
     return rows[0]!;
@@ -536,14 +539,31 @@ export class Store {
     id: string,
     accountId: string,
     expectedVersion: number,
-    next: { document: DraftDocument; finishedAt: Date | null; packageVersion: string; now: Date },
+    next: {
+      document: DraftDocument;
+      finishedAt: Date | null;
+      packageVersion: string;
+      now: Date;
+      /** New extensions; left as they are if undefined. */
+      extensions?: string[] | undefined;
+    },
   ): Promise<DraftRow | undefined> {
     const rows = await this.db.query<DraftRow>(
       `UPDATE drafts
-       SET document = $4::jsonb, finished_at = $5, package_version = $6, updated_at = $7, version = version + 1
+       SET document = $4::jsonb, finished_at = $5, package_version = $6, updated_at = $7, version = version + 1,
+         extensions = COALESCE($8::text[], extensions)
        WHERE id = $1 AND account_id = $2 AND version = $3
        RETURNING ${DRAFT_COLUMNS}`,
-      [id, accountId, expectedVersion, next.document, next.finishedAt, next.packageVersion, next.now],
+      [
+        id,
+        accountId,
+        expectedVersion,
+        next.document,
+        next.finishedAt,
+        next.packageVersion,
+        next.now,
+        next.extensions ?? null,
+      ],
     );
     return rows[0];
   }

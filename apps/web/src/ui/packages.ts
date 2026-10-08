@@ -31,6 +31,11 @@ export function loadPackageList(lang: string): Promise<PackageListEntry[]> {
   );
 }
 
+/** The package a draft is built with: its base and the extensions switched on, as the server names it. */
+export function draftPackageKey(d: { packageId: string; extensions: readonly string[] }): string {
+  return [d.packageId, ...[...new Set(d.extensions)].sort()].join("+");
+}
+
 export function loadPackageStructure(id: string): Promise<PackageStructure> {
   return cached(structures, id, () =>
     api<{ package: PackageStructure }>("GET", `/api/packages/${encodeURIComponent(id)}`).then(

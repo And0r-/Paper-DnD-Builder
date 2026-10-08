@@ -28,6 +28,7 @@ describe("healthReport", () => {
   it("names a rejected package by its folder, not its full path", () => {
     const registry: PackageRegistry = {
       packages: new Map(),
+      extensions: new Map(),
       rejected: [{ dir: "/srv/packages/broken", report: "manifest.json: missing" }],
       get: () => undefined,
     };

@@ -19,7 +19,14 @@ import { randomBytes } from "node:crypto";
 import { z } from "zod";
 import type { App, ChangeSource, DraftEvent, Via } from "../app.ts";
 import { HttpError } from "../api/http.ts";
-import { changeBodies, commitChange, draftView, edits, type Edit } from "../api/routes/drafts.ts";
+import {
+  changeBodies,
+  commitChange,
+  draftView,
+  edits,
+  packageKeyOf,
+  type Edit,
+} from "../api/routes/drafts.ts";
 import type { Limit } from "../auth/rate-limit.ts";
 import type { ReachableDraftRow } from "../store.ts";
 
@@ -363,7 +370,7 @@ export class LiveHub {
 
   /** The draft as `m` sees it, with what the message adds (who changed it and how, `ref`, `stale`). */
   private state(row: ReachableDraftRow, m: Member, extra: object, raisedFrom?: number) {
-    const view = draftView({ ...row, access: m.role }, this.app.packages.get(row.package_id), raisedFrom);
+    const view = draftView({ ...row, access: m.role }, this.app.packages.get(packageKeyOf(row)), raisedFrom);
     return { type: "state", draftId: row.id, version: row.version, ...extra, ...view };
   }
 

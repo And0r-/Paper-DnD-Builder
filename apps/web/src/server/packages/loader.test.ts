@@ -14,11 +14,17 @@ let root: string;
 let log: { info: string[]; error: string[] };
 const logger = () => ({ info: (m: string) => log.info.push(m), error: (m: string) => log.error.push(m) });
 
-async function copyPackage(from: string, name: string): Promise<string> {
+/** Copies a package; without its `extensions/` folder unless asked. */
+async function copyPackage(from: string, name: string, withExtensions = false): Promise<string> {
   const to = path.join(root, name);
-  await cp(from, to, { recursive: true, filter: (src) => !src.includes("node_modules") });
+  await cp(from, to, {
+    recursive: true,
+    filter: (src) =>
+      !src.includes("node_modules") && (withExtensions || !src.startsWith(path.join(from, "extensions"))),
+  });
   return to;
 }
+const TIDES = path.join(DEMO_PACKAGE_DIR, "extensions", "demo-tides");
 
 beforeEach(async () => {
   root = await mkdtemp(path.join(tmpdir(), "packages-"));
@@ -66,6 +72,53 @@ describe("loadPackages", () => {
   it("accepts a directory that is itself a package", async () => {
     const reg = await loadPackages(DEMO_PACKAGE_DIR, logger());
     expect([...reg.packages.keys()]).toEqual(["demo"]);
+  });
+
+  it("loads an extension next to its base or in its extensions folder, and puts them together", async () => {
+    await copyPackage(DEMO_PACKAGE_DIR, "demo", true);
+    const reg = await loadPackages(root, logger());
+    expect([...reg.extensions.keys()]).toEqual(["demo-tides"]);
+    expect(reg.extensions.get("demo-tides")).toMatchObject({ base: "demo", info: { publishable: false } });
+    const has = (key: string, thing: string) => reg.get(key)!.things.some((t) => t.id === thing);
+    expect(has("demo+demo-tides", "path.tide-warden")).toBe(true);
+    expect(has("demo", "path.tide-warden")).toBe(false);
+    expect(reg.get("demo+demo-tides")).toBe(reg.get("demo+demo-tides"));
+    expect(reg.get("demo+nothing")).toBeUndefined();
+    expect(log.info.at(-1)).toBe("Packages: 1 loaded (and 1 extension(s)), 0 rejected.");
+
+    await rm(path.join(root, "demo", "extensions"), { recursive: true });
+    await copyPackage(TIDES, "demo-tides");
+    expect([...(await loadPackages(root, logger())).extensions.keys()]).toEqual(["demo-tides"]);
+  });
+
+  it("rejects an extension that does not fit, and the base runs on", async () => {
+    await copyPackage(DEMO_PACKAGE_DIR, "demo");
+    const ext = await copyPackage(TIDES, "demo-tides");
+    const things = JSON.parse(await readFile(path.join(ext, "things/tides.json"), "utf8"));
+    things[0].id = "path.ferrymaster";
+    await writeFile(path.join(ext, "things/tides.json"), JSON.stringify(things));
+    const reg = await loadPackages(root, logger());
+    expect([...reg.packages.keys()]).toEqual(["demo"]);
+    expect(reg.extensions.size).toBe(0);
+    expect(reg.rejected[0]!.report).toContain('thing "path.ferrymaster" is already in "demo"');
+    expect(log.error.join("\n")).toContain("REJECTED");
+    expect(reg.get("demo+demo-tides")).toBeUndefined();
+  });
+
+  it("rejects an extension whose base is missing, or a second one that clashes with the first", async () => {
+    await copyPackage(TIDES, "demo-tides");
+    expect((await loadPackages(root, logger())).rejected[0]!.report).toContain(
+      'needs the package "demo", which is not loaded',
+    );
+    await copyPackage(DEMO_PACKAGE_DIR, "demo");
+    const twin = await copyPackage(TIDES, "demo-tides-twin");
+    const manifest = JSON.parse(await readFile(path.join(twin, "manifest.json"), "utf8"));
+    await writeFile(path.join(twin, "manifest.json"), JSON.stringify({ ...manifest, id: "demo-twin" }));
+    const reg = await loadPackages(root, logger());
+    expect([...reg.extensions.keys()]).toEqual(["demo-tides"]);
+    expect(reg.rejected.map((r) => r.report)).toEqual([
+      expect.stringContaining("does not fit together with demo-tides"),
+    ]);
   });
 
   it("starts without packages, and says why, when the directory is missing, empty or not set", async () => {

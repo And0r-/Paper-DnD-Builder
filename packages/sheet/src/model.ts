@@ -705,6 +705,13 @@ export function buildSheetModel(
     });
   }
 
+  // Content of an extension that may not be shared, if the character has any (SPEC 17.7).
+  const had = new Set(ev.things.map((h) => h.id));
+  const closed = (pkg.extensions ?? [])
+    .filter((x) => !x.publishable && x.things.some((id) => had.has(id)))
+    .map((x) => x.name[language] ?? x.id);
+  const notForSharing = closed.length > 0 ? messages.notForSharing(list.format(closed)) : "";
+
   return {
     version: 1,
     language,
@@ -722,7 +729,7 @@ export function buildSheetModel(
     packageName,
     units,
     unitsLine,
-    attribution: text("sheet.attribution"),
+    attribution: [text("sheet.attribution"), notForSharing].filter((l) => l !== "").join(" "),
     createdOn: messages.createdOn(
       new Intl.DateTimeFormat(language, { dateStyle: "medium" }).format(createdAt),
     ),

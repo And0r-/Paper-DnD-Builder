@@ -11,6 +11,7 @@ import { useApp } from "../../../../src/ui/app-state.tsx";
 import { RichText } from "../../../../src/ui/components/RichText.tsx";
 import { Icon } from "../../../../src/ui/components/Icon.tsx";
 import { useDraft } from "../../../../src/ui/flow/draft-state.tsx";
+import { ExtensionSwitches } from "../../../../src/ui/flow/extensions.tsx";
 import { StepFooter, StepFrame } from "../../../../src/ui/flow/frame.tsx";
 import { useGuardedChange } from "../../../../src/ui/flow/guard.tsx";
 import { LEVEL_KEY } from "../../../../src/ui/flow/model.ts";
@@ -144,6 +145,7 @@ export default function LevelPage() {
           </p>
         )}
       </div>
+      <ExtensionSwitches />
       {guard.dialog}
     </StepFrame>
   );

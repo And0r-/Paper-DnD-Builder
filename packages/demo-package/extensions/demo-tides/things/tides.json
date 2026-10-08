@@ -1,0 +1,16 @@
+[
+  {
+    "id": "path.tide-warden",
+    "kind": "path",
+    "source": "tides",
+    "requires": "has('calling.river-runner')",
+    "grants": [{ "thing": "talent.tide-reading" }, { "value": "guard", "add": 1 }]
+  },
+  {
+    "id": "talent.tide-reading",
+    "kind": "talent",
+    "source": "tides",
+    "tags": ["for-river-runner"],
+    "stats": { "score": { "text": "value.wit.name" }, "roll": { "value": "tideReadingRoll" } }
+  }
+]

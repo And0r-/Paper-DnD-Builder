@@ -99,7 +99,9 @@ builder, copy `packages/demo-package` there). Packages are validated on
 start; an invalid one is rejected with the validator's report in the log
 (`docker compose logs web`) and the builder starts without it. To swap a
 content package, replace its files in `./packages-mount` and run
-`docker compose restart web`.
+`docker compose restart web`. An extension package (one that builds on
+another, see [`packages-mount/README.md`](packages-mount/README.md)) goes
+into a folder of its own next to its base.
 
 Run it behind a reverse proxy that terminates TLS and appends
 `X-Forwarded-For` (per-IP login limits use the last entry). With an

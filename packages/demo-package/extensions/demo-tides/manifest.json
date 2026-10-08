@@ -1,0 +1,22 @@
+{
+  "formatVersion": "0.20",
+  "id": "demo-tides",
+  "version": "0.1.0",
+  "dependsOn": [{ "id": "demo", "minVersion": "0.18.0" }],
+  "languages": ["en", "de"],
+  "kinds": [],
+  "sources": {
+    "tides": {
+      "title": "Tides of Mistland, an invented extension of the demo world",
+      "version": "0.1.0",
+      "retrieved": "2026-10-08",
+      "license": "example-closed"
+    }
+  },
+  "licenses": {
+    "example-closed": {
+      "name": "Invented closed license, to show content that may not be shared",
+      "publishable": false
+    }
+  }
+}

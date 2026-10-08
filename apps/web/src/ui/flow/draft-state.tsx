@@ -40,7 +40,7 @@ import { api, ApiError, type DraftInfo, type DraftView } from "../api.ts";
 import { useLiveChannel, viewOf, type LiveChannel } from "../live/channel.ts";
 import { draftPath, forgetHelpToken, helpTokenFor } from "../live/help-token.ts";
 import { stepOfPath } from "../live/where.ts";
-import { usePackage, type LoadedPackage } from "../packages.ts";
+import { draftPackageKey, usePackage, type LoadedPackage } from "../packages.ts";
 import { buildFlow, stepDiff, stepTitle, type FlowEntry } from "./model.ts";
 import { planDiff, plannedDraft } from "./plan.ts";
 import { flowOf, type Raise } from "./raise.ts";
@@ -120,6 +120,12 @@ export interface DraftApi {
   live: LiveChannel;
   /** Someone else just changed the character: their name, for a short line. */
   changedBy: { name: string; seq: number } | null;
+  /**
+   * Switches the package's extensions for this character. The screen then
+   * loads the package with them. "inUse": an answer still comes from one
+   * that would go off.
+   */
+  setExtensions(extensions: string[]): Promise<"ok" | "inUse" | "failed">;
 }
 
 const Ctx = createContext<DraftApi | null>(null);
@@ -193,7 +199,7 @@ export function DraftProvider({
     };
   }, [draftId, attempt]);
 
-  const pkg = usePackage(view?.packageAvailable ? view.draft.packageId : undefined, lang);
+  const pkg = usePackage(view?.packageAvailable ? draftPackageKey(view.draft) : undefined, lang);
 
   let load: DraftLoad;
   if (loadError === "notFound") load = { state: "notFound" };
@@ -492,6 +498,25 @@ function ReadyDraft({
     [setServer],
   );
 
+  const setExtensions = useCallback(
+    async (extensions: string[]): Promise<"ok" | "inUse" | "failed"> => {
+      if (!(await flush())) return "failed";
+      try {
+        const res = await api<DraftView>("PATCH", `/api/drafts/${serverRef.current.draft.id}`, {
+          version: serverRef.current.draft.version,
+          extensions,
+        });
+        serverRef.current = res;
+        // Another package now: the loader above fetches it and shows the draft with it.
+        setServer(res);
+        return "ok";
+      } catch (error) {
+        return error instanceof ApiError && error.code === "extensionInUse" ? "inUse" : "failed";
+      }
+    },
+    [flush, setServer],
+  );
+
   const value = useMemo<DraftApi>(
     () => ({
       lp,
@@ -512,6 +537,7 @@ function ReadyDraft({
       setCampaign,
       live,
       changedBy,
+      setExtensions,
     }),
     [
       lp,
@@ -529,6 +555,7 @@ function ReadyDraft({
       setCampaign,
       live,
       changedBy,
+      setExtensions,
     ],
   );
   return <Ctx.Provider value={value}>{render({ state: "ready", api: value })}</Ctx.Provider>;

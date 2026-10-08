@@ -23,6 +23,7 @@ export {
   type TextAnswer,
 } from "./draft.ts";
 export { evaluate, evaluateCondition, evaluateNumber, RuleError, type ExprScope } from "./expr.ts";
+export { answersFromExtension } from "./extensions.ts";
 export { judgeAnswer, type Problem } from "./judge.ts";
 export {
   byLevel,

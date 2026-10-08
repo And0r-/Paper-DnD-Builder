@@ -19,7 +19,7 @@ import { AppShell } from "../../src/ui/components/Shell.tsx";
 import { CharacterCard, describeCharacter, packagesFor } from "../../src/ui/characters.tsx";
 import { usePageTitle } from "../../src/ui/flow/frame.tsx";
 import { RequireAccount } from "../../src/ui/guards.tsx";
-import type { LoadedPackage } from "../../src/ui/packages.ts";
+import { draftPackageKey, type LoadedPackage } from "../../src/ui/packages.ts";
 
 const UNDO_MS = 10_000;
 
@@ -114,7 +114,7 @@ function Characters() {
     const items = data.drafts
       .filter((d) => !hidden.current.has(d.id))
       .map((d) => ({
-        ...describeCharacter(d, data.packages.get(d.packageId), t),
+        ...describeCharacter(d, data.packages.get(draftPackageKey(d)), t),
         campaign: d.campaignId ? data.campaigns.get(d.campaignId) : undefined,
       }))
       .sort((a, b) => Number(a.finished) - Number(b.finished));

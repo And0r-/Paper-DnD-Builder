@@ -249,6 +249,11 @@ function remember<T>(cache: Map<string, Promise<T>>, key: string, load: () => Pr
 }
 
 /** One path segment; choice ids of copies carry `@`. */
+/** The package a character is built with, as the builder names it: its base and its extensions. */
+export function draftPackage(d: { packageId: string; extensions: readonly string[] }): string {
+  return [d.packageId, ...[...new Set(d.extensions)].sort()].join("+");
+}
+
 export function enc(segment: string): string {
   return encodeURIComponent(segment);
 }

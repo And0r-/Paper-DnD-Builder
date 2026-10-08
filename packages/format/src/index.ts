@@ -17,5 +17,7 @@ export { FALLBACK_LANGUAGE, shownLanguage } from "./languages.ts";
 export { readPackageDir, ROOT_FILES } from "./read.ts";
 export type { PackageFiles, ReadResult } from "./read.ts";
 export { validatePackageDir, validatePackageFiles, RESERVED_PREFIXES } from "./validate.ts";
-export type { Issue, ContentPackage, ValidationResult, TextOrigin } from "./validate.ts";
+export type { Issue, ContentPackage, ValidationResult, TextOrigin, ExtensionInfo } from "./validate.ts";
 export { formatIssue, formatReport } from "./report.ts";
+export { validateExtensionFiles, extensionDependency, versionAccepts } from "./extension.ts";
+export type { ExtensionBase, ExtensionResult } from "./extension.ts";

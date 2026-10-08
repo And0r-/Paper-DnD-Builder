@@ -21,7 +21,7 @@ import { QrCode } from "../../../src/ui/components/QrCode.tsx";
 import { AppShell } from "../../../src/ui/components/Shell.tsx";
 import { usePageTitle } from "../../../src/ui/flow/frame.tsx";
 import { RequireAccount } from "../../../src/ui/guards.tsx";
-import type { LoadedPackage } from "../../../src/ui/packages.ts";
+import { draftPackageKey, type LoadedPackage } from "../../../src/ui/packages.ts";
 
 type Data = { lang: string; view: CampaignView; packages: Map<string, LoadedPackage> };
 
@@ -122,7 +122,7 @@ function CampaignScreen() {
                     <li key={d.id}>
                       <CharacterCard
                         heading="h3"
-                        item={describeCharacter(d, data.packages.get(d.packageId), t)}
+                        item={describeCharacter(d, data.packages.get(draftPackageKey(d)), t)}
                       />
                     </li>
                   ))}
@@ -175,7 +175,7 @@ function CampaignScreen() {
                               <CharacterCard
                                 heading="h4"
                                 helpOut
-                                item={describeCharacter(d, data.packages.get(d.packageId), t)}
+                                item={describeCharacter(d, data.packages.get(draftPackageKey(d)), t)}
                               />
                             </li>
                           ))}
