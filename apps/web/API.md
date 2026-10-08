@@ -3,7 +3,9 @@
 JSON over HTTP. All routes live in
 [`src/server/api/routes`](src/server/api/routes); the router works on
 standard `Request`/`Response`, and Next.js hands it every `/api/*` request
-([`app/api/[...path]/route.ts`](app/api/[...path]/route.ts)).
+([`app/api/[...path]/route.ts`](app/api/[...path]/route.ts)). The one
+WebSocket, the [live help](#live-help), lives in
+[`src/server/live`](src/server/live).
 
 Every route, body, answer and error code is also described in
 [`openapi.json`](openapi.json) (OpenAPI 3.1). A test
@@ -154,7 +156,7 @@ else is derived by the rule core and returned with every response:
 
 ```json
 {
-  "draft": { "id", "packageId", "version", "status": "draft|finished", "level", "levelBefore", "answers", "owner": { "name" }, "access": "owner|gameMaster", ... },
+  "draft": { "id", "packageId", "version", "status": "draft|finished", "level", "levelBefore", "answers", "owner": { "name" }, "access": "owner|gameMaster|helper", ... },
   "packageAvailable": true,
   "evaluation": { "level", "steps", "choices", "things", "values", "inputs", "raises", "open", "complete", "inactiveAnswers" },
   "summary": { "name", "level", "complete", "line" },
@@ -164,7 +166,8 @@ else is derived by the rule core and returned with every response:
 
 Every change sends the `version` it was made on. If the draft has moved on,
 the answer is `409 versionConflict` with the current state in
-`error.current` (optimistic locking).
+`error.current` (optimistic locking). Opening and changing a draft also
+works for a [helper](#live-help) with `?help=<token>` (`access: "helper"`).
 
 | Method & path                            | Body                                 | Result                                                                                                                        |
 | ---------------------------------------- | ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------- |
@@ -475,6 +478,126 @@ and places; the campaign stays. Deleting the game master's account removes
 their campaigns and player lists; the players keep their characters.
 Tests: [`campaigns.test.ts`](src/server/api/campaigns.test.ts).
 
+## Live help
+
+Several people build one character together, at the same time: everyone
+on it sees who else is there, on which step and pointing at what, and gets
+the character's new state the moment anyone changes it. Everyone on it may
+answer. Who may join:
+
+- its **owner**;
+- the **game master** of the campaign it belongs to, without a link (the
+  same reach as on the draft routes);
+- **anyone else with an account**, with the character's **help link**:
+  the owner makes it (`/help/<token>` on `BASE_URL`), hands it over or
+  shows it as a QR code. One link per character; it ends after 12 hours,
+  when the owner makes a new one, or withdraws it, and whoever helps with
+  it is out at once. A helper opens and changes the character (also over
+  the draft routes, with `?help=<token>`), nothing else of the owner's: no
+  list, no prints, no kept sheets, no deleting.
+
+Anyone else gets `404` (live: close code `4404`), as for a character that
+does not exist. Every check is on the server, when connecting and again
+before every change. The character is stored as always; the live channel
+keeps nothing but who is connected. A lost connection loses nothing:
+connect again with the same URL (and the same link while it works).
+
+| Method & path                         | Body | Who       | Result                                                                                                                                                                                                                                                                 |
+| ------------------------------------- | ---- | --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 🔒 `GET /api/drafts/:id/help-link`    | —    | owner     | `{ helpLink }`: `{ url, token, expiresAt, createdAt }` while it works, else `null`.                                                                                                                                                                                    |
+| 🔒 `POST /api/drafts/:id/help-link`   | —    | owner     | `201 { helpLink }`, a new link for 12 hours; the one before stops working. `429` (30 per hour).                                                                                                                                                                        |
+| 🔒 `DELETE /api/drafts/:id/help-link` | —    | owner     | `204`. The link stops working.                                                                                                                                                                                                                                         |
+| `GET /api/help/:token`                | —    | anyone    | `{ draftId, owner: { name }, expiresAt, yours, live }`, shown before helping; `yours` is true for the owner; `live` is the channel's path with the link. `404 helpLinkNotFound` (unknown, replaced, withdrawn, ended). `429`: 60 lookups per 15 minutes per IP.        |
+| 🔒 `GET /api/live/drafts/:id`         | —    | see above | The live channel, a **WebSocket** (`ws://` or `wss://`, same host and port). Login by the session cookie (the browser sends it itself) or `Authorization: Bearer cbk_...`; the handshake must come from this site (`Origin`, else `403`). Helpers add `?help=<token>`. |
+
+A game master gets `403 ownerOnly` on the help link routes; a helper and
+anyone else `404 draftNotFound`.
+
+### In the browser
+
+```js
+const live = new WebSocket(
+  `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/api/live/drafts/${id}` +
+    (token ? `?help=${token}` : ""),
+);
+live.onmessage = (e) => {
+  const m = JSON.parse(e.data);
+  if (m.type === "state") show(m); // the same shape as GET /api/drafts/:id
+};
+live.onclose = (e) => {
+  if (e.code === 4404 || e.code === 4401) return gone(e.code); // no reach (anymore), or not logged in
+  setTimeout(reconnect, 1000); // anything else: connect again with the same URL
+};
+live.send(
+  JSON.stringify({ type: "answer", ref: "a1", version, choice: "folk", answer: { pick: "folk.hillfolk" } }),
+);
+```
+
+The CSP's `connect-src 'self'` allows this: same host, same port. Keep the
+`state` with the highest `draft.version`; the server sends them in order.
+
+### Messages
+
+Text frames, one JSON object each, at most 64 KiB. `ref` is optional on
+every change: any string up to 100 characters, given back on the answer
+to that change, to the sender only.
+
+**To the server**
+
+| `type`     | Fields                                | Does                                                                                      |
+| ---------- | ------------------------------------- | ----------------------------------------------------------------------------------------- |
+| `answer`   | `version`, `choice`, `answer`, `ref?` | As `PUT /api/drafts/:id/answers/:choice`; `answer: null` removes it.                      |
+| `pool`     | `version`, `step`, `picks`, `ref?`    | As `PUT /api/drafts/:id/pools/:step`.                                                     |
+| `setLevel` | `version`, `level`, `ref?`            | As `PATCH /api/drafts/:id`.                                                               |
+| `levelUp`  | `version`, `level`, `ref?`            | As `POST /api/drafts/:id/level-up`.                                                       |
+| `finish`   | `version`, `ref?`                     | As `POST /api/drafts/:id/finish`.                                                         |
+| `step`     | `step`: string (≤ 200) or `null`      | Where you are now (a step id, `overview`, …: the screen's own words). Goes to `presence`. |
+| `point`    | `target`: string (≤ 200) or `null`    | What you point at ("this card": a thing, choice or value id). Goes to `presence`.         |
+| `hint`     | `text`: 1–500 characters              | A short note to everyone on the character ("Look at the spells step").                    |
+
+**From the server**
+
+| `type`     | Fields                                                                                                             | When                                                                                                                                                                                                                                                                                                                                 |
+| ---------- | ------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `welcome`  | `you: Person`                                                                                                      | First, once connected.                                                                                                                                                                                                                                                                                                               |
+| `presence` | `people: [Person]`                                                                                                 | When someone joins or leaves, or changes `step` or `point`; to everyone. In the order they joined.                                                                                                                                                                                                                                   |
+| `state`    | `draft`, `packageAvailable`, `evaluation`, `summary`, `levelUp` (as `GET /api/drafts/:id`), `by`, `ref?`, `stale?` | On joining, and after every change of the character, by anyone, live or over the HTTP API; to everyone. `by: { id, name }` is who changed it live, `null` on joining and for a change over HTTP. `ref` only to the one who sent the change.                                                                                          |
+| `hint`     | `from: { id, name }`, `text`                                                                                       | Someone sent a hint; to everyone, the sender too.                                                                                                                                                                                                                                                                                    |
+| `error`    | `code`, `ref?`, details as the HTTP error                                                                          | A change the rules refuse (`changeRejected`, `incomplete`, `notFinished`, `packageUnavailable`), a message of the wrong shape (`badJson`, `badRequest` with `issues`), too many messages (`tooManyRequests`: 60 per 10 seconds). To the sender only. Before a close: `notLoggedIn`, `keyNotValid`, `draftNotFound`, `tooManyPeople`. |
+
+`Person` is `{ id, name, role: "owner|gameMaster|helper", step, point }`.
+`id` is the connection's (one person in two tabs is there twice); `name`
+the account's name, never an address.
+
+**The server is the truth.** A change sent with an old `version` changes
+nothing and is no error: the sender gets the current `state` with
+`stale: true` (and its `ref`), and answers again on that.
+
+**Close codes**: `4401` not logged in or key not valid; `4404` no such
+character, or no reach (anymore: a help link withdrawn, replaced or ended,
+the character deleted, or out of the game master's campaign);
+`4429` more than 20 connections on one character. Anything else
+(`1001`, `1006`, …) is the connection: connect again. The server pings
+every 30 seconds and drops a connection that does not answer.
+
+### Example
+
+The owner (left) and a helper with the link (right):
+
+```text
+helper → open  wss://builder.example/api/live/drafts/7b1e…?help=Qm9va3MgYXJlIGdyZWF0IQ
+helper ← { "type": "welcome", "you": { "id": "k3J…", "name": "Mara", "role": "helper", "step": null, "point": null } }
+both   ← { "type": "presence", "people": [ { "id": "a9x…", "name": "Lio", "role": "owner", … }, { "id": "k3J…", "name": "Mara", "role": "helper", … } ] }
+helper ← { "type": "state", "by": null, "draft": { "version": 4, "access": "helper", … }, "evaluation": { … }, … }
+helper → { "type": "hint", "text": "Look at the spells step" }
+both   ← { "type": "hint", "from": { "id": "k3J…", "name": "Mara" }, "text": "Look at the spells step" }
+owner  → { "type": "answer", "ref": "r7", "version": 4, "choice": "folk", "answer": { "pick": "folk.hillfolk" } }
+owner  ← { "type": "state", "ref": "r7", "by": { "id": "a9x…", "name": "Lio" }, "draft": { "version": 5, … }, … }
+helper ← { "type": "state", "by": { "id": "a9x…", "name": "Lio" }, "draft": { "version": 5, … }, … }
+helper → { "type": "answer", "version": 4, "choice": "folk", "answer": { "pick": "folk.coastfolk" } }
+helper ← { "type": "state", "stale": true, "by": null, "draft": { "version": 5, … }, … }
+```
+
 ## Print
 
 | Method & path                  | Result                                                                                                                                                                                                                                                                                                                                                      |
@@ -616,60 +739,61 @@ Tests: [`sheet-copies.test.ts`](src/server/api/sheet-copies.test.ts).
 
 ## Error codes
 
-| Status | Code                     | When                                                                                                                      |
-| ------ | ------------------------ | ------------------------------------------------------------------------------------------------------------------------- |
-| `400`  | `badJson`                | The body is not JSON.                                                                                                     |
-| `400`  | `badRequest`             | The body has the wrong shape; `issues` lists `{ path, message }`.                                                         |
-| `400`  | `badQuery`               | A query parameter has a value the API does not know (`parameter`, `value`).                                               |
-| `400`  | `designNotAvailable`     | A planned sheet design not drawn yet (`designs` lists those that are); `422` in the settings.                             |
-| `401`  | `notLoggedIn`            | No session cookie and no `Authorization` header.                                                                          |
-| `401`  | `keyNotValid`            | The access key is unknown, withdrawn, past its end or not `Bearer cbk_...`.                                               |
-| `401`  | `wrongLogin`             | No account fits this name or address and this password.                                                                   |
-| `403`  | `crossSite`              | A change sent from another site.                                                                                          |
-| `403`  | `keyCannotMakeKeys`      | Making an access key with an access key.                                                                                  |
-| `403`  | `keyCannotMakePasswords` | Making a password with an access key.                                                                                     |
-| `403`  | `gameMasterOnly`         | A player of the campaign calls a game master's route.                                                                     |
-| `403`  | `ownerOnly`              | A game master deletes a player's character; only the owner does.                                                          |
-| `404`  | `notFound`               | No such API path.                                                                                                         |
-| `404`  | `draftNotFound`          | No draft with this id that you may reach (someone else's looks the same).                                                 |
-| `404`  | `campaignNotFound`       | No campaign with this id that you lead or play in.                                                                        |
-| `404`  | `playerNotFound`         | No such player in this campaign.                                                                                          |
-| `404`  | `copyNotFound`           | No kept copy with this id on this character.                                                                              |
-| `404`  | `keyNotFound`            | No access key with this id in this account.                                                                               |
-| `404`  | `passwordNotFound`       | No password with this id in this account.                                                                                 |
-| `404`  | `resetLinkInvalid`       | The link back in is unknown, used already or older than 30 minutes.                                                       |
-| `404`  | `packageNotFound`        | No loaded package with this id.                                                                                           |
-| `404`  | `languageNotFound`       | The package has no texts in this language.                                                                                |
-| `404`  | `inviteNotFound`         | No campaign has this invitation link (unknown, or replaced by a new one).                                                 |
-| `404`  | `valueNotFound`          | The draft's package has no value with this id (explaining a value).                                                       |
-| `404`  | `versionNotFound`        | No such copy of the sheet: not `original` and not a kept copy of this character.                                          |
-| `405`  | `methodNotAllowed`       | The path exists, the method does not.                                                                                     |
-| `409`  | `versionConflict`        | The draft, copy or play state moved on; `current` holds it now.                                                           |
-| `409`  | `notFinished`            | PDF or sheet of a draft, or raising a draft that is not in a raise; `open` lists the open choices.                        |
-| `409`  | `tooManyCopies`          | The character has 10 kept copies (`max`); delete one first.                                                               |
-| `409`  | `originalChanged`        | A copy made with `model` from an original that changed since; `original` says how it is now.                              |
-| `409`  | `copyUnreadable`         | A kept copy stored in a shape this server no longer prints; `version` names it.                                           |
-| `409`  | `packageUnavailable`     | The draft's package is not loaded right now; `packageId` names it.                                                        |
-| `413`  | `bodyTooLarge`           | Body over 64 KiB (516 KiB for a body with a sheet copy; `max`).                                                           |
-| `413`  | `copyTooLarge`           | A sheet copy's model over 512 KiB (`max`).                                                                                |
-| `415`  | `jsonRequired`           | Body not `application/json`.                                                                                              |
-| `422`  | `changeRejected`         | The rule core refused the change; `reason` is a `ChangeError` (below).                                                    |
-| `422`  | `incomplete`             | Finishing with open choices; `open` lists them.                                                                           |
-| `422`  | `languageNotSupported`   | The account's language cannot be printed with this package; `languages` lists those that can.                             |
-| `422`  | `tooManyCampaigns`       | The account leads 50 campaigns (`max`).                                                                                   |
-| `422`  | `tooManyPlayers`         | The campaign has 50 players (`max`).                                                                                      |
-| `422`  | `tooManyKeys`            | The account has 20 access keys (`max`).                                                                                   |
-| `422`  | `tooManyPasswords`       | The account has 10 passwords (`max`).                                                                                     |
-| `422`  | `lastPassword`           | Deleting the account's last password.                                                                                     |
-| `422`  | `unknownUnit`            | No loaded package offers this unit (`dimension`, `unit`).                                                                 |
-| `429`  | `tooManyAttempts`        | Too many failed logins, new accounts, new or opened invitation links, or links back in; `retryAfter`, also `Retry-After`. |
-| `429`  | `tooManyRequests`        | Too many PDFs; `Retry-After`.                                                                                             |
-| `500`  | `internal`               | A bug in the builder.                                                                                                     |
-| `500`  | `packageRuleError`       | The package's rules could not be worked out (a bug in the package); `message`.                                            |
-| `502`  | `mailFailed`             | The mail server refused the mail with a link back in; nothing changed.                                                    |
-| `503`  | `mailNotConfigured`      | The server has no mail (or no `BASE_URL` for links back in) set up.                                                       |
-| `503`  | `baseUrlNotSet`          | The server has no public address (`BASE_URL`); the MCP zip cannot say where the builder is.                               |
-| `503`  | `mcpPackageMissing`      | This build has no `server.mjs` for the MCP zip.                                                                           |
+| Status | Code                     | When                                                                                                                              |
+| ------ | ------------------------ | --------------------------------------------------------------------------------------------------------------------------------- |
+| `400`  | `badJson`                | The body is not JSON.                                                                                                             |
+| `400`  | `badRequest`             | The body has the wrong shape; `issues` lists `{ path, message }`.                                                                 |
+| `400`  | `badQuery`               | A query parameter has a value the API does not know (`parameter`, `value`).                                                       |
+| `400`  | `designNotAvailable`     | A planned sheet design not drawn yet (`designs` lists those that are); `422` in the settings.                                     |
+| `401`  | `notLoggedIn`            | No session cookie and no `Authorization` header.                                                                                  |
+| `401`  | `keyNotValid`            | The access key is unknown, withdrawn, past its end or not `Bearer cbk_...`.                                                       |
+| `401`  | `wrongLogin`             | No account fits this name or address and this password.                                                                           |
+| `403`  | `crossSite`              | A change sent from another site.                                                                                                  |
+| `403`  | `keyCannotMakeKeys`      | Making an access key with an access key.                                                                                          |
+| `403`  | `keyCannotMakePasswords` | Making a password with an access key.                                                                                             |
+| `403`  | `gameMasterOnly`         | A player of the campaign calls a game master's route.                                                                             |
+| `403`  | `ownerOnly`              | A game master deletes a player's character or calls a help link route; only the owner does.                                       |
+| `404`  | `notFound`               | No such API path.                                                                                                                 |
+| `404`  | `draftNotFound`          | No draft with this id that you may reach (someone else's looks the same).                                                         |
+| `404`  | `campaignNotFound`       | No campaign with this id that you lead or play in.                                                                                |
+| `404`  | `playerNotFound`         | No such player in this campaign.                                                                                                  |
+| `404`  | `copyNotFound`           | No kept copy with this id on this character.                                                                                      |
+| `404`  | `keyNotFound`            | No access key with this id in this account.                                                                                       |
+| `404`  | `passwordNotFound`       | No password with this id in this account.                                                                                         |
+| `404`  | `resetLinkInvalid`       | The link back in is unknown, used already or older than 30 minutes.                                                               |
+| `404`  | `packageNotFound`        | No loaded package with this id.                                                                                                   |
+| `404`  | `languageNotFound`       | The package has no texts in this language.                                                                                        |
+| `404`  | `helpLinkNotFound`       | No character has this help link (unknown, replaced, withdrawn or older than 12 hours).                                            |
+| `404`  | `inviteNotFound`         | No campaign has this invitation link (unknown, or replaced by a new one).                                                         |
+| `404`  | `valueNotFound`          | The draft's package has no value with this id (explaining a value).                                                               |
+| `404`  | `versionNotFound`        | No such copy of the sheet: not `original` and not a kept copy of this character.                                                  |
+| `405`  | `methodNotAllowed`       | The path exists, the method does not.                                                                                             |
+| `409`  | `versionConflict`        | The draft, copy or play state moved on; `current` holds it now.                                                                   |
+| `409`  | `notFinished`            | PDF or sheet of a draft, or raising a draft that is not in a raise; `open` lists the open choices.                                |
+| `409`  | `tooManyCopies`          | The character has 10 kept copies (`max`); delete one first.                                                                       |
+| `409`  | `originalChanged`        | A copy made with `model` from an original that changed since; `original` says how it is now.                                      |
+| `409`  | `copyUnreadable`         | A kept copy stored in a shape this server no longer prints; `version` names it.                                                   |
+| `409`  | `packageUnavailable`     | The draft's package is not loaded right now; `packageId` names it.                                                                |
+| `413`  | `bodyTooLarge`           | Body over 64 KiB (516 KiB for a body with a sheet copy; `max`).                                                                   |
+| `413`  | `copyTooLarge`           | A sheet copy's model over 512 KiB (`max`).                                                                                        |
+| `415`  | `jsonRequired`           | Body not `application/json`.                                                                                                      |
+| `422`  | `changeRejected`         | The rule core refused the change; `reason` is a `ChangeError` (below).                                                            |
+| `422`  | `incomplete`             | Finishing with open choices; `open` lists them.                                                                                   |
+| `422`  | `languageNotSupported`   | The account's language cannot be printed with this package; `languages` lists those that can.                                     |
+| `422`  | `tooManyCampaigns`       | The account leads 50 campaigns (`max`).                                                                                           |
+| `422`  | `tooManyPlayers`         | The campaign has 50 players (`max`).                                                                                              |
+| `422`  | `tooManyKeys`            | The account has 20 access keys (`max`).                                                                                           |
+| `422`  | `tooManyPasswords`       | The account has 10 passwords (`max`).                                                                                             |
+| `422`  | `lastPassword`           | Deleting the account's last password.                                                                                             |
+| `422`  | `unknownUnit`            | No loaded package offers this unit (`dimension`, `unit`).                                                                         |
+| `429`  | `tooManyAttempts`        | Too many failed logins, new accounts, new or opened invitation or help links, or links back in; `retryAfter`, also `Retry-After`. |
+| `429`  | `tooManyRequests`        | Too many PDFs; `Retry-After`.                                                                                                     |
+| `500`  | `internal`               | A bug in the builder.                                                                                                             |
+| `500`  | `packageRuleError`       | The package's rules could not be worked out (a bug in the package); `message`.                                                    |
+| `502`  | `mailFailed`             | The mail server refused the mail with a link back in; nothing changed.                                                            |
+| `503`  | `mailNotConfigured`      | The server has no mail (or no `BASE_URL` for links back in) set up.                                                               |
+| `503`  | `baseUrlNotSet`          | The server has no public address (`BASE_URL`); the MCP zip cannot say where the builder is.                                       |
+| `503`  | `mcpPackageMissing`      | This build has no `server.mjs` for the MCP zip.                                                                                   |
 
 `changeRejected` reasons (`error.reason.code`): `levelOutOfRange` (`min`,
 `max`), `levelNotHigher` (`level`), `unknownChoice`, `notAsked` (the choice

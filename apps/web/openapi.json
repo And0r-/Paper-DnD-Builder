@@ -50,6 +50,10 @@
       "description": "Whoever makes a campaign leads it (game master) and invites players with one link per campaign (`/join/{token}`), which they send themselves; the builder mails no invitations; the game master sees their names, never their addresses. The game master reaches the players' characters that belong to the campaign; a character in no campaign stays private. A player sees only their own characters and the campaigns they are in. Anyone else gets 404."
     },
     {
+      "name": "Live help",
+      "description": "Several people build one character together, live over a WebSocket: its owner, the game master of its campaign, and anyone the owner gives the character's help link (`/help/{token}`, 12 hours, one per character). See API.md, section Live help."
+    },
+    {
       "name": "Server"
     },
     {
@@ -1659,6 +1663,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "help",
+            "in": "query",
+            "required": false,
+            "description": "The draft's help link token, for someone who is neither its owner nor the game master of its campaign (see Live help). Without a working one, someone else's draft answers 404.",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -1698,7 +1711,7 @@
             "$ref": "#/components/responses/ServerError"
           }
         },
-        "description": "Your own character, or a player's in a campaign you lead (`draft.access`). Every draft route below works on both."
+        "description": "Your own character, a player's in a campaign you lead, or one whose help link you hold (`?help=`; `draft.access`). Every draft route below works on the first two; opening and changing (this, explain, level, answers, pools, level-up, finish) also on the third."
       },
       "patch": {
         "operationId": "setLevel",
@@ -1711,6 +1724,15 @@
             "in": "path",
             "required": true,
             "description": "Draft id (a UUID).",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "help",
+            "in": "query",
+            "required": false,
+            "description": "The draft's help link token, for someone who is neither its owner nor the game master of its campaign (see Live help). Without a working one, someone else's draft answers 404.",
             "schema": {
               "type": "string"
             }
@@ -1926,6 +1948,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "help",
+            "in": "query",
+            "required": false,
+            "description": "The draft's help link token, for someone who is neither its owner nor the game master of its campaign (see Live help). Without a working one, someone else's draft answers 404.",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -2007,6 +2038,15 @@
             "in": "path",
             "required": true,
             "description": "Choice id from `evaluation.choices`, URL-encoded (`@` as `%40`).",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "help",
+            "in": "query",
+            "required": false,
+            "description": "The draft's help link token, for someone who is neither its owner nor the game master of its campaign (see Live help). Without a working one, someone else's draft answers 404.",
             "schema": {
               "type": "string"
             }
@@ -2163,6 +2203,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "help",
+            "in": "query",
+            "required": false,
+            "description": "The draft's help link token, for someone who is neither its owner nor the game master of its campaign (see Live help). Without a working one, someone else's draft answers 404.",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -2303,6 +2352,15 @@
             "in": "path",
             "required": true,
             "description": "Draft id (a UUID).",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "help",
+            "in": "query",
+            "required": false,
+            "description": "The draft's help link token, for someone who is neither its owner nor the game master of its campaign (see Live help). Without a working one, someone else's draft answers 404.",
             "schema": {
               "type": "string"
             }
@@ -2555,6 +2613,15 @@
             "in": "path",
             "required": true,
             "description": "Draft id (a UUID).",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "help",
+            "in": "query",
+            "required": false,
+            "description": "The draft's help link token, for someone who is neither its owner nor the game master of its campaign (see Live help). Without a working one, someone else's draft answers 404.",
             "schema": {
               "type": "string"
             }
@@ -5148,6 +5215,423 @@
           }
         }
       }
+    },
+    "/api/drafts/{id}/help-link": {
+      "get": {
+        "operationId": "getHelpLink",
+        "summary": "The help link of a character",
+        "tags": ["Live help"],
+        "description": "Owner only. The link while it works, to show it again; `null` for none, or one that ended.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Draft id (a UUID).",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The link, or null.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "helpLink": {
+                      "anyOf": [
+                        {
+                          "$ref": "#/components/schemas/HelpLink"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": ["helpLink"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "description": "`ownerOnly` (the game master of the campaign; they need no link), `crossSite`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "enum": ["ownerOnly", "crossSite"]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`draftNotFound` (also someone else's character)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "enum": ["draftNotFound"]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      },
+      "post": {
+        "operationId": "makeHelpLink",
+        "summary": "A new help link",
+        "tags": ["Live help"],
+        "description": "Owner only. Makes the character's help link; the one before stops working, and whoever helps with it is out at once, also live. Ends after 12 hours. At most 30 per hour per account.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Draft id (a UUID).",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "The new link.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "helpLink": {
+                      "$ref": "#/components/schemas/HelpLink"
+                    }
+                  },
+                  "required": ["helpLink"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "description": "`ownerOnly` (the game master of the campaign; they need no link), `crossSite`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "enum": ["ownerOnly", "crossSite"]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`draftNotFound` (also someone else's character)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "enum": ["draftNotFound"]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "`tooManyAttempts`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "enum": ["tooManyAttempts"]
+                        },
+                        "retryAfter": {
+                          "type": "integer"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds to wait.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteHelpLink",
+        "summary": "Withdraw the help link",
+        "tags": ["Live help"],
+        "description": "Owner only. The link stops working; whoever helps with it is out at once, also live. Without a link, changes nothing.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Draft id (a UUID).",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Done. No body."
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "description": "`ownerOnly` (the game master of the campaign; they need no link), `crossSite`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "enum": ["ownerOnly", "crossSite"]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`draftNotFound` (also someone else's character)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "enum": ["draftNotFound"]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/api/help/{token}": {
+      "get": {
+        "operationId": "getHelp",
+        "summary": "What a help link opens",
+        "tags": ["Live help"],
+        "security": [],
+        "description": "Whose character a help link opens, shown before helping; also without a login. Counts against the same 60 lookups per 15 minutes per IP as an invitation, found or not.",
+        "parameters": [
+          {
+            "name": "token",
+            "in": "path",
+            "required": true,
+            "description": "The token of the link `/help/{token}`.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The draft the link opens.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "draftId": {
+                      "type": "string"
+                    },
+                    "owner": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["name"],
+                      "additionalProperties": false
+                    },
+                    "expiresAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "yours": {
+                      "type": "boolean",
+                      "description": "True when you own the character: you need no link for it."
+                    },
+                    "live": {
+                      "type": "string",
+                      "description": "The path of the live channel with this link: `/api/live/drafts/{id}?help={token}`."
+                    }
+                  },
+                  "required": ["draftId", "owner", "expiresAt", "yours", "live"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`helpLinkNotFound` (unknown, replaced, withdrawn or ended)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "enum": ["helpLinkNotFound"]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "`tooManyAttempts`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "enum": ["tooManyAttempts"]
+                        },
+                        "retryAfter": {
+                          "type": "integer"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds to wait.",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/api/live/drafts/{id}": {
+      "get": {
+        "operationId": "liveDraft",
+        "summary": "The live channel of a character (WebSocket)",
+        "tags": ["Live help"],
+        "description": "A WebSocket (`Upgrade: websocket`), not a JSON route: everyone on the character sees the same state at once and may answer. Login as everywhere: the session cookie or `Authorization: Bearer <key>`; the handshake must come from this site (`Origin`). Who is neither the owner nor the game master of the character's campaign adds `?help=<token>`. A refused login or a character you may not reach closes the connection after one `error` message with code 4401 or 4404 (as 401 and 404 here). The messages are in API.md, section Live help.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Draft id (a UUID).",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "help",
+            "in": "query",
+            "required": false,
+            "description": "The character's help link token.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "101": {
+            "description": "Switching to the WebSocket protocol. Then JSON messages both ways (API.md, Live help)."
+          },
+          "403": {
+            "description": "The handshake came from another site. No body."
+          },
+          "default": {
+            "description": "Not a WebSocket handshake, or the server is not ready. No body."
+          }
+        }
+      }
     }
   },
   "components": {
@@ -6271,7 +6755,7 @@
         "additionalProperties": false
       },
       "ErrorCode": {
-        "description": "Every error code the API answers with. Stable and English; screens word them in the player's language.\n\n- `badJson`: 400. The body is not JSON.\n- `badRequest`: 400. The body has the wrong shape; `issues` lists `{ path, message }`.\n- `badQuery`: 400. A query parameter has a value the API does not know; `parameter` and `value` name it.\n- `designNotAvailable`: 400 (PDF) or 422 (settings). A planned sheet design that is not drawn yet; `designs` lists those that are.\n- `notLoggedIn`: 401. No session cookie and no `Authorization` header.\n- `keyNotValid`: 401. The `Authorization` header holds no valid access key (unknown, withdrawn, past its end, or not `Bearer <key>`).\n- `wrongLogin`: 401. No account fits this name or address and this password.\n- `crossSite`: 403. A change sent from another site (`Origin` or `Sec-Fetch-Site`).\n- `keyCannotMakeKeys`: 403. Access keys are made on the settings screen only, never with a key.\n- `keyCannotMakePasswords`: 403. Passwords are made on the settings screen only, never with a key.\n- `notFound`: 404. No such API path.\n- `draftNotFound`: 404. No draft with this id in this account.\n- `keyNotFound`: 404. No access key with this id in this account.\n- `passwordNotFound`: 404. No password with this id in this account.\n- `inviteNotFound`: 404. No campaign has this invitation link (unknown, or replaced by a new one).\n- `resetLinkInvalid`: 404. The link back in is unknown, used already or older than 30 minutes.\n- `packageNotFound`: 404. No loaded package with this id.\n- `languageNotFound`: 404. The package has no texts in this language.\n- `valueNotFound`: 404. The draft's package has no value with this id.\n- `versionNotFound`: 404. No such version of the sheet to print: neither `original` nor a kept copy of this character.\n- `methodNotAllowed`: 405. The path exists, the method does not.\n- `versionConflict`: 409. The draft moved on; `current` holds its state now.\n- `notFinished`: 409. The character is not finished (PDF) or not finished and not in a raise (level-up); `open` lists the open choices.\n- `packageUnavailable`: 409. The draft's package is not loaded right now; `packageId` names it.\n- `copyUnreadable`: 409. A kept copy stored in a shape this server no longer prints; `version` names it.\n- `bodyTooLarge`: 413. The body is larger than 64 KiB.\n- `jsonRequired`: 415. The body is not `application/json`.\n- `changeRejected`: 422. The rule core refused the change; `reason` says why (see `ChangeError`).\n- `incomplete`: 422. Finishing with open choices; `open` lists them.\n- `languageNotSupported`: 422. The account's language cannot be printed with this package; `languages` lists those that can.\n- `tooManyKeys`: 422. The account has the most access keys allowed (`max`).\n- `tooManyPasswords`: 422. The account has the most passwords allowed (`max`).\n- `lastPassword`: 422. The account's last password cannot be deleted.\n- `unknownUnit`: 422. No loaded package offers this unit for this dimension.\n- `tooManyAttempts`: 429. Too many failed logins, new accounts, new invitation links, invitation lookups or links back in; `retryAfter` seconds, also in `Retry-After`.\n- `tooManyRequests`: 429. Too many PDFs; see `Retry-After`.\n- `internal`: 500. A bug in the builder.\n- `packageRuleError`: 500. The package's rules could not be worked out (a bug in the package); `message` says where.\n- `mailFailed`: 502. The mail server refused the mail with a link back in; nothing was changed.\n- `mailNotConfigured`: 503. The server has no mail (or no `BASE_URL` for links) set up; no link back in can be mailed.\n- `baseUrlNotSet`: 503. The server has no public address configured (`BASE_URL`), so the MCP zip cannot say where the builder is.\n- `mcpPackageMissing`: 503. This build of the server has no `server.mjs` for the MCP zip.",
+        "description": "Every error code the API answers with. Stable and English; screens word them in the player's language.\n\n- `badJson`: 400. The body is not JSON.\n- `badRequest`: 400. The body has the wrong shape; `issues` lists `{ path, message }`.\n- `badQuery`: 400. A query parameter has a value the API does not know; `parameter` and `value` name it.\n- `designNotAvailable`: 400 (PDF) or 422 (settings). A planned sheet design that is not drawn yet; `designs` lists those that are.\n- `notLoggedIn`: 401. No session cookie and no `Authorization` header.\n- `keyNotValid`: 401. The `Authorization` header holds no valid access key (unknown, withdrawn, past its end, or not `Bearer <key>`).\n- `wrongLogin`: 401. No account fits this name or address and this password.\n- `crossSite`: 403. A change sent from another site (`Origin` or `Sec-Fetch-Site`).\n- `keyCannotMakeKeys`: 403. Access keys are made on the settings screen only, never with a key.\n- `keyCannotMakePasswords`: 403. Passwords are made on the settings screen only, never with a key.\n- `notFound`: 404. No such API path.\n- `draftNotFound`: 404. No draft with this id in this account.\n- `keyNotFound`: 404. No access key with this id in this account.\n- `passwordNotFound`: 404. No password with this id in this account.\n- `inviteNotFound`: 404. No campaign has this invitation link (unknown, or replaced by a new one).\n- `helpLinkNotFound`: 404. No character has this help link (unknown, replaced, withdrawn or older than 12 hours).\n- `resetLinkInvalid`: 404. The link back in is unknown, used already or older than 30 minutes.\n- `packageNotFound`: 404. No loaded package with this id.\n- `languageNotFound`: 404. The package has no texts in this language.\n- `valueNotFound`: 404. The draft's package has no value with this id.\n- `versionNotFound`: 404. No such version of the sheet to print: neither `original` nor a kept copy of this character.\n- `methodNotAllowed`: 405. The path exists, the method does not.\n- `versionConflict`: 409. The draft moved on; `current` holds its state now.\n- `notFinished`: 409. The character is not finished (PDF) or not finished and not in a raise (level-up); `open` lists the open choices.\n- `packageUnavailable`: 409. The draft's package is not loaded right now; `packageId` names it.\n- `copyUnreadable`: 409. A kept copy stored in a shape this server no longer prints; `version` names it.\n- `bodyTooLarge`: 413. The body is larger than 64 KiB.\n- `jsonRequired`: 415. The body is not `application/json`.\n- `changeRejected`: 422. The rule core refused the change; `reason` says why (see `ChangeError`).\n- `incomplete`: 422. Finishing with open choices; `open` lists them.\n- `languageNotSupported`: 422. The account's language cannot be printed with this package; `languages` lists those that can.\n- `tooManyKeys`: 422. The account has the most access keys allowed (`max`).\n- `tooManyPasswords`: 422. The account has the most passwords allowed (`max`).\n- `lastPassword`: 422. The account's last password cannot be deleted.\n- `unknownUnit`: 422. No loaded package offers this unit for this dimension.\n- `tooManyAttempts`: 429. Too many failed logins, new accounts, new invitation links, invitation or help link lookups, new help links or links back in; `retryAfter` seconds, also in `Retry-After`.\n- `tooManyRequests`: 429. Too many PDFs; see `Retry-After`.\n- `internal`: 500. A bug in the builder.\n- `packageRuleError`: 500. The package's rules could not be worked out (a bug in the package); `message` says where.\n- `mailFailed`: 502. The mail server refused the mail with a link back in; nothing was changed.\n- `mailNotConfigured`: 503. The server has no mail (or no `BASE_URL` for links) set up; no link back in can be mailed.\n- `baseUrlNotSet`: 503. The server has no public address configured (`BASE_URL`), so the MCP zip cannot say where the builder is.\n- `mcpPackageMissing`: 503. This build of the server has no `server.mjs` for the MCP zip.",
         "enum": [
           "badJson",
           "badQuery",
@@ -6324,7 +6808,8 @@
           "valueNotFound",
           "versionConflict",
           "versionNotFound",
-          "wrongLogin"
+          "wrongLogin",
+          "helpLinkNotFound"
         ]
       },
       "JsonRpcError": {
@@ -6676,8 +7161,8 @@
             "description": "Whose character it is, by name. It stays theirs, whoever changes it."
           },
           "access": {
-            "enum": ["owner", "gameMaster"],
-            "description": "`owner`: your own. `gameMaster`: a player's, in a campaign you lead; you may open, change, raise and print it, not delete it."
+            "enum": ["owner", "gameMaster", "helper"],
+            "description": "`owner`: your own. `gameMaster`: a player's, in a campaign you lead; you may open, change, raise and print it, not delete it. `helper`: someone's who gave you its help link; you may open and change it while the link works, nothing else."
           }
         },
         "required": [
@@ -8020,6 +8505,31 @@
           }
         },
         "required": ["parts", "design", "state"],
+        "additionalProperties": false
+      },
+      "HelpLink": {
+        "type": "object",
+        "description": "A draft's help link, as its owner sees it.",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "The link to hand over: `/help/{token}` on the server's public address."
+          },
+          "token": {
+            "type": "string",
+            "description": "22 characters; opens the draft with `?help=` and on the live channel."
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "12 hours after it was made."
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": ["url", "token", "expiresAt", "createdAt"],
         "additionalProperties": false
       }
     }
