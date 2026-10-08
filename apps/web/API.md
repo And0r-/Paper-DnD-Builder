@@ -162,19 +162,19 @@ Every change sends the `version` it was made on. If the draft has moved on,
 the answer is `409 versionConflict` with the current state in
 `error.current` (optimistic locking).
 
-| Method & path                            | Body                                 | Result                                                                                                                              |
-| ---------------------------------------- | ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------- |
-| 🔒 `GET /api/drafts`                     | —                                    | The account's own drafts with summaries (a game master finds the players' in the campaign).                                         |
-| 🔒 `POST /api/drafts`                    | `{ packageId, level?, campaignId? }` | `201`, new draft at version 1. `campaignId`: a campaign you play in (`joinedAt` in the campaign list); else `404 campaignNotFound`. |
-| 🔒 `GET /api/drafts/:id`                 | —                                    | The draft.                                                                                                                          |
-| 🔒 `GET /api/drafts/:id/explain/:value`  | —                                    | Where one number comes from: its parts and their sources; see [Explaining a value](#explaining-a-value). `404 valueNotFound`.       |
-| 🔒 `PATCH /api/drafts/:id`               | `{ version, level }`                 | Changes the level.                                                                                                                  |
-| 🔒 `PUT /api/drafts/:id/pools/:step`     | `{ version, picks }`                 | All picks of a step with a shared list (`steps[].pool`); the core spreads them over the step's choices.                             |
-| 🔒 `PUT /api/drafts/:id/answers/:choice` | `{ version, answer }`                | Answers one choice; `answer: null` removes it. `422 changeRejected` with the reason if it does not fit now.                         |
-| 🔒 `POST /api/drafts/:id/level-up`       | `{ version, level }`                 | Raises a finished character; see [Raising a character](#raising-a-character).                                                       |
-| 🔒 `POST /api/drafts/:id/finish`         | `{ version }`                        | Marks the character finished; `422 incomplete` with the open choices.                                                               |
-| 🔒 `PUT /api/drafts/:id/campaign`        | `{ campaignId }`                     | Owner only. Puts the character into a campaign you play in, or into none (`null`). The `version` stays.                             |
-| 🔒 `DELETE /api/drafts/:id`              | —                                    | `204`.                                                                                                                              |
+| Method & path                            | Body                                 | Result                                                                                                                        |
+| ---------------------------------------- | ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------- |
+| 🔒 `GET /api/drafts`                     | —                                    | The account's own drafts with summaries (a game master finds the players' in the campaign).                                   |
+| 🔒 `POST /api/drafts`                    | `{ packageId, level?, campaignId? }` | `201`, new draft at version 1. `campaignId`: a campaign you play in or lead; else `404 campaignNotFound`.                     |
+| 🔒 `GET /api/drafts/:id`                 | —                                    | The draft.                                                                                                                    |
+| 🔒 `GET /api/drafts/:id/explain/:value`  | —                                    | Where one number comes from: its parts and their sources; see [Explaining a value](#explaining-a-value). `404 valueNotFound`. |
+| 🔒 `PATCH /api/drafts/:id`               | `{ version, level }`                 | Changes the level.                                                                                                            |
+| 🔒 `PUT /api/drafts/:id/pools/:step`     | `{ version, picks }`                 | All picks of a step with a shared list (`steps[].pool`); the core spreads them over the step's choices.                       |
+| 🔒 `PUT /api/drafts/:id/answers/:choice` | `{ version, answer }`                | Answers one choice; `answer: null` removes it. `422 changeRejected` with the reason if it does not fit now.                   |
+| 🔒 `POST /api/drafts/:id/level-up`       | `{ version, level }`                 | Raises a finished character; see [Raising a character](#raising-a-character).                                                 |
+| 🔒 `POST /api/drafts/:id/finish`         | `{ version }`                        | Marks the character finished; `422 incomplete` with the open choices.                                                         |
+| 🔒 `PUT /api/drafts/:id/campaign`        | `{ campaignId }`                     | Owner only. Puts the character into a campaign you play in or lead, or into none (`null`). The `version` stays.               |
+| 🔒 `DELETE /api/drafts/:id`              | —                                    | `204`.                                                                                                                        |
 
 Answer shapes by choice kind: `pickOne` `{ "pick": "thing.key" }`,
 `pickMany` `{ "picks": [...] }`, `distribute`
@@ -422,40 +422,42 @@ open, change, raise, print, and make a new one for a player. A character
 in no campaign or in another stays private. When a player leaves or is
 removed, their characters leave the campaign too. The characters stay the players' (`draft.owner`);
 only the owner deletes one. A player sees their own characters and the
-campaigns they are in, not the other players. Anyone else gets `404`, as
+campaigns they are in, not the other players. The game master is a member
+of their own campaign without being a player: their own characters can
+belong to it, and `playerCount` does not count them. Anyone else gets `404`, as
 for something that does not exist. Every route checks this on the server;
 access keys have the same rights as the screens.
 
 | Method & path                                         | Body                    | Who                       | Result                                                                                                                                                                                                                                                      |
 | ----------------------------------------------------- | ----------------------- | ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 🔒 `GET /api/campaigns`                               | —                       | everyone                  | `{ campaigns: [Campaign] }`: the ones you lead or play in, oldest first.                                                                                                                                                                                    |
-| 🔒 `POST /api/campaigns`                              | `{ name }`              | everyone                  | `201 { campaign, players: [] }`. You lead it. `422 tooManyCampaigns` (`max`, 50).                                                                                                                                                                           |
-| 🔒 `GET /api/campaigns/:id`                           | —                       | game master, player       | `{ campaign, players }`. Game master: `players: [{ id, email, addedAt, characters: [draft list entries] }]`. Player: `players: null`.                                                                                                                       |
+| 🔒 `POST /api/campaigns`                              | `{ name }`              | everyone                  | `201 { campaign, characters: [], players: [] }`. You lead it. `422 tooManyCampaigns` (`max`, 50).                                                                                                                                                           |
+| 🔒 `GET /api/campaigns/:id`                           | —                       | game master, player       | `{ campaign, characters, players }`. Game master: `characters`: their own in this campaign (draft list entries); `players: [{ id, email, addedAt, characters }]`. Player: both `null`.                                                                      |
 | 🔒 `PATCH /api/campaigns/:id`                         | `{ name }`              | game master               | `{ campaign }`.                                                                                                                                                                                                                                             |
-| 🔒 `DELETE /api/campaigns/:id`                        | —                       | game master               | `204`. Campaign and player list go; the characters stay with the players.                                                                                                                                                                                   |
+| 🔒 `DELETE /api/campaigns/:id`                        | —                       | game master               | `204`. Campaign and player list go; every character stays with its owner, in no campaign.                                                                                                                                                                   |
 | 🔒 `POST /api/campaigns/:id/players`                  | `{ email, language? }`  | game master               | `201 { player: { id, email, addedAt } }`. New address: account made, password mail. Existing account: short mail, password unchanged. Same answer either way. `409 alreadyPlayer`, `422 cannotAddYourself`, `422 tooManyPlayers` (50), `429`, `502`, `503`. |
 | 🔒 `DELETE /api/campaigns/:id/players/:playerId`      | —                       | game master; player: `me` | `204`. The game master removes a player; a player leaves with `me`. The characters stay and leave the campaign; the game master's reach ends at once. `404 playerNotFound`.                                                                                 |
 | 🔒 `POST /api/campaigns/:id/players/:playerId/drafts` | `{ packageId, level? }` | game master               | `201`, a new draft that belongs to the player (`access: "gameMaster"`) and to this campaign. Then build it with the draft routes.                                                                                                                           |
 
-`Campaign` is `{ id, name, role: "gameMaster|player", gameMaster: { email }, playerCount, createdAt }`.
+`Campaign` is `{ id, name, role: "gameMaster|player", gameMaster: { email }, playerCount, createdAt, joinedAt }`; `joinedAt` is null for the game master.
 A player of the campaign gets `403 gameMasterOnly` on the game master's
 routes (they know the campaign exists); anyone else `404 campaignNotFound`.
 
 **Who may do what**
 
-| Call                                                                                                 | Game master            | Player                 | Anyone else     |
-| ---------------------------------------------------------------------------------------------------- | ---------------------- | ---------------------- | --------------- |
-| `GET /api/campaigns`                                                                                 | sees it (`gameMaster`) | sees it (`player`)     | does not see it |
-| `GET /api/campaigns/:id`                                                                             | `200`, with players    | `200`, `players: null` | `404`           |
-| `PATCH`, `DELETE /api/campaigns/:id`                                                                 | `200` / `204`          | `403`                  | `404`           |
-| `POST /api/campaigns/:id/players`                                                                    | `201`                  | `403`                  | `404`           |
-| `DELETE /api/campaigns/:id/players/:playerId`                                                        | `204` (any player)     | `204` (`me` only)      | `404`           |
-| `POST /api/campaigns/:id/players/:playerId/drafts`                                                   | `201`                  | `403`                  | `404`           |
-| `GET /api/drafts`                                                                                    | own only               | own only               | own only        |
-| `GET`, `PATCH /api/drafts/:id`, answers, pools, finish, level-up, sheet, pdf of a player's character | `200`                  | `200` (owner)          | `404`           |
-| sheet copies (all four) and play state of a player's character                                       | `200` / `201` / `204`  | the same (owner)       | `404`           |
-| `DELETE /api/drafts/:id` of a player's character                                                     | `403 ownerOnly`        | `204` (owner)          | `404`           |
-| any draft route on the game master's own character                                                   | `200` (owner)          | `404`                  | `404`           |
+| Call                                                                                                 | Game master            | Player              | Anyone else     |
+| ---------------------------------------------------------------------------------------------------- | ---------------------- | ------------------- | --------------- |
+| `GET /api/campaigns`                                                                                 | sees it (`gameMaster`) | sees it (`player`)  | does not see it |
+| `GET /api/campaigns/:id`                                                                             | `200`, with players    | `200`, `null` lists | `404`           |
+| `PATCH`, `DELETE /api/campaigns/:id`                                                                 | `200` / `204`          | `403`               | `404`           |
+| `POST /api/campaigns/:id/players`                                                                    | `201`                  | `403`               | `404`           |
+| `DELETE /api/campaigns/:id/players/:playerId`                                                        | `204` (any player)     | `204` (`me` only)   | `404`           |
+| `POST /api/campaigns/:id/players/:playerId/drafts`                                                   | `201`                  | `403`               | `404`           |
+| `GET /api/drafts`                                                                                    | own only               | own only            | own only        |
+| `GET`, `PATCH /api/drafts/:id`, answers, pools, finish, level-up, sheet, pdf of a player's character | `200`                  | `200` (owner)       | `404`           |
+| sheet copies (all four) and play state of a player's character                                       | `200` / `201` / `204`  | the same (owner)    | `404`           |
+| `DELETE /api/drafts/:id` of a player's character                                                     | `403 ownerOnly`        | `204` (owner)       | `404`           |
+| any draft route on the game master's own character                                                   | `200` (owner)          | `404`               | `404`           |
 
 A game master prints a player's character in the game master's own
 language and units. Deleting a player's account removes their characters

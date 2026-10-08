@@ -416,6 +416,7 @@
   "campaigns.left": "You no longer play in {name}.",
   "campaign.notFound": "This campaign does not exist, or you are not part of it.",
   "campaign.youLead": "You lead this campaign. You see your players' characters in this campaign. You can keep building them and print them.",
+  "campaign.mine": "My characters",
   "campaign.players": "Players",
   "campaign.addLabel": "Email address of a player",
   "campaign.addHelp": "The person gets an email from us. It says that you ({email}) are inviting them to “{name}”. If they have no account yet, the email also holds their password.",

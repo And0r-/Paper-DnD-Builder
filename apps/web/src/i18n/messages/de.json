@@ -416,6 +416,7 @@
   "campaigns.left": "Du spielst nicht mehr bei {name} mit.",
   "campaign.notFound": "Diese Kampagne gibt es nicht, oder du gehörst nicht dazu.",
   "campaign.youLead": "Du leitest diese Kampagne. Du siehst die Charaktere deiner Mitspieler in dieser Kampagne. Du kannst sie weiterbauen und drucken.",
+  "campaign.mine": "Meine Charaktere",
   "campaign.players": "Mitspieler",
   "campaign.addLabel": "Mailadresse eines Mitspielers",
   "campaign.addHelp": "Die Person bekommt von uns eine Mail. Darin steht, dass du ({email}) sie zu „{name}“ einlädst. Hat sie noch kein Konto, steht in der Mail auch ihr Passwort.",

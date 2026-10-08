@@ -4,8 +4,8 @@
  * draft starts at once (flow spec 4.3, Hick's law). With several, the
  * player picks the game first; that cannot be changed later.
  *
- * A player of a campaign first says which campaign the character is for
- * (AND-231), with the campaign they joined last chosen: most come here
+ * A member of a campaign (player or game master) first says which campaign
+ * the character is for (AND-231, AND-234), with the campaign they joined last chosen: most come here
  * straight from the invitation. Without a campaign the question is skipped.
  *
  * `?campaign=<id>&player=<id>`: a game master builds for a player of their
@@ -23,7 +23,7 @@ import {
   type DraftView,
   type PackageListEntry,
 } from "../../src/ui/api.ts";
-import { loadPlayedCampaigns, NO_CAMPAIGN } from "../../src/ui/campaigns.ts";
+import { loadMemberCampaigns, NO_CAMPAIGN } from "../../src/ui/campaigns.ts";
 import { Button, ButtonLink } from "../../src/ui/components/Button.tsx";
 import { Callout, EmptyState, ErrorState, Loading } from "../../src/ui/components/Feedback.tsx";
 import { SelectField } from "../../src/ui/components/Fields.tsx";
@@ -76,7 +76,7 @@ function NewCharacter() {
   const forPlayer = useForPlayer();
   const [list, setList] = useState<PackageListEntry[] | null>(null);
   const [failed, setFailed] = useState(false);
-  // The campaigns the viewer plays in; not asked when a game master builds for a player.
+  // The campaigns the viewer plays in or leads; not asked when a game master builds for a player.
   const [campaigns, setCampaigns] = useState<Campaign[] | null>(null);
   const [campaignPick, setCampaignPick] = useState<string>();
   /** The campaign the character is for once decided; NO_CAMPAIGN for none. */
@@ -130,7 +130,7 @@ function NewCharacter() {
   useEffect(() => {
     if (forPlayer !== undefined) return;
     let live = true;
-    loadPlayedCampaigns().then(
+    loadMemberCampaigns().then(
       (c) => {
         if (!live) return;
         setCampaigns(c);

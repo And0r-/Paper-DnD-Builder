@@ -150,7 +150,7 @@ function applyOrReject(pkg: ContentPackage, row: DraftRow, c: DraftChange) {
 export const newDraftSchema = z.strictObject({
   packageId: z.string().max(100),
   level: z.number().int().optional(),
-  /** A campaign the owner plays in; none if left out or null. */
+  /** A campaign the owner plays in or leads; none if left out or null. */
   campaignId: z.string().regex(UUID).nullable().optional(),
 });
 
@@ -169,8 +169,8 @@ export async function createDraft(
   if (ledCampaignId) {
     if (campaignId && campaignId !== ledCampaignId) throw new HttpError(404, "campaignNotFound");
     campaignId = ledCampaignId;
-  } else if (campaignId && !(await ctx.app.store.findPlayer(campaignId, owner.id))) {
-    // Only a campaign the owner plays in; any other looks missing.
+  } else if (campaignId && !(await ctx.app.store.isMember(campaignId, owner.id))) {
+    // Only a campaign the owner plays in or leads; any other looks missing.
     throw new HttpError(404, "campaignNotFound");
   }
   const pkg = ctx.app.packages.get(body.packageId);
@@ -306,8 +306,8 @@ export const draftRoutes: Route[] = [
     },
   },
   {
-    // The owner puts the character into a campaign they play in, or into
-    // none. The character itself does not change: its version stays.
+    // The owner puts the character into a campaign they play in or lead,
+    // or into none. The character itself does not change: its version stays.
     method: "PUT",
     path: "/api/drafts/:id/campaign",
     handler: async (ctx) => {

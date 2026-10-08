@@ -2,7 +2,9 @@
  * The campaign question before the first step (AND-231). A player in no
  * campaign never sees it. A player in campaigns gets one list, with the
  * campaign they joined last chosen, and can change it later on the
- * overview.
+ * overview. A game master is a member of their own campaigns: the step
+ * offers them too, and their characters show on the campaign page
+ * (AND-234).
  */
 import type { Browser, Page } from "@playwright/test";
 import de from "../src/i18n/messages/de.json" with { type: "json" };
@@ -85,6 +87,60 @@ test("in campaigns: the one joined last is chosen, and can be changed later", as
   await page.waitForURL(/\/c\/[0-9a-f-]+\/level$/);
   const second = /\/c\/([0-9a-f-]+)\//.exec(page.url())![1]!;
   expect(await campaignOf(page, second)).toBeNull();
+});
+
+test("game master in no other campaign: their own one is chosen, and the character shows on its page", async ({
+  page,
+  foreign,
+}) => {
+  void foreign;
+  const m = de;
+  await login(page, uniqueEmail("leitet"));
+  const made = await page.request.post("/api/campaigns", { data: { name: "Nebelrunde" } });
+  const id = ((await made.json()) as { campaign: { id: string } }).campaign.id;
+
+  await page.goto("/new");
+  await expect(page.getByRole("heading", { level: 1, name: m["new.campaignQuestion"] })).toBeVisible();
+  await expect(page.getByLabel(m["new.campaignLabel"])).toHaveValue(id);
+  await page.getByRole("button", { name: m["common.next"] }).click();
+  await page.waitForURL(/\/c\/[0-9a-f-]+\/level$/);
+  const draftId = /\/c\/([0-9a-f-]+)\//.exec(page.url())![1]!;
+  expect(await campaignOf(page, draftId)).toBe(id);
+
+  // On the campaign page, in a block of its own before the players.
+  const named = await page.request.put(`/api/drafts/${draftId}/answers/name`, {
+    data: { version: 1, answer: { text: "Tamsin" } },
+  });
+  expect(named.status()).toBe(200);
+  await page.goto(`/campaigns/${id}`);
+  const mine = page.getByRole("region", { name: m["campaign.mine"] });
+  await expect(mine.getByRole("heading", { level: 3, name: "Tamsin" })).toBeVisible();
+  await expect(page.locator(".campaign-page").getByRole("heading", { level: 2 })).toHaveText([
+    m["campaign.mine"],
+    m["campaign.players"],
+    m["campaign.delete"],
+  ]);
+  await expectOneLanguage(page, "de");
+  await shot(page, "94-kampagne-eigene-charaktere");
+});
+
+test("leads one, joined another later: the one joined later is chosen", async ({
+  page,
+  browser,
+  foreign,
+}) => {
+  void foreign;
+  const m = de;
+  const player = uniqueEmail("beides");
+  await login(page, player);
+  const made = await page.request.post("/api/campaigns", { data: { name: "Eigene Runde" } });
+  expect(made.status()).toBe(201);
+  const joined = await invite(browser, "Spätere Runde", player);
+
+  await page.goto("/new");
+  const field = page.getByLabel(m["new.campaignLabel"]);
+  await expect(field).toHaveValue(joined);
+  await expect(field.locator("option")).toHaveText(["Spätere Runde", "Eigene Runde", m["new.noCampaign"]]);
 });
 
 test("en: the campaign question in English only", async ({ page, browser, foreign }) => {

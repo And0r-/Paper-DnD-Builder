@@ -1124,7 +1124,7 @@
         "operationId": "createDraft",
         "summary": "Start a character",
         "tags": ["Characters"],
-        "description": "An empty draft at version 1. Without `level`, the package's default level. With `campaignId`, the character belongs to that campaign; it must be one you play in.",
+        "description": "An empty draft at version 1. Without `level`, the package's default level. With `campaignId`, the character belongs to that campaign; it must be one you play in or lead.",
         "requestBody": {
           "required": true,
           "content": {
@@ -1141,7 +1141,7 @@
                   },
                   "campaignId": {
                     "anyOf": [{ "type": "string" }, { "type": "null" }],
-                    "description": "A campaign you play in; left out or null for none."
+                    "description": "A campaign you play in or lead; left out or null for none."
                   }
                 },
                 "required": ["packageId"],
@@ -1171,7 +1171,7 @@
             "$ref": "#/components/responses/CrossSite"
           },
           "404": {
-            "description": "`packageNotFound`, `campaignNotFound` (also a campaign you do not play in)",
+            "description": "`packageNotFound`, `campaignNotFound` (also a campaign you neither play in nor lead)",
             "content": {
               "application/json": {
                 "schema": {
@@ -1991,7 +1991,7 @@
         "operationId": "setDraftCampaign",
         "summary": "Put a character into a campaign",
         "tags": ["Characters"],
-        "description": "Only the owner, and only into a campaign they play in; `null` takes it out of every campaign. The character itself does not change: its `version` stays.",
+        "description": "Only the owner, and only into a campaign they play in or lead; `null` takes it out of every campaign. The character itself does not change: its `version` stays.",
         "parameters": [
           {
             "name": "id",
@@ -2012,7 +2012,7 @@
                 "properties": {
                   "campaignId": {
                     "anyOf": [{ "type": "string" }, { "type": "null" }],
-                    "description": "A campaign you play in, or null for none."
+                    "description": "A campaign you play in or lead, or null for none."
                   }
                 },
                 "required": ["campaignId"],
@@ -2058,7 +2058,7 @@
             }
           },
           "404": {
-            "description": "`draftNotFound`, `campaignNotFound` (also a campaign you do not play in)",
+            "description": "`draftNotFound`, `campaignNotFound` (also a campaign you neither play in nor lead)",
             "content": {
               "application/json": {
                 "schema": {
@@ -3458,7 +3458,7 @@
             }
           }
         ],
-        "description": "The game master gets the players and their characters in this campaign; a player gets the campaign only.",
+        "description": "The game master gets their own characters in this campaign, and the players with theirs; a player gets the campaign only.",
         "responses": {
           "200": {
             "description": "The campaign.",
@@ -3621,7 +3621,7 @@
             }
           }
         ],
-        "description": "Game master only. The campaign and its player list go; every character stays with its player.",
+        "description": "Game master only. The campaign and its player list go; every character stays with its owner, in no campaign.",
         "responses": {
           "204": {
             "description": "Done. No body."
@@ -6383,6 +6383,13 @@
           "campaign": {
             "$ref": "#/components/schemas/Campaign"
           },
+          "characters": {
+            "anyOf": [
+              { "type": "array", "items": { "$ref": "#/components/schemas/DraftListEntry" } },
+              { "type": "null" }
+            ],
+            "description": "For the game master: their own characters in this campaign, newest first. For a player: null."
+          },
           "players": {
             "anyOf": [
               {
@@ -6420,7 +6427,7 @@
             "description": "For the game master: the players with their characters. For a player: null (players do not see each other)."
           }
         },
-        "required": ["campaign", "players"],
+        "required": ["campaign", "characters", "players"],
         "additionalProperties": false,
         "description": "A campaign; what it shows depends on your role in it."
       },

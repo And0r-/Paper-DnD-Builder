@@ -157,8 +157,12 @@ export interface CampaignPlayer {
   characters: DraftListEntry[];
 }
 
-/** `players` is null for a player of the campaign: they see only its name and who leads it. */
+/**
+ * `characters` (the game master's own in this campaign) and `players` are
+ * null for a player of the campaign: they see only its name and who leads it.
+ */
 export interface CampaignView {
   campaign: Campaign;
+  characters: DraftListEntry[] | null;
   players: CampaignPlayer[] | null;
 }

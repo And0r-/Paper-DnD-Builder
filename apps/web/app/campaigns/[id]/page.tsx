@@ -1,6 +1,7 @@
 "use client";
 /**
- * One campaign. The game master adds players by mail address (the hint
+ * One campaign. The game master sees their own characters in it first,
+ * adds players by mail address (the hint
  * says who gets which mail), sees each player with their characters as
  * cards, opens or prints them, builds a new one for a player, removes a
  * player or deletes the campaign. A player sees only who leads it.
@@ -51,7 +52,7 @@ function CampaignScreen({ me }: { me: string }) {
     let live = true;
     (async () => {
       const view = await api<CampaignView>("GET", `/api/campaigns/${encodeURIComponent(id)}`);
-      const drafts = (view.players ?? []).flatMap((p) => p.characters);
+      const drafts = [...(view.characters ?? []), ...(view.players ?? []).flatMap((p) => p.characters)];
       return { lang, view, packages: await packagesFor(drafts, lang) };
     })().then(
       (d) => live && (setData(d), setFailed(null)),
@@ -116,7 +117,7 @@ function CampaignScreen({ me }: { me: string }) {
   } else if (!data) {
     content = <Loading shape="cards" count={3} />;
   } else {
-    const { campaign, players } = data.view;
+    const { campaign, characters, players } = data.view;
     content = (
       <>
         <h1 className="page__title">{campaign.name}</h1>
@@ -135,6 +136,23 @@ function CampaignScreen({ me }: { me: string }) {
         ) : (
           <>
             <p>{t("campaign.youLead")}</p>
+            {characters && characters.length > 0 && (
+              <section className="campaign-page__section" aria-labelledby="p-mine">
+                <h2 className="section-title" id="p-mine">
+                  {t("campaign.mine")}
+                </h2>
+                <ul className="character-list">
+                  {characters.map((d) => (
+                    <li key={d.id}>
+                      <CharacterCard
+                        heading="h3"
+                        item={describeCharacter(d, data.packages.get(d.packageId), t)}
+                      />
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
             <section className="campaign-page__section" aria-labelledby="p-players">
               <h2 className="section-title" id="p-players">
                 {t("campaign.players")}

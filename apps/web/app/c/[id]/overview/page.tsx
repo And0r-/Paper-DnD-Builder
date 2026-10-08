@@ -9,7 +9,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useId, useState, type ReactNode } from "react";
 import type { Campaign } from "../../../../src/ui/api.ts";
 import { useApp } from "../../../../src/ui/app-state.tsx";
-import { loadPlayedCampaigns, NO_CAMPAIGN } from "../../../../src/ui/campaigns.ts";
+import { loadMemberCampaigns, NO_CAMPAIGN } from "../../../../src/ui/campaigns.ts";
 import { Button, ButtonLink } from "../../../../src/ui/components/Button.tsx";
 import { Callout } from "../../../../src/ui/components/Feedback.tsx";
 import { SelectField } from "../../../../src/ui/components/Fields.tsx";
@@ -204,7 +204,7 @@ export default function OverviewPage() {
 
 /**
  * Which campaign the character belongs to; its owner changes it here, saved
- * at once. Shown only to an owner who plays in a campaign, or whose
+ * at once. Shown only to an owner who plays in or leads a campaign, or whose
  * character is in one.
  */
 function CampaignField() {
@@ -219,7 +219,7 @@ function CampaignField() {
     if (!owner) return;
     let live = true;
     // Without the list there is nothing to choose from; the field stays away.
-    loadPlayedCampaigns().then(
+    loadMemberCampaigns().then(
       (c) => live && setCampaigns(c),
       () => undefined,
     );

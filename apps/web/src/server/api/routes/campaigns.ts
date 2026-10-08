@@ -94,22 +94,26 @@ export const campaignRoutes: Route[] = [
       );
       if (!made) throw new HttpError(422, "tooManyCampaigns", { max: MAX_CAMPAIGNS_PER_ACCOUNT });
       const campaign = (await ctx.app.store.findCampaign(id, account.id))!;
-      return json(201, { campaign: publicCampaign(campaign), players: [] });
+      return json(201, { campaign: publicCampaign(campaign), characters: [], players: [] });
     },
   },
   {
-    // The game master gets the players with their characters in this campaign; a player gets `players: null`.
+    // The game master gets their own characters in this campaign and the
+    // players with theirs; a player gets `characters: null, players: null`.
     method: "GET",
     path: "/api/campaigns/:id",
     handler: async (ctx) => {
-      const { campaign } = await loadCampaign(ctx);
-      if (!campaign.leading) return json(200, { campaign: publicCampaign(campaign), players: null });
+      const { campaign, viewer } = await loadCampaign(ctx);
+      if (!campaign.leading) {
+        return json(200, { campaign: publicCampaign(campaign), characters: null, players: null });
+      }
       const [players, drafts] = await Promise.all([
         ctx.app.store.listPlayers(campaign.id),
         ctx.app.store.listCampaignDrafts(campaign.id),
       ]);
       return json(200, {
         campaign: publicCampaign(campaign),
+        characters: drafts.filter((d) => d.account_id === viewer.id).map((d) => listEntry(ctx.app, d)),
         players: players.map((p) => ({
           ...publicPlayer(p),
           characters: drafts.filter((d) => d.account_id === p.id).map((d) => listEntry(ctx.app, d)),
