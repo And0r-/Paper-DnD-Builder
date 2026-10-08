@@ -1,7 +1,9 @@
 /**
- * Campaigns. Whoever makes one leads it (the game master) and adds players
- * by mail address (until invitations by link come); the game master sees
- * the players' names, never their addresses. The game master reaches the players' characters that
+ * Campaigns. Whoever makes one leads it (the game master) and invites
+ * players with one link per campaign, sent by the game master however they
+ * like or shown as a QR code; whoever opens it and joins is a player. The
+ * builder sends no invitation mails. The game master sees the players'
+ * names, never their addresses. The game master reaches the players' characters that
  * belong to the campaign (open, change, print, make a new one for a
  * player); the characters stay the players'. A character in no campaign,
  * or in another one, stays private. A player sees the campaigns they are in and who leads
@@ -11,12 +13,12 @@
  * Every check is here, on the server, on every request; the screens only
  * show what these routes allow.
  */
-import { randomUUID } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import { z } from "zod";
-import { emailSchema, inviteAccount, limited, nameSchema, UI_LANGUAGES } from "../../auth/accounts.ts";
+import { limited, nameSchema } from "../../auth/accounts.ts";
 import { LIMITS } from "../../auth/rate-limit.ts";
 import type { AccountRow, CampaignRow, PlayerRow } from "../../store.ts";
-import { HttpError, json, readJson } from "../http.ts";
+import { clientIp, HttpError, json, readJson } from "../http.ts";
 import type { RequestContext, Route } from "../router.ts";
 import { createDraft, listEntry } from "./drafts.ts";
 
@@ -25,6 +27,18 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 /** Enough for anyone who leads groups; stops a loop from filling the table. */
 export const MAX_CAMPAIGNS_PER_ACCOUNT = 50;
 export const MAX_PLAYERS_PER_CAMPAIGN = 50;
+
+/** 128 random bits, 22 characters: enough that nobody guesses one, short enough for a small QR code. */
+const newInviteToken = () => randomBytes(16).toString("base64url");
+const INVITE_TOKEN = /^[A-Za-z0-9_-]{22}$/;
+
+/**
+ * The link the game master hands out. On BASE_URL when it is set, else on
+ * the address the game master's own browser used: the link is only shown
+ * to them, so a forged Host header fools nobody else.
+ */
+const inviteUrl = (ctx: RequestContext, token: string) =>
+  new URL(`/join/${token}`, ctx.app.config.baseUrl ?? ctx.url.origin).href;
 
 const publicCampaign = (c: CampaignRow) => ({
   id: c.id,
@@ -65,6 +79,19 @@ async function loadPlayer(ctx: RequestContext) {
   return { campaign, player };
 }
 
+/**
+ * The invitation of the URL. Every lookup counts against the IP, found or
+ * not: 128 bits cannot be guessed, and the limit keeps a guessing loop from
+ * costing the server anything.
+ */
+async function loadInvite(ctx: RequestContext) {
+  limited(ctx.app, `invite-open:ip:${clientIp(ctx.req)}`, LIMITS.inviteOpensPerIp, true);
+  const token = ctx.params["token"]!;
+  const invite = INVITE_TOKEN.test(token) ? await ctx.app.store.findInvite(token) : undefined;
+  if (!invite) throw new HttpError(404, "inviteNotFound");
+  return invite;
+}
+
 export const campaignRoutes: Route[] = [
   {
     method: "GET",
@@ -83,16 +110,20 @@ export const campaignRoutes: Route[] = [
       const body = await readJson(ctx.req, z.strictObject({ name: nameSchema }));
       const id = randomUUID();
       const made = await ctx.app.store.createCampaign(
-        { id, account_id: account.id, name: body.name, created_at: ctx.app.now() },
+        { id, account_id: account.id, name: body.name, invite_token: newInviteToken(), created_at: ctx.app.now() },
         MAX_CAMPAIGNS_PER_ACCOUNT,
       );
       if (!made) throw new HttpError(422, "tooManyCampaigns", { max: MAX_CAMPAIGNS_PER_ACCOUNT });
       const campaign = (await ctx.app.store.findCampaign(id, account.id))!;
-      return json(201, { campaign: publicCampaign(campaign), characters: [], players: [] });
+      return json(201, {
+        campaign: { ...publicCampaign(campaign), inviteUrl: inviteUrl(ctx, campaign.invite_token!) },
+        characters: [],
+        players: [],
+      });
     },
   },
   {
-    // The game master gets their own characters in this campaign and the
+    // The game master gets the invitation link, their own characters in this campaign and the
     // players with theirs; a player gets `characters: null, players: null`.
     method: "GET",
     path: "/api/campaigns/:id",
@@ -101,12 +132,14 @@ export const campaignRoutes: Route[] = [
       if (!campaign.leading) {
         return json(200, { campaign: publicCampaign(campaign), characters: null, players: null });
       }
-      const [players, drafts] = await Promise.all([
+      const [players, drafts, token] = await Promise.all([
         ctx.app.store.listPlayers(campaign.id),
         ctx.app.store.listCampaignDrafts(campaign.id),
+        campaign.invite_token ?? ctx.app.store.ensureInviteToken(campaign.id, viewer.id, newInviteToken()),
       ]);
       return json(200, {
-        campaign: publicCampaign(campaign),
+        // The invitation link only for the game master: they decide who gets it.
+        campaign: { ...publicCampaign(campaign), inviteUrl: inviteUrl(ctx, token) },
         characters: drafts.filter((d) => d.account_id === viewer.id).map((d) => listEntry(ctx.app, d)),
         players: players.map((p) => ({
           ...publicPlayer(p),
@@ -136,47 +169,15 @@ export const campaignRoutes: Route[] = [
     },
   },
   {
-    // Add a player by mail address. An existing account gets a short mail that
-    // names the game master; an address without an account gets an account
-    // without a password (see inviteAccount). The answer is the same either way.
+    // A new invitation link; the old one stops working, the players stay.
     method: "POST",
-    path: "/api/campaigns/:id/players",
+    path: "/api/campaigns/:id/invite",
     handler: async (ctx) => {
       const { campaign, viewer } = await loadLedCampaign(ctx);
-      const body = await readJson(
-        ctx.req,
-        z.strictObject({
-          email: emailSchema,
-          /** Language of the new account and its mail; an existing account keeps its own. */
-          language: z.enum(UI_LANGUAGES).optional(),
-        }),
-      );
-      const existing = (await ctx.app.store.findAccountsByEmail(body.email))[0];
-      if (existing?.id === viewer.id) throw new HttpError(422, "cannotAddYourself");
-      if (existing && (await ctx.app.store.findPlayer(campaign.id, existing.id))) {
-        throw new HttpError(409, "alreadyPlayer");
-      }
-      if (campaign.player_count >= MAX_PLAYERS_PER_CAMPAIGN) {
-        throw new HttpError(422, "tooManyPlayers", { max: MAX_PLAYERS_PER_CAMPAIGN });
-      }
       limited(ctx.app, `invite:account:${viewer.id}`, LIMITS.invitationsPerAccount, true);
-      const account = await inviteAccount(
-        ctx.app,
-        body.email,
-        body.language ?? viewer.language,
-        { by: viewer.name, campaign: campaign.name },
-        async (a) => {
-          const added = await ctx.app.store.addPlayer(
-            campaign.id,
-            a.id,
-            ctx.app.now(),
-            MAX_PLAYERS_PER_CAMPAIGN,
-          );
-          if (!added) throw new HttpError(422, "tooManyPlayers", { max: MAX_PLAYERS_PER_CAMPAIGN });
-        },
-      );
-      const player = (await ctx.app.store.findPlayer(campaign.id, account.id))!;
-      return json(201, { player: publicPlayer(player) });
+      const token = newInviteToken();
+      await ctx.app.store.replaceInviteToken(campaign.id, viewer.id, token);
+      return json(200, { inviteUrl: inviteUrl(ctx, token) });
     },
   },
   {
@@ -204,6 +205,37 @@ export const campaignRoutes: Route[] = [
     handler: async (ctx) => {
       const { campaign, player } = await loadPlayer(ctx);
       return createDraft(ctx, player, "gameMaster", campaign.id);
+    },
+  },
+  {
+    // Who invites to what: shown before joining, also to whoever has no account yet.
+    method: "GET",
+    path: "/api/invites/:token",
+    handler: async (ctx) => {
+      const invite = await loadInvite(ctx);
+      return json(200, {
+        campaign: { id: invite.campaign_id, name: invite.campaign_name },
+        gameMaster: { name: invite.game_master_name },
+      });
+    },
+  },
+  {
+    // Joins the campaign as a player. Joining again, or as its game master, changes nothing.
+    method: "POST",
+    path: "/api/invites/:token/join",
+    handler: async (ctx) => {
+      const { account } = await ctx.requireSession();
+      const invite = await loadInvite(ctx);
+      if (invite.game_master_id !== account.id) {
+        const added = await ctx.app.store.addPlayer(
+          invite.campaign_id,
+          account.id,
+          ctx.app.now(),
+          MAX_PLAYERS_PER_CAMPAIGN,
+        );
+        if (!added) throw new HttpError(422, "tooManyPlayers", { max: MAX_PLAYERS_PER_CAMPAIGN });
+      }
+      return json(200, { campaignId: invite.campaign_id });
     },
   },
 ];

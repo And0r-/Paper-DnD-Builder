@@ -32,11 +32,22 @@ beforeEach(async () => {
   expect(made.status, JSON.stringify(made.json)).toBe(201);
   campaignId = made.json.campaign.id;
 
-  // Until invitations by link come, the game master adds a player by the address the player gave.
-  const added = await gm.call("POST", `/api/campaigns/${campaignId}/players`, { email: PLAYER });
-  expect(added.status, JSON.stringify(added.json)).toBe(201);
-  playerId = added.json.player.id;
+  // The game master hands out the campaign's link; the player opens it and joins.
+  await join(player, await inviteToken(campaignId));
+  playerId = (await gm.call("GET", `/api/campaigns/${campaignId}`)).json.players[0].id;
 });
+
+/** The token of the campaign's invitation link, as its game master sees it. */
+async function inviteToken(campaign: string, by = gm): Promise<string> {
+  const url: string = (await by.call("GET", `/api/campaigns/${campaign}`)).json.campaign.inviteUrl;
+  return url.split("/join/")[1]!;
+}
+
+async function join(c: Client, token: string) {
+  const res = await c.call("POST", `/api/invites/${token}/join`);
+  expect(res.status, JSON.stringify(res.json)).toBe(200);
+  return res.json;
+}
 
 const newDraft = async (c: Client, campaign?: string) => {
   const res = await c.call("POST", "/api/drafts", { packageId: "demo", campaignId: campaign });
@@ -72,71 +83,116 @@ function answerFor(c: ChoiceState): unknown {
   throw new Error(`no answer for ${c.kind}`);
 }
 
-describe("adding players", () => {
-  it("adds an existing account: a short mail names the game master; the answer names the player", async () => {
-    const other = await gm.call("POST", "/api/campaigns", { name: "Zweite Runde" });
-    const before = server.mails.length;
-
-    const res = await gm.call("POST", `/api/campaigns/${other.json.campaign.id}/players`, {
-      email: PLAYER.toUpperCase(),
-    });
-    expect(res.status).toBe(201);
-    // A name only: the game master learns no address they did not type.
-    expect(res.json.player).toEqual({ id: playerId, name: "player", addedAt: "2026-10-04T10:00:00.000Z" });
-
-    expect(server.mails).toHaveLength(before + 1);
-    const mail = server.mails.at(-1)!;
-    expect(mail).toMatchObject({ to: PLAYER, subject: "Du bist jetzt in einer Kampagne" });
-    expect(mail.text).toContain("lead hat dich zur Kampagne „Zweite Runde“ hinzugefügt.");
-    expect(mail.text).not.toContain(GM);
-    expect(mail.text.match(/https?:\/\/[^\s]+/g)).toEqual(["http://builder.test"]);
+describe("invitation link", () => {
+  it("is one link per campaign, shown to its game master alone", async () => {
+    const made = await gm.call("POST", "/api/campaigns", { name: "Zweite Runde" });
+    const url: string = made.json.campaign.inviteUrl;
+    // 128 bits, base64url: 22 characters.
+    expect(url).toMatch(/^http:\/\/builder\.test\/join\/[A-Za-z0-9_-]{22}$/);
+    // The same link every time the game master looks; none for a player.
+    expect((await gm.call("GET", `/api/campaigns/${made.json.campaign.id}`)).json.campaign.inviteUrl).toBe(url);
+    expect(await inviteToken(campaignId)).not.toBe(url.split("/join/")[1]);
+    const asPlayer = (await player.call("GET", `/api/campaigns/${campaignId}`)).json.campaign;
+    expect(asPlayer).not.toHaveProperty("inviteUrl");
+    expect(JSON.stringify((await gm.call("GET", "/api/campaigns")).json)).not.toContain("/join/");
   });
 
-  it("makes an account without a password and without a mail for a new address", async () => {
-    const before = server.mails.length;
-    const res = await gm.call("POST", `/api/campaigns/${campaignId}/players`, {
-      email: "guest@example.org",
-      language: "en",
-    });
-    expect(res.status).toBe(201);
-    expect(res.json.player).toMatchObject({ name: "guest" });
-    expect(server.mails).toHaveLength(before);
-    const rows = await server.db.query(
-      `SELECT a.name, a.language, a.password_hash, (SELECT count(*) FROM passwords p WHERE p.account_id = a.id)::int AS n
-       FROM accounts a WHERE email = 'guest@example.org'`,
-    );
-    expect(rows).toEqual([{ name: "guest", language: "en", password_hash: null, n: 0 }]);
+  it("tells anyone, without an account, who invites to what", async () => {
+    const token = await inviteToken(campaignId);
+    const res = await new Client(server, "203.0.113.9").call("GET", `/api/invites/${token}`);
+    expect(res.status).toBe(200);
+    expect(res.json).toEqual({ campaign: { id: campaignId, name: "Die Nebelrunde" }, gameMaster: { name: "lead" } });
+
+    for (const bad of ["AAAAAAAAAAAAAAAAAAAAAA", "short", `${token}x`]) {
+      const missing = await stranger.call("GET", `/api/invites/${bad}`);
+      expect(missing.status, bad).toBe(404);
+      expect(missing.json.error.code).toBe("inviteNotFound");
+    }
   });
 
-  it("adds the oldest account when two give the same address", async () => {
-    const twin = new Client(server, "203.0.113.4");
-    await twin.call("POST", "/api/auth/signup", { name: "Twin", email: "same@example.org" });
+  it("joins: once is enough, again changes nothing, the game master stays game master", async () => {
+    const token = await inviteToken(campaignId);
     server.advance(60_000);
-    await new Client(server, "203.0.113.5").call("POST", "/api/auth/signup", {
-      name: "Later",
-      email: "same@example.org",
+    expect(await join(stranger, token)).toEqual({ campaignId });
+    const players = (await gm.call("GET", `/api/campaigns/${campaignId}`)).json.players;
+    expect(players.map((p: { name: string }) => p.name)).toEqual(["player", "stranger"]);
+    expect(await join(stranger, token)).toEqual({ campaignId });
+    expect(await join(gm, token)).toEqual({ campaignId });
+    expect((await gm.call("GET", `/api/campaigns/${campaignId}`)).json.players).toEqual(players);
+    expect((await gm.call("GET", "/api/campaigns")).json.campaigns[0]).toMatchObject({
+      role: "gameMaster",
+      playerCount: 2,
     });
-    const res = await gm.call("POST", `/api/campaigns/${campaignId}/players`, { email: "same@example.org" });
-    expect(res.json.player.name).toBe("Twin");
+    // No mail goes anywhere for any of it.
+    expect(server.mails).toEqual([]);
   });
 
-  it("refuses the game master, someone already in, and names with line breaks", async () => {
-    const self = await gm.call("POST", `/api/campaigns/${campaignId}/players`, { email: GM });
-    expect(self.status).toBe(422);
-    expect(self.json.error.code).toBe("cannotAddYourself");
-    const twice = await gm.call("POST", `/api/campaigns/${campaignId}/players`, { email: PLAYER });
-    expect(twice.status).toBe(409);
-    expect(twice.json.error.code).toBe("alreadyPlayer");
+  it("needs an account to join", async () => {
+    const res = await new Client(server, "203.0.113.9").call(
+      "POST",
+      `/api/invites/${await inviteToken(campaignId)}/join`,
+    );
+    expect(res.status).toBe(401);
+  });
+
+  it("is replaced by a new one: the old one stops working, the players stay", async () => {
+    const old = await inviteToken(campaignId);
+    const res = await gm.call("POST", `/api/campaigns/${campaignId}/invite`);
+    expect(res.status).toBe(200);
+    const fresh = (res.json.inviteUrl as string).split("/join/")[1]!;
+    expect(fresh).not.toBe(old);
+    expect(await inviteToken(campaignId)).toBe(fresh);
+    expect((await stranger.call("GET", `/api/invites/${old}`)).status).toBe(404);
+    expect((await stranger.call("POST", `/api/invites/${old}/join`)).status).toBe(404);
+    expect((await gm.call("GET", `/api/campaigns/${campaignId}`)).json.players).toMatchObject([{ id: playerId }]);
+    await join(stranger, fresh);
+  });
+
+  it("gives a campaign from before a link the first time its game master opens it", async () => {
+    await server.db.query("UPDATE campaigns SET invite_token = NULL");
+    const first = await inviteToken(campaignId);
+    expect(first).toMatch(/^[A-Za-z0-9_-]{22}$/);
+    expect(await inviteToken(campaignId)).toBe(first);
+  });
+
+  it("refuses the 51st player", async () => {
+    await server.db.query(
+      `INSERT INTO accounts (id, name, language, created_at)
+       SELECT gen_random_uuid(), 'p' || i, 'de', now() FROM generate_series(1, 49) i`,
+    );
+    await server.db.query(
+      `INSERT INTO campaign_players (campaign_id, account_id, added_at)
+       SELECT $1, id, now() FROM accounts WHERE name LIKE 'p%' AND name <> 'player'`,
+      [campaignId],
+    );
+    const res = await stranger.call("POST", `/api/invites/${await inviteToken(campaignId)}/join`);
+    expect(res.status).toBe(422);
+    expect(res.json.error.code).toBe("tooManyPlayers");
+  });
+
+  it("limits lookups per IP, so nobody guesses tokens", async () => {
+    const guesser = new Client(server, "203.0.113.66");
+    for (let i = 0; i < 60; i++) await guesser.call("GET", `/api/invites/${"A".repeat(21)}${i % 10}`);
+    const res = await guesser.call("GET", `/api/invites/${await inviteToken(campaignId)}`);
+    expect(res.status).toBe(429);
+    expect(res.json.error.code).toBe("tooManyAttempts");
+  });
+
+  it("limits new links per game master", async () => {
+    for (let i = 0; i < 30; i++) {
+      expect((await gm.call("POST", `/api/campaigns/${campaignId}/invite`)).status).toBe(200);
+    }
+    expect((await gm.call("POST", `/api/campaigns/${campaignId}/invite`)).status).toBe(429);
+  });
+
+  it("refuses names with line breaks", async () => {
     expect((await gm.call("POST", "/api/campaigns", { name: "a\nb" })).status).toBe(400);
     expect((await gm.call("POST", "/api/campaigns", { name: "   " })).status).toBe(400);
   });
 
-  it("adds nobody when the mail cannot be sent", async () => {
-    const other = await gm.call("POST", "/api/campaigns", { name: "Zweite Runde" });
-    server.failMail.on = true;
-    const res = await gm.call("POST", `/api/campaigns/${other.json.campaign.id}/players`, { email: PLAYER });
-    expect(res.status).toBe(502);
-    expect((await gm.call("GET", `/api/campaigns/${other.json.campaign.id}`)).json.players).toEqual([]);
+  it("is the only way in: there is no adding by mail address", async () => {
+    const res = await gm.call("POST", `/api/campaigns/${campaignId}/players`, { email: "x@example.org" });
+    expect(res.status).toBe(404);
   });
 });
 
@@ -192,7 +248,7 @@ describe("who sees what", () => {
     const expectations: [string, string, unknown, number, number][] = [
       // method, path, body, player, stranger
       ["PATCH", c, { name: "Neu" }, 403, 404],
-      ["POST", `${c}/players`, { email: "x@example.org" }, 403, 404],
+      ["POST", `${c}/invite`, undefined, 403, 404],
       ["POST", `${c}/players/${playerId}/drafts`, { packageId: "demo" }, 403, 404],
       ["DELETE", `${c}/players/${playerId}`, undefined, 204, 404],
       ["DELETE", c, undefined, 403, 404],
@@ -208,8 +264,13 @@ describe("who sees what", () => {
       expect(p.json.error.code).toBe("gameMasterOnly");
     }
     // A player removes only themselves.
-    const other = await gm.call("POST", `${c}/players`, { email: "second@example.org" });
-    const removeOther = await player.call("DELETE", `${c}/players/${other.json.player.id}`);
+    const second = new Client(server, "203.0.113.4");
+    await signIn(second, "second@example.org");
+    await join(second, await inviteToken(campaignId));
+    const otherId: string = (await gm.call("GET", c)).json.players.find(
+      (p: { name: string }) => p.name === "second",
+    ).id;
+    const removeOther = await player.call("DELETE", `${c}/players/${otherId}`);
     expect(removeOther.status).toBe(403);
 
     // The game master can do all of it.
@@ -217,10 +278,10 @@ describe("who sees what", () => {
     const made = await gm.call("POST", `${c}/players/${playerId}/drafts`, { packageId: "demo", level: 2 });
     expect(made.status).toBe(201);
     expect(made.json.draft).toMatchObject({ level: 2, access: "gameMaster", owner: { name: "player" } });
-    expect((await gm.call("DELETE", `${c}/players/${other.json.player.id}`)).status).toBe(204);
-    expect((await gm.call("DELETE", `${c}/players/${other.json.player.id}`)).status).toBe(404);
+    expect((await gm.call("DELETE", `${c}/players/${otherId}`)).status).toBe(204);
+    expect((await gm.call("DELETE", `${c}/players/${otherId}`)).status).toBe(404);
     expect(
-      (await gm.call("POST", `${c}/players/${other.json.player.id}/drafts`, { packageId: "demo" })).status,
+      (await gm.call("POST", `${c}/players/${otherId}/drafts`, { packageId: "demo" })).status,
     ).toBe(404);
     expect((await gm.call("DELETE", c)).status).toBe(204);
     expect((await gm.call("GET", c)).status).toBe(404);
@@ -329,7 +390,7 @@ describe("who sees what", () => {
   it("keeps a player's character in no campaign, or in another, from the game master", async () => {
     const none = await newDraft(player);
     const other = (await gm.call("POST", "/api/campaigns", { name: "Zweite Runde" })).json.campaign.id;
-    await gm.call("POST", `/api/campaigns/${other}/players`, { email: PLAYER });
+    await join(player, await inviteToken(other));
     const elsewhere = await newDraft(player, other);
     // Same game master, but the character is not in this campaign: it shows only there.
     const view = (await gm.call("GET", `/api/campaigns/${campaignId}`)).json;
@@ -356,7 +417,7 @@ describe("who sees what", () => {
     expect(after.json.draft.campaignId).toBeNull();
 
     // Joining again does not bring it back; the player puts it in again.
-    await gm.call("POST", `/api/campaigns/${campaignId}/players`, { email: PLAYER });
+    await join(player, await inviteToken(campaignId));
     expect((await gm.call("GET", `/api/drafts/${d.id}`)).status).toBe(404);
     await player.call("PUT", `/api/drafts/${d.id}/campaign`, { campaignId });
     expect((await gm.call("GET", `/api/drafts/${d.id}`)).status).toBe(200);

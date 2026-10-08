@@ -278,6 +278,8 @@ describe("a link back in", () => {
       await client.call("POST", "/api/account/passwords", { name: `P${i}` });
     }
     await ask(client);
+    // A second later than P9, so the order of the list does not hang on random ids.
+    server.advance(1000);
     const token = linksIn(server.mails[0]!.text)["player"]!;
     const res = await client.call("POST", "/api/auth/reset/use", { token });
     expect(res.status).toBe(200);
@@ -289,7 +291,7 @@ describe("a link back in", () => {
     expect(names.at(-1)).toBe("Reset 2026-10-04");
   });
 
-  it("gives an account a game master made, which has no password yet, its first", async () => {
+  it("gives an account a game master made by address (before invitation links), which has no password yet, its first", async () => {
     await server.db.query(
       `INSERT INTO accounts (id, name, email, language, created_at)
        VALUES ('00000000-0000-4000-8000-000000000002', 'invited', $1, 'en', now())`,

@@ -1,6 +1,7 @@
 /**
- * Outgoing mail: "you are in a campaign now" and the link back in for
- * whoever lost every password. Passwords are never mailed; they are shown
+ * Outgoing mail: only the link back in for whoever lost every password.
+ * Invitations to a campaign are links the game master sends themselves.
+ * Passwords are never mailed; they are shown
  * once on the screen (see auth/accounts.ts). The link back in opens the
  * account once, within 30 minutes, so it is still worth protecting on the way.
  *
@@ -36,8 +37,8 @@ export function createSmtpMailer(smtp: SmtpConfig | undefined, from: string | un
     host: smtp.host,
     port: smtp.port,
     secure: smtp.secure,
-    // Without implicit TLS, insist on STARTTLS: mails name people and campaigns, and a
-    // link back in opens an account until it is used or expires.
+    // Without implicit TLS, insist on STARTTLS: a link back in opens an account
+    // until it is used or expires.
     requireTLS: !smtp.secure,
     ...(smtp.user ? { auth: { user: smtp.user, pass: smtp.password ?? "" } } : {}),
   });
@@ -45,47 +46,6 @@ export function createSmtpMailer(smtp: SmtpConfig | undefined, from: string | un
     async send(mail) {
       await transport.sendMail({ from, to: mail.to, subject: mail.subject, text: mail.text });
     },
-  };
-}
-
-/** Who added a person to which campaign; named in the mail, so nobody is added unseen. */
-export interface Invitation {
-  /** The game master's name. */
-  by: string;
-  campaign: string;
-}
-
-/** To an existing account that a game master added to a campaign. No password: theirs stays. */
-export function addedToCampaignMail(
-  language: string,
-  to: string,
-  baseUrl: URL | undefined,
-  invitation: Invitation,
-): Mail {
-  const link = baseUrl ? baseUrl.origin : undefined;
-  if (language === "de") {
-    return {
-      to,
-      subject: "Du bist jetzt in einer Kampagne",
-      text: [
-        `${invitation.by} hat dich zur Kampagne „${invitation.campaign}“ hinzugefügt.`,
-        `${invitation.by} leitet die Kampagne und kann deine Charaktere sehen, ändern und drucken.`,
-        "",
-        ...(link ? [`Du findest die Kampagne nach dem Anmelden: ${link}`, ""] : []),
-        "Willst du das nicht? Dann kannst du die Kampagne nach dem Anmelden verlassen.",
-      ].join("\n"),
-    };
-  }
-  return {
-    to,
-    subject: "You are in a campaign now",
-    text: [
-      `${invitation.by} added you to the campaign "${invitation.campaign}".`,
-      `${invitation.by} leads the campaign and can see, change and print your characters.`,
-      "",
-      ...(link ? [`You find the campaign after logging in: ${link}`, ""] : []),
-      "Do not want this? Then leave the campaign after logging in.",
-    ].join("\n"),
   };
 }
 

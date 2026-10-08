@@ -25,13 +25,7 @@ import { printChoiceOf } from "@builder/sheet/printouts";
 import { z } from "zod";
 import type { App } from "../app.ts";
 import { HttpError } from "../api/http.ts";
-import {
-  addedToCampaignMail,
-  MailNotConfiguredError,
-  resetMail,
-  type Invitation,
-  type Mail,
-} from "../mail.ts";
+import { MailNotConfiguredError, resetMail, type Mail } from "../mail.ts";
 import type { AccountRow } from "../store.ts";
 import {
   dummyPasswordHash,
@@ -57,7 +51,11 @@ export const emailSchema = z
   .max(254)
   .regex(/^[^\s@]+@[^\s@]+\.[^\s@]+$/, "not a mail address");
 
-/** One line of plain text, 1 to 80 characters: a person's name, a campaign's, a password's. */
+/**
+ * One line of plain text, 1 to 80 characters: a person's name, a campaign's,
+ * a password's. A name is shown to others (a campaign's on its invitation
+ * page, a game master's there too), never as markup.
+ */
 export const nameSchema = z
   .string()
   .trim()
@@ -76,20 +74,6 @@ export function limited(app: App, key: string, limit: Limit, take: boolean): voi
       { retryAfter: r.retryAfter },
       { "Retry-After": String(r.retryAfter) },
     );
-  }
-}
-
-// Invitations for the same address run one after another, so two quick
-// ones cannot make two accounts for it.
-const queues = new Map<string, Promise<unknown>>();
-async function serialized<T>(key: string, fn: () => Promise<T>): Promise<T> {
-  const before = queues.get(key) ?? Promise.resolve();
-  const run = before.catch(() => undefined).then(fn);
-  queues.set(key, run);
-  try {
-    return await run;
-  } finally {
-    if (queues.get(key) === run) queues.delete(key);
   }
 }
 
@@ -288,46 +272,6 @@ export async function useReset(app: App, token: string, ip: string) {
     MAX_PASSWORDS_PER_ACCOUNT,
   );
   return { account, password: { row, secret }, session: await openSession(app, account.id) };
-}
-
-/**
- * The account a game master adds to a campaign, by mail address, until
- * invitations by link come (AND-233, part 3). An existing account gets a
- * short mail that names who added it. An address without an account gets
- * one, named after the part before the "@", with no password and no mail:
- * its owner gets in only once a way back in by mail (part 2) or the
- * invitation link (part 3) exists. Meanwhile the game master can build for it.
- *
- * `add` puts the account into the campaign; it runs inside the same
- * per-address queue, so the account cannot be made twice meanwhile.
- */
-export async function inviteAccount(
-  app: App,
-  email: string,
-  language: string | undefined,
-  invitation: Invitation,
-  add: (account: AccountRow) => Promise<void>,
-): Promise<AccountRow> {
-  limited(app, `invite:address:${email}`, LIMITS.invitationMailsPerAddress, false);
-  return serialized(email, async () => {
-    // Two accounts may give the same address; the oldest one is added.
-    const existing = (await app.store.findAccountsByEmail(email))[0];
-    app.limiter.record(`invite:address:${email}`, LIMITS.invitationMailsPerAddress);
-    if (existing) {
-      await deliver(app, addedToCampaignMail(existing.language, email, app.config.baseUrl, invitation));
-      await add(existing);
-      return existing;
-    }
-    const account = await app.store.createAccount({
-      id: randomUUID(),
-      name: email.split("@")[0]!.slice(0, 80),
-      email,
-      language: uiLanguage(language),
-      created_at: app.now(),
-    });
-    await add(account);
-    return account;
-  });
 }
 
 export function publicAccount(a: AccountRow) {

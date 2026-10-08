@@ -79,6 +79,16 @@ export type CampaignRow = {
   /** When the viewer joined it as a player; null for the game master. */
   joined_at: Date | null;
   player_count: number;
+  /** The token of the invitation link; null for a campaign from before until its game master opens it. */
+  invite_token: string | null;
+};
+
+/** What an invitation link tells whoever opens it. */
+export type InviteRow = {
+  campaign_id: string;
+  campaign_name: string;
+  game_master_id: string;
+  game_master_name: string;
 };
 
 export type PlayerRow = {
@@ -142,7 +152,7 @@ const reachable = (viewer: string) => `(d.account_id = ${viewer} OR EXISTS (
   WHERE c.id = d.campaign_id AND p.account_id = d.account_id AND c.account_id = ${viewer}))`;
 
 /** A campaign as the viewer `$1` sees it; `c` the campaigns row. */
-const CAMPAIGN_SELECT = `SELECT c.id, c.name, c.created_at, gm.name AS game_master_name,
+const CAMPAIGN_SELECT = `SELECT c.id, c.name, c.created_at, c.invite_token, gm.name AS game_master_name,
   c.account_id = $1 AS leading,
   (SELECT j.added_at FROM campaign_players j WHERE j.campaign_id = c.id AND j.account_id = $1) AS joined_at,
   (SELECT count(*) FROM campaign_players n WHERE n.campaign_id = c.id)::int AS player_count
@@ -527,15 +537,15 @@ export class Store {
 
   /** Inserts a campaign unless the account already leads `max`; returns false then. */
   async createCampaign(
-    c: { id: string; account_id: string; name: string; created_at: Date },
+    c: { id: string; account_id: string; name: string; invite_token: string; created_at: Date },
     max: number,
   ): Promise<boolean> {
     const rows = await this.db.query(
-      `INSERT INTO campaigns (id, account_id, name, created_at)
-       SELECT $1, $2, $3, $4
-       WHERE (SELECT count(*) FROM campaigns WHERE account_id = $2) < $5
+      `INSERT INTO campaigns (id, account_id, name, invite_token, created_at)
+       SELECT $1, $2, $3, $4, $5
+       WHERE (SELECT count(*) FROM campaigns WHERE account_id = $2) < $6
        RETURNING id`,
-      [c.id, c.account_id, c.name, c.created_at, max],
+      [c.id, c.account_id, c.name, c.invite_token, c.created_at, max],
     );
     return rows.length > 0;
   }
@@ -563,6 +573,40 @@ export class Store {
       gameMasterId,
       name,
     ]);
+  }
+
+  /**
+   * The campaign's invitation token: `token` if it has none yet (a campaign
+   * from before), else the one it has. Game master only.
+   */
+  async ensureInviteToken(id: string, gameMasterId: string, token: string): Promise<string> {
+    const rows = await this.db.query<{ invite_token: string }>(
+      `UPDATE campaigns SET invite_token = COALESCE(invite_token, $3)
+       WHERE id = $1 AND account_id = $2 RETURNING invite_token`,
+      [id, gameMasterId, token],
+    );
+    return rows[0]!.invite_token;
+  }
+
+  /** Replaces the invitation token; the old link stops working. Game master only. */
+  async replaceInviteToken(id: string, gameMasterId: string, token: string): Promise<void> {
+    await this.db.query("UPDATE campaigns SET invite_token = $3 WHERE id = $1 AND account_id = $2", [
+      id,
+      gameMasterId,
+      token,
+    ]);
+  }
+
+  /** The campaign an invitation token opens, and who leads it; undefined for an unknown token. */
+  async findInvite(token: string): Promise<InviteRow | undefined> {
+    const rows = await this.db.query<InviteRow>(
+      `SELECT c.id AS campaign_id, c.name AS campaign_name,
+              gm.id AS game_master_id, gm.name AS game_master_name
+       FROM campaigns c JOIN accounts gm ON gm.id = c.account_id
+       WHERE c.invite_token = $1`,
+      [token],
+    );
+    return rows[0];
   }
 
   /** Removes the campaign and its player list; every character stays, in no campaign. */
