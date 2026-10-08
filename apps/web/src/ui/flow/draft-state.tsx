@@ -108,9 +108,13 @@ function hits(change: Change | undefined, p: Pending, view: DraftView): boolean 
     view.evaluation?.steps.find((s) => s.id === step)?.choices.includes(choice) ?? false;
   switch (change.kind) {
     case "answer":
-      return p.type === "answer" ? p.choice === change.choice : p.type === "pool" && inStep(p.step, change.choice);
+      return p.type === "answer"
+        ? p.choice === change.choice
+        : p.type === "pool" && inStep(p.step, change.choice);
     case "pool":
-      return p.type === "pool" ? p.step === change.step : p.type === "answer" && inStep(change.step, p.choice);
+      return p.type === "pool"
+        ? p.step === change.step
+        : p.type === "answer" && inStep(change.step, p.choice);
     case "level":
     case "levelUp":
       return p.type === "setLevel";
@@ -318,7 +322,10 @@ function ReadyDraft({
 
   // ------------------------------------------------------------ live help
   const [told, setTold] = useState<Told | null>(null);
-  const tell = useCallback((next: Omit<Told, "seq">) => setTold((c) => ({ ...next, seq: (c?.seq ?? 0) + 1 })), []);
+  const tell = useCallback(
+    (next: Omit<Told, "seq">) => setTold((c) => ({ ...next, seq: (c?.seq ?? 0) + 1 })),
+    [],
+  );
   const youId = useRef<string | null>(null);
   const listeners = useRef(new Set<(news: LiveNews) => void>());
   const listen = useCallback((f: (news: LiveNews) => void) => {
@@ -353,11 +360,22 @@ function ReadyDraft({
         serverRef.current = v;
         setServer(v);
         // Ours still on their way stay on top (not one that gave way); saving sends them on this version.
-        setDoc(apply(pkg, docOf(v), queue.current.filter((p) => p !== beaten.current)));
+        setDoc(
+          apply(
+            pkg,
+            docOf(v),
+            queue.current.filter((p) => p !== beaten.current),
+          ),
+        );
         if (elsewhere) for (const f of listeners.current) f({ type: "draft", version: v.draft.version });
       }
       if (elsewhere && m.source) {
-        tell({ source: m.source, event: m.event!, change: m.change, overruled: overruled || gaveWay.current });
+        tell({
+          source: m.source,
+          event: m.event!,
+          change: m.change,
+          overruled: overruled || gaveWay.current,
+        });
         gaveWay.current = false;
       }
     },

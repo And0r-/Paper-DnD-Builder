@@ -611,8 +611,14 @@ player's character from the campaign ("Help out"). On the character, a
 row under the top bar shows who else is there and on which step, what
 they point at, the last hint and a lost connection; the step list marks
 where the others are. Changes go over the channel while someone else is
-there, over HTTP otherwise. Code: [`src/ui/live`](src/ui/live); browser test:
-[`e2e/live-help.spec.ts`](e2e/live-help.spec.ts).
+there, over HTTP otherwise. Every change made elsewhere shows at once, with
+a short line from `source` and `change` ("Changed over MCP: Level", "Vexa
+(game master) made a change: Folk", "Changed in another window"); the sheet
+reads the play state, a kept sheet or the original again. An unsaved change
+of the window to the same question gives way to the stored one, and the
+line says so. Code: [`src/ui/live`](src/ui/live); browser tests:
+[`e2e/live-help.spec.ts`](e2e/live-help.spec.ts),
+[`e2e/live-sources.spec.ts`](e2e/live-sources.spec.ts).
 
 ### Where a change comes from
 

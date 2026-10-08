@@ -290,12 +290,23 @@ export function sheetTests(device: "phone" | "desk"): void {
       ).toHaveAttribute("aria-pressed", "true");
       await expect(page.getByRole("textbox", { name: pencil.label })).toHaveValue("18");
 
-      // Another device was first: the screen loads what it stored and says so.
-      const now = (await (await page.request.get(`/api/drafts/${id}/state`)).json()) as { version: number };
-      const elsewhere = await page.request.put(`/api/drafts/${id}/state`, {
-        data: { version: now.version, state: { [pencil.field!]: 7 } },
-      });
-      expect(elsewhere.status()).toBe(200);
+      // Another window stores something: it shows here at once (AND-258).
+      const storeElsewhere = async (value: number) => {
+        const now = (await (await page.request.get(`/api/drafts/${id}/state`)).json()) as { version: number };
+        const elsewhere = await page.request.put(`/api/drafts/${id}/state`, {
+          data: { version: now.version, state: { [pencil.field!]: value } },
+        });
+        expect(elsewhere.status()).toBe(200);
+      };
+      await storeElsewhere(5);
+      await expect(page.getByRole("textbox", { name: pencil.label })).toHaveValue("5");
+      await expect(page.locator("[data-told]")).toContainText(m["live.from.window"]);
+
+      // Without the live channel, another device was first: the screen loads what it stored and says so.
+      await page.routeWebSocket(/\/api\/live\//, () => {});
+      await page.reload();
+      await expect(page.getByRole("textbox", { name: pencil.label })).toHaveValue("5");
+      await storeElsewhere(7);
       await page.getByRole("button", { name: `${squares.label}: Haken 1 von ${squares.squares}` }).click();
       await expect(page.getByText(m["sheet.otherDevice"])).toBeVisible();
       await expect(page.getByRole("textbox", { name: pencil.label })).toHaveValue("7");
