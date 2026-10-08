@@ -27,6 +27,7 @@ export function SkipLink() {
 export function AppShell({
   title,
   status,
+  bar,
   tools,
   menuExtra,
   menuMark,
@@ -39,6 +40,8 @@ export function AppShell({
   title?: ReactNode;
   /** Right side of the top bar (save status). */
   status?: ReactNode;
+  /** A row under the top bar that stays with it (who else builds along); it may render nothing. */
+  bar?: ReactNode;
   /** Lists of the screen's own beside the language, on large screens only (the sheet's version and style). */
   tools?: ReactNode;
   /** Extra content at the top of the menu (the step list). */
@@ -55,32 +58,43 @@ export function AppShell({
   const { t } = useApp();
   const [menuOpen, setMenuOpen] = useState(false);
   const layout = sidebar || aside ? "shell--columns" : wide ? "shell--wide" : "";
+  const header = (
+    <header className="topbar">
+      <button
+        type="button"
+        className="topbar__menu"
+        aria-haspopup="dialog"
+        aria-expanded={menuOpen}
+        onClick={() => setMenuOpen(true)}
+      >
+        <Icon name="menu" />
+        <span>{t("menu.open")}</span>
+        {menuMark}
+      </button>
+      <div className="topbar__title">
+        {title ?? (
+          <Explained hint={t("app.about")}>
+            <Link href="/characters">{t("app.name")}</Link>
+          </Explained>
+        )}
+      </div>
+      <div className="topbar__status">{status}</div>
+      {tools && <div className="topbar__tools">{tools}</div>}
+      <LanguageMenu />
+    </header>
+  );
   return (
     <div className={`shell ${layout}`}>
       <SkipLink />
-      <header className="topbar">
-        <button
-          type="button"
-          className="topbar__menu"
-          aria-haspopup="dialog"
-          aria-expanded={menuOpen}
-          onClick={() => setMenuOpen(true)}
-        >
-          <Icon name="menu" />
-          <span>{t("menu.open")}</span>
-          {menuMark}
-        </button>
-        <div className="topbar__title">
-          {title ?? (
-            <Explained hint={t("app.about")}>
-              <Link href="/characters">{t("app.name")}</Link>
-            </Explained>
-          )}
+      {bar ? (
+        // The row under the top bar stays with it: one sticky block.
+        <div className="shell__top">
+          {header}
+          {bar}
         </div>
-        <div className="topbar__status">{status}</div>
-        {tools && <div className="topbar__tools">{tools}</div>}
-        <LanguageMenu />
-      </header>
+      ) : (
+        header
+      )}
       <MenuDrawer open={menuOpen} onClose={() => setMenuOpen(false)}>
         {menuExtra}
       </MenuDrawer>

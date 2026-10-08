@@ -25,6 +25,8 @@ import { Icon } from "../components/Icon.tsx";
 import { RichText } from "../components/RichText.tsx";
 import { AppShell } from "../components/Shell.tsx";
 import { takeJoined } from "../joined.ts";
+import { HelpDialog } from "../live/help-dialog.tsx";
+import { LiveBar, useOthers } from "../live/live-bar.tsx";
 import { levelWord, ptext } from "../package-text.ts";
 import { useDraft } from "./draft-state.tsx";
 import { levelHeading, levelSpan } from "./level-runs.ts";
@@ -152,6 +154,7 @@ function StepLink({
   current,
   note,
   mark,
+  who,
 }: {
   entry: FlowEntry;
   current: string | undefined;
@@ -159,8 +162,10 @@ function StepLink({
   note?: string | undefined;
   /** Green: the step just came (or got more). Red: a part of it just went. */
   mark?: "new" | "lost" | undefined;
+  /** Names of the others on this step right now (live help). */
+  who?: string[] | undefined;
 }) {
-  const { t } = useApp();
+  const { t, list } = useApp();
   const here = entry.key === current;
   const state = here ? "current" : entry.status;
   return (
@@ -184,6 +189,12 @@ function StepLink({
       <span className="steplist__name">
         {entry.title}
         {note && <span className="steplist__note">{note}</span>}
+        {who && who.length > 0 && (
+          <span className="steplist__who">
+            <span className="livebar__dot" aria-hidden="true" />
+            {t("flow.whoHere", { names: list(who) })}
+          </span>
+        )}
       </span>
       <span className="visually-hidden">, {t(`flow.status.${state}`)}</span>
     </Link>
@@ -216,6 +227,7 @@ function LevelRuns({
   const { t } = useApp();
   const { lp } = useDraft();
   const change = useContext(ChangeCtx);
+  const whoAt = useWhoAt();
   const word = levelWord(lp);
   const min = lp.pkg.flow.level.min;
   const keys = new Set(items.map((e) => e.key));
@@ -241,7 +253,12 @@ function LevelRuns({
                     : t("flow.atLevel", { levelName: ptext(lp, "level.name") ?? "", level: e.atLevel })}
                 </p>
               )}
-              <StepLink entry={e} current={current} mark={lit?.has(e.key) ? "new" : undefined} />
+              <StepLink
+                entry={e}
+                current={current}
+                mark={lit?.has(e.key) ? "new" : undefined}
+                who={whoAt.get(e.key)}
+              />
             </li>
             {goneAfter(gone, e.key, leaving)}
           </Fragment>
@@ -249,6 +266,16 @@ function LevelRuns({
       })}
     </ol>
   );
+}
+
+/** The names of the others on the character by the step they are on (live help). */
+function useWhoAt(): Map<string, string[]> {
+  const others = useOthers();
+  return useMemo(() => {
+    const at = new Map<string, string[]>();
+    for (const p of others) if (p.step) at.set(p.step, [...(at.get(p.step) ?? []), p.name]);
+    return at;
+  }, [others]);
 }
 
 /**
@@ -312,16 +339,24 @@ function StepItem({
 }) {
   const { t } = useApp();
   const { lp, entries } = useDraft();
+  const whoAt = useWhoAt();
   const all = entries.filter((e) => e.section === head.section);
   const parts = all.slice(1);
   const open = here !== undefined && here.section === head.section;
   const mark = markOf(head, all, open);
+  // Shut, the step shows everyone on any of its parts; open, each part shows its own.
+  const who = open ? whoAt.get(head.key) : [...new Set(all.flatMap((e) => whoAt.get(e.key) ?? []))];
   if (head.sectionTitle === undefined || all.length === 1) {
     // Shut, the step is red if a part of it is, and leads there (AND-162).
     const red = open ? undefined : parts.find((e) => e.status === "needsAttention");
     return (
       <li className="steplist__item">
-        <StepLink entry={red ? { ...red, title: head.title } : head} current={current} mark={mark} />
+        <StepLink
+          entry={red ? { ...red, title: head.title } : head}
+          current={current}
+          mark={mark}
+          who={who}
+        />
         {open && <LevelRuns section={head.key} items={parts} current={current} from={head.atLevel} />}
       </li>
     );
@@ -338,6 +373,7 @@ function StepItem({
         current={open ? undefined : current}
         note={span}
         mark={open ? undefined : mark}
+        who={open ? undefined : who}
       />
       {open && <LevelRuns section={head.key} items={all} current={current} from={lp.pkg.flow.level.min} />}
     </li>
@@ -357,6 +393,7 @@ export function FlowLayout({ current, children }: { current: string | undefined;
       ? (nameState.answer as { text: string }).text.trim()
       : "";
   const wide = useWide();
+  const [askingHelp, setAskingHelp] = useState(false);
   // Phones show the long explanation inside each card instead ("Learn more").
   const showAside = wide && current !== undefined && current !== OVERVIEW_KEY && current !== "level";
   useEffect(() => setContent(null), [current]);
@@ -371,15 +408,33 @@ export function FlowLayout({ current, children }: { current: string | undefined;
               <span className="topbar__level">
                 {ptext(lp, "level.name")} {ev.level}
               </span>
-              {/* A game master building for a player always sees whose character it is. */}
-              {draft.access === "gameMaster" && (
+              {/* A game master or a helper building for someone always sees whose character it is. */}
+              {draft.access !== "owner" && (
                 <span className="topbar__owner">{t("flow.forPlayer", { name: draft.owner.name })}</span>
               )}
             </span>
           }
           status={<SaveStatus />}
+          bar={<LiveBar />}
           menuMark={<MenuMark change={change} />}
-          menuExtra={<StepList current={current} />}
+          menuExtra={
+            <>
+              {/* Asking for help where a stuck newcomer looks first: the menu. */}
+              {draft.access === "owner" && (
+                <Button
+                  variant="secondary"
+                  icon="people"
+                  className="drawer__help"
+                  aria-haspopup="dialog"
+                  data-closes-menu
+                  onClick={() => setAskingHelp(true)}
+                >
+                  {t("help.button")}
+                </Button>
+              )}
+              <StepList current={current} />
+            </>
+          }
           sidebar={wide ? <StepList current={current} /> : undefined}
           aside={
             showAside ? (
@@ -391,6 +446,9 @@ export function FlowLayout({ current, children }: { current: string | undefined;
         >
           {children}
         </AppShell>
+        {draft.access === "owner" && (
+          <HelpDialog draftId={draft.id} open={askingHelp} onClose={() => setAskingHelp(false)} />
+        )}
       </ExplainCtx.Provider>
     </ChangeCtx.Provider>
   );

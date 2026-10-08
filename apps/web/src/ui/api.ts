@@ -143,8 +143,8 @@ export interface DraftInfo {
   finishedAt: string | null;
   /** Whose character it is; a game master sees the player here. */
   owner: { name: string };
-  /** Opened as its owner, or as the game master of a campaign the owner plays in. */
-  access: "owner" | "gameMaster";
+  /** Opened as its owner, as the game master of a campaign the owner plays in, or with a help link. */
+  access: "owner" | "gameMaster" | "helper";
 }
 
 export interface DraftView {

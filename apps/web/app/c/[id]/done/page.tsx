@@ -77,6 +77,8 @@ export default function DonePage() {
   const canRaise = ev.level < lp.pkg.flow.level.max;
   // A game master built this for a player: say whose it is, and lead back to the campaigns.
   const forPlayer = draft.access === "gameMaster";
+  // A helper with a help link reaches only the character itself: no sheet, no print (AND-246).
+  const helper = draft.access === "helper";
   usePageTitle([title]);
   // Only promise cards when the PDF has some: not every character has things that are cards.
   const hasCards = useMemo(() => cardCount(lp.pkg, ev) > 0, [lp.pkg, ev]);
@@ -85,11 +87,11 @@ export default function DonePage() {
   const [copies, setCopies] = useState(0);
   const finished = draft.status === "finished";
   useEffect(() => {
-    if (!finished) return;
+    if (!finished || helper) return;
     api<{ copies: unknown[] }>("GET", `/api/drafts/${draft.id}/sheet-copies`)
       .then((r) => setCopies(r.copies.length))
       .catch(() => {});
-  }, [draft.id, finished]);
+  }, [draft.id, finished, helper]);
 
   if (draft.status !== "finished") {
     return (
@@ -97,6 +99,26 @@ export default function DonePage() {
         <EmptyState title={t("done.notFinished")}>
           <ButtonLink href={`/c/${draft.id}/overview`}>{t("done.toOverview")}</ButtonLink>
         </EmptyState>
+      </div>
+    );
+  }
+
+  if (helper) {
+    return (
+      <div className="page done">
+        <Icon name="check" size={56} className="done__icon" />
+        <h1 className="done__title" tabIndex={-1} ref={headingRef}>
+          {title}
+        </h1>
+        <p className="done__text">{t("done.helper", { name: draft.owner.name })}</p>
+        <div className="done__next">
+          <ButtonLink href={`/c/${draft.id}/overview`} variant="secondary">
+            {t("done.toOverview")}
+          </ButtonLink>
+          <ButtonLink href="/characters" variant="secondary">
+            {t("done.toList")}
+          </ButtonLink>
+        </div>
       </div>
     );
   }

@@ -64,6 +64,17 @@ export default function DraftLayout({ children }: { children: ReactNode }) {
                     </div>
                   </AppShell>
                 );
+              case "helpEnded":
+                return (
+                  <AppShell>
+                    <div className="page">
+                      <EmptyState title={t("live.helpEndedTitle")}>
+                        <p>{t("live.helpEndedText")}</p>
+                        <ButtonLink href="/characters">{t("menu.characters")}</ButtonLink>
+                      </EmptyState>
+                    </div>
+                  </AppShell>
+                );
               case "error":
                 return (
                   <AppShell>
