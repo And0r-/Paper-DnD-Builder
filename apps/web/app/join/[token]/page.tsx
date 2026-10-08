@@ -1,8 +1,10 @@
 "use client";
 /**
  * An invitation link (AND-237): who invites to which campaign, and what
- * that means. Whoever is logged in joins with one button and goes on to
- * a new character with the campaign chosen ("no campaign" stays a choice).
+ * that means. Whoever is logged in joins with one button and is asked
+ * which character they bring: one they have, or a new one with the
+ * campaign chosen (AND-272). Without a character of their own, a new one
+ * starts at once ("no campaign" stays a choice there).
  *
  * Whoever is not logged in gets "Get started" right here, not on a detour
  * through the login screen: on a phone, a newcomer types a name, keeps the
@@ -11,14 +13,15 @@
  *
  * Whoever leads the campaign, or plays in it already (also from an old
  * link that was replaced), is told so instead of being asked to join
- * (AND-241).
+ * (AND-241); a player may still bring another character.
  */
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useApp } from "../../../src/ui/app-state.tsx";
 import { api, ApiError, type Invite } from "../../../src/ui/api.ts";
 import { Button, ButtonLink } from "../../../src/ui/components/Button.tsx";
 import { Callout, Loading } from "../../../src/ui/components/Feedback.tsx";
+import { BringCharacter } from "../../../src/ui/components/BringCharacter.tsx";
 import { Explained } from "../../../src/ui/components/Explained.tsx";
 import { GetStarted } from "../../../src/ui/components/GetStarted.tsx";
 import { GuestShell } from "../../../src/ui/components/Shell.tsx";
@@ -30,7 +33,6 @@ type State =
 export default function JoinPage() {
   const app = useApp();
   const { t, tc, account } = app;
-  const router = useRouter();
   const { token } = useParams<{ token: string }>();
   const [state, setState] = useState<State>({ kind: "loading" });
   const [attempt, setAttempt] = useState(0);
@@ -38,16 +40,20 @@ export default function JoinPage() {
   const [error, setError] = useState<string>();
   // A password just made: shown in the register form until the newcomer says they have it, then they join.
   const [registered, setRegistered] = useState(false);
+  // Joined just now: which character comes along.
+  const [joined, setJoined] = useState(false);
   const path = `/join/${encodeURIComponent(token)}`;
 
   usePageTitle([
     registered
       ? t("password.title")
-      : state.kind === "invite"
-        ? state.invite.campaign.name
-        : state.kind === "notFound"
-          ? t("join.notFoundTitle")
-          : t("join.checking"),
+      : joined
+        ? t("join.bringTitle")
+        : state.kind === "invite"
+          ? state.invite.campaign.name
+          : state.kind === "notFound"
+            ? t("join.notFoundTitle")
+            : t("join.checking"),
   ]);
 
   useEffect(() => {
@@ -65,11 +71,9 @@ export default function JoinPage() {
     setBusy(true);
     setError(undefined);
     try {
-      const { campaignId } = await api<{ campaignId: string }>(
-        "POST",
-        `/api/invites/${encodeURIComponent(token)}/join`,
-      );
-      router.replace(`/new?campaign=${encodeURIComponent(campaignId)}&joined`);
+      await api<{ campaignId: string }>("POST", `/api/invites/${encodeURIComponent(token)}/join`);
+      setJoined(true);
+      setBusy(false);
     } catch (e) {
       const err = e instanceof ApiError ? e : new ApiError(0, "network");
       if (err.status === 404) setState({ kind: "notFound" });
@@ -106,6 +110,12 @@ export default function JoinPage() {
     );
   } else if (state.kind === "loading" || account === undefined) {
     content = <Loading shape="page" count={2} />;
+  } else if (joined) {
+    content = (
+      <section className="auth__card">
+        <BringCharacter campaign={state.invite.campaign} joined />
+      </section>
+    );
   } else if (account && state.invite.you === "gameMaster") {
     content = (
       <section className="auth__card" aria-labelledby="join-title">
@@ -124,12 +134,7 @@ export default function JoinPage() {
         <h1 className="auth__title" id="join-title">
           {t("join.alreadyTitle", { name: state.invite.campaign.name })}
         </h1>
-        <ButtonLink href={`/new?campaign=${encodeURIComponent(state.invite.campaign.id)}`} icon="plus" block>
-          {t("characters.new")}
-        </ButtonLink>
-        <ButtonLink href="/characters" variant="ghost">
-          {t("menu.characters")}
-        </ButtonLink>
+        <BringCharacter campaign={state.invite.campaign} joined={false} headingLevel="h2" />
       </section>
     );
   } else {

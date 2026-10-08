@@ -6,9 +6,14 @@
  * player with their characters as cards, open or print them, build a new
  * one for a player, remove a player or delete the campaign. A player sees
  * only who leads it.
+ *
+ * The game master's page follows on its own: when a player joins or brings
+ * a character, it shows up without reloading (AND-272). The page asks again
+ * while it is in view, every little while and when it comes back into view;
+ * a failed quiet ask changes nothing on screen.
  */
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useApp } from "../../../src/ui/app-state.tsx";
 import { api, ApiError, type CampaignPlayer, type CampaignView } from "../../../src/ui/api.ts";
 import { CharacterCard, describeCharacter, packagesFor } from "../../../src/ui/characters.tsx";
@@ -24,6 +29,15 @@ import { RequireAccount } from "../../../src/ui/guards.tsx";
 import type { LoadedPackage } from "../../../src/ui/packages.ts";
 
 type Data = { lang: string; view: CampaignView; packages: Map<string, LoadedPackage> };
+
+/** How often the game master's page asks again while in view. */
+const FOLLOW_MS = 10_000;
+
+async function loadCampaign(id: string, lang: string): Promise<Data> {
+  const view = await api<CampaignView>("GET", `/api/campaigns/${encodeURIComponent(id)}`);
+  const drafts = [...(view.characters ?? []), ...(view.players ?? []).flatMap((p) => p.characters)];
+  return { lang, view, packages: await packagesFor(drafts, lang) };
+}
 
 export default function CampaignPage() {
   return <RequireAccount>{() => <CampaignScreen />}</RequireAccount>;
@@ -49,11 +63,7 @@ function CampaignScreen() {
 
   useEffect(() => {
     let live = true;
-    (async () => {
-      const view = await api<CampaignView>("GET", `/api/campaigns/${encodeURIComponent(id)}`);
-      const drafts = [...(view.characters ?? []), ...(view.players ?? []).flatMap((p) => p.characters)];
-      return { lang, view, packages: await packagesFor(drafts, lang) };
-    })().then(
+    loadCampaign(id, lang).then(
       (d) => live && (setData(d), setFailed(null)),
       (e) => live && setFailed(e instanceof ApiError && e.status === 404 ? "notFound" : "error"),
     );
@@ -64,10 +74,35 @@ function CampaignScreen() {
 
   const reload = () => setAttempt((n) => n + 1);
 
+  // Players and their characters arrive without reloading; only the game master sees them.
+  const leads = data?.view.campaign.role === "gameMaster";
+  // Counts the page's own changes: a quiet answer asked before one of them is old.
+  const changes = useRef(0);
+  useEffect(() => {
+    if (!leads) return;
+    let live = true;
+    const ask = () => {
+      if (document.visibilityState !== "visible") return;
+      const asked = changes.current;
+      loadCampaign(id, lang).then(
+        (d) => live && asked === changes.current && setData(d),
+        () => undefined,
+      );
+    };
+    const timer = setInterval(ask, FOLLOW_MS);
+    document.addEventListener("visibilitychange", ask);
+    return () => {
+      live = false;
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", ask);
+    };
+  }, [leads, id, lang]);
+
   async function renew() {
     setBusy(true);
     setError(undefined);
     try {
+      changes.current++;
       const { inviteUrl } = await api<{ inviteUrl: string }>("POST", `/api/campaigns/${id}/invite`);
       setData((d) => d && { ...d, view: { ...d.view, campaign: { ...d.view.campaign, inviteUrl } } });
       setToast(t("campaign.renewed"));
@@ -238,6 +273,7 @@ function CampaignScreen() {
           setBusy(true);
           setError(undefined);
           try {
+            changes.current++;
             await api("DELETE", `/api/campaigns/${id}/players/${p.id}`);
             setToast(t("campaign.removed", { name: p.name }));
           } catch (e) {

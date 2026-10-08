@@ -999,6 +999,60 @@ textarea.field__input {
   color: var(--color-ink-muted);
 }
 
+/* "Which character are you bringing?" after joining (AND-272): option cards as in a step. */
+.bring {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.bring__list {
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+
+.bring__option .option__name {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.bring__more {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: 0;
+  padding-left: calc(1.5rem + var(--space-3));
+  font-size: var(--text-sm);
+  line-height: var(--text-sm-lh);
+}
+
+.bring__status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--color-ink-muted);
+}
+
+.bring__status--done {
+  color: var(--color-success);
+  font-weight: var(--weight-semibold);
+}
+
+.bring__moves {
+  color: var(--color-warning);
+  font-weight: var(--weight-semibold);
+}
+
+.bring__done-title {
+  font-size: var(--text-lg);
+  line-height: var(--text-lg-lh);
+  font-weight: var(--weight-bold);
+}
+
 .auth__switch {
   text-align: center;
 }

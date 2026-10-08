@@ -38,6 +38,15 @@ export function McpSetup({ origin }: { origin: string }) {
   const content = (
     <article className="mcp-setup prose">
       <h1 className="page__title">{t("mcp.title")}</h1>
+      {/* A newcomer who ended up here learns first that they can leave (AND-272). */}
+      <Callout tone="info">
+        <p>{t("mcp.onlyIf")}</p>
+        <p>
+          <Link href={signedIn ? "/characters" : "/login"}>
+            {signedIn ? t("mcp.toCharacters") : t("mcp.keyLoginButton")}
+          </Link>
+        </p>
+      </Callout>
       <p className="mcp-setup__lead">{t("mcp.intro")}</p>
       <p>{t("mcp.choose")}</p>
       <p className="note">{t("mcp.what")}</p>
