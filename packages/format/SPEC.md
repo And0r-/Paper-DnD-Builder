@@ -1710,6 +1710,9 @@ optional except `manifest.json`:
   order; give them a `when` so only characters who need them get them.
   `cards` adds layouts for kinds the base has none for.
 - `texts/<lang>/*.json`: one folder per language of `manifest.languages`.
+  `package.name` and `package.short` are the extension's own name and
+  description (required in its fallback language); they do not replace
+  the base's.
 - `units.json` is not allowed: an extension uses the base's units. Every
   amount it states must be convertible with them.
 
@@ -1735,10 +1738,13 @@ later adds the same key, the extension is not loaded until it is renamed.
 - **Options of base choices.** A choice offers every thing its `options`
   select by `kind`, `tags` and `ids` ([9.3](#93-choices)). A thing of the
   extension that the selection matches is offered there too. Example: the
-  base's `path-herbalist` choice selects `{ "kind": "path", "tags":
-["path-herbalist"] }`; an extension thing `path.tide-warden` of kind
-  `path` with tag `path-herbalist` becomes a further option. A choice that
-  lists `ids` offers only those things; an extension cannot add to it.
+  demo's `path` choice selects `{ "kind": "path" }`, each path `requires`
+  its calling; the extension thing `path.tide-warden` of kind `path` with
+  `"requires": "has('calling.river-runner')"` becomes a further path for
+  river runners. A choice that selects `{ "kind": "subclass", "tags":
+["subclass-fighter"] }` gets every extension thing of that kind with that
+  tag. A choice that lists `ids` offers only those things; an extension
+  cannot add to it.
 - **Counts and conditions.** `count('<tag>')` and `has()` of the base see
   the extension's things the character has, like any other thing.
 - **Grants.** Things of the extension may grant base things, base choices
@@ -1785,7 +1791,10 @@ those files; the base's own warnings are not repeated.
 ### 17.7 Characters with extensions
 
 The builder loads every base first, then the extensions of each base,
-each put together with its base when it starts. An extension that does not
+each put together with its base when it starts. An extension is a folder
+of its own next to its base, or inside the base's folder under
+`extensions/<extension>/` (the demo package carries its demo extension
+`demo-tides` there). An extension that does not
 fit (its base missing, invalid or of a version it does not accept, an
 error in the extension, a key another extension of the same base already
 has) is not loaded; the builder writes why into its log and the base and
