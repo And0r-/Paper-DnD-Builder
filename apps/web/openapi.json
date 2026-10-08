@@ -35,7 +35,7 @@
     },
     {
       "name": "Campaigns",
-      "description": "Whoever makes a campaign leads it (game master) and adds players by mail address. The game master reaches every character of the players; a player sees only their own characters and the campaigns they are in. Anyone else gets 404."
+      "description": "Whoever makes a campaign leads it (game master) and adds players by mail address. The game master reaches the players' characters that belong to the campaign; a character in no campaign stays private. A player sees only their own characters and the campaigns they are in. Anyone else gets 404."
     },
     { "name": "Server" },
     {
@@ -3458,7 +3458,7 @@
             }
           }
         ],
-        "description": "The game master gets the players and all their characters; a player gets the campaign only.",
+        "description": "The game master gets the players and their characters in this campaign; a player gets the campaign only.",
         "responses": {
           "200": {
             "description": "The campaign.",
@@ -3920,7 +3920,7 @@
             }
           }
         ],
-        "description": "The game master removes any player; a player removes only themselves (`me`). The characters stay with the player; the game master no longer reaches them.",
+        "description": "The game master removes any player; a player removes only themselves (`me`). The characters stay with the player and leave the campaign; the game master no longer reaches them.",
         "responses": {
           "204": {
             "description": "Done. No body."

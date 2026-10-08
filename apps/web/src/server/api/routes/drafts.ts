@@ -69,8 +69,8 @@ export function ownDraft(row: DraftRow, account: AccountRow): ReachableDraftRow 
 }
 
 /**
- * The draft of the URL, if the viewer may reach it: their own, or a
- * player's in a campaign they lead (see `Store.findReachableDraft`).
+ * The draft of the URL, if the viewer may reach it: their own, or one a
+ * player put into a campaign they lead (see `Store.findReachableDraft`).
  */
 /** A draft in a list: the draft's fields with `packageAvailable` and `summary`. */
 export function listEntry(app: App, row: ReachableDraftRow) {

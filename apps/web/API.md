@@ -417,8 +417,10 @@ level-3 character of the demo package this way, from empty to the PDF.
 
 Whoever makes a campaign leads it (the game master); there is no role on
 the account. The game master adds players by mail address and then reaches
-**every character of those players**: open, change, raise, print, and make
-a new one for a player. The characters stay the players' (`draft.owner`);
+**the players' characters that belong to this campaign** (`campaignId`):
+open, change, raise, print, and make a new one for a player. A character
+in no campaign or in another stays private. When a player leaves or is
+removed, their characters leave the campaign too. The characters stay the players' (`draft.owner`);
 only the owner deletes one. A player sees their own characters and the
 campaigns they are in, not the other players. Anyone else gets `404`, as
 for something that does not exist. Every route checks this on the server;
@@ -432,7 +434,7 @@ access keys have the same rights as the screens.
 | 🔒 `PATCH /api/campaigns/:id`                         | `{ name }`              | game master               | `{ campaign }`.                                                                                                                                                                                                                                             |
 | 🔒 `DELETE /api/campaigns/:id`                        | —                       | game master               | `204`. Campaign and player list go; the characters stay with the players.                                                                                                                                                                                   |
 | 🔒 `POST /api/campaigns/:id/players`                  | `{ email, language? }`  | game master               | `201 { player: { id, email, addedAt } }`. New address: account made, password mail. Existing account: short mail, password unchanged. Same answer either way. `409 alreadyPlayer`, `422 cannotAddYourself`, `422 tooManyPlayers` (50), `429`, `502`, `503`. |
-| 🔒 `DELETE /api/campaigns/:id/players/:playerId`      | —                       | game master; player: `me` | `204`. The game master removes a player; a player leaves with `me`. The characters stay; the game master's reach ends at once. `404 playerNotFound`.                                                                                                        |
+| 🔒 `DELETE /api/campaigns/:id/players/:playerId`      | —                       | game master; player: `me` | `204`. The game master removes a player; a player leaves with `me`. The characters stay and leave the campaign; the game master's reach ends at once. `404 playerNotFound`.                                                                                 |
 | 🔒 `POST /api/campaigns/:id/players/:playerId/drafts` | `{ packageId, level? }` | game master               | `201`, a new draft that belongs to the player (`access: "gameMaster"`) and to this campaign. Then build it with the draft routes.                                                                                                                           |
 
 `Campaign` is `{ id, name, role: "gameMaster|player", gameMaster: { email }, playerCount, createdAt }`.
@@ -573,7 +575,7 @@ it. Both are kept apart from the draft; the builder never reads them.
 `SheetCopy` is `{ id, name, createdAt, updatedAt, fromLevel, fromChangedAt,
 fromPackageVersion, language, units, version }`.
 
-- **Access** is the character's: owner, game master of the owner's
+- **Access** is the character's: owner, game master of the character's
   campaign (also deleting a copy) and access keys of either. Someone
   else's character is `404 draftNotFound`.
 - **Versions** as for drafts: a write names the version it was read at;

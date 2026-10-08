@@ -15,6 +15,7 @@ let gm: Client;
 let player: Client;
 let stranger: Client;
 let id: string;
+let campaignId: string;
 
 const PLAYER = "player@example.org";
 
@@ -26,6 +27,7 @@ beforeEach(async () => {
   await signIn(gm, server, "lead@example.org");
   await signIn(stranger, server, "stranger@example.org");
   const campaign = (await gm.call("POST", "/api/campaigns", { name: "Die Nebelrunde" })).json.campaign;
+  campaignId = campaign.id;
   await gm.call("POST", `/api/campaigns/${campaign.id}/players`, { email: PLAYER, language: "de" });
   const password = passwordFromMail(server.mails, PLAYER);
   expect((await player.call("POST", "/api/auth/login", { email: PLAYER, password })).status).toBe(200);
@@ -82,7 +84,7 @@ async function answerOpen(view: View): Promise<View> {
 }
 
 async function finished(level: number): Promise<View> {
-  const created = (await player.call("POST", "/api/drafts", { packageId: "demo", level })).json;
+  const created = (await player.call("POST", "/api/drafts", { packageId: "demo", level, campaignId })).json;
   const view = await answerOpen(created);
   const done = await player.call("POST", `/api/drafts/${view.draft.id}/finish`, {
     version: view.draft.version,

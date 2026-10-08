@@ -524,7 +524,8 @@ async function walk(server: TestServer): Promise<void> {
     email: "mate@example.org",
     password: passwordFromMail(server.mails, "mate@example.org"),
   });
-  const theirs = (await mate.call("POST", "/api/drafts", { packageId: "demo" })).json.draft.id;
+  const theirs = (await mate.call("POST", "/api/drafts", { packageId: "demo", campaignId: campaign.id })).json
+    .draft.id;
   await mate.call("GET", "/api/campaigns");
   await mate.call("GET", cp);
   await mate.call("PATCH", cp, { name: "Meine" });

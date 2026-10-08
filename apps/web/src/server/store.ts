@@ -117,12 +117,13 @@ const DRAFT_COLUMNS_D = DRAFT_COLUMNS.split(", ")
 
 /**
  * The one rule of who may reach whose characters: the owner, and the game
- * master of a campaign the owner plays in. `$viewer` is the viewer's
- * account id, `d` the drafts row.
+ * master of the campaign the character belongs to, while the owner plays
+ * in it. A character in no campaign is the owner's alone. `$viewer` is the
+ * viewer's account id, `d` the drafts row.
  */
 const reachable = (viewer: string) => `(d.account_id = ${viewer} OR EXISTS (
   SELECT 1 FROM campaign_players p JOIN campaigns c ON c.id = p.campaign_id
-  WHERE p.account_id = d.account_id AND c.account_id = ${viewer}))`;
+  WHERE c.id = d.campaign_id AND p.account_id = d.account_id AND c.account_id = ${viewer}))`;
 
 /** A campaign as the viewer `$1` sees it; `c` the campaigns row. */
 const CAMPAIGN_SELECT = `SELECT c.id, c.name, c.created_at, gm.email AS game_master_email,
@@ -444,21 +445,31 @@ export class Store {
     return rows.length > 0 || (await this.findPlayer(campaignId, accountId)) !== undefined;
   }
 
+  /**
+   * Removes a player; their characters in this campaign go back to none, so
+   * they stay private when the player joins again.
+   */
   async removePlayer(campaignId: string, accountId: string): Promise<boolean> {
     const rows = await this.db.query(
-      "DELETE FROM campaign_players WHERE campaign_id = $1 AND account_id = $2 RETURNING account_id",
+      `WITH removed AS (
+         DELETE FROM campaign_players WHERE campaign_id = $1 AND account_id = $2 RETURNING account_id
+       ), released AS (
+         UPDATE drafts SET campaign_id = NULL
+         WHERE campaign_id = $1 AND account_id IN (SELECT account_id FROM removed)
+       )
+       SELECT account_id FROM removed`,
       [campaignId, accountId],
     );
     return rows.length > 0;
   }
 
-  /** Every character of the campaign's players, newest first. */
+  /** The players' characters that belong to the campaign, newest first. */
   async listCampaignDrafts(campaignId: string): Promise<ReachableDraftRow[]> {
     return this.db.query<ReachableDraftRow>(
       `SELECT ${DRAFT_COLUMNS_D}, o.email AS owner_email, 'gameMaster' AS access
-       FROM drafts d JOIN campaign_players p ON p.account_id = d.account_id
+       FROM drafts d JOIN campaign_players p ON p.account_id = d.account_id AND p.campaign_id = d.campaign_id
        JOIN accounts o ON o.id = d.account_id
-       WHERE p.campaign_id = $1 ORDER BY d.updated_at DESC, d.id`,
+       WHERE d.campaign_id = $1 ORDER BY d.updated_at DESC, d.id`,
       [campaignId],
     );
   }
