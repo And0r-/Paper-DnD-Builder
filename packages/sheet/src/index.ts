@@ -31,6 +31,7 @@ export {
   MAX_SQUARES,
   MAX_USE_BOXES,
   sheetFields,
+  sheetFieldNames,
   sheetLanguages,
   SheetError,
   type Card,
