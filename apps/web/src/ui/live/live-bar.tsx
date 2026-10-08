@@ -67,10 +67,8 @@ function useToldLine(): { seq: number; text: string } | null {
     told,
     {
       step: (id) => stepTitle(lp, ev, id),
-      choice: (id) => {
-        const step = ev.steps.find((s) => s.choices.includes(id));
-        return stepTitle(lp, ev, step ? step.id : id);
-      },
+      // The question's own title ("Name"), as the step shows it.
+      choice: (id) => stepTitle(lp, ev, id),
       level: ptext(lp, "level.name") ?? "",
     },
     t,

@@ -93,12 +93,14 @@ test("help link: owner on a phone, newcomer on a desktop, one character", async 
   await card(page, "folk.hillfolk").click();
   await expect(card(page, "folk.hillfolk")).toHaveClass(/option--checked/);
   await expect(card(p2, "folk.hillfolk")).toHaveClass(/option--checked/);
-  await expect(bar(p2)).toContainText(m["live.changedBy"].replace("{name}", "Lio"));
+  await expect(bar(p2)).toContainText(m["live.from.person"].replace("{who}", "Lio") + ": Herkunft");
 
   await card(p2, "folk.moorfolk").click();
   await expect(card(page, "folk.moorfolk")).toHaveClass(/option--checked/);
   await expect(card(page, "folk.hillfolk")).not.toHaveClass(/option--checked/);
-  await expect(bar(page)).toContainText(m["live.changedBy"].replace("{name}", "Mara"));
+  await expect(bar(page)).toContainText(
+    m["live.from.person"].replace("{who}", m["live.person.helper"].replace("{name}", "Mara")) + ": Herkunft",
+  );
   // The server's state counts: both read the same answer from it.
   const stored = (await (await page.request.get(`/api/drafts/${id}`)).json()) as {
     draft: { answers: Record<string, unknown> };
@@ -187,7 +189,10 @@ test("game master helps out from the campaign, without a link", async ({ page, b
 
   await card(page, "folk.hillfolk").click();
   await expect(card(player, "folk.hillfolk")).toHaveClass(/option--checked/);
-  await expect(bar(player)).toContainText(m["live.changedBy"].replace("{name}", "Kim"));
+  await expect(bar(player)).toContainText(
+    m["live.from.person"].replace("{who}", m["live.person.gameMaster"].replace("{name}", "Kim")) +
+      ": Herkunft",
+  );
   // The owner gets no pointing buttons: only who helps points.
   await expect(card(player, "folk.hillfolk").locator(".option__point")).toHaveCount(0);
   await expect(card(page, "folk.hillfolk").locator(".option__point")).toHaveCount(1);
