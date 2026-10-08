@@ -493,18 +493,16 @@ textarea.field__input {
   --compact-select-width: 8.5rem;
 }
 
-/* On a phone the word alone; the globe comes back where there is room. */
-@media (max-width: 22.5rem) {
-  .language-menu {
-    --compact-select-width: 6.5rem;
+/* On a phone the globe alone (AND-267): the screen already shows which language it is in, and
+   the name, the save status and the menu need the room. The select keeps its spoken name. */
+@media (max-width: 599px) {
+  .topbar .language-menu {
+    --compact-select-width: calc(var(--space-2) + 20px + var(--space-1) + 16px + var(--space-2));
   }
 
-  .language-menu .compact-select__icon {
-    display: none;
-  }
-
-  .language-menu .compact-select__shown {
-    padding-left: var(--space-2);
+  .topbar .language-menu .compact-select__shown {
+    padding: 0;
+    visibility: hidden;
   }
 }
 

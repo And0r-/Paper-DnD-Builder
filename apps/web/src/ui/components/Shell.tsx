@@ -68,7 +68,7 @@ export function AppShell({
         onClick={() => setMenuOpen(true)}
       >
         <Icon name="menu" />
-        <span>{t("menu.open")}</span>
+        <span className="topbar__menu-word">{t("menu.open")}</span>
         {menuMark}
       </button>
       <div className="topbar__title">

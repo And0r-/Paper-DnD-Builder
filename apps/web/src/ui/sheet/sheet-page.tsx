@@ -24,22 +24,19 @@ import { Callout, EmptyState, ErrorState, Loading } from "../components/Feedback
 import { CompactSelect, type CompactOption } from "../components/Fields.tsx";
 import { AppShell } from "../components/Shell.tsx";
 import { useDraft } from "../flow/draft-state.tsx";
-import { usePageTitle } from "../flow/frame.tsx";
+import { SaveLine as SaveStatusLine, usePageTitle } from "../flow/frame.tsx";
 import { ptext } from "../package-text.ts";
 import { PrintDialog } from "../flow/print-dialog.tsx";
 import { copyChoice, newestFirst } from "./copy-name.ts";
-import { ORIGINAL, useSheet, type SaveState, type SheetController } from "./sheet-state.ts";
+import { ORIGINAL, useSheet, type SheetController } from "./sheet-state.ts";
 import { SHEET_UI, SheetUiProvider } from "./sheet-ui.tsx";
 
 /** "Saved", and for a short while after clearing all ticks or crossing out a row, "Undo" beside it. */
 function SaveLine({ sheet }: { sheet: SheetController }) {
   const { t } = useApp();
-  const save: SaveState = sheet.save;
   return (
     <div className="sheet-save">
-      <p className={`save-status save-status--${save}`} aria-live="polite">
-        {save === "idle" ? "" : t(`save.${save}`)}
-      </p>
+      <SaveStatusLine state={sheet.save} />
       {sheet.undo && (
         <button
           type="button"
