@@ -92,6 +92,44 @@
         }
       }
     },
+    "/api/openapi.json": {
+      "get": {
+        "operationId": "openapi",
+        "summary": "This description",
+        "tags": ["Server"],
+        "description": "This file, openapi.json (OpenAPI 3.1), as it is in the repository. Without a login. Read by the API reference at `/api/docs`.",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "The description of every route.",
+            "content": {
+              "application/json": {
+                "schema": { "type": "object" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/docs": {
+      "get": {
+        "operationId": "docs",
+        "summary": "API reference",
+        "tags": ["Server"],
+        "description": "This description as a page in the browser: every route to read, and to try with an access key. Without a login. Everything on it, scripts and fonts included, comes from this server; a request made with \"Try it\" goes straight to this server, and the key is not stored in the browser.",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "The page.",
+            "content": {
+              "text/html": {
+                "schema": { "type": "string" }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/auth/password": {
       "post": {
         "operationId": "requestPassword",

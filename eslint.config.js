@@ -11,6 +11,7 @@ export default tseslint.config(
       "**/dist/",
       "**/coverage/",
       "packages-mount/",
+      "apps/web/public/scalar/",
       "**/next-env.d.ts",
     ],
   },
