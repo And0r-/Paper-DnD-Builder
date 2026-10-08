@@ -161,6 +161,14 @@ export interface Campaign {
   createdAt: string;
   /** When the viewer joined as a player; null for the game master. */
   joinedAt: string | null;
+  /** The invitation link: for the game master, on a single campaign only. */
+  inviteUrl?: string;
+}
+
+/** What an invitation link shows before joining (`GET /api/invites/:token`). */
+export interface Invite {
+  campaign: { id: string; name: string };
+  gameMaster: { name: string };
 }
 
 export interface CampaignPlayer {

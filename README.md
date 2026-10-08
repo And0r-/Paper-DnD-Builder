@@ -25,6 +25,11 @@ particular game's data, that is a bug in the builder.
   the password alone logs in. Players make and delete further passwords
   (one per device, one on paper) in the settings; nobody chooses one, and
   nothing waits for a mail.
+- **Campaigns by link.** Whoever makes a campaign leads it and gets one
+  invitation link for it, also shown as a QR code (drawn on the page, no
+  outside service). They send it however they like or show it at the
+  table; whoever opens it joins and builds a character for it. The builder
+  sends no invitation mails. A new link replaces the old one.
 - **We collect nothing.** Stored data is limited to a name, a mail address
   if one is given, password hashes, settings and character data. No tracking, no analytics, no
   third-party scripts, no requests from the browser to any other domain
@@ -71,8 +76,8 @@ running database.
 
 For `pnpm dev`, set `PACKAGES_DIR=packages/demo-package` (it may point at a
 single package or at a folder of packages) and `DATABASE_URL`. Logging in needs no
-mail. SMTP (`SMTP_*`, `MAIL_FROM`) is used only when a game master adds a
-player by address; for local development point it at a local mail catcher.
+mail. SMTP (`SMTP_*`, `MAIL_FROM`) is used only for the link back in after
+a lost password; for local development point it at a local mail catcher.
 The server never logs or stores passwords, only their hashes.
 
 The HTTP API is described in [apps/web/API.md](apps/web/API.md).

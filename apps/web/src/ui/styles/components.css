@@ -1105,6 +1105,47 @@ textarea.field__input {
   gap: var(--space-3);
 }
 
+/* The invitation link and its QR code (AND-237): side by side on a desk, the code below on a phone. */
+.invite__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.invite__link {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+  flex: 1;
+}
+
+.invite__link .btn {
+  align-self: flex-start;
+}
+
+.qr-code {
+  display: block;
+  width: min(100%, 16rem);
+  min-width: 200px;
+  height: auto;
+  align-self: center;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-1);
+}
+
+@media (min-width: 600px) {
+  .invite__body {
+    flex-direction: row;
+    align-items: flex-start;
+  }
+
+  .qr-code {
+    width: 14rem;
+    flex: none;
+  }
+}
+
 .campaign-list,
 .player-list {
   list-style: none;

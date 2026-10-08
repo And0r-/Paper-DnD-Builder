@@ -1,10 +1,11 @@
 "use client";
 /**
  * One campaign. The game master sees their own characters in it first,
- * adds players by mail address (the hint
- * says who gets which mail), sees each player with their characters as
- * cards, opens or prints them, builds a new one for a player, removes a
- * player or deletes the campaign. A player sees only who leads it.
+ * then the invitation link with its QR code (AND-237) to send or show at
+ * the table, and makes a new one if the old one went too far. They see each
+ * player with their characters as cards, open or print them, build a new
+ * one for a player, remove a player or delete the campaign. A player sees
+ * only who leads it.
  */
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -14,23 +15,21 @@ import { CharacterCard, describeCharacter, packagesFor } from "../../../src/ui/c
 import { Button, ButtonLink } from "../../../src/ui/components/Button.tsx";
 import { ConfirmDialog } from "../../../src/ui/components/Dialog.tsx";
 import { Callout, EmptyState, ErrorState, Loading } from "../../../src/ui/components/Feedback.tsx";
-import { TextField, Toast } from "../../../src/ui/components/Fields.tsx";
+import { CopyText } from "../../../src/ui/components/CopyText.tsx";
+import { Toast } from "../../../src/ui/components/Fields.tsx";
+import { QrCode } from "../../../src/ui/components/QrCode.tsx";
 import { AppShell } from "../../../src/ui/components/Shell.tsx";
 import { usePageTitle } from "../../../src/ui/flow/frame.tsx";
 import { RequireAccount } from "../../../src/ui/guards.tsx";
 import type { LoadedPackage } from "../../../src/ui/packages.ts";
 
-/** The server's own check (see accounts.ts), so most typing errors show before sending. */
-const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
 type Data = { lang: string; view: CampaignView; packages: Map<string, LoadedPackage> };
 
 export default function CampaignPage() {
-  return <RequireAccount>{(account) => <CampaignScreen me={account.name} />}</RequireAccount>;
+  return <RequireAccount>{() => <CampaignScreen />}</RequireAccount>;
 }
 
-/** `me`: the game master's name, as the added player's mail shows it. */
-function CampaignScreen({ me }: { me: string }) {
+function CampaignScreen() {
   const { t, tc, lang } = useApp();
   const router = useRouter();
   const { id } = useParams<{ id: string }>();
@@ -39,12 +38,11 @@ function CampaignScreen({ me }: { me: string }) {
   const data = loaded?.lang === lang ? loaded : null;
   const [failed, setFailed] = useState<"notFound" | "error" | null>(null);
   const [attempt, setAttempt] = useState(0);
-  const [email, setEmail] = useState("");
-  const [emailError, setEmailError] = useState<string>();
   const [busy, setBusy] = useState(false);
   const [remove, setRemove] = useState<CampaignPlayer>();
   const [askDelete, setAskDelete] = useState(false);
   const [askLeave, setAskLeave] = useState(false);
+  const [askRenew, setAskRenew] = useState(false);
   const [error, setError] = useState<string>();
   const [toast, setToast] = useState<string>();
   usePageTitle([data?.view.campaign.name ?? "", t("campaigns.title")]);
@@ -66,47 +64,21 @@ function CampaignScreen({ me }: { me: string }) {
 
   const reload = () => setAttempt((n) => n + 1);
 
-  async function add() {
-    const address = email.trim().toLowerCase();
-    if (!EMAIL.test(address)) {
-      setEmailError(t("login.emailInvalid"));
-      return;
-    }
+  async function renew() {
     setBusy(true);
-    setEmailError(undefined);
+    setError(undefined);
     try {
-      const r = await api<{ player: { name: string } }>("POST", `/api/campaigns/${id}/players`, {
-        email: address,
-        language: lang,
-      });
-      setEmail("");
-      setToast(t("campaign.added", { name: r.player.name }));
-      reload();
+      const { inviteUrl } = await api<{ inviteUrl: string }>("POST", `/api/campaigns/${id}/invite`);
+      setData((d) => d && { ...d, view: { ...d.view, campaign: { ...d.view.campaign, inviteUrl } } });
+      setToast(t("campaign.renewed"));
     } catch (e) {
-      setEmailError(addError(e, address));
+      if (e instanceof ApiError && e.status === 429)
+        setError(tc("campaign.tooFast", Math.max(1, Math.ceil((e.retryAfter ?? 60) / 60))));
+      else setError(e instanceof ApiError && e.isNetwork ? t("common.offline") : t("common.loadError"));
     } finally {
       setBusy(false);
+      setAskRenew(false);
     }
-  }
-
-  function addError(e: unknown, address: string): string {
-    if (!(e instanceof ApiError)) return t("common.loadError");
-    if (e.isNetwork) return t("common.offline");
-    switch (e.code) {
-      case "alreadyPlayer":
-        return t("campaign.alreadyPlayer", { email: address });
-      case "cannotAddYourself":
-        return t("campaign.cannotAddYourself");
-      case "tooManyPlayers":
-        return t("campaign.tooManyPlayers", { max: Number(e.details["max"]) });
-      case "mailFailed":
-        return t("campaign.mailFailed");
-      case "mailNotConfigured":
-        return t("campaign.mailNotConfigured");
-    }
-    if (e.status === 429) return tc("campaign.tooFast", Math.max(1, Math.ceil((e.retryAfter ?? 60) / 60)));
-    if (e.status === 400) return t("login.emailInvalid");
-    return t("common.loadError");
   }
 
   let content;
@@ -157,36 +129,27 @@ function CampaignScreen({ me }: { me: string }) {
                 </ul>
               </section>
             )}
+            {campaign.inviteUrl && (
+              <section className="campaign-page__section invite" aria-labelledby="p-invite">
+                <h2 className="section-title" id="p-invite">
+                  {t("campaign.inviteTitle")}
+                </h2>
+                <div className="invite__body">
+                  <div className="invite__link">
+                    <p>{t("campaign.inviteText")}</p>
+                    <CopyText label={t("campaign.inviteLabel")} value={campaign.inviteUrl} />
+                    <Button variant="ghost" icon="refresh" onClick={() => setAskRenew(true)}>
+                      {t("campaign.renew")}
+                    </Button>
+                  </div>
+                  <QrCode value={campaign.inviteUrl} label={t("campaign.inviteQr")} />
+                </div>
+              </section>
+            )}
             <section className="campaign-page__section" aria-labelledby="p-players">
               <h2 className="section-title" id="p-players">
                 {t("campaign.players")}
               </h2>
-              <form
-                className="campaigns__new"
-                noValidate
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  void add();
-                }}
-              >
-                <TextField
-                  label={t("campaign.addLabel")}
-                  help={t("campaign.addHelp", { gameMaster: me, name: campaign.name })}
-                  error={emailError}
-                  type="email"
-                  inputMode="email"
-                  autoComplete="off"
-                  spellCheck={false}
-                  value={email}
-                  onChange={(e) => {
-                    setEmail(e.currentTarget.value);
-                    if (emailError) setEmailError(undefined);
-                  }}
-                />
-                <Button type="submit" icon="mail" busy={busy} busyLabel={t("campaign.adding")}>
-                  {t("campaign.add")}
-                </Button>
-              </form>
               {players.length === 0 ? (
                 <p className="note">{t("campaign.noPlayers")}</p>
               ) : (
@@ -333,6 +296,17 @@ function CampaignScreen({ me }: { me: string }) {
         }}
       >
         <p>{t("campaigns.leaveText")}</p>
+      </ConfirmDialog>
+
+      <ConfirmDialog
+        open={askRenew}
+        title={t("campaign.renewTitle")}
+        confirmLabel={t("campaign.renew")}
+        busy={busy}
+        onCancel={() => setAskRenew(false)}
+        onConfirm={renew}
+      >
+        <p>{t("campaign.renewText")}</p>
       </ConfirmDialog>
 
       {toast && <Toast message={toast} duration={6000} onDone={() => setToast(undefined)} />}

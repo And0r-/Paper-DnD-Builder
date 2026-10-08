@@ -421,8 +421,11 @@ level-3 character of the demo package this way, from empty to the PDF.
 ## Campaigns
 
 Whoever makes a campaign leads it (the game master); there is no role on
-the account. The game master adds players by mail address (until
-invitations by link come) and sees them by name, never by address. Then they reach
+the account. The game master invites players with the campaign's one
+invitation link (`campaign.inviteUrl`, `<BASE_URL>/join/<token>`), which
+they send themselves or show as a QR code; the builder mails no
+invitations. Whoever opens the link and joins is a player. The game master
+sees players by name, never by address. Then they reach
 **the players' characters that belong to this campaign** (`campaignId`):
 open, change, raise, print, and make a new one for a player. A character
 in no campaign or in another stays private. When a player leaves or is
@@ -434,18 +437,20 @@ belong to it, and `playerCount` does not count them. Anyone else gets `404`, as
 for something that does not exist. Every route checks this on the server;
 access keys have the same rights as the screens.
 
-| Method & path                                         | Body                    | Who                       | Result                                                                                                                                                                                                                                                                                                                                                                      |
-| ----------------------------------------------------- | ----------------------- | ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 🔒 `GET /api/campaigns`                               | —                       | everyone                  | `{ campaigns: [Campaign] }`: the ones you lead or play in, oldest first.                                                                                                                                                                                                                                                                                                    |
-| 🔒 `POST /api/campaigns`                              | `{ name }`              | everyone                  | `201 { campaign, characters: [], players: [] }`. You lead it. `422 tooManyCampaigns` (`max`, 50).                                                                                                                                                                                                                                                                           |
-| 🔒 `GET /api/campaigns/:id`                           | —                       | game master, player       | `{ campaign, characters, players }`. Game master: `characters`: their own in this campaign (draft list entries); `players: [{ id, name, addedAt, characters }]`. Player: both `null`.                                                                                                                                                                                       |
-| 🔒 `PATCH /api/campaigns/:id`                         | `{ name }`              | game master               | `{ campaign }`.                                                                                                                                                                                                                                                                                                                                                             |
-| 🔒 `DELETE /api/campaigns/:id`                        | —                       | game master               | `204`. Campaign and player list go; every character stays with its owner, in no campaign.                                                                                                                                                                                                                                                                                   |
-| 🔒 `POST /api/campaigns/:id/players`                  | `{ email, language? }`  | game master               | `201 { player: { id, name, addedAt } }`. The address a player gave; an existing account gets a short mail naming the game master (two accounts with the address: the oldest). New address: an account without a password, no mail. Same answer either way; never the address. `409 alreadyPlayer`, `422 cannotAddYourself`, `422 tooManyPlayers` (50), `429`, `502`, `503`. |
-| 🔒 `DELETE /api/campaigns/:id/players/:playerId`      | —                       | game master; player: `me` | `204`. The game master removes a player; a player leaves with `me`. The characters stay and leave the campaign; the game master's reach ends at once. `404 playerNotFound`.                                                                                                                                                                                                 |
-| 🔒 `POST /api/campaigns/:id/players/:playerId/drafts` | `{ packageId, level? }` | game master               | `201`, a new draft that belongs to the player (`access: "gameMaster"`) and to this campaign. Then build it with the draft routes.                                                                                                                                                                                                                                           |
+| Method & path                                         | Body                    | Who                       | Result                                                                                                                                                                                                      |
+| ----------------------------------------------------- | ----------------------- | ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 🔒 `GET /api/campaigns`                               | —                       | everyone                  | `{ campaigns: [Campaign] }`: the ones you lead or play in, oldest first.                                                                                                                                    |
+| 🔒 `POST /api/campaigns`                              | `{ name }`              | everyone                  | `201 { campaign, characters: [], players: [] }`. You lead it. `422 tooManyCampaigns` (`max`, 50).                                                                                                           |
+| 🔒 `GET /api/campaigns/:id`                           | —                       | game master, player       | `{ campaign, characters, players }`. Game master: `campaign.inviteUrl`; `characters`: their own in this campaign (draft list entries); `players: [{ id, name, addedAt, characters }]`. Player: both `null`. |
+| 🔒 `PATCH /api/campaigns/:id`                         | `{ name }`              | game master               | `{ campaign }`.                                                                                                                                                                                             |
+| 🔒 `DELETE /api/campaigns/:id`                        | —                       | game master               | `204`. Campaign and player list go; every character stays with its owner, in no campaign.                                                                                                                   |
+| 🔒 `POST /api/campaigns/:id/invite`                   | —                       | game master               | `{ inviteUrl }`, a new link; the old one stops working at once, the players stay. `429` (30 per hour).                                                                                                      |
+| `GET /api/invites/:token`                             | —                       | anyone                    | `{ campaign: { id, name }, gameMaster: { name } }`, shown before joining. `404 inviteNotFound`. `429`: 60 lookups and joins per 15 minutes per IP.                                                          |
+| 🔒 `POST /api/invites/:token/join`                    | —                       | everyone                  | `{ campaignId }`. You play in the campaign now; joining again, or as its game master, changes nothing. `404 inviteNotFound`, `422 tooManyPlayers` (50), `429`.                                              |
+| 🔒 `DELETE /api/campaigns/:id/players/:playerId`      | —                       | game master; player: `me` | `204`. The game master removes a player; a player leaves with `me`. The characters stay and leave the campaign; the game master's reach ends at once. `404 playerNotFound`.                                 |
+| 🔒 `POST /api/campaigns/:id/players/:playerId/drafts` | `{ packageId, level? }` | game master               | `201`, a new draft that belongs to the player (`access: "gameMaster"`) and to this campaign. Then build it with the draft routes.                                                                           |
 
-`Campaign` is `{ id, name, role: "gameMaster|player", gameMaster: { name }, playerCount, createdAt, joinedAt }`; `joinedAt` is null for the game master.
+`Campaign` is `{ id, name, role: "gameMaster|player", gameMaster: { name }, playerCount, createdAt, joinedAt }`; `joinedAt` is null for the game master. On a single campaign (`GET`, `POST`) its game master also gets `inviteUrl`; a player never does.
 A player of the campaign gets `403 gameMasterOnly` on the game master's
 routes (they know the campaign exists); anyone else `404 campaignNotFound`.
 
@@ -612,62 +617,61 @@ Tests: [`sheet-copies.test.ts`](src/server/api/sheet-copies.test.ts).
 
 ## Error codes
 
-| Status | Code                     | When                                                                                                  |
-| ------ | ------------------------ | ----------------------------------------------------------------------------------------------------- |
-| `400`  | `badJson`                | The body is not JSON.                                                                                 |
-| `400`  | `badRequest`             | The body has the wrong shape; `issues` lists `{ path, message }`.                                     |
-| `400`  | `badQuery`               | A query parameter has a value the API does not know (`parameter`, `value`).                           |
-| `400`  | `designNotAvailable`     | A planned sheet design not drawn yet (`designs` lists those that are); `422` in the settings.         |
-| `401`  | `notLoggedIn`            | No session cookie and no `Authorization` header.                                                      |
-| `401`  | `keyNotValid`            | The access key is unknown, withdrawn, past its end or not `Bearer cbk_...`.                           |
-| `401`  | `wrongPassword`          | No account has this password.                                                                         |
-| `401`  | `wrongMailOrPassword`    | Login of an account from before failed.                                                               |
-| `403`  | `crossSite`              | A change sent from another site.                                                                      |
-| `403`  | `keyCannotMakeKeys`      | Making an access key with an access key.                                                              |
-| `403`  | `keyCannotMakePasswords` | Making a password with an access key.                                                                 |
-| `403`  | `gameMasterOnly`         | A player of the campaign calls a game master's route.                                                 |
-| `403`  | `ownerOnly`              | A game master deletes a player's character; only the owner does.                                      |
-| `404`  | `notFound`               | No such API path.                                                                                     |
-| `404`  | `draftNotFound`          | No draft with this id that you may reach (someone else's looks the same).                             |
-| `404`  | `campaignNotFound`       | No campaign with this id that you lead or play in.                                                    |
-| `404`  | `playerNotFound`         | No such player in this campaign.                                                                      |
-| `404`  | `copyNotFound`           | No kept copy with this id on this character.                                                          |
-| `404`  | `keyNotFound`            | No access key with this id in this account.                                                           |
-| `404`  | `passwordNotFound`       | No password with this id in this account.                                                             |
-| `404`  | `resetLinkInvalid`       | The link back in is unknown, used already or older than 30 minutes.                                   |
-| `404`  | `packageNotFound`        | No loaded package with this id.                                                                       |
-| `404`  | `languageNotFound`       | The package has no texts in this language.                                                            |
-| `404`  | `valueNotFound`          | The draft's package has no value with this id (explaining a value).                                   |
-| `404`  | `versionNotFound`        | No such copy of the sheet: not `original` and not a kept copy of this character.                      |
-| `405`  | `methodNotAllowed`       | The path exists, the method does not.                                                                 |
-| `409`  | `versionConflict`        | The draft, copy or play state moved on; `current` holds it now.                                       |
-| `409`  | `notFinished`            | PDF or sheet of a draft, or raising a draft that is not in a raise; `open` lists the open choices.    |
-| `409`  | `tooManyCopies`          | The character has 10 kept copies (`max`); delete one first.                                           |
-| `409`  | `originalChanged`        | A copy made with `model` from an original that changed since; `original` says how it is now.          |
-| `409`  | `copyUnreadable`         | A kept copy stored in a shape this server no longer prints; `version` names it.                       |
-| `409`  | `alreadyPlayer`          | The address is already a player of this campaign.                                                     |
-| `409`  | `packageUnavailable`     | The draft's package is not loaded right now; `packageId` names it.                                    |
-| `413`  | `bodyTooLarge`           | Body over 64 KiB (516 KiB for a body with a sheet copy; `max`).                                       |
-| `413`  | `copyTooLarge`           | A sheet copy's model over 512 KiB (`max`).                                                            |
-| `415`  | `jsonRequired`           | Body not `application/json`.                                                                          |
-| `422`  | `changeRejected`         | The rule core refused the change; `reason` is a `ChangeError` (below).                                |
-| `422`  | `incomplete`             | Finishing with open choices; `open` lists them.                                                       |
-| `422`  | `languageNotSupported`   | The account's language cannot be printed with this package; `languages` lists those that can.         |
-| `422`  | `cannotAddYourself`      | A game master adds their own address as a player.                                                     |
-| `422`  | `tooManyCampaigns`       | The account leads 50 campaigns (`max`).                                                               |
-| `422`  | `tooManyPlayers`         | The campaign has 50 players (`max`).                                                                  |
-| `422`  | `tooManyKeys`            | The account has 20 access keys (`max`).                                                               |
-| `422`  | `tooManyPasswords`       | The account has 10 passwords (`max`).                                                                 |
-| `422`  | `lastPassword`           | Deleting the account's last password.                                                                 |
-| `422`  | `unknownUnit`            | No loaded package offers this unit (`dimension`, `unit`).                                             |
-| `429`  | `tooManyAttempts`        | Too many failed logins, new accounts, invitations or links back in; `retryAfter`, also `Retry-After`. |
-| `429`  | `tooManyRequests`        | Too many PDFs; `Retry-After`.                                                                         |
-| `500`  | `internal`               | A bug in the builder.                                                                                 |
-| `500`  | `packageRuleError`       | The package's rules could not be worked out (a bug in the package); `message`.                        |
-| `502`  | `mailFailed`             | The mail server refused the mail (added player, link back in); nothing changed.                       |
-| `503`  | `mailNotConfigured`      | The server has no mail (or no `BASE_URL` for links back in) set up.                                   |
-| `503`  | `baseUrlNotSet`          | The server has no public address (`BASE_URL`); the MCP zip cannot say where the builder is.           |
-| `503`  | `mcpPackageMissing`      | This build has no `server.mjs` for the MCP zip.                                                       |
+| Status | Code                     | When                                                                                                                      |
+| ------ | ------------------------ | ------------------------------------------------------------------------------------------------------------------------- |
+| `400`  | `badJson`                | The body is not JSON.                                                                                                     |
+| `400`  | `badRequest`             | The body has the wrong shape; `issues` lists `{ path, message }`.                                                         |
+| `400`  | `badQuery`               | A query parameter has a value the API does not know (`parameter`, `value`).                                               |
+| `400`  | `designNotAvailable`     | A planned sheet design not drawn yet (`designs` lists those that are); `422` in the settings.                             |
+| `401`  | `notLoggedIn`            | No session cookie and no `Authorization` header.                                                                          |
+| `401`  | `keyNotValid`            | The access key is unknown, withdrawn, past its end or not `Bearer cbk_...`.                                               |
+| `401`  | `wrongPassword`          | No account has this password.                                                                                             |
+| `401`  | `wrongMailOrPassword`    | Login of an account from before failed.                                                                                   |
+| `403`  | `crossSite`              | A change sent from another site.                                                                                          |
+| `403`  | `keyCannotMakeKeys`      | Making an access key with an access key.                                                                                  |
+| `403`  | `keyCannotMakePasswords` | Making a password with an access key.                                                                                     |
+| `403`  | `gameMasterOnly`         | A player of the campaign calls a game master's route.                                                                     |
+| `403`  | `ownerOnly`              | A game master deletes a player's character; only the owner does.                                                          |
+| `404`  | `notFound`               | No such API path.                                                                                                         |
+| `404`  | `draftNotFound`          | No draft with this id that you may reach (someone else's looks the same).                                                 |
+| `404`  | `campaignNotFound`       | No campaign with this id that you lead or play in.                                                                        |
+| `404`  | `playerNotFound`         | No such player in this campaign.                                                                                          |
+| `404`  | `copyNotFound`           | No kept copy with this id on this character.                                                                              |
+| `404`  | `keyNotFound`            | No access key with this id in this account.                                                                               |
+| `404`  | `passwordNotFound`       | No password with this id in this account.                                                                                 |
+| `404`  | `resetLinkInvalid`       | The link back in is unknown, used already or older than 30 minutes.                                                       |
+| `404`  | `packageNotFound`        | No loaded package with this id.                                                                                           |
+| `404`  | `languageNotFound`       | The package has no texts in this language.                                                                                |
+| `404`  | `inviteNotFound`         | No campaign has this invitation link (unknown, or replaced by a new one).                                                 |
+| `404`  | `valueNotFound`          | The draft's package has no value with this id (explaining a value).                                                       |
+| `404`  | `versionNotFound`        | No such copy of the sheet: not `original` and not a kept copy of this character.                                          |
+| `405`  | `methodNotAllowed`       | The path exists, the method does not.                                                                                     |
+| `409`  | `versionConflict`        | The draft, copy or play state moved on; `current` holds it now.                                                           |
+| `409`  | `notFinished`            | PDF or sheet of a draft, or raising a draft that is not in a raise; `open` lists the open choices.                        |
+| `409`  | `tooManyCopies`          | The character has 10 kept copies (`max`); delete one first.                                                               |
+| `409`  | `originalChanged`        | A copy made with `model` from an original that changed since; `original` says how it is now.                              |
+| `409`  | `copyUnreadable`         | A kept copy stored in a shape this server no longer prints; `version` names it.                                           |
+| `409`  | `packageUnavailable`     | The draft's package is not loaded right now; `packageId` names it.                                                        |
+| `413`  | `bodyTooLarge`           | Body over 64 KiB (516 KiB for a body with a sheet copy; `max`).                                                           |
+| `413`  | `copyTooLarge`           | A sheet copy's model over 512 KiB (`max`).                                                                                |
+| `415`  | `jsonRequired`           | Body not `application/json`.                                                                                              |
+| `422`  | `changeRejected`         | The rule core refused the change; `reason` is a `ChangeError` (below).                                                    |
+| `422`  | `incomplete`             | Finishing with open choices; `open` lists them.                                                                           |
+| `422`  | `languageNotSupported`   | The account's language cannot be printed with this package; `languages` lists those that can.                             |
+| `422`  | `tooManyCampaigns`       | The account leads 50 campaigns (`max`).                                                                                   |
+| `422`  | `tooManyPlayers`         | The campaign has 50 players (`max`).                                                                                      |
+| `422`  | `tooManyKeys`            | The account has 20 access keys (`max`).                                                                                   |
+| `422`  | `tooManyPasswords`       | The account has 10 passwords (`max`).                                                                                     |
+| `422`  | `lastPassword`           | Deleting the account's last password.                                                                                     |
+| `422`  | `unknownUnit`            | No loaded package offers this unit (`dimension`, `unit`).                                                                 |
+| `429`  | `tooManyAttempts`        | Too many failed logins, new accounts, new or opened invitation links, or links back in; `retryAfter`, also `Retry-After`. |
+| `429`  | `tooManyRequests`        | Too many PDFs; `Retry-After`.                                                                                             |
+| `500`  | `internal`               | A bug in the builder.                                                                                                     |
+| `500`  | `packageRuleError`       | The package's rules could not be worked out (a bug in the package); `message`.                                            |
+| `502`  | `mailFailed`             | The mail server refused the mail with a link back in; nothing changed.                                                    |
+| `503`  | `mailNotConfigured`      | The server has no mail (or no `BASE_URL` for links back in) set up.                                                       |
+| `503`  | `baseUrlNotSet`          | The server has no public address (`BASE_URL`); the MCP zip cannot say where the builder is.                               |
+| `503`  | `mcpPackageMissing`      | This build has no `server.mjs` for the MCP zip.                                                                           |
 
 `changeRejected` reasons (`error.reason.code`): `levelOutOfRange` (`min`,
 `max`), `levelNotHigher` (`level`), `unknownChoice`, `notAsked` (the choice
