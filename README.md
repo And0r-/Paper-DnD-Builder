@@ -105,6 +105,16 @@ Run it behind a reverse proxy that terminates TLS and appends
 `X-Forwarded-For` (per-IP login limits use the last entry). With an
 `https://` `BASE_URL`, cookies are `Secure` and `__Host-` prefixed.
 
+The live help (several people on one character) is a WebSocket on the same
+port and process, at `/api/live/drafts/{id}`; there is no second port. The
+proxy must pass WebSocket upgrades on to the web container (`Upgrade` and
+`Connection` headers; in nginx `proxy_http_version 1.1`,
+`proxy_set_header Upgrade $http_upgrade` and
+`proxy_set_header Connection "upgrade"`; Caddy and Traefik do it on their
+own) and keep idle connections open for at least a minute (the server pings
+every 30 seconds). Live connections are kept in the one web process's
+memory: run one web container, not several behind a load balancer.
+
 ## Contributing
 
 **No rulebook text in this repository, including tests, fixtures and

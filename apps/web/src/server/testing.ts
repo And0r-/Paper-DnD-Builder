@@ -107,6 +107,11 @@ export class Client {
     return res;
   }
 
+  /** The session cookie as a `Cookie` header, for a WebSocket handshake. */
+  get cookieHeader(): string | undefined {
+    return this.cookie;
+  }
+
   get hasSession(): boolean {
     return this.cookie !== undefined;
   }

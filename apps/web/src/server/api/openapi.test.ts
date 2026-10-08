@@ -92,7 +92,9 @@ describe("openapi.json", () => {
     const server = [
       ...ROUTES.map((r) => `${r.method} ${toSpecPath(r.path)}`),
       "GET /api/health",
-      // Outside the router: app/api/docs, app/api/openapi.json, app/mcp and app/downloads/builder-mcp.zip.
+      // Outside the router: app/api/docs, app/api/openapi.json, app/mcp, app/downloads/builder-mcp.zip
+      // and the live channel's WebSocket (src/server/live).
+      "GET /api/live/drafts/{id}",
       "GET /api/docs",
       "GET /api/openapi.json",
       "GET /mcp",
@@ -258,6 +260,7 @@ describe("openapi.json", () => {
         "gameMasterOnly",
         "playerNotFound",
         "inviteNotFound",
+        "helpLinkNotFound",
         "ownerOnly",
         "copyNotFound",
         "valueNotFound",
@@ -562,6 +565,23 @@ async function walk(server: TestServer): Promise<void> {
   await mate.call("PATCH", cp, { name: "Meine" });
   await call("GET", cp);
   await call("GET", `/api/drafts/${theirs}`, undefined, k);
+  // The player asks someone else for help with a help link; the game master needs none.
+  const dp = `/api/drafts/${theirs}/help-link`;
+  await call("POST", dp);
+  await mate.call("GET", dp);
+  const help = (await mate.call("POST", dp)).json.helpLink.token as string;
+  await mate.call("GET", dp);
+  const helper = new Client(server, "198.51.100.22");
+  await signIn(helper, "helper@example.org");
+  await helper.call("GET", `/api/help/${help}`);
+  await helper.call("GET", "/api/help/AAAAAAAAAAAAAAAAAAAAAA");
+  await helper.call("GET", `/api/drafts/${theirs}?help=${help}`);
+  await helper.call("PUT", `/api/drafts/${theirs}/answers/folk?help=${help}`, {
+    version: 1,
+    answer: { pick: "folk.hillfolk" },
+  });
+  await mate.call("DELETE", dp);
+  await helper.call("GET", `/api/drafts/${theirs}?help=${help}`);
   await call("DELETE", `/api/drafts/${theirs}`, undefined, k);
   await call("PUT", `/api/drafts/${theirs}/campaign`, { campaignId: null }, k);
   await call("POST", "/api/drafts", { packageId: "demo", campaignId: campaign.id }, k);

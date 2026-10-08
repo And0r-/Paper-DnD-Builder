@@ -182,6 +182,8 @@ export const campaignRoutes: Route[] = [
     handler: async (ctx) => {
       const { campaign, viewer } = await loadLedCampaign(ctx);
       await ctx.app.store.deleteCampaign(campaign.id, viewer.id);
+      // The game master no longer reaches the players' characters, also not live.
+      ctx.app.draftEvents.publish({ kind: "access" });
       return json(204, null);
     },
   },
@@ -208,10 +210,12 @@ export const campaignRoutes: Route[] = [
       if (!campaign.leading) {
         if (playerId !== "me" && playerId !== viewer.id) throw new HttpError(403, "gameMasterOnly");
         await ctx.app.store.removePlayer(campaign.id, viewer.id);
+        ctx.app.draftEvents.publish({ kind: "access" });
         return json(204, null);
       }
       const removed = UUID.test(playerId) && (await ctx.app.store.removePlayer(campaign.id, playerId));
       if (!removed) throw new HttpError(404, "playerNotFound");
+      ctx.app.draftEvents.publish({ kind: "access" });
       return json(204, null);
     },
   },
