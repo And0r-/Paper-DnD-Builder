@@ -94,7 +94,10 @@ export interface Account {
 /** A password as the settings list it; the password itself is shown only when it is made. */
 export interface PasswordInfo {
   id: string;
-  name: string;
+  /** Null: the screen names it, by `origin` or by its day. */
+  name: string | null;
+  /** Made by the server: the first one, or one from a link back in. */
+  origin: "first" | "reset" | null;
   createdAt: string;
 }
 

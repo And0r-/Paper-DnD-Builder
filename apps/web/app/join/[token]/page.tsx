@@ -88,6 +88,7 @@ export default function JoinPage() {
         </h1>
         <FreshPassword
           secret={fresh.secret}
+          noMail={!fresh.account.email}
           onDone={() => {
             app.setAccount(fresh.account);
             setFresh(undefined);
@@ -132,7 +133,7 @@ export default function JoinPage() {
           <h1 className="auth__title" id="join-title">
             {t("join.title", { gameMaster: invite.gameMaster.name, name: invite.campaign.name })}
           </h1>
-          <p className="auth__intro">{t("join.text")}</p>
+          <p className="auth__intro">{t("join.text", { gameMaster: invite.gameMaster.name })}</p>
           {account && (
             <>
               {errorBox}

@@ -50,7 +50,7 @@ test("lost password: a link by mail shows a new password, once", async ({ page, 
 
   // The link shows a new password and logs in.
   await lost.goto(path);
-  const shown = lost.getByRole("region", { name: m["password.welcome"].replace("{name}", "Kim") });
+  const shown = lost.getByRole("region", { name: m["password.welcomeBack"].replace("{name}", "Kim") });
   const fresh = (await shown.locator(".copy-text__value").textContent())!.trim();
   expect(fresh).toMatch(/^[a-zäöüß]+(?:-[a-zäöüß]+){4}-\d{4}$/);
   expect(fresh).not.toBe(first);

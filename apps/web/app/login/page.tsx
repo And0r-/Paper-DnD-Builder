@@ -55,7 +55,8 @@ export default function LoginPage() {
   const [resent, setResent] = useState(false);
   // A password just made: shown until the player says they have it. The
   // account is taken over only then, so nothing moves on before.
-  const [fresh, setFresh] = useState<{ account: Account; secret: string }>();
+  // `back`: an account from before, not a new one.
+  const [fresh, setFresh] = useState<{ account: Account; secret: string; back: boolean }>();
   const emailRef = useRef<HTMLInputElement & HTMLTextAreaElement>(null);
   const passwordRef = useRef<HTMLInputElement & HTMLTextAreaElement>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
@@ -122,8 +123,8 @@ export default function LoginPage() {
     return false;
   };
 
-  const showFresh = (r: { account: Account; password: FreshPasswordInfo }) => {
-    setFresh({ account: r.account, secret: r.password.secret });
+  const showFresh = (r: { account: Account; password: FreshPasswordInfo }, back = false) => {
+    setFresh({ account: r.account, secret: r.password.secret, back });
     setPassword("");
     focusHeading();
   };
@@ -163,6 +164,7 @@ export default function LoginPage() {
           email: email.trim(),
           password: password.trim(),
         }),
+        true,
       );
     } catch (error) {
       const err = failure(error);
@@ -267,10 +269,11 @@ export default function LoginPage() {
         {fresh ? (
           <section className="auth__card" aria-labelledby="fresh-title">
             <h1 className="auth__title" id="fresh-title" tabIndex={-1} ref={headingRef}>
-              {t("password.welcome", { name: fresh.account.name })}
+              {t(fresh.back ? "password.welcomeBack" : "password.welcome", { name: fresh.account.name })}
             </h1>
             <FreshPassword
               secret={fresh.secret}
+              noMail={!fresh.account.email}
               onDone={() => {
                 app.setAccount(fresh.account);
                 router.replace(nextPath());
@@ -282,7 +285,7 @@ export default function LoginPage() {
             title={t("login.title")}
             intro={t("login.intro")}
             headingRef={headingRef}
-            onStarted={showFresh}
+            onStarted={(r) => showFresh(r)}
             footer={
               <p className="auth__switch">
                 <button type="button" className="link-button" onClick={() => go("login")}>
@@ -324,12 +327,13 @@ export default function LoginPage() {
               {t("login.lostTitle")}
             </h1>
             <p className="auth__intro">{t("login.lostIntro")}</p>
+            {/* Before the field: the server always answers "on its way", so after sending it is too late to learn this. */}
+            <Callout tone="info">{t("login.lostNoMail")}</Callout>
             {emailField(t("login.lostEmailLabel"))}
             {errorBox}
             <Button type="submit" block busy={busy} busyLabel={t("login.lostSending")}>
               {t("login.lostSend")}
             </Button>
-            <p className="auth__small">{t("login.lostNoMail")}</p>
             <p className="auth__switch">
               <button type="button" className="link-button" onClick={() => go("login")}>
                 {t("login.toLogin")}

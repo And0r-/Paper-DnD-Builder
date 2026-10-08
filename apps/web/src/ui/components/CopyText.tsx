@@ -4,9 +4,30 @@
  * Copy button. Without a clipboard (plain HTTP) the text is selected, so it
  * can be copied by hand.
  */
-import { useId, useRef, useState } from "react";
+import { Fragment, useId, useRef, useState } from "react";
 import { useApp } from "../app-state.tsx";
 import { Button } from "./Button.tsx";
+
+/**
+ * A password's words, so a line breaks only before a hyphen, never after
+ * it: "silo-" at a line end would leave unclear whether the hyphen belongs
+ * to the password. The text itself keeps plain hyphens, so copying by hand
+ * gives the password as it is.
+ */
+function wordsOf(value: string) {
+  const [first, ...rest] = value.split("-");
+  return (
+    <>
+      {first}
+      {rest.map((word, i) => (
+        <Fragment key={i}>
+          <wbr />
+          <span className="copy-text__word">-{word}</span>
+        </Fragment>
+      ))}
+    </>
+  );
+}
 
 /** `large`: a password to write down, big enough to read letter by letter. */
 export function CopyText({ label, value, large }: { label: string; value: string; large?: boolean }) {
@@ -21,7 +42,7 @@ export function CopyText({ label, value, large }: { label: string; value: string
       </p>
       <div className="copy-text__row">
         <pre className="copy-text__value" aria-labelledby={labelId} tabIndex={0} translate="no">
-          <code ref={ref}>{value}</code>
+          <code ref={ref}>{large ? wordsOf(value) : value}</code>
         </pre>
         <Button
           variant="secondary"

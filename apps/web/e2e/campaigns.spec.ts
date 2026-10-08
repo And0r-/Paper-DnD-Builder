@@ -106,7 +106,7 @@ test("game master, newcomer, player with an account and a stranger", async ({ pa
       name: m["join.title"].replace("{gameMaster}", gmName).replace("{name}", campaignName),
     }),
   ).toBeVisible();
-  await expect(p2.getByText(m["join.text"])).toBeVisible();
+  await expect(p2.getByText(m["join.text"].replaceAll("{gameMaster}", gmName))).toBeVisible();
   await expectOneLanguage(p2, "de");
   await noAxeViolations(p2);
   await shot(p2, "95-einladung-neuling");

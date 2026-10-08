@@ -1391,6 +1391,10 @@ textarea.field__input {
   font-weight: var(--weight-semibold);
 }
 
+.copy-text__word {
+  white-space: nowrap;
+}
+
 .copy-text__value:focus-visible {
   outline: var(--focus-ring);
   outline-offset: 2px;
