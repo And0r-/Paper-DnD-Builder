@@ -8,11 +8,20 @@ import {
   MAX_KEYS_PER_ACCOUNT,
   newAccessKey,
 } from "../../auth/access-keys.ts";
-import { publicAccount, renewPassword, UI_LANGUAGES } from "../../auth/accounts.ts";
+import {
+  defaultPasswordName,
+  emailSchema,
+  makePassword,
+  MAX_PASSWORDS_PER_ACCOUNT,
+  nameSchema,
+  publicAccount,
+  UI_LANGUAGES,
+} from "../../auth/accounts.ts";
 import { clearSessionCookie } from "../../auth/session.ts";
 import { HttpError, json, readJson } from "../http.ts";
 import type { RequestContext, Route } from "../router.ts";
 import type { AccessKeyRow } from "../../store.ts";
+import { freshPassword, publicPassword } from "./auth.ts";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
@@ -53,6 +62,9 @@ async function makeKey(ctx: RequestContext, accountId: string, name: string) {
 }
 
 const settingsSchema = z.strictObject({
+  name: nameSchema.optional(),
+  /** The address for a way back in; `null` removes it. */
+  email: emailSchema.nullable().optional(),
   language: z.enum(UI_LANGUAGES).optional(),
   /** Unit per dimension; `null` goes back to the language's default. */
   units: z.record(z.string().max(50), z.string().max(20).nullable()).optional(),
@@ -92,6 +104,13 @@ export const accountRoutes: Route[] = [
       if (design !== undefined && !SHEET_DESIGNS.some((d) => d.id === design)) {
         throw new HttpError(422, "designNotAvailable", { design });
       }
+      if (body.name !== undefined || body.email !== undefined) {
+        await ctx.app.store.updateIdentity(
+          account.id,
+          body.name ?? account.name,
+          body.email === undefined ? account.email : body.email,
+        );
+      }
       const updated = await ctx.app.store.updateSettings(
         account.id,
         body.language ?? account.language,
@@ -102,12 +121,44 @@ export const accountRoutes: Route[] = [
     },
   },
   {
+    method: "GET",
+    path: "/api/account/passwords",
+    handler: async (ctx) => {
+      const { account } = await ctx.requireSession();
+      const passwords = await ctx.app.store.listPasswords(account.id);
+      return json(200, { passwords: passwords.map(publicPassword) });
+    },
+  },
+  {
+    // The password is in this answer and nowhere else; the server keeps only its hash.
     method: "POST",
-    path: "/api/account/password",
+    path: "/api/account/passwords",
     handler: async (ctx) => {
       const session = await ctx.requireSession();
-      await renewPassword(ctx.app, session.account, session.id);
-      return json(202, { status: "sent" });
+      // Only the person makes passwords: a leaked key cannot turn itself into a login.
+      if (session.via === "key") throw new HttpError(403, "keyCannotMakePasswords");
+      const body = await readJson(ctx.req, z.strictObject({ name: nameSchema.optional() }));
+      const made = await makePassword(
+        ctx.app,
+        session.account,
+        body.name ?? defaultPasswordName(ctx.app.now()),
+      );
+      if (!made) throw new HttpError(422, "tooManyPasswords", { max: MAX_PASSWORDS_PER_ACCOUNT });
+      return json(201, { password: freshPassword(made) });
+    },
+  },
+  {
+    // Stops working at once. The last one stays: without it, nobody gets back in.
+    method: "DELETE",
+    path: "/api/account/passwords/:id",
+    handler: async (ctx) => {
+      const { account } = await ctx.requireSession();
+      const id = ctx.params["id"]!;
+      const result = UUID.test(id) ? await ctx.app.store.deletePassword(id, account.id) : "missing";
+      // Someone else's password looks exactly like a missing one.
+      if (result === "missing") throw new HttpError(404, "passwordNotFound");
+      if (result === "last") throw new HttpError(422, "lastPassword");
+      return json(204, null);
     },
   },
   {
@@ -147,15 +198,14 @@ export const accountRoutes: Route[] = [
     },
   },
   {
-    // "Delete my account" deletes everything: account, sessions, access keys, every draft.
+    // "Delete my account" deletes everything: account, sessions, passwords, access keys, every draft.
     method: "DELETE",
     path: "/api/account",
     handler: async (ctx) => {
       const { account } = await ctx.requireSession();
       await readJson(ctx.req, z.strictObject({ confirm: z.literal(true) }));
       await ctx.app.store.deleteAccount(account.id);
-      ctx.app.limiter.reset(`login:account:${account.email}`);
-      ctx.app.limiter.reset(`password:account:${account.email}`);
+      if (account.email) ctx.app.limiter.reset(`login:account:${account.email}`);
       ctx.responseHeaders.delete("Set-Cookie");
       return json(204, null, { "Set-Cookie": clearSessionCookie(ctx.app.config.secureCookies) });
     },

@@ -6,11 +6,11 @@ import AxeBuilder from "@axe-core/playwright";
 import { devices, type Page } from "@playwright/test";
 import m from "../src/i18n/messages/de.json" with { type: "json" };
 import en from "../src/i18n/messages/en.json" with { type: "json" };
-import { expect, expectOneLanguage, login, makeLeveled, shot, test, uniqueEmail } from "./helpers.ts";
+import { expect, expectOneLanguage, makeLeveled, shot, signup, test } from "./helpers.ts";
 
 test("the level screen: one number field, starting at 1", async ({ page, foreign }) => {
   void foreign;
-  await login(page, uniqueEmail("levels"));
+  await signup(page, "levels");
   await page.getByRole("link", { name: m["characters.emptyAction"] }).click();
   await expect(
     page.getByRole("heading", { level: 1, name: "Welche Stufe hat dein Charakter?" }),
@@ -63,7 +63,7 @@ test("the level screen: one number field, starting at 1", async ({ page, foreign
 
 test("lowering the level asks first, and says which choices drop out", async ({ page, foreign }) => {
   void foreign;
-  await login(page, uniqueEmail("level-lower"));
+  await signup(page, "level-lower");
   const id = await makeLeveled(page, 5);
   await page.goto(`/c/${id}/level`);
   const field = page.getByRole("spinbutton", { name: "Stufe" });
@@ -93,7 +93,7 @@ test.describe("in English, on a large screen", () => {
 
   test("the same one field", async ({ page, foreign }) => {
     void foreign;
-    await login(page, uniqueEmail("levels-en"), "en");
+    await signup(page, "levels-en", "en");
     await page.getByRole("link", { name: en["characters.emptyAction"] }).click();
     await expect(
       page.getByRole("heading", { level: 1, name: "What level is your character?" }),
@@ -110,7 +110,7 @@ test.describe("in English, on a large screen", () => {
 
 test("raising values: old value, points, new value, and why a row is full", async ({ page, foreign }) => {
   void foreign;
-  await login(page, uniqueEmail("raise"));
+  await signup(page, "raise");
   // Level 20, everything recommended up to the boon of level 16: heart is at its limit 15 by then.
   const id = await makeLeveled(page, 20, "calling.lantern-bearer", "boon-raise@boon-16");
   await page.goto(`/c/${id}/step/${encodeURIComponent("boon-raise@boon-16")}`);
@@ -184,7 +184,7 @@ async function openMenu(page: Page) {
 
 test("a long build: the step list groups the steps a higher level brings", async ({ page, foreign }) => {
   void foreign;
-  await login(page, uniqueEmail("steplist"));
+  await signup(page, "steplist");
   const id = await makeLeveled(page, 20, "calling.lantern-bearer", "boon-raise@boon-8");
   await page.goto(`/c/${id}/step/${encodeURIComponent("boon-raise@boon-8")}`);
   await openMenu(page);

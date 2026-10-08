@@ -3,8 +3,8 @@
  *
  * - a `test` whose browser records every request and fails the test if one
  *   leaves the builder's own origin (plan: no calls to other domains),
- * - login through the real screens, with the password read from the mail
- *   folder,
+ * - sign-up and login through the real screens, with the password read
+ *   from the screen that shows it once,
  * - the one-language check: no text of the other language on screen.
  */
 import { expect, test as base, type APIResponse, type Page } from "@playwright/test";
@@ -46,19 +46,15 @@ export function uniqueEmail(tag: string): string {
   return `${tag}-${Date.now()}-${Math.floor(Math.random() * 1e6)}@example.test`;
 }
 
-/** The newest password mailed to an address (the outbox folder stands in for SMTP). */
-export async function passwordFor(email: string): Promise<string> {
+/** The newest mail to an address (the outbox folder stands in for SMTP); passwords are never mailed. */
+export async function mailTo(email: string): Promise<string> {
   for (let i = 0; i < 50; i++) {
     const files = (await readdir(OUTBOX).catch(() => [])).filter((f) => f.includes(email)).sort();
     const last = files.at(-1);
-    if (last) {
-      const text = await readFile(join(OUTBOX, last), "utf8");
-      const m = /: ([a-zäöüß]+(?:-[a-zäöüß]+){3}-\d{4})$/m.exec(text);
-      if (m) return m[1]!;
-    }
+    if (last) return readFile(join(OUTBOX, last), "utf8");
     await new Promise((r) => setTimeout(r, 100));
   }
-  throw new Error(`no password mail to ${email}`);
+  throw new Error(`no mail to ${email}`);
 }
 
 /** Switches the language with the switch in the top bar, which every screen has (AND-153). */
@@ -69,16 +65,39 @@ export async function chooseLanguage(page: Page, lang: "de" | "en"): Promise<voi
   await expect(page.locator("html")).toHaveAttribute("lang", lang);
 }
 
-/** Logs in through the screens: address, mail, password. Ends on "My characters". */
-export async function login(page: Page, email: string, lang: "de" | "en" = "de"): Promise<void> {
+/**
+ * Gets started through the screens: a name (and an address, if given), the
+ * password shown once, "I have saved it". Ends on "My characters" and
+ * returns the password, for a second browser to log in with.
+ */
+export async function signup(
+  page: Page,
+  name: string,
+  lang: "de" | "en" = "de",
+  email?: string,
+): Promise<string> {
   const m = lang === "de" ? de : en;
   await page.goto("/login");
   if (lang === "en") await chooseLanguage(page, "en");
   await expect(page.getByRole("heading", { name: m["login.title"] })).toBeVisible();
-  await page.getByLabel(m["login.emailLabel"]).fill(email);
-  await page.getByRole("button", { name: m["login.send"] }).click();
-  await expect(page.getByRole("heading", { name: m["login.checkTitle"] })).toBeVisible();
-  await page.getByLabel(m["login.passwordLabel"]).fill(await passwordFor(email));
+  await page.getByLabel(m["login.nameLabel"]).fill(name);
+  if (email) await page.getByLabel(m["login.emailLabel"]).fill(email);
+  await page.getByRole("button", { name: m["login.start"] }).click();
+  const shown = page.getByRole("region", { name: m["password.welcome"].replace("{name}", name) });
+  const password = (await shown.locator(".copy-text__value").textContent())!.trim();
+  await shown.getByRole("button", { name: m["password.done"] }).click();
+  await expect(page.getByRole("heading", { name: m["characters.title"], level: 1 })).toBeVisible();
+  return password;
+}
+
+/** Logs in through the screens with the password alone. Ends on "My characters". */
+export async function login(page: Page, password: string, lang: "de" | "en" = "de"): Promise<void> {
+  const m = lang === "de" ? de : en;
+  await page.goto("/login");
+  if (lang === "en") await chooseLanguage(page, "en");
+  await page.getByRole("button", { name: m["login.havePassword"] }).click();
+  await expect(page.getByRole("heading", { name: m["login.haveTitle"] })).toBeVisible();
+  await page.getByLabel(m["login.passwordLabel"]).fill(password);
   await page.getByRole("button", { name: m["login.submit"], exact: true }).click();
   await expect(page.getByRole("heading", { name: m["characters.title"], level: 1 })).toBeVisible();
 }

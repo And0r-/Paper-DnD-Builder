@@ -8,7 +8,8 @@ export type TextValue = string | string[] | null;
 export type Texts = Record<string, TextValue>;
 
 export interface Account {
-  email: string;
+  name: string;
+  email: string | null;
   language: string;
   units: Record<string, string>;
 }

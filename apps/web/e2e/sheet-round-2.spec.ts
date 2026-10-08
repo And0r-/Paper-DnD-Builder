@@ -8,7 +8,7 @@
  */
 import { devices, type Locator, type Page } from "@playwright/test";
 import m from "../src/i18n/messages/de.json" with { type: "json" };
-import { expect, login, makeCharacter, makeLeveled, test, uniqueEmail } from "./helpers.ts";
+import { expect, makeCharacter, makeLeveled, signup, test } from "./helpers.ts";
 
 const DESIGNS = ["classic", "verbose"] as const;
 const { defaultBrowserType: _desk, ...desk } = devices["Desktop Chrome"];
@@ -92,7 +92,7 @@ test.describe("at a desk", () => {
 
   for (const level of [3, 20]) {
     test(`as many pages as the PDF, original and copy, both designs (level ${level})`, async ({ page }) => {
-      await login(page, uniqueEmail("sheet-pages"));
+      await signup(page, "sheet-pages");
       const id = await finished(page, level);
       const { copy } = await longCopy(page, id);
       for (const design of DESIGNS) {
@@ -114,7 +114,7 @@ test.describe("at a desk", () => {
   }
 
   test("verbose: the rolls on page 1 at level 20, as in the PDF", async ({ page }) => {
-    await login(page, uniqueEmail("sheet-rolls"));
+    await signup(page, "sheet-rolls");
     const id = await finished(page, 20);
     const sheet = await openSheet(page, id, "verbose");
     await expect
@@ -133,7 +133,7 @@ test.describe("at a desk", () => {
   test("classic, a copy with many rows: page 1 stays A4, the gear goes on under its title, continued", async ({
     page,
   }) => {
-    await login(page, uniqueEmail("sheet-gear"));
+    await signup(page, "sheet-gear");
     const id = await finished(page, 20);
     const { copy, gear } = await longCopy(page, id);
     const sheet = await openSheet(page, id, "classic", copy);
@@ -167,7 +167,7 @@ test.describe("at a desk", () => {
   test("lines from the play state right under the entries, as high as them, both designs", async ({
     page,
   }) => {
-    await login(page, uniqueEmail("sheet-lines"));
+    await signup(page, "sheet-lines");
     const id = await finished(page, 3);
     const gear = (await longCopy(page, id)).gear;
     for (const design of DESIGNS) {
@@ -184,7 +184,7 @@ test.describe("at a desk", () => {
   });
 
   test("the bar right under the top bar, the style whole in the top bar, the name once", async ({ page }) => {
-    await login(page, uniqueEmail("sheet-bar"));
+    await signup(page, "sheet-bar");
     const id = await finished(page, 3);
     for (const design of DESIGNS) {
       await openSheet(page, id, design);
@@ -210,7 +210,7 @@ test.describe("on a phone", () => {
   test("the menu: one word for the style, the original named as in the download, buttons at one edge; clearing closes it", async ({
     page,
   }) => {
-    await login(page, uniqueEmail("sheet-menu-2"));
+    await signup(page, "sheet-menu-2");
     const id = await finished(page, 3);
     await page.request.post(`/api/drafts/${id}/sheet-copies`, { data: {} });
     const sheet = await openSheet(page, id, "classic");
@@ -259,7 +259,7 @@ test.describe("on a phone", () => {
   });
 
   test("the download dialog names the original as the menu does", async ({ page }) => {
-    await login(page, uniqueEmail("sheet-original"));
+    await signup(page, "sheet-original");
     const id = await finished(page, 3);
     await page.request.post(`/api/drafts/${id}/sheet-copies`, { data: {} });
     await openSheet(page, id, "classic");

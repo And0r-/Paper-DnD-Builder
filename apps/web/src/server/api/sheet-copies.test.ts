@@ -7,7 +7,7 @@
  */
 import { sheetModelSchema } from "@builder/sheet";
 import { beforeEach, describe, expect, it } from "vitest";
-import { Client, passwordFromMail, signIn, startTestServer, type TestServer } from "../testing.ts";
+import { Client, signIn, startTestServer, type TestServer } from "../testing.ts";
 import { MAX_COPIES_PER_CHARACTER, MAX_COPY_BYTES } from "./routes/sheet-copies.ts";
 
 let server: TestServer;
@@ -24,13 +24,12 @@ beforeEach(async () => {
   gm = new Client(server, "203.0.113.1");
   player = new Client(server, "203.0.113.2");
   stranger = new Client(server, "203.0.113.3");
-  await signIn(gm, server, "lead@example.org");
-  await signIn(stranger, server, "stranger@example.org");
+  await signIn(gm, "lead@example.org");
+  await signIn(stranger, "stranger@example.org");
+  await signIn(player, PLAYER);
   const campaign = (await gm.call("POST", "/api/campaigns", { name: "Die Nebelrunde" })).json.campaign;
   campaignId = campaign.id;
   await gm.call("POST", `/api/campaigns/${campaign.id}/players`, { email: PLAYER, language: "de" });
-  const password = passwordFromMail(server.mails, PLAYER);
-  expect((await player.call("POST", "/api/auth/login", { email: PLAYER, password })).status).toBe(200);
   id = (await finished(3)).draft.id;
 });
 

@@ -5,11 +5,11 @@
  * cut back to the range on leaving, as before.
  */
 import m from "../src/i18n/messages/de.json" with { type: "json" };
-import { expect, login, makeLeveled, shot, test, uniqueEmail } from "./helpers.ts";
+import { expect, makeLeveled, shot, signup, test } from "./helpers.ts";
 
 test("new build: a typed level stands in the top bar before Next", async ({ page, foreign }) => {
   void foreign;
-  await login(page, uniqueEmail("typed-level"));
+  await signup(page, "typed-level");
   await page.getByRole("link", { name: m["characters.emptyAction"] }).click();
   const field = page.getByRole("spinbutton", { name: "Stufe" });
   const level = page.locator(".topbar__character");
@@ -44,7 +44,7 @@ test("new build: a typed level stands in the top bar before Next", async ({ page
 
 test("level up: the button and the hint name the typed level at once", async ({ page, foreign }) => {
   void foreign;
-  await login(page, uniqueEmail("typed-raise"));
+  await signup(page, "typed-raise");
   const id = await makeLeveled(page, 3);
   const view = (await (await page.request.get(`/api/drafts/${id}`)).json()) as {
     draft: { version: number };

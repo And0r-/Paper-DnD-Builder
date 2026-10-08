@@ -16,7 +16,7 @@ let client: Client;
 beforeEach(async () => {
   server = await startTestServer();
   client = new Client(server);
-  await signIn(client, server, "player@example.org");
+  await signIn(client, "player@example.org");
 });
 
 interface ChoiceState {
@@ -122,7 +122,7 @@ describe("GET /api/drafts/:id/explain/:value", () => {
       expect(res.json.error.code).toBe("valueNotFound");
     }
     const other = new Client(server, "198.51.100.30");
-    await signIn(other, server, "other@example.org");
+    await signIn(other, "other@example.org");
     const theirs = await other.call("GET", `/api/drafts/${id}/explain/might`);
     expect(theirs.status).toBe(404);
     expect(theirs.json.error.code).toBe("draftNotFound");

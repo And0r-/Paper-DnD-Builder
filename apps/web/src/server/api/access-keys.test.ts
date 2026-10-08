@@ -13,7 +13,7 @@ let owner: Client;
 beforeEach(async () => {
   server = await startTestServer();
   owner = new Client(server);
-  await signIn(owner, server, "owner@example.org");
+  await signIn(owner, "owner@example.org");
 });
 
 async function makeKey(
@@ -205,7 +205,7 @@ describe("making, listing and withdrawing keys", () => {
 
   it("is judged by the key alone, never by a cookie sent along", async () => {
     const stranger = new Client(server, "198.51.100.9");
-    await signIn(stranger, server, "stranger@example.org");
+    await signIn(stranger, "stranger@example.org");
     const key = await makeKey();
     const res = await stranger.call("GET", "/api/account", undefined, {
       authorization: `Bearer ${key.secret}`,
@@ -215,7 +215,7 @@ describe("making, listing and withdrawing keys", () => {
 
   it("sees only its own account", async () => {
     const stranger = new Client(server, "198.51.100.9");
-    await signIn(stranger, server, "stranger@example.org");
+    await signIn(stranger, "stranger@example.org");
     const theirs = (await stranger.call("POST", "/api/drafts", { packageId: "demo" })).json.draft.id;
     const theirKey = await makeKey(stranger);
 

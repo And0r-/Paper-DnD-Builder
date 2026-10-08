@@ -7,7 +7,7 @@
  */
 import { devices, type Locator, type Page } from "@playwright/test";
 import m from "../src/i18n/messages/de.json" with { type: "json" };
-import { expect, login, makeCharacter, makeLeveled, test, uniqueEmail } from "./helpers.ts";
+import { expect, makeCharacter, makeLeveled, signup, test } from "./helpers.ts";
 
 const { defaultBrowserType: _desk, ...desk } = devices["Desktop Chrome"];
 const A4 = (297 / 25.4) * 96;
@@ -43,7 +43,7 @@ for (const width of [1280, 1440]) {
       test(`classic, level 3 with a short apart part (${lang}): its rest under page 2 in one column of half the page`, async ({
         page,
       }) => {
-        await login(page, uniqueEmail("sheet-apart"), lang);
+        await signup(page, "sheet-apart", lang);
         const id = await finished(page, 3);
         const sheet = await openSheet(page, id, "classic");
         const pages = sheet.locator(".csheet__page");
@@ -69,7 +69,7 @@ for (const width of [1280, 1440]) {
       });
 
       test(`classic, level 20 (${lang}): page 1 stays A4, also after a reload`, async ({ page }) => {
-        await login(page, uniqueEmail("sheet-a4"), lang);
+        await signup(page, "sheet-a4", lang);
         const id = await finished(page, 20);
         for (let run = 0; run < 3; run++) {
           const sheet = await openSheet(page, id, "classic");
@@ -87,7 +87,7 @@ for (const width of [1280, 1440]) {
     test("version and style in the top bar: a fixed width, a long name cut with …, whole when opened", async ({
       page,
     }) => {
-      await login(page, uniqueEmail("sheet-bar-name"));
+      await signup(page, "sheet-bar-name");
       const id = await finished(page, 3);
       const made = (await (
         await page.request.post(`/api/drafts/${id}/sheet-copies`, { data: {} })
@@ -141,7 +141,7 @@ test.describe("on a phone", () => {
   test.use({ viewport: { width: 390, height: 844 } });
 
   test("a copy's footer wraps with its dots at the end of a line, never at the start", async ({ page }) => {
-    await login(page, uniqueEmail("sheet-footer-dot"));
+    await signup(page, "sheet-footer-dot");
     const id = await finished(page, 3);
     const made = (await (await page.request.post(`/api/drafts/${id}/sheet-copies`, { data: {} })).json()) as {
       copy: { id: string };

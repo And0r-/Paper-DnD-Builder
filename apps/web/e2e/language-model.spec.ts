@@ -10,7 +10,7 @@ import { unzipSync, strFromU8 } from "fflate";
 import { readFile } from "node:fs/promises";
 import de from "../src/i18n/messages/de.json" with { type: "json" };
 import en from "../src/i18n/messages/en.json" with { type: "json" };
-import { chooseLanguage, expect, expectOneLanguage, login, shot, test, uniqueEmail } from "./helpers.ts";
+import { chooseLanguage, expect, expectOneLanguage, shot, signup, test } from "./helpers.ts";
 
 const ZIP = "/downloads/builder-mcp.zip";
 
@@ -70,7 +70,7 @@ for (const lang of ["de", "en"] as const) {
     foreign,
   }) => {
     void foreign;
-    await login(page, uniqueEmail(`mcp-${lang}`), lang);
+    await signup(page, `mcp-${lang}`, lang);
     await page.goto("/settings");
     // The old section is gone: no zip link in the settings, a sentence leads to the MCP page.
     await expect(page.getByRole("heading", { name: m["settings.keys"] })).toBeVisible();
@@ -108,7 +108,7 @@ test.describe("desktop", () => {
     const m = lang === "de" ? de : en;
     test(`${lang}: the MCP page on a large screen, logged in`, async ({ page, foreign }) => {
       void foreign;
-      await login(page, uniqueEmail(`mcp-desk-${lang}`), lang);
+      await signup(page, `mcp-desk-${lang}`, lang);
       await page.goto("/mcp/setup");
       await expect(page.getByRole("heading", { name: m["mcp.title"], level: 1 })).toBeVisible();
       await expect(page.getByRole("link", { name: m["mcp.download"] })).toHaveAttribute("href", ZIP);
@@ -149,7 +149,7 @@ test("the zip and /mcp without a login; /mcp with a key", async ({ page, playwri
   expect(opened.headers()["location"]).toBe("/mcp/setup");
 
   // With a key made in the settings, the tools answer.
-  await login(page, uniqueEmail("mcp-http"), "en");
+  await signup(page, "mcp-http", "en");
   const made = await page.request.post("/api/account/keys", {
     headers: { origin: new URL(baseURL!).origin },
     data: { name: "Language model" },

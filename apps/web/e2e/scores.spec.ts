@@ -9,7 +9,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import type { Page } from "@playwright/test";
 import { join } from "node:path";
-import { chooseLanguage, expect, login, shot, SHOTS, test, uniqueEmail } from "./helpers.ts";
+import { chooseLanguage, expect, shot, SHOTS, signup, test } from "./helpers.ts";
 
 async function axe(page: Page) {
   const r = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"]).analyze();
@@ -44,7 +44,7 @@ async function bellTowerDraft(page: Page, more: [string, unknown][] = []): Promi
 const row = (page: Page, name: string) => page.locator(".pointbuy__row", { hasText: name });
 
 test("scores: each row says what its number does for this calling", async ({ page }) => {
-  await login(page, uniqueEmail("scores"));
+  await signup(page, "scores");
   const id = await bellTowerDraft(page);
   await page.goto(`/c/${id}/step/scores`);
   await expect(
@@ -76,7 +76,7 @@ test("scores: each row says what its number does for this calling", async ({ pag
 });
 
 test("the upbringing's gift comes after the scores and reads as a sum", async ({ page }) => {
-  await login(page, uniqueEmail("gifts"));
+  await signup(page, "gifts");
   const id = await bellTowerDraft(page, [
     ["scores", { method: 0, assign: { mightBase: 8, graceBase: 7, witBase: 9, heartBase: 11 } }],
   ]);
@@ -108,7 +108,7 @@ test("the upbringing's gift comes after the scores and reads as a sum", async ({
 });
 
 test("overview: each score summed up once, every part named", async ({ page }) => {
-  await login(page, uniqueEmail("scores-overview"));
+  await signup(page, "scores-overview");
   const id = await bellTowerDraft(page, [
     ["talents-lantern-bearer", { picks: ["talent.mending", "talent.climbing"] }],
     ["gear", { pick: "item.reed-shield" }],
@@ -138,7 +138,7 @@ test("overview: each score summed up once, every part named", async ({ page }) =
 });
 
 test("in English the same rows, only English", async ({ page }) => {
-  await login(page, uniqueEmail("scores-en"));
+  await signup(page, "scores-en");
   const id = await bellTowerDraft(page);
   await page.goto("/settings");
   await chooseLanguage(page, "en");

@@ -2,17 +2,26 @@
  * Generated passwords and their hashes.
  *
  * Nobody chooses a password. The server makes one like
- * `anker-falke-wiese-7320`: four different words from the list of the
- * player's language and a four-digit number, all drawn with the operating
- * system's cryptographic random generator. With lists of 700+ words that is
- * more than 50 bits, far beyond what an online attacker gets through the
- * rate limits, and expensive offline because only an Argon2id hash is kept.
+ * `anker-falke-wiese-ofen-dach-7320`: five different words from the list of
+ * the player's language and a four-digit number, all drawn with the
+ * operating system's cryptographic random generator. With lists of 700+
+ * words that is about 60 bits (`passwordEntropyBits`).
+ *
+ * A login is the password alone, with no mail address to find the account
+ * by, so the password is looked up by its SHA-256 (`passwordHash`), like an
+ * access key. That is safe because nobody picks the password: 60 random
+ * bits are far beyond what an online attacker gets through the rate limits,
+ * and a leaked database holds only hashes of values too many to try. A
+ * salt would not help: there are no common passwords to precompute.
+ *
+ * Argon2id stays only for accounts from before, which had one password,
+ * looked up by mail address (`verifyPassword`).
  */
 import { hash, verify } from "@node-rs/argon2";
-import { randomInt } from "node:crypto";
+import { createHash, randomInt } from "node:crypto";
 import { WORD_LISTS } from "./words.ts";
 
-export const PASSWORD_WORDS = 4;
+export const PASSWORD_WORDS = 5;
 
 /** Longest input we hash at all; generated passwords are far shorter. Stops hashing huge inputs. */
 export const MAX_PASSWORD_INPUT = 200;
@@ -49,11 +58,16 @@ export function normalizePassword(input: string): string {
 }
 
 /**
- * Argon2id with the OWASP baseline (19 MiB memory, 2 passes, 1 lane). The
+ * Old passwords only. Argon2id with the OWASP baseline (19 MiB memory, 2 passes, 1 lane). The
  * library's default algorithm is Argon2id; the PHC string records the
  * parameters, so they can be raised later without breaking old hashes.
  */
 const ARGON2 = { memoryCost: 19_456, timeCost: 2, parallelism: 1 } as const;
+
+/** The stored form of a password of the new kind: SHA-256 (hex) of the normalised input. */
+export function passwordHash(input: string): string {
+  return createHash("sha256").update(normalizePassword(input)).digest("hex");
+}
 
 export function hashPassword(password: string): Promise<string> {
   return hash(normalizePassword(password), ARGON2);

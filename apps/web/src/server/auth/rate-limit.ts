@@ -69,12 +69,16 @@ export class RateLimiter {
 
 const MINUTE = 60_000;
 
-/** Limits used by the login. Failures are counted per account and per IP; requests for a password per both too. */
+/**
+ * Limits used by the login. Failed logins are counted per IP; failed logins
+ * with an old password (address and password) per address too. New
+ * accounts are counted per IP.
+ */
 export const LIMITS = {
   loginFailuresPerAccount: { max: 10, windowMs: 15 * MINUTE },
   loginFailuresPerIp: { max: 30, windowMs: 15 * MINUTE },
-  passwordMailsPerAccount: { max: 3, windowMs: 60 * MINUTE },
-  passwordMailsPerIp: { max: 10, windowMs: 60 * MINUTE },
+  // A family or a club behind one address signs up together; a script does not get far.
+  signupsPerIp: { max: 10, windowMs: 60 * MINUTE },
   // A game master adds a group at a time; a loop cannot turn the builder into a mail cannon.
   invitationsPerAccount: { max: 30, windowMs: 60 * MINUTE },
   invitationMailsPerAddress: { max: 5, windowMs: 60 * MINUTE },

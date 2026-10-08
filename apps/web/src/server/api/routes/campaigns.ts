@@ -1,6 +1,7 @@
 /**
  * Campaigns. Whoever makes one leads it (the game master) and adds players
- * by mail address. The game master reaches the players' characters that
+ * by mail address (until invitations by link come); the game master sees
+ * the players' names, never their addresses. The game master reaches the players' characters that
  * belong to the campaign (open, change, print, make a new one for a
  * player); the characters stay the players'. A character in no campaign,
  * or in another one, stays private. A player sees the campaigns they are in and who leads
@@ -12,7 +13,7 @@
  */
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
-import { emailSchema, inviteAccount, limited, UI_LANGUAGES } from "../../auth/accounts.ts";
+import { emailSchema, inviteAccount, limited, nameSchema, UI_LANGUAGES } from "../../auth/accounts.ts";
 import { LIMITS } from "../../auth/rate-limit.ts";
 import type { AccountRow, CampaignRow, PlayerRow } from "../../store.ts";
 import { HttpError, json, readJson } from "../http.ts";
@@ -25,26 +26,19 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 export const MAX_CAMPAIGNS_PER_ACCOUNT = 50;
 export const MAX_PLAYERS_PER_CAMPAIGN = 50;
 
-/** One line of plain text: it goes into mails, so no line breaks or other control characters. */
-export const nameSchema = z
-  .string()
-  .trim()
-  .min(1)
-  .max(80)
-  .regex(/^[^\p{Cc}\p{Cf}]*$/u, "no control characters");
-
 const publicCampaign = (c: CampaignRow) => ({
   id: c.id,
   name: c.name,
   role: c.leading ? "gameMaster" : "player",
-  gameMaster: { email: c.game_master_email },
+  gameMaster: { name: c.game_master_name },
   playerCount: c.player_count,
   createdAt: c.created_at.toISOString(),
   /** When the viewer joined as a player; null for the game master. */
   joinedAt: c.joined_at?.toISOString() ?? null,
 });
 
-const publicPlayer = (p: PlayerRow) => ({ id: p.id, email: p.email, addedAt: p.added_at.toISOString() });
+// A name only: the mail address of other people is never given out.
+const publicPlayer = (p: PlayerRow) => ({ id: p.id, name: p.name, addedAt: p.added_at.toISOString() });
 
 /** The campaign of the URL if the viewer leads it or plays in it; else 404. */
 async function loadCampaign(ctx: RequestContext): Promise<{ campaign: CampaignRow; viewer: AccountRow }> {
@@ -142,9 +136,9 @@ export const campaignRoutes: Route[] = [
     },
   },
   {
-    // Add a player by mail address. An address without an account gets one and
-    // the password mail; an existing account gets a short mail. Both name the
-    // game master. The answer is the same either way.
+    // Add a player by mail address. An existing account gets a short mail that
+    // names the game master; an address without an account gets an account
+    // without a password (see inviteAccount). The answer is the same either way.
     method: "POST",
     path: "/api/campaigns/:id/players",
     handler: async (ctx) => {
@@ -157,8 +151,8 @@ export const campaignRoutes: Route[] = [
           language: z.enum(UI_LANGUAGES).optional(),
         }),
       );
-      if (body.email === viewer.email) throw new HttpError(422, "cannotAddYourself");
-      const existing = await ctx.app.store.findAccountByEmail(body.email);
+      const existing = (await ctx.app.store.findAccountsByEmail(body.email))[0];
+      if (existing?.id === viewer.id) throw new HttpError(422, "cannotAddYourself");
       if (existing && (await ctx.app.store.findPlayer(campaign.id, existing.id))) {
         throw new HttpError(409, "alreadyPlayer");
       }
@@ -170,7 +164,7 @@ export const campaignRoutes: Route[] = [
         ctx.app,
         body.email,
         body.language ?? viewer.language,
-        { by: viewer.email, campaign: campaign.name },
+        { by: viewer.name, campaign: campaign.name },
         async (a) => {
           const added = await ctx.app.store.addPlayer(
             campaign.id,

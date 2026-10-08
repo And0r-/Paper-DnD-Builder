@@ -80,13 +80,26 @@ export async function api<T>(
 // ------------------------------------------------------------------ shapes
 
 export interface Account {
-  email: string;
+  /** What the player wants to be called; game masters see it. */
+  name: string;
+  /** Only a way back in; null when none was given. */
+  email: string | null;
   language: string;
   units: Record<string, string>;
   /** What the download dialog offers first: the last download's choice. */
   print: PrintChoice;
   createdAt: string;
 }
+
+/** A password as the settings list it; the password itself is shown only when it is made. */
+export interface PasswordInfo {
+  id: string;
+  name: string;
+  createdAt: string;
+}
+
+/** A password just made: the one answer that holds it. */
+export type FreshPasswordInfo = PasswordInfo & { secret: string };
 
 /** A sheet design as `GET /api/sheet-designs` lists it; names per screen language. */
 export interface SheetDesignInfo {
@@ -124,7 +137,7 @@ export interface DraftInfo {
   updatedAt: string;
   finishedAt: string | null;
   /** Whose character it is; a game master sees the player here. */
-  owner: { email: string };
+  owner: { name: string };
   /** Opened as its owner, or as the game master of a campaign the owner plays in. */
   access: "owner" | "gameMaster";
 }
@@ -143,7 +156,7 @@ export interface Campaign {
   id: string;
   name: string;
   role: "gameMaster" | "player";
-  gameMaster: { email: string };
+  gameMaster: { name: string };
   playerCount: number;
   createdAt: string;
   /** When the viewer joined as a player; null for the game master. */
@@ -152,7 +165,7 @@ export interface Campaign {
 
 export interface CampaignPlayer {
   id: string;
-  email: string;
+  name: string;
   addedAt: string;
   characters: DraftListEntry[];
 }

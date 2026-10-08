@@ -38,7 +38,7 @@ import type {
 } from "../../store.ts";
 import { HttpError, json, readJson } from "../http.ts";
 import type { RequestContext, Route } from "../router.ts";
-import { nameSchema } from "./campaigns.ts";
+import { nameSchema } from "../../auth/accounts.ts";
 import { loadDraft } from "./drafts.ts";
 import { originalSheet } from "./print.ts";
 

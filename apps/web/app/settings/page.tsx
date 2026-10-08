@@ -1,20 +1,22 @@
 "use client";
 /**
- * Settings (flow spec 4.8): language, units, new password, access keys,
- * log out, what we store, delete account. Language and units apply at once, everywhere.
+ * Settings (flow spec 4.8): name and mail address, language, units, the
+ * player's passwords, access keys, log out, what we store, delete account.
+ * Language and units apply at once, everywhere.
  */
 import { effectiveUnits, formatMeasure } from "@builder/core";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { useApp } from "../../src/ui/app-state.tsx";
-import { api, type Account } from "../../src/ui/api.ts";
+import { api, ApiError, type Account } from "../../src/ui/api.ts";
 import { AccessKeys } from "../../src/ui/components/AccessKeys.tsx";
 import { Button } from "../../src/ui/components/Button.tsx";
-import { ConfirmDialog, TypedConfirmDialog } from "../../src/ui/components/Dialog.tsx";
+import { TypedConfirmDialog } from "../../src/ui/components/Dialog.tsx";
 import { Callout, ErrorState, Loading } from "../../src/ui/components/Feedback.tsx";
-import { Segmented, Toast } from "../../src/ui/components/Fields.tsx";
+import { Segmented, TextField, Toast } from "../../src/ui/components/Fields.tsx";
 import { LanguageSelect } from "../../src/ui/components/LanguageSelect.tsx";
+import { Passwords } from "../../src/ui/components/Passwords.tsx";
 import { AppShell } from "../../src/ui/components/Shell.tsx";
 import { usePageTitle } from "../../src/ui/flow/frame.tsx";
 import { RequireAccount } from "../../src/ui/guards.tsx";
@@ -59,7 +61,6 @@ function Settings({ account }: { account: Account }) {
   const { packages, failed, retry } = useUnitPackages(lang);
   const [error, setError] = useState<string>();
   const [toast, setToast] = useState<string>();
-  const [askPassword, setAskPassword] = useState(false);
   const [askDelete, setAskDelete] = useState(false);
   const [busy, setBusy] = useState(false);
   const [draftCount, setDraftCount] = useState<number | null>(null);
@@ -85,7 +86,7 @@ function Settings({ account }: { account: Account }) {
     <AppShell>
       <div className="page settings">
         <h1 className="page__title">{t("settings.title")}</h1>
-        <p className="note">{t("settings.signedInAs", { email: account.email })}</p>
+        <p className="note">{t("settings.signedInAs", { name: account.name })}</p>
         <div aria-live="polite">
           {error && (
             <Callout tone="danger" role="alert">
@@ -93,6 +94,8 @@ function Settings({ account }: { account: Account }) {
             </Callout>
           )}
         </div>
+
+        <Identity account={account} />
 
         <section className="settings__section" aria-labelledby="s-language">
           <h2 className="section-title" id="s-language">
@@ -145,15 +148,7 @@ function Settings({ account }: { account: Account }) {
           <p className="note">{t("settings.unitsHint")}</p>
         </section>
 
-        <section className="settings__section" aria-labelledby="s-password">
-          <h2 className="section-title" id="s-password">
-            {t("settings.password")}
-          </h2>
-          <p>{t("settings.passwordText")}</p>
-          <Button variant="secondary" icon="mail" onClick={() => setAskPassword(true)}>
-            {t("settings.passwordButton")}
-          </Button>
-        </section>
+        <Passwords />
 
         <AccessKeys />
 
@@ -197,28 +192,6 @@ function Settings({ account }: { account: Account }) {
         </section>
       </div>
 
-      <ConfirmDialog
-        open={askPassword}
-        title={t("settings.passwordConfirmTitle")}
-        confirmLabel={t("settings.passwordConfirm")}
-        busy={busy}
-        onCancel={() => setAskPassword(false)}
-        onConfirm={async () => {
-          setBusy(true);
-          try {
-            await api("POST", "/api/account/password", {});
-            setToast(t("settings.passwordSent"));
-          } catch {
-            fail();
-          } finally {
-            setBusy(false);
-            setAskPassword(false);
-          }
-        }}
-      >
-        <p>{t("settings.passwordConfirmText")}</p>
-      </ConfirmDialog>
-
       <TypedConfirmDialog
         open={askDelete}
         title={t("settings.deleteTitle")}
@@ -248,5 +221,96 @@ function Settings({ account }: { account: Account }) {
 
       {toast && <Toast message={toast} duration={6000} onDone={() => setToast(undefined)} />}
     </AppShell>
+  );
+}
+
+const MAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+/** The server's limit for a name (see API.md). */
+const MAX_NAME = 80;
+
+/** Name (what game masters see) and mail address (only a way back in); empty removes the address. */
+function Identity({ account }: { account: Account }) {
+  const app = useApp();
+  const { t } = app;
+  const [name, setName] = useState(account.name);
+  const [email, setEmail] = useState(account.email ?? "");
+  const [nameError, setNameError] = useState<string>();
+  const [emailError, setEmailError] = useState<string>();
+  const [error, setError] = useState<string>();
+  const [busy, setBusy] = useState(false);
+  const [toast, setToast] = useState<string>();
+
+  const save = async (e: FormEvent) => {
+    e.preventDefault();
+    const n = name.trim();
+    const m = email.trim();
+    setNameError(n ? undefined : t("login.nameMissing"));
+    setEmailError(!m || MAIL.test(m) ? undefined : t("login.emailInvalid"));
+    if (!n || (m && !MAIL.test(m))) return;
+    setError(undefined);
+    setBusy(true);
+    try {
+      const r = await api<{ account: Account }>("PATCH", "/api/account/settings", {
+        name: n,
+        email: m || null,
+      });
+      app.setAccount(r.account);
+      setName(r.account.name);
+      setEmail(r.account.email ?? "");
+      setToast(t("settings.identitySaved"));
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 400) setEmailError(t("login.emailInvalid"));
+      else setError(t("settings.saveError"));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <section className="settings__section" aria-labelledby="s-identity">
+      <h2 className="section-title" id="s-identity">
+        {t("settings.identity")}
+      </h2>
+      <form className="settings__identity" onSubmit={save} noValidate>
+        <TextField
+          label={t("settings.nameLabel")}
+          help={t("settings.nameHelp")}
+          autoComplete="nickname"
+          maxLength={MAX_NAME}
+          value={name}
+          error={nameError}
+          onChange={(e) => {
+            setName(e.target.value);
+            setNameError(undefined);
+          }}
+        />
+        <TextField
+          label={t("settings.emailLabel")}
+          help={t("settings.emailHelp")}
+          type="email"
+          inputMode="email"
+          autoComplete="email"
+          autoCapitalize="none"
+          spellCheck={false}
+          value={email}
+          error={emailError}
+          onChange={(e) => {
+            setEmail(e.target.value);
+            setEmailError(undefined);
+          }}
+        />
+        {error && (
+          <Callout tone="danger" role="alert">
+            {error}
+          </Callout>
+        )}
+        <div>
+          <Button type="submit" variant="secondary" busy={busy} busyLabel={t("settings.identitySaving")}>
+            {t("settings.identitySave")}
+          </Button>
+        </div>
+      </form>
+      {toast && <Toast message={toast} duration={4000} onDone={() => setToast(undefined)} />}
+    </section>
   );
 }

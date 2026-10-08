@@ -7,7 +7,7 @@
  */
 import type { Page } from "@playwright/test";
 import en from "../src/i18n/messages/en.json" with { type: "json" };
-import { chooseLanguage, expect, expectOneLanguage, login, shot, test, uniqueEmail } from "./helpers.ts";
+import { chooseLanguage, expect, expectOneLanguage, shot, signup, test } from "./helpers.ts";
 
 /** A level-1 river runner of the given folk, made through the API. */
 async function riverRunner(page: Page, folk: string): Promise<string> {
@@ -38,7 +38,7 @@ async function intro(page: Page, id: string, lang: "de" | "en", text: RegExp, na
 
 test("the talents step counts one more talent for hillfolk", async ({ page, foreign }) => {
   void foreign;
-  await login(page, uniqueEmail("variants"));
+  await signup(page, "variants");
   const hill = await riverRunner(page, "folk.hillfolk");
   const moor = await riverRunner(page, "folk.moorfolk");
 

@@ -82,7 +82,7 @@ export function getApp(): Promise<App> {
     const packages = await loadPackages(config.packagesDir);
     const outbox = process.env["MAIL_OUTBOX_DIR"]?.trim();
     if (!outbox && (!config.smtp || !config.mailFrom)) {
-      console.error("Mail: SMTP_HOST or MAIL_FROM is not set; nobody can receive a password.");
+      console.error("Mail: SMTP_HOST or MAIL_FROM is not set; game masters cannot add players by address.");
     }
     return createApp({
       config,

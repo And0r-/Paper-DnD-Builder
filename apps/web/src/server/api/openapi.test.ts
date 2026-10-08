@@ -18,7 +18,8 @@ import { healthReport } from "../health.ts";
 import { createMcpRoute } from "../mcp-route.ts";
 import { buildMcpZip, mcpZipResponse } from "../mcp-zip.ts";
 import { loadPackages } from "../packages/loader.ts";
-import { Client, passwordFromMail, signIn, startTestServer, type TestServer } from "../testing.ts";
+import { hashPassword } from "../auth/password.ts";
+import { Client, signIn, startTestServer, type TestServer } from "../testing.ts";
 import { ROUTES } from "./router.ts";
 
 const WEB = new URL("../../../", import.meta.url).pathname;
@@ -233,9 +234,13 @@ describe("openapi.json", () => {
         "badRequest",
         "notLoggedIn",
         "keyNotValid",
+        "wrongPassword",
         "wrongMailOrPassword",
         "crossSite",
         "keyCannotMakeKeys",
+        "keyCannotMakePasswords",
+        "passwordNotFound",
+        "lastPassword",
         "notFound",
         "draftNotFound",
         "keyNotFound",
@@ -370,17 +375,25 @@ async function walk(server: TestServer): Promise<void> {
 
   // Login and refusals before it.
   expect((await call("GET", "/api/account")).status).toBe(401);
-  await call("POST", "/api/auth/password", "{nope", { "content-type": "application/json" });
-  await call("POST", "/api/auth/password", { email: "not a mail" });
-  await call("POST", "/api/auth/password", "x", { "content-type": "text/plain" });
-  server.failMail.on = true;
-  await call("POST", "/api/auth/password", { email: "walker@example.org" });
-  server.failMail.on = false;
-  await call("POST", "/api/auth/login", {
-    email: "walker@example.org",
-    password: "wrong-words-here-and-1234",
+  await call("POST", "/api/auth/signup", "{nope", { "content-type": "application/json" });
+  await call("POST", "/api/auth/signup", { name: "Walker", email: "not a mail" });
+  await call("POST", "/api/auth/signup", "x", { "content-type": "text/plain" });
+  await call("POST", "/api/auth/login", { password: "wrong-words-here-and-there-1234" });
+  await call("POST", "/api/auth/legacy-login", {
+    email: "old@example.org",
+    password: "wrong-words-here-1234",
   });
-  await signIn(c, server, "walker@example.org");
+  // An account from before, with its one old password: swapped for a new one at its first login.
+  await server.db.query(
+    `INSERT INTO accounts (id, name, email, password_hash, language, created_at)
+     VALUES ('00000000-0000-4000-8000-0000000000aa', 'old', 'old@example.org', $1, 'en', now())`,
+    [await hashPassword("anker-falke-wiese-7320")],
+  );
+  await new Client(server, "198.51.100.40").call("POST", "/api/auth/legacy-login", {
+    email: "old@example.org",
+    password: "anker-falke-wiese-7320",
+  });
+  const password = await signIn(c, "walker@example.org");
   await call("POST", "/api/drafts", { packageId: "demo" }, { origin: "https://elsewhere.example" });
   await call("GET", "/api/nothing-here");
   await call("PUT", "/api/account");
@@ -389,11 +402,20 @@ async function walk(server: TestServer): Promise<void> {
   await call("GET", "/api/account");
   await call("PATCH", "/api/account/settings", { language: "en", units: { length: null } });
   await call("PATCH", "/api/account/settings", { units: { length: "parsec" } });
-  await call("PATCH", "/api/account/settings", { language: "de" });
+  await call("PATCH", "/api/account/settings", { language: "de", name: "Walker", email: null });
+  await call("PATCH", "/api/account/settings", { email: "walker@example.org" });
   await call("PATCH", "/api/account/settings", { print: { parts: ["sheet", "texts"], design: "verbose" } });
   await call("PATCH", "/api/account/settings", { print: { design: "classic" } });
   await call("GET", "/api/sheet-designs");
-  await call("POST", "/api/account/password");
+
+  // Own passwords.
+  const paper = (await call("POST", "/api/account/passwords", { name: "On paper" })).json.password;
+  await call("POST", "/api/account/passwords", { name: "" });
+  await call("GET", "/api/account/passwords");
+  await call("DELETE", "/api/account/passwords/00000000-0000-4000-8000-000000000000");
+  await call("DELETE", `/api/account/passwords/${paper.id}`);
+  const [first] = (await call("GET", "/api/account/passwords")).json.passwords;
+  await call("DELETE", `/api/account/passwords/${first.id}`);
 
   // Keys.
   const made = await call("POST", "/api/account/keys", { name: "Laptop at home" });
@@ -402,6 +424,7 @@ async function walk(server: TestServer): Promise<void> {
   await call("GET", "/api/account/keys");
   await call("GET", "/api/account", undefined, { authorization: "Bearer cbk_unknown" });
   await call("POST", "/api/account/keys", { name: "Next" }, { authorization: `Bearer ${key}` });
+  await call("POST", "/api/account/passwords", {}, { authorization: `Bearer ${key}` });
   await call("DELETE", "/api/account/keys/00000000-0000-4000-8000-000000000000");
   const second = await call("POST", "/api/account/keys", { name: "Second" });
   await call("DELETE", `/api/account/keys/${second.json.key.id}`);
@@ -512,18 +535,15 @@ async function walk(server: TestServer): Promise<void> {
   await call("GET", "/api/campaigns");
   await call("PATCH", cp, { name: "Die Runde" });
   await call("GET", "/api/campaigns/00000000-0000-4000-8000-000000000000");
+  const mate = new Client(server, "198.51.100.20");
+  await signIn(mate, "mate@example.org", "en");
   await call("POST", `${cp}/players`, { email: "walker@example.org" });
   server.failMail.on = true;
-  await call("POST", `${cp}/players`, { email: "late@example.org" });
-  server.failMail.on = false;
-  const added = (await call("POST", `${cp}/players`, { email: "mate@example.org", language: "en" })).json
-    .player;
   await call("POST", `${cp}/players`, { email: "mate@example.org" });
-  const mate = new Client(server, "198.51.100.20");
-  await mate.call("POST", "/api/auth/login", {
-    email: "mate@example.org",
-    password: passwordFromMail(server.mails, "mate@example.org"),
-  });
+  server.failMail.on = false;
+  await call("POST", `${cp}/players`, { email: "late@example.org", language: "en" });
+  const added = (await call("POST", `${cp}/players`, { email: "mate@example.org" })).json.player;
+  await call("POST", `${cp}/players`, { email: "mate@example.org" });
   const theirs = (await mate.call("POST", "/api/drafts", { packageId: "demo", campaignId: campaign.id })).json
     .draft.id;
   await mate.call("GET", "/api/campaigns");
@@ -541,8 +561,6 @@ async function walk(server: TestServer): Promise<void> {
   await call("DELETE", cp);
 
   await call("POST", "/api/auth/logout");
-  // The password renewed above is the newest in the mailbox.
-  const password = passwordFromMail(server.mails, "walker@example.org");
-  await call("POST", "/api/auth/login", { email: "walker@example.org", password });
+  await call("POST", "/api/auth/login", { password });
   await call("DELETE", "/api/account", { confirm: true });
 }

@@ -7,7 +7,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import type { Page } from "@playwright/test";
 import m from "../src/i18n/messages/de.json" with { type: "json" };
-import { expect, login, shot, test, uniqueEmail } from "./helpers.ts";
+import { expect, shot, signup, test } from "./helpers.ts";
 
 /** A level-3 lantern bearer whose scores are still open. */
 async function openScores(page: Page): Promise<string> {
@@ -33,7 +33,7 @@ async function axe(page: Page) {
 }
 
 test("fixed numbers: tap to give, tap to take back, no dropdowns", async ({ page }) => {
-  await login(page, uniqueEmail("tap-numbers"));
+  await signup(page, "tap-numbers");
   const id = await openScores(page);
   await page.goto(`/c/${id}/step/scores`);
   await expect(

@@ -26,9 +26,10 @@ const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 type Data = { lang: string; view: CampaignView; packages: Map<string, LoadedPackage> };
 
 export default function CampaignPage() {
-  return <RequireAccount>{(account) => <CampaignScreen me={account.email} />}</RequireAccount>;
+  return <RequireAccount>{(account) => <CampaignScreen me={account.name} />}</RequireAccount>;
 }
 
+/** `me`: the game master's name, as the added player's mail shows it. */
 function CampaignScreen({ me }: { me: string }) {
   const { t, tc, lang } = useApp();
   const router = useRouter();
@@ -74,9 +75,12 @@ function CampaignScreen({ me }: { me: string }) {
     setBusy(true);
     setEmailError(undefined);
     try {
-      await api("POST", `/api/campaigns/${id}/players`, { email: address, language: lang });
+      const r = await api<{ player: { name: string } }>("POST", `/api/campaigns/${id}/players`, {
+        email: address,
+        language: lang,
+      });
       setEmail("");
-      setToast(t("campaign.added", { email: address }));
+      setToast(t("campaign.added", { name: r.player.name }));
       reload();
     } catch (e) {
       setEmailError(addError(e, address));
@@ -96,9 +100,9 @@ function CampaignScreen({ me }: { me: string }) {
       case "tooManyPlayers":
         return t("campaign.tooManyPlayers", { max: Number(e.details["max"]) });
       case "mailFailed":
-        return t("login.mailFailed");
+        return t("campaign.mailFailed");
       case "mailNotConfigured":
-        return t("login.mailNotConfigured");
+        return t("campaign.mailNotConfigured");
     }
     if (e.status === 429) return tc("campaign.tooFast", Math.max(1, Math.ceil((e.retryAfter ?? 60) / 60)));
     if (e.status === 400) return t("login.emailInvalid");
@@ -123,7 +127,7 @@ function CampaignScreen({ me }: { me: string }) {
         <h1 className="page__title">{campaign.name}</h1>
         {players === null ? (
           <>
-            <Callout tone="info" title={t("campaign.playerTitle", { email: campaign.gameMaster.email })}>
+            <Callout tone="info" title={t("campaign.playerTitle", { name: campaign.gameMaster.name })}>
               <p>{t("campaign.playerText")}</p>
             </Callout>
             <div className="page-actions">
@@ -167,7 +171,7 @@ function CampaignScreen({ me }: { me: string }) {
               >
                 <TextField
                   label={t("campaign.addLabel")}
-                  help={t("campaign.addHelp", { email: me, name: campaign.name })}
+                  help={t("campaign.addHelp", { gameMaster: me, name: campaign.name })}
                   error={emailError}
                   type="email"
                   inputMode="email"
@@ -190,10 +194,10 @@ function CampaignScreen({ me }: { me: string }) {
                   {players.map((p) => (
                     <li key={p.id} className="player">
                       <div className="player__head">
-                        <h3 className="player__name">{p.email}</h3>
+                        <h3 className="player__name">{p.name}</h3>
                         <Button
                           variant="ghost"
-                          aria-label={t("campaign.removeLabel", { email: p.email })}
+                          aria-label={t("campaign.removeLabel", { name: p.name })}
                           onClick={() => setRemove(p)}
                         >
                           {t("campaign.remove")}
@@ -219,7 +223,7 @@ function CampaignScreen({ me }: { me: string }) {
                         icon="plus"
                         className="player__build"
                       >
-                        {t("campaign.buildFor", { email: p.email })}
+                        {t("campaign.buildFor", { name: p.name })}
                       </ButtonLink>
                     </li>
                   ))}
@@ -260,7 +264,7 @@ function CampaignScreen({ me }: { me: string }) {
 
       <ConfirmDialog
         open={remove !== undefined}
-        title={t("campaign.removeTitle", { email: remove?.email ?? "" })}
+        title={t("campaign.removeTitle", { name: remove?.name ?? "" })}
         confirmLabel={t("campaign.remove")}
         danger
         busy={busy}
@@ -271,7 +275,7 @@ function CampaignScreen({ me }: { me: string }) {
           setError(undefined);
           try {
             await api("DELETE", `/api/campaigns/${id}/players/${p.id}`);
-            setToast(t("campaign.removed", { email: p.email }));
+            setToast(t("campaign.removed", { name: p.name }));
           } catch (e) {
             // Already gone (another tab): reloading shows the list as it is.
             if (!(e instanceof ApiError && e.code === "playerNotFound")) setError(t("common.loadError"));

@@ -6,7 +6,7 @@
 import type { Page } from "@playwright/test";
 import de from "../src/i18n/messages/de.json" with { type: "json" };
 import en from "../src/i18n/messages/en.json" with { type: "json" };
-import { chooseLanguage, expect, login, makeCharacter, shot, test, uniqueEmail } from "./helpers.ts";
+import { chooseLanguage, expect, makeCharacter, shot, signup, test } from "./helpers.ts";
 
 async function storedUnits(page: Page) {
   return page.evaluate(async () => {
@@ -42,7 +42,7 @@ async function knackReach(page: Page, id: string, lang: "de" | "en") {
 
 test("units the reader never chose follow the language", async ({ page, foreign }) => {
   void foreign;
-  await login(page, uniqueEmail("units-follow"));
+  await signup(page, "units-follow");
   const id = await makeCharacter(page);
 
   await page.goto("/settings");
@@ -66,7 +66,7 @@ test("units switch at once everywhere and chosen units stay with a new language"
   foreign,
 }) => {
   void foreign;
-  await login(page, uniqueEmail("units"));
+  await signup(page, "units");
   const id = await makeCharacter(page);
 
   // German starts with meters.

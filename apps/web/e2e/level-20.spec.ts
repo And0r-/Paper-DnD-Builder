@@ -5,11 +5,11 @@
  */
 import { readFile } from "node:fs/promises";
 import m from "../src/i18n/messages/de.json" with { type: "json" };
-import { expect, expectOneLanguage, login, shot, test, uniqueEmail } from "./helpers.ts";
+import { expect, expectOneLanguage, shot, signup, test } from "./helpers.ts";
 
 test("a level-20 character with nothing but choose for me, down to the PDF", async ({ page, foreign }) => {
   void foreign;
-  await login(page, uniqueEmail("level-20"));
+  await signup(page, "level-20");
   await page.getByRole("link", { name: m["characters.emptyAction"] }).click();
 
   await expect(

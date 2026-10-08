@@ -9,16 +9,7 @@ import type { Page } from "@playwright/test";
 import { readFile } from "node:fs/promises";
 import de from "../src/i18n/messages/de.json" with { type: "json" };
 import en from "../src/i18n/messages/en.json" with { type: "json" };
-import {
-  animationsDone,
-  expect,
-  expectOneLanguage,
-  login,
-  makeCharacter,
-  shot,
-  test,
-  uniqueEmail,
-} from "./helpers.ts";
+import { animationsDone, expect, expectOneLanguage, makeCharacter, shot, signup, test } from "./helpers.ts";
 
 const MESSAGES = { de, en };
 /** The part words in file names, as the server's print words have them. */
@@ -47,7 +38,7 @@ for (const lang of ["de", "en"] as const) {
     void foreign;
     const m = MESSAGES[lang];
     const words = FILE_WORDS[lang];
-    await login(page, uniqueEmail(`print-${lang}`), lang);
+    await signup(page, `print-${lang}`, lang);
     const id = await makeCharacter(page);
     await page.goto(`/c/${id}/done`);
 
@@ -133,7 +124,7 @@ test("prints a kept copy with the play state filled in, and keeps the play state
 }) => {
   void foreign;
   const m = de;
-  await login(page, uniqueEmail("print-copy"), "de");
+  await signup(page, "print-copy", "de");
   const id = await makeCharacter(page);
   const made = (await (await page.request.post(`/api/drafts/${id}/sheet-copies`, { data: {} })).json()) as {
     copy: { id: string; createdAt: string; fromLevel: number };
@@ -190,7 +181,7 @@ test("a character without cards cannot tick them, and keeps the wish for the nex
 }) => {
   void foreign;
   const m = de;
-  await login(page, uniqueEmail("print-nocards"), "de");
+  await signup(page, "print-nocards", "de");
   const id = await makeCharacter(page);
   await page.request.patch("/api/account/settings", { data: { print: { parts: ["sheet", "cards"] } } });
   // The same package where nothing is a card.

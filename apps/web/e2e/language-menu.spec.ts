@@ -13,16 +13,7 @@ import de from "../src/i18n/messages/de.json" with { type: "json" };
 import en from "../src/i18n/messages/en.json" with { type: "json" };
 import pde from "../../../packages/demo-package/texts/de/core.json" with { type: "json" };
 import pen from "../../../packages/demo-package/texts/en/core.json" with { type: "json" };
-import {
-  animationsDone,
-  expect,
-  expectOneLanguage,
-  login,
-  makeCharacter,
-  shot,
-  test,
-  uniqueEmail,
-} from "./helpers.ts";
+import { animationsDone, expect, expectOneLanguage, makeCharacter, shot, signup, test } from "./helpers.ts";
 
 const NAMES: Record<string, string> = { de: "Deutsch", en: "English" };
 
@@ -100,7 +91,7 @@ test("logged in: the top bar of every screen switches, stored with the account, 
 }) => {
   void foreign;
   test.skip(!!process.env["E2E_PACKAGES_DIR"], "builds a demo character");
-  await login(page, uniqueEmail("lang-menu"));
+  await signup(page, "lang-menu");
   const id = await makeCharacter(page);
   const before = await storedAccount(page);
 
@@ -158,7 +149,7 @@ test("switching in the middle of a step keeps the step, the choices and what is 
 }) => {
   void foreign;
   test.skip(!!process.env["E2E_PACKAGES_DIR"], "builds a demo character");
-  await login(page, uniqueEmail("lang-keep"));
+  await signup(page, "lang-keep");
   const id = await makeCharacter(page, false);
 
   await page.goto(`/c/${id}/step/character`);
@@ -187,7 +178,7 @@ test("fits a small phone", async ({ page, foreign }) => {
   void foreign;
   test.skip(!!process.env["E2E_PACKAGES_DIR"], "builds a demo character");
   await page.setViewportSize({ width: 320, height: 640 });
-  await login(page, uniqueEmail("lang-small"));
+  await signup(page, "lang-small");
   const id = await makeCharacter(page);
   for (const url of ["/characters", `/c/${id}/step/folk`, `/c/${id}/overview`]) {
     await page.goto(url);

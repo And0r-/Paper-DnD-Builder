@@ -22,7 +22,7 @@ let outside: string[];
 beforeEach(async () => {
   server = await startTestServer();
   owner = new Client(server);
-  await signIn(owner, server, "owner@example.org", "en");
+  await signIn(owner, "owner@example.org", "en");
   outside = [];
   vi.stubGlobal("fetch", (input: string | URL | Request) => {
     outside.push(input instanceof Request ? input.url : String(input));
@@ -96,7 +96,7 @@ describe("/mcp", () => {
 
   it("with key A shows only A's characters, never B's", async () => {
     const other = new Client(server, "203.0.113.8");
-    await signIn(other, server, "other@example.org");
+    await signIn(other, "other@example.org");
     const theirId: string = (await other.call("POST", "/api/drafts", { packageId: "demo" })).json.draft.id;
     const keyA = (await makeKey()).secret;
     const keyB = (await makeKey(other)).secret;

@@ -112,26 +112,12 @@ export class Client {
   }
 }
 
-/** The password from the newest mail to an address. */
-export function passwordFromMail(mails: Mail[], to: string): string {
-  const mail = mails.filter((m) => m.to === to).at(-1);
-  const m = mail && /: ([a-z]+(?:-[a-z]+){3}-\d{4})$/m.exec(mail.text);
-  if (!m) throw new Error(`no password mail to ${to}`);
-  return m[1]!;
-}
-
-/** Signs up (or resets) and logs in; returns the password used. */
-export async function signIn(
-  client: Client,
-  server: TestServer,
-  email: string,
-  language = "de",
-): Promise<string> {
-  const req = await client.call("POST", "/api/auth/password", { email, language });
-  if (req.status !== 202)
-    throw new Error(`password request failed: ${req.status} ${JSON.stringify(req.json)}`);
-  const password = passwordFromMail(server.mails, email);
-  const login = await client.call("POST", "/api/auth/login", { email, password });
-  if (login.status !== 200) throw new Error(`login failed: ${login.status}`);
-  return password;
+/**
+ * Signs up with the address as the way back in and the part before the "@"
+ * as the name, and keeps the session; returns the password shown.
+ */
+export async function signIn(client: Client, email: string, language = "de"): Promise<string> {
+  const res = await client.call("POST", "/api/auth/signup", { name: email.split("@")[0], email, language });
+  if (res.status !== 201) throw new Error(`sign-up failed: ${res.status} ${JSON.stringify(res.json)}`);
+  return res.json.password.secret as string;
 }

@@ -3,14 +3,14 @@
  * itself; a list that cannot load says so and offers to try again.
  */
 import m from "../src/i18n/messages/de.json" with { type: "json" };
-import { expect, login, makeCharacter, shot, test, uniqueEmail } from "./helpers.ts";
+import { expect, makeCharacter, shot, signup, test } from "./helpers.ts";
 
 test("saving keeps the choice on screen while the server is away, then catches up", async ({
   page,
   foreign,
 }) => {
   void foreign;
-  await login(page, uniqueEmail("states"));
+  await signup(page, "states");
   const id = await makeCharacter(page, false);
 
   await page.goto(`/c/${id}/step/gear`);
@@ -28,7 +28,7 @@ test("saving keeps the choice on screen while the server is away, then catches u
 
 test("the character list shows a designed error and can try again", async ({ page, foreign }) => {
   void foreign;
-  await login(page, uniqueEmail("states2"));
+  await signup(page, "states2");
   await page.route("**/api/drafts", (route) => route.fulfill({ status: 500, body: "{}" }));
   await page.goto("/characters");
   await expect(page.getByText(m["characters.loadError"])).toBeVisible();

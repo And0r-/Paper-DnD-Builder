@@ -107,7 +107,7 @@ export default function DonePage() {
       <h1 className="done__title" tabIndex={-1} ref={headingRef}>
         {title}
       </h1>
-      {forPlayer && <p className="done__owner">{t("done.forPlayer", { email: draft.owner.email })}</p>}
+      {forPlayer && <p className="done__owner">{t("done.forPlayer", { name: draft.owner.name })}</p>}
       {news && (
         <div className="done__news">
           {params.get("asked") === "0" && <p>{t("done.raisedNothing", { levelName, level: ev.level })}</p>}

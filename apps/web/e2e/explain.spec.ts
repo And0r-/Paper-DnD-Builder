@@ -7,16 +7,7 @@
 import type { Page } from "@playwright/test";
 import de from "../src/i18n/messages/de.json" with { type: "json" };
 import en from "../src/i18n/messages/en.json" with { type: "json" };
-import {
-  chooseLanguage,
-  expect,
-  expectOneLanguage,
-  login,
-  makeCharacter,
-  shot,
-  test,
-  uniqueEmail,
-} from "./helpers.ts";
+import { chooseLanguage, expect, expectOneLanguage, makeCharacter, shot, signup, test } from "./helpers.ts";
 
 /** A level-3 draft with only these answers, made through the API. */
 async function draftWith(page: Page, answers: [string, unknown][]): Promise<string> {
@@ -133,7 +124,7 @@ async function checkAll(page: Page, id: string, early: string, lang: Lang) {
 
 test("numbers and things say where they come from, in both languages", async ({ page, foreign }) => {
   void foreign;
-  await login(page, uniqueEmail("explain"));
+  await signup(page, "explain");
   const id = await makeCharacter(page);
   // More might, so the scores add to the calling's stamina too.
   const view = (await (await page.request.get(`/api/drafts/${id}`)).json()) as { draft: { version: number } };
