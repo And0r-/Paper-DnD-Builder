@@ -16,7 +16,9 @@ It writes `private, stdio` or `public, HTTP on port 8787` to stderr on start.
 It talks to the builder **only over the public HTTP API**
 ([`apps/web/API.md`](../../apps/web/API.md),
 [`openapi.json`](../../apps/web/openapi.json)) with an access key
-(`Authorization: Bearer cbk_...`). It imports neither the database nor the
+(`Authorization: Bearer cbk_...`), and says what it is with
+`X-Builder-Client: mcp`: the builder's live channel shows the changes it
+makes as made over MCP (a label, not a login). It imports neither the database nor the
 rule core; from `@builder/format` it uses only the placeholder parser and
 the unit conversion, to write package texts for the reader.
 

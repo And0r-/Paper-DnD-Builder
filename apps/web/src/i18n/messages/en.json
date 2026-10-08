@@ -344,6 +344,7 @@
   "privacy.notStored": "What we never do",
   "privacy.noTracking": "We do not watch you: no ads, no statistics about you, no recording of your clicks.",
   "privacy.noThirdParty": "Your browser loads nothing from other sites. No outside fonts, no outside scripts.",
+  "privacy.live": "Whoever has a character open sees who else has it open: the name, and whether in the browser or with a program. A change to the character shows the other person who made it, by name. The server only knows this while you are connected. It writes it down nowhere.",
   "privacy.languageModel": "A language model of your choice can read your characters and build with you: through the address /mcp of this server, or with a program you download. Both need an access key you make yourself. Our server only answers requests. It sends nothing to anyone else and has no language model in it. Your characters go only to the language model you set up yourself.",
   "privacy.delete": "You can delete your account in the settings at any time. Then everything is gone.",
   "privacy.back": "Back",

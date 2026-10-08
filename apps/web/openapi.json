@@ -5599,7 +5599,7 @@
         "operationId": "liveDraft",
         "summary": "The live channel of a character (WebSocket)",
         "tags": ["Live help"],
-        "description": "A WebSocket (`Upgrade: websocket`), not a JSON route: everyone on the character sees the same state at once and may answer. Login as everywhere: the session cookie or `Authorization: Bearer <key>`; the handshake must come from this site (`Origin`). Who is neither the owner nor the game master of the character's campaign adds `?help=<token>`. A refused login or a character you may not reach closes the connection after one `error` message with code 4401 or 4404 (as 401 and 404 here). The messages are in API.md, section Live help.",
+        "description": "A WebSocket (`Upgrade: websocket`), not a JSON route, and the one live channel of a character: everyone on it sees who else is there and hears of every stored change at once, whoever made it and however (over this channel, the HTTP API with the cookie or a key, or the MCP server: `source.via` is `browser`, `api` or `mcp`), and may answer. Login as everywhere: the session cookie or `Authorization: Bearer <key>`; the handshake must come from this site (`Origin`). Who is neither the owner nor the game master of the character's campaign adds `?help=<token>`. A browser window adds its own id, `?clientId=`, the same it sends as `X-Builder-Client-Id` on its HTTP changes; the MCP server sends `X-Builder-Client: mcp`. A refused login or a character you may not reach closes the connection after one `error` message with code 4401 or 4404 (as 401 and 404 here). The messages are in API.md, section Live help.",
         "parameters": [
           {
             "name": "id",
@@ -5615,6 +5615,15 @@
             "in": "query",
             "required": false,
             "description": "The character's help link token.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "clientId",
+            "in": "query",
+            "required": false,
+            "description": "The browser window's own id (1–64 characters `A-Z a-z 0-9 _ -`), as it sends it in `X-Builder-Client-Id`; shown in `presence` and on its changes. Anything else is ignored.",
             "schema": {
               "type": "string"
             }
