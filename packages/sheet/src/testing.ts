@@ -11,9 +11,11 @@ import {
   type ChoiceState,
   type DraftDocument,
 } from "@builder/core";
-import type { Choice, ContentPackage } from "@builder/format";
+import type { ContentPackage } from "@builder/format";
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 import { validatePackageDir } from "@builder/format";
-import { DEMO_PACKAGE_DIR } from "@builder/demo-package";
+import { DEMO_EXAMPLES_DIR, DEMO_PACKAGE_DIR } from "@builder/demo-package";
 
 export async function loadDemoPackage(): Promise<ContentPackage> {
   const result = await validatePackageDir(DEMO_PACKAGE_DIR);
@@ -69,34 +71,21 @@ export function demoCharacter(
 }
 
 /**
- * The demo package with its callings as tracks (SPEC 9.7), for sheets of a
- * character with two callings: the head and the summary line name the
- * callings with their levels, the knacks of each calling show that
- * calling's numbers on their cards (`cardValues`), and gear and talents come
- * from the first calling only. Invented numbers, like the demo's own.
+ * The demo package with the callings and their levels in the sheet's head
+ * and in the summary line (`{ "tracks": true }`), for sheets of a character
+ * with two callings. The demo package itself does not name them there yet.
  */
-export function demoWithTracks(demo: ContentPackage): ContentPackage {
+export function demoWithTracksHead(demo: ContentPackage): ContentPackage {
   const pkg = structuredClone(demo);
-  pkg.flow.level.tracks = { choice: "calling" };
   pkg.flow.summary.line = { ...pkg.flow.summary.line, calling: { tracks: true } };
   const header = pkg.sheet.sections.find((s) => s.kind === "header");
   if (header?.kind === "header") header.fields = [{ tracks: true }, ...(header.fields ?? [])];
-  for (const t of pkg.things.filter((x) => x.kind === "calling"))
-    for (const g of t.grants ?? [])
-      if (g.choice === "gear" || g.choice?.startsWith("talents-")) g.only = "first";
-  const own = { lantern: "heartBonus", current: "graceBonus", root: "mightBonus" } as const;
-  for (const [tag, bonus] of Object.entries(own)) {
-    pkg.values.push(
-      { id: `${tag}KnackHit`, source: "mistland", formula: `practice + ${bonus}` },
-      { id: `${tag}KnackTarget`, source: "mistland", formula: `8 + practice + ${bonus}` },
-    );
-    const choice = pkg.flow.choices.find((c) => c.id === `knacks-${tag}`) as Extract<
-      Choice,
-      { kind: "pickMany" }
-    >;
-    choice.cardValues = { knackHit: `${tag}KnackHit`, knackTarget: `${tag}KnackTarget` };
-  }
   return pkg;
+}
+
+/** A draft from the demo package's `examples/` folder (characters with more than one calling). */
+export async function demoExample(name: string): Promise<DraftDocument> {
+  return JSON.parse(await readFile(join(DEMO_EXAMPLES_DIR, `${name}.json`), "utf8")) as DraftDocument;
 }
 
 /**

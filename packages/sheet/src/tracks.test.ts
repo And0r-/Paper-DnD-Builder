@@ -1,58 +1,54 @@
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 import { evaluateDraft, type DraftDocument } from "@builder/core";
+import { DEMO_EXAMPLES_DIR } from "@builder/demo-package";
 import type { ContentPackage } from "@builder/format";
 import { beforeAll, describe, expect, it } from "vitest";
 import { buildSheetModel, type SheetModel } from "./index.ts";
 import { sheetModelSchema } from "./schema.ts";
-import { demoCharacter, demoWithTracks, loadDemoPackage } from "./testing.ts";
+import { demoExample, demoWithTracksHead, loadDemoPackage } from "./testing.ts";
 
-const L = "calling.lantern-bearer";
-const H = "calling.herbalist";
 const createdAt = new Date("2026-10-04T12:00:00Z");
 
 let pkg: ContentPackage;
-/** Lantern bearer 2 / herbalist 3: the herbalist has the most levels, so it comes first in the head. */
-let doc: DraftDocument;
+/** The demo's example characters: lantern bearer 3 / herbalist 2, herbalist 1 / river runner 4. */
+const docs: Record<string, DraftDocument> = {};
+let expected: Record<
+  string,
+  { tracksLine: Record<string, string>; cards: Record<string, { target: number; hit: number }> }
+>;
 beforeAll(async () => {
-  pkg = demoWithTracks(await loadDemoPackage());
-  doc = demoCharacter(pkg, 5, "Mira Fennwick", L, [L, H, H, H]);
+  pkg = demoWithTracksHead(await loadDemoPackage());
+  expected = JSON.parse(await readFile(join(DEMO_EXAMPLES_DIR, "expected.json"), "utf8"));
+  for (const name of ["lantern-herbalist", "herbalist-river-runner"]) docs[name] = await demoExample(name);
 });
 
-const sheet = (language: string): SheetModel => buildSheetModel(pkg, doc, { language, createdAt });
+const sheet = (name: string, language: string): SheetModel =>
+  buildSheetModel(pkg, docs[name]!, { language, createdAt });
 const header = (m: SheetModel) => m.sections.find((s) => s.kind === "header")!;
 
 describe("a sheet with two tracks", () => {
-  it("names the callings with their levels in the head and the summary, most levels first", () => {
-    expect(evaluateDraft(pkg, doc).complete).toBe(true);
-    for (const [language, names] of [
-      ["en", "Herbalist 3 / Lantern Bearer 2"],
-      ["de", "Kräuterkundige 3 / Laternenträgerin 2"],
-    ] as const) {
-      const h = header(sheet(language));
-      if (h.kind !== "header") throw new Error("no header");
-      expect(h.fields[0]!.text).toBe(names);
-      expect(h.summary).toContain(names);
-      expect(sheetModelSchema.safeParse(JSON.parse(JSON.stringify(sheet(language)))).success).toBe(true);
-    }
-  });
+  for (const name of ["lantern-herbalist", "herbalist-river-runner"]) {
+    it(`names the callings with their levels in the head and the summary, most levels first (${name})`, () => {
+      expect(evaluateDraft(pkg, docs[name]!).complete).toBe(true);
+      for (const [language, line] of Object.entries(expected[name]!.tracksLine)) {
+        const m = sheet(name, language);
+        const h = header(m);
+        if (h.kind !== "header") throw new Error("no header");
+        expect(h.fields[0]!.text).toBe(line);
+        expect(h.summary).toContain(line);
+        expect(sheetModelSchema.safeParse(JSON.parse(JSON.stringify(m))).success).toBe(true);
+      }
+    });
 
-  it("shows on each knack card the numbers of the calling it was picked for", () => {
-    const ev = evaluateDraft(pkg, doc);
-    const m = sheet("en");
-    const pickedIn = (id: string) => ev.things.find((t) => t.id === id)?.pickedIn;
-    const lantern = m.cards.find((c) => pickedIn(c.id) === "knacks-lantern")!;
-    const root = m.cards.find((c) => pickedIn(c.id) === "knacks-root@calling.herbalist")!;
-    const numbers = (bonus: string) => {
-      const practice = ev.values["practice"]!;
-      const b = ev.values[bonus]!;
-      return [8 + practice + b, practice + b];
-    };
-    const [lt, lh] = numbers("heartBonus");
-    const [rt, rh] = numbers("mightBonus");
-    // The demo's scores make the two callings' numbers differ.
-    expect([lt, lh]).not.toEqual([rt, rh]);
-    expect(lantern.origin!.value).toContain(String(lt));
-    expect(lantern.origin!.value).toContain(String(lh));
-    expect(root.origin!.value).toContain(String(rt));
-    expect(root.origin!.value).toContain(String(rh));
-  });
+    it(`shows on each knack card the numbers of the choice it was picked in (${name})`, () => {
+      const m = sheet(name, "en");
+      for (const [id, { target, hit }] of Object.entries(expected[name]!.cards)) {
+        const card = m.cards.find((c) => c.id === id);
+        expect(card?.origin?.value).toMatch(
+          new RegExp(`\\b${target}\\b.*\\b${hit}\\b|\\b${hit}\\b.*\\b${target}\\b`),
+        );
+      }
+    });
+  }
 });

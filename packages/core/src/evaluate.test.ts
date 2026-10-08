@@ -322,10 +322,10 @@ describe("a complete level 3 character", () => {
       thing: "calling.lantern-bearer",
       things: ["item.lantern-staff", "item.provisions", "trait.steady-flame"],
       counts: { "item.provisions": 3 },
+      // The glow slots go by a value both callings share, not by the calling (format 0.21).
       values: [
         { value: "stamina", add: 18 },
-        { value: "lanternSlots1", add: 2 },
-        { value: "lanternSlots2", add: 1 },
+        { value: "lanternKnackRank", add: 2 },
       ],
       choices: ["talents-lantern-bearer", "gear", "knacks-lantern", "extra-talent", "path"],
     });
@@ -635,8 +635,12 @@ describe("text variants (format 0.15)", () => {
     if (typeof stat !== "object" || !("text" in stat)) throw new Error("demo package changed");
     return stat;
   };
+  // The variant goes by the level in the lantern bearer's calling.
   const keyAt = (level: number) =>
-    filledTextKey(harm(), evaluationScope(pkg, evaluateDraft(pkg, draft(level))));
+    filledTextKey(
+      harm(),
+      evaluationScope(pkg, evaluateDraft(pkg, draft(level, { calling: { pick: "calling.lantern-bearer" } }))),
+    );
 
   it("keeps the text while no variant holds", () => {
     expect(keyAt(4)).toBe("stat-value.item.lantern-staff.harm");
