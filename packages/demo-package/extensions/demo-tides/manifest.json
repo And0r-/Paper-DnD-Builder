@@ -1,5 +1,5 @@
 {
-  "formatVersion": "0.20",
+  "formatVersion": "0.21",
   "id": "demo-tides",
   "version": "0.1.0",
   "dependsOn": [{ "id": "demo", "minVersion": "0.18.0" }],

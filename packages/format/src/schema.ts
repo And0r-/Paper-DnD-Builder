@@ -147,11 +147,19 @@ export const valueSchema = z
     formula: expr.optional(),
     /** The value before modifiers, one number per character level (like a formula). */
     byLevel: z.array(z.number()).min(1).optional(),
+    /** The value before modifiers, looked up in `table` by another value (entry 0 at 0). */
+    byValue: z.string().regex(VALUE_ID_PATTERN).optional(),
+    /** One number per whole number of `byValue`, from 0 on. */
+    table: z.array(z.number()).min(1).optional(),
     min: z.number().optional(),
     max: z.number().optional(),
   })
-  .refine((v) => [v.formula, v.default, v.byLevel].filter((x) => x !== undefined).length <= 1, {
-    message: "use only one of formula, default and byLevel",
+  .refine((v) => [v.formula, v.default, v.byLevel, v.byValue].filter((x) => x !== undefined).length <= 1, {
+    message: "use only one of formula, default, byLevel and byValue",
+  })
+  .refine((v) => (v.byValue === undefined) === (v.table === undefined), {
+    message: '"byValue" and "table" go together',
+    path: ["table"],
   });
 
 export const valuesSchema = z.array(valueSchema);
@@ -170,8 +178,16 @@ export const grantSchema = z
     value: valueId.optional(),
     /** ... this number, expression or table by level. */
     add: amountSchema.optional(),
-    /** Character level from which the grant applies. Default 1. */
+    /**
+     * Level from which the grant applies. Default 1. For a thing that belongs
+     * to a track (flow.level.tracks) the level in that track, else the character level.
+     */
     atLevel: level.optional(),
+    /**
+     * Only if the thing's track is the character's first track ("first"), or
+     * only if it is a track added later ("added"). See flow.level.tracks.
+     */
+    only: z.enum(["first", "added"]).optional(),
   })
   .superRefine((g, ctx) => {
     const set = [g.thing, g.choice, g.value].filter((x) => x !== undefined).length;
@@ -230,6 +246,11 @@ export const thingSchema = z.strictObject({
   tags: z.array(id).optional(),
   /** Condition under which the thing may be chosen. */
   requires: expr.optional(),
+  /**
+   * For a track (an option of the choice flow.level.tracks names): condition
+   * for adding it as a further track. Reason text: `<thing>.addReason`.
+   */
+  addRequires: expr.optional(),
   /** Fixed facts shown on cards and in the "learn more" panel. Labels: stat.<key>.name */
   stats: z.record(z.string().regex(VALUE_ID_PATTERN, "stat keys are camelCase"), statValueSchema).optional(),
   grants: z.array(grantSchema).optional(),
@@ -272,6 +293,8 @@ export const choiceOptionsSchema = z
     ...optionSourceShape,
     owned: z.boolean().optional(),
     ownedFrom: z.array(id).min(1).optional(),
+    /** Only things whose `rank` is at most this (an expression, often a value key); no rank counts as 0. */
+    rankUpTo: expr.optional(),
   })
   .refine(...selectsSomething)
   .refine((o) => o.ownedFrom === undefined || o.owned === true, {
@@ -318,6 +341,13 @@ const targetBadge = z.strictObject({
  */
 const held = z.strictObject({ text: textKey });
 
+/**
+ * On the cards of things picked in this choice, the value on the right is
+ * shown wherever the card would show the value on the left (its stats and
+ * the vars of its texts), e.g. the numbers of the track the pick came from.
+ */
+const cardValues = z.record(valueId, valueId);
+
 export const pointBuySchema = z.strictObject({
   method: z.literal("pointBuy"),
   budget: z.number().int().positive(),
@@ -353,6 +383,7 @@ export const choiceSchema = z.discriminatedUnion("kind", [
     /** Shown on an option instead of the "recommended" badge. At most one per thing. */
     badges: z.array(badge).optional(),
     held: held.optional(),
+    cardValues: cardValues.optional(),
   }),
   z.strictObject({
     ...choiceBase,
@@ -369,6 +400,7 @@ export const choiceSchema = z.discriminatedUnion("kind", [
     recommend: z.array(pickRecommendation).optional(),
     badges: z.array(badge).optional(),
     held: held.optional(),
+    cardValues: cardValues.optional(),
   }),
   z.strictObject({
     ...choiceBase,
@@ -445,9 +477,23 @@ export const gatherStepSchema = z.strictObject({
   when: expr.optional(),
 });
 
+/**
+ * The choice whose things carry levels (tracks). The character's first
+ * level goes to its answer; each further level to the track the draft's
+ * `tracks` names for it. Without it, a character has no tracks.
+ */
+export const tracksSchema = z.strictObject({
+  choice: id,
+  /** Adding a track also needs the `addRequires` of every track the character already has. */
+  addRequiresCurrent: z.boolean().optional(),
+});
+
+/** `{ "tracks": true }`: the character's tracks with their levels, "A 3 / B 2". */
+const tracksArg = z.strictObject({ tracks: z.literal(true) });
+
 export const flowSchema = z.strictObject({
   level: z
-    .strictObject({ min: level, max: level, default: level })
+    .strictObject({ min: level, max: level, default: level, tracks: tracksSchema.optional() })
     .refine((l) => l.min <= l.default && l.default <= l.max, { message: "need min <= default <= max" }),
   steps: z.array(z.union([fixedStepSchema, gatherStepSchema])).min(1),
   choices: z.array(choiceSchema).min(1),
@@ -465,7 +511,7 @@ export const flowSchema = z.strictObject({
     /** Arguments for the summary.line text, by {{var:name}}. */
     line: z.record(
       z.string().regex(VALUE_ID_PATTERN),
-      z.union([z.strictObject({ choice: id }), z.strictObject({ value: z.string() })]),
+      z.union([z.strictObject({ choice: id }), z.strictObject({ value: z.string() }), tracksArg]),
     ),
   }),
 });
@@ -551,6 +597,7 @@ export const sectionSchema = z.discriminatedUnion("kind", [
         z.union([
           z.strictObject({ choice: id, label: textKey.optional() }),
           z.strictObject({ things: optionSourceSchema, label: textKey.optional() }),
+          z.strictObject({ ...tracksArg.shape, label: textKey.optional() }),
         ]),
       )
       .min(1)
@@ -717,6 +764,7 @@ export type OptionSource = z.infer<typeof optionSourceSchema>;
 export type ChoiceOptions = z.infer<typeof choiceOptionsSchema>;
 export type Choice = z.infer<typeof choiceSchema>;
 export type Flow = z.infer<typeof flowSchema>;
+export type Tracks = z.infer<typeof tracksSchema>;
 export type Step = Flow["steps"][number];
 export type FixedStep = z.infer<typeof fixedStepSchema>;
 export type GatherStep = z.infer<typeof gatherStepSchema>;

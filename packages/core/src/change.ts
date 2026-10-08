@@ -163,11 +163,13 @@ export function summarize(pkg: ContentPackage, doc: DraftDocument, ev: Evaluatio
     nameState?.status === "answered" ? ((nameState.answer as { text: string }).text.trim() ?? null) : null;
   const line: DraftSummary["line"] = {};
   for (const [key, arg] of Object.entries(pkg.flow.summary.line)) {
-    if ("choice" in arg) {
-      const held = ev.things.find((t) => t.pickedIn === arg.choice);
-      line[key] = held?.id ?? null;
-    } else {
+    if ("value" in arg) {
       line[key] = arg.value === "level" ? doc.level : (ev.values[arg.value] ?? null);
+    } else {
+      // `{ tracks }` names the first track only until the core counts levels per track (AND-248).
+      const choice = "choice" in arg ? arg.choice : pkg.flow.level.tracks?.choice;
+      const held = ev.things.find((t) => t.pickedIn === choice);
+      line[key] = held?.id ?? null;
     }
   }
   return { name, level: doc.level, complete: ev.complete, line };

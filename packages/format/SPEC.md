@@ -1,6 +1,6 @@
 # Content package format — specification
 
-Format version **0.20**. This document describes everything a content
+Format version **0.21**. This document describes everything a content
 package contains and every rule a valid package follows. After reading it
 you should be able to write your own package. The demo package in
 [`packages/demo-package`](../demo-package) uses every feature and is the
@@ -126,7 +126,7 @@ an extension with such a license says so ([17.7](#177-characters-with-extensions
 
 ```json
 {
-  "formatVersion": "0.20",
+  "formatVersion": "0.21",
   "id": "demo",
   "version": "0.1.0",
   "languages": ["de", "en"],
@@ -202,20 +202,21 @@ Each `things/*.json` file is an array of things:
 }
 ```
 
-| Field        | Required | Meaning                                                                                                                                                                                     |
-| ------------ | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `id`         | yes      | Thing key.                                                                                                                                                                                  |
-| `kind`       | yes      | One of `manifest.kinds`.                                                                                                                                                                    |
-| `source`     | yes      | Source key. `license` optional.                                                                                                                                                             |
-| `rank`       | no       | The thing's own tier (for example a spell level). Shown on cards. Not the character level.                                                                                                  |
-| `group`      | no       | Heading under which the thing appears in long option lists. Text: `group.<group>.name`.                                                                                                     |
-| `tags`       | no       | Free labels for selecting things (`options`, `count()`).                                                                                                                                    |
-| `requires`   | no       | [Expression](#8-expressions). The thing is offered as an option only while it is true.                                                                                                      |
-| `stats`      | no       | Facts shown on cards and in details: number, `true`/`false`, quantity `{amount, unit}`, `{text}` (a text key, for words like "instant") or `{value}` (see below). Label: `stat.<key>.name`. |
-| `grants`     | no       | What having this thing gives, see below.                                                                                                                                                    |
-| `about`      | no       | Another thing this one is about, for example skill with one tool → that tool. Used by choices with `held` ([9.3](#93-choices)).                                                             |
-| `card`       | no       | Print a card for this thing. Needs a card layout for its kind in `sheet.json`.                                                                                                              |
-| `repeatable` | no       | May be picked again in a later choice although the character has it; each pick asks the choices it grants anew (see below).                                                                 |
+| Field         | Required | Meaning                                                                                                                                                                                     |
+| ------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`          | yes      | Thing key.                                                                                                                                                                                  |
+| `kind`        | yes      | One of `manifest.kinds`.                                                                                                                                                                    |
+| `source`      | yes      | Source key. `license` optional.                                                                                                                                                             |
+| `rank`        | no       | The thing's own tier (for example a spell level). Shown on cards. Not the character level.                                                                                                  |
+| `group`       | no       | Heading under which the thing appears in long option lists. Text: `group.<group>.name`.                                                                                                     |
+| `tags`        | no       | Free labels for selecting things (`options`, `count()`).                                                                                                                                    |
+| `requires`    | no       | [Expression](#8-expressions). The thing is offered as an option only while it is true.                                                                                                      |
+| `addRequires` | no       | For a track: [expression](#8-expressions) that must be true to add it as a further track ([9.7](#97-tracks-levels-in-more-than-one-thing)). Text: `<thing>.addReason`.                      |
+| `stats`       | no       | Facts shown on cards and in details: number, `true`/`false`, quantity `{amount, unit}`, `{text}` (a text key, for words like "instant") or `{value}` (see below). Label: `stat.<key>.name`. |
+| `grants`      | no       | What having this thing gives, see below.                                                                                                                                                    |
+| `about`       | no       | Another thing this one is about, for example skill with one tool → that tool. Used by choices with `held` ([9.3](#93-choices)).                                                             |
+| `card`        | no       | Print a card for this thing. Needs a card layout for its kind in `sheet.json`.                                                                                                              |
+| `repeatable`  | no       | May be picked again in a later choice although the character has it; each pick asks the choices it grants anew (see below).                                                                 |
 
 **Stats that grow.** A stat is fixed per thing, except `{ "value": "<value>" }`:
 it shows the character's value with that key (with its unit, if it has
@@ -301,6 +302,15 @@ adds the entry of the character's level (entry 0 at `flow.level.min`, one
 entry per level up to `flow.level.max`). Use it for numbers that only the
 characters with this thing have, such as slots per rank of one class.
 
+With tracks ([9.7](#97-tracks-levels-in-more-than-one-thing)), `atLevel`
+and a table by level of a thing that belongs to a track count the levels
+in that track, not the character level. A grant may then also say
+`"only": "first"` (it applies only if its track is the character's first
+track) or `"only": "added"` (only if its track was added later), for
+example full training from the first track and part of it from an added
+one. On a thing that never belongs to a track such a grant never applies
+(a warning).
+
 ### Repeatable things
 
 Normally a thing counts once, and a pick choice does not offer a thing the
@@ -371,21 +381,23 @@ needing a new answer. Going back restores it if it becomes valid again.
 ]
 ```
 
-| Field      | Meaning                                                                        |
-| ---------- | ------------------------------------------------------------------------------ |
-| `id`       | Value key (camelCase). Text: `value.<id>.name`, optional `value.<id>.explain`. |
-| `source`   | Source key. `license` optional.                                                |
-| `formula`  | Expression for the base value. Cannot be combined with `default` or `byLevel`. |
-| `byLevel`  | The base value as a table by level: one number per level, see below.           |
-| `default`  | Base value if no formula and no player input. Default `0`.                     |
-| `unit`     | The value is a quantity in this unit (see [12](#12-units)).                    |
-| `min, max` | The final value is clamped to this range.                                      |
+| Field              | Meaning                                                                                                                    |
+| ------------------ | -------------------------------------------------------------------------------------------------------------------------- |
+| `id`               | Value key (camelCase). Text: `value.<id>.name`, optional `value.<id>.explain`.                                             |
+| `source`           | Source key. `license` optional.                                                                                            |
+| `formula`          | Expression for the base value. Cannot be combined with `default` or `byLevel`.                                             |
+| `byLevel`          | The base value as a table by level: one number per level, see below.                                                       |
+| `byValue`, `table` | The base value looked up in `table` by another value, see below. Together, and not with `formula`, `default` or `byLevel`. |
+| `default`          | Base value if no formula and no player input. Default `0`.                                                                 |
+| `unit`             | The value is a quantity in this unit (see [12](#12-units)).                                                                |
+| `min, max`         | The final value is clamped to this range.                                                                                  |
 
 How the rule core computes a value:
 
 ```
 base  = formula result            if the value has a formula
       = byLevel[level - min]      if the value has a table by level
+      = table[byValue]            if the value has a table by another value
       = the player's input        if a distribute or number choice sets it
       = default (or 0)            otherwise
 value = clamp(base + sum of all "add" grants of things the character has
@@ -417,6 +429,31 @@ works for a grant's `add` and a `pickMany` choice's `count`.
 A bonus that grows by a rule is still a formula:
 `{ "id": "practice", "formula": "floor((level - 1) / 4) + 2" }`.
 
+**Tables by another value** (since 0.21). Some tables are not by the
+character level but by a number worked out first, for example slots by a
+level that adds up the levels of several tracks. `byValue` names that
+value (or `level`), `table` has one number per whole number of it, entry
+0 at 0. The value is rounded down; below 0 it takes entry 0, above the
+end the last entry. If the named value has a `max`, the validator warns
+when the table is shorter than `max + 1`.
+
+```json
+[
+  {
+    "id": "glowLevel",
+    "source": "mistland",
+    "formula": "levelOf('calling.lantern-bearer') + ceil(levelOf('calling.herbalist') / 2)",
+    "max": 20
+  },
+  {
+    "id": "sharedSlots1",
+    "source": "mistland",
+    "byValue": "glowLevel",
+    "table": [0, 2, 3, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4]
+  }
+]
+```
+
 ## 8. Expressions
 
 Conditions (`requires`, `when`) and formulas (`formula`, `add`, `count`,
@@ -446,17 +483,20 @@ where whole numbers matter. Arithmetic on booleans is an error.
 
 Functions:
 
-| Function                                    | Result                                                |
-| ------------------------------------------- | ----------------------------------------------------- |
-| `floor(x)`, `ceil(x)`, `round(x)`, `abs(x)` | as usual                                              |
-| `min(a, b, ...)`, `max(a, b, ...)`          | smallest / largest argument                           |
-| `if(cond, a, b)`                            | `a` if `cond` is true, else `b`                       |
-| `has('thing.key')`                          | true if the character has that thing                  |
-| `count('tag')`                              | number of things the character has that carry the tag |
+| Function                                    | Result                                                                                                                 |
+| ------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `floor(x)`, `ceil(x)`, `round(x)`, `abs(x)` | as usual                                                                                                               |
+| `min(a, b, ...)`, `max(a, b, ...)`          | smallest / largest argument                                                                                            |
+| `if(cond, a, b)`                            | `a` if `cond` is true, else `b`                                                                                        |
+| `has('thing.key')`                          | true if the character has that thing                                                                                   |
+| `count('tag')`                              | number of things the character has that carry the tag                                                                  |
+| `levelOf('thing.key')`                      | the levels the character has in that track, 0 if it does not have it ([9.7](#97-tracks-levels-in-more-than-one-thing)) |
 
 The validator checks that every expression parses, every value exists and
 every `has()` names an existing thing. `count()` of a tag that no thing
-carries is a warning.
+carries is a warning. `levelOf()` needs `flow.level.tracks` and names an
+option of the tracks choice. `level` is always the character level, also
+with tracks.
 
 ## 9. The flow: steps and choices
 
@@ -484,7 +524,8 @@ carries is a warning.
 
 The player chooses the level first (the builder shows this screen; its texts
 are `level.name`, `level.intro` and `level.hint`; the level is one number
-field starting at `level.default`, and the hint is one sentence under it). `max` may be raised later;
+field starting at `level.default`, and the hint is one sentence under it). `tracks` (optional)
+names the choice whose things carry levels, see [9.7](#97-tracks-levels-in-more-than-one-thing). `max` may be raised later;
 grants with `atLevel` above `max` are allowed and simply never apply until
 then. Tables by level (`byLevel`) have one entry per level, so raising
 `max` means adding entries to them.
@@ -609,7 +650,21 @@ level, `{ "byLevel": [2, 3, 3, ...] }`); with `"upTo": true`, up to `count`.
 `options` selects things: all things that match `kind` (if given), are
 listed in `ids` (if given) and carry every tag in `tags` (if given). From
 these, the builder offers those whose `requires` is true and that the
-character does not already have from somewhere else.
+character does not already have from somewhere else. With `rankUpTo` (an
+expression, often a value key) it offers only things whose `rank` is at
+most its result; a thing without `rank` counts as rank 0. It sees the
+character as `requires` does. Use it for a limit that belongs to the
+choice rather than to the thing, for example "knacks up to the rank this
+calling reaches": `"options": { "tags": ["lantern"], "rankUpTo": "lanternRank" }`.
+
+**Card values** (`cardValues`, on `pickOne` and `pickMany`). The card of a
+thing picked in this choice shows, wherever it would show the value on
+the left, the value on the right: in `{value}` stats, in the `vars` of
+its `{text}` stats and in its card lines (`origins`). Use it when the same
+thing may come from two tracks with different numbers, for example
+`"cardValues": { "knackHit": "herbalistKnackHit" }` on the knack choice of
+one calling. Both sides name existing values; a choice none of whose
+options has a card gets a warning.
 
 **The level a pick sees.** A `pickOne`, and a `pickMany` whose `count` is
 a number, is a pick made once, at the level of its step (the higher of
@@ -849,7 +904,9 @@ core re-evaluates and marks later answers that no longer fit.
 - `summary.fields`: values shown large on the overview screen.
 - `summary.line`: arguments for the text `summary.line` (shown in the list
   of characters). Each argument is `{ "choice": id }` (the name of the
-  picked thing) or `{ "value": id }` (a number; `level` allowed).
+  picked thing), `{ "value": id }` (a number; `level` allowed) or
+  `{ "tracks": true }` (the tracks with their levels, see
+  [9.7](#97-tracks-levels-in-more-than-one-thing)).
 
 ### 9.6 Things every character has
 
@@ -874,6 +931,84 @@ if the package drops it.
 
 Use it only for what really every character has. What comes with a folk,
 a calling or another pick belongs to that thing's `grants`.
+
+### 9.7 Tracks: levels in more than one thing
+
+Since 0.21, optional. In many games a character's levels belong to a
+thing, and a character may split them between several such things. The
+builder knows no such word; it calls them **tracks**: things that collect
+levels. Without `flow.level.tracks` nothing in this section applies, and
+a character is built as before.
+
+```json
+"level": { "min": 1, "max": 20, "default": 1, "tracks": { "choice": "calling", "addRequiresCurrent": true } }
+```
+
+- `tracks.choice` names a `pickOne` choice listed in a step (not granted,
+  not `options.owned`). Its options are the tracks. Its answer is the
+  **first track**: it gets character level 1.
+- Each further level goes to a track: the one it already has, or a new
+  one, which is then **added**. The draft stores this as `tracks`, one
+  thing key per character level from 2 on, in level order
+  (`["calling.herbalist", "calling.lantern-bearer"]` for a level-3
+  character: levels 1 and 2 herbalist, level 3 lantern bearer). A missing
+  entry, or a missing list, means the first track. So every draft saved
+  before 0.21 stays valid and is computed as before.
+- The **level in a track** is how many character levels went to it.
+  `levelOf('<track>')` is that number (0 for a track the character does
+  not have). The character level is the sum of all of them.
+
+**What belongs to a track.** A thing belongs to a track if it is that
+track, or came through it: by a grant of the track, by an answer to a
+choice the track grants, by a grant of such a thing, and so on, to any
+depth. A thing that comes through two tracks belongs to the one that gave
+it first, and counts once, as always. Things that come otherwise (from
+another fixed step, or from `flow.grants`) belong to no track.
+
+**Which level counts.**
+
+1. For a thing that belongs to a track, `atLevel` of its grants and the
+   tables by level in them (`add`, and the `count` of a choice it
+   grants) count the **level in that track**.
+2. For every other thing they count the character level, as before.
+3. `level` in expressions is always the **character level**. Where the
+   level in a track is meant, write `levelOf('<track>')`.
+4. `byLevel` in `values.json` counts the character level.
+
+So a single-track character (all levels in the first track) is computed
+exactly as without tracks.
+
+**The steps of a track.** A granted step gets as its level the character
+level at which its track reached the level of the grant. Example: a
+character takes lantern bearer at character level 4; the lantern bearer's
+grant with `"atLevel": 2` comes at character level 5. Raising a character
+still adds exactly the steps with a higher level. A choice that comes
+through an added track is asked as a copy `<choice>@<track>`, with an
+answer of its own, even if the first track grants the same choice (two
+tracks may each give a bonus pick at their level 4). The first track
+keeps the plain choice ids, so no saved answer changes its key.
+
+**Adding a track.** A track with `addRequires` may be added only while
+that expression is true; with `addRequiresCurrent: true`, the
+`addRequires` of every track the character already has must be true as
+well. Both are checked for the character as it was before the level that
+adds the track. Further levels in a track the character already has are
+not checked. The text `<thing>.addReason` says in one sentence what is
+needed ("Needs wit 13 or more."); the builder shows it at a track that
+cannot be added.
+
+**First or added** (`only` on grants, see [6](#grants)). A grant with
+`"only": "first"` applies only if its thing belongs to the first track;
+`"only": "added"` only if it belongs to an added track. Typical use: what
+a track gives in full only to a character that starts with it, and in
+part to one that adds it.
+
+**Showing the tracks.** `{ "tracks": true }` as an argument of
+`summary.line` and as a header field ([13](#13-print-sheet-and-cards))
+gives the tracks with their levels, e.g. "Herbalist 3 / Lantern bearer
+2": the track with the most levels first, on a tie the earlier one; names
+joined by " / ". The default label of the header field is the title of
+the tracks choice.
 
 ## 10. Texts
 
@@ -922,6 +1057,7 @@ Text keys follow from the keys of the things they belong to.
 | `<thing>.explain.example`                                                | no                                                                  | a small scene                                                              |
 | `<thing>.goodIf`                                                         | no                                                                  | who it suits, at most 80 characters                                        |
 | `<thing>.rules`                                                          | no                                                                  | the official rules text, verbatim                                          |
+| `<thing>.addReason`                                                      | if the thing has `addRequires`                                      | why the track cannot be added, one sentence (9.7)                          |
 | `choice.<id>.title`, `.question`, `.intro`                               | yes                                                                 | a choice's step                                                            |
 | `choice.<id>.missing`                                                    | no                                                                  | what is still missing                                                      |
 | `choice.<id>.variant.<variant>.title`, `.question`, `.intro`, `.missing` | no; once in one language, in all                                    | a text variant (9.3)                                                       |
@@ -1176,6 +1312,11 @@ printed small under the summary line, after its label, and names either
   grants, whether fixed or picked. The label is `label`, or else the name
   of `things.kind` (`kind.<kind>.name`); without a `kind`, `label` is
   needed. If the character has none of them, a line to write on.
+
+- `{ "tracks": true }`: the tracks with their levels
+  ([9.7](#97-tracks-levels-in-more-than-one-thing)); the label is
+  `label`, or else the title of the tracks choice. Needs
+  `flow.level.tracks`.
 
 Use it for what a game master asks first and the summary line does not
 say, for example
@@ -1491,6 +1632,13 @@ well-formed does the second stage check the rules between files:
   the same condition;
 - `ownedFrom` goes only with `"owned": true` and names pick choices
   without `owned`;
+- tracks (0.21): `flow.level.tracks.choice` is a `pickOne` choice listed in
+  a step, without `owned` options; `levelOf()` names one of its options;
+  `addRequires` is on one of its options, parses, and its `<thing>.addReason`
+  exists in every language; `only` and `{ "tracks": true }` (summary line,
+  header field) need `flow.level.tracks`; `byValue` names another existing
+  value and goes with `table`, and is not circular; `rankUpTo` parses;
+  `cardValues` names existing values;
 - text variants: ids unique per choice, conditions parse; a variant text
   that exists in one language exists in every language;
 - units: every language has defaults; every stated amount can be converted;
@@ -1503,7 +1651,10 @@ never asked; computed quantities without a conversion fallback; text
 variants without any text; a gather group without a gather step; a choice
 with `gather` that is listed in a fixed step; a gather step that no choice
 is gathered in; a repeatable thing that grants no choice; `maxPerTarget`
-above `points`.
+above `points`; `only` on a thing that never belongs to a track; a
+`byValue` table shorter than the named value's `max + 1`; `rankUpTo` on
+options without a rank; `cardValues` on a choice whose options have no
+card; `addRequiresCurrent` without any `addRequires`.
 
 In code: `validatePackageDir(dir)` returns `{ ok, errors, warnings,
 package }`; `package` is the typed, loaded content including the origin of
@@ -1551,6 +1702,7 @@ are removed (saved characters may lose picks). Keys are never renamed.
 | 0.18    | 2026-10-07 | Optional `apart` on every sheet section: the section belongs to a part of the sheet of its own. A design may set such parts apart (the "classic" design gives them a page of their own if one of them is a `statBoxes` section); the sheet model and `GET /api/drafts/:id/sheet` carry it as `apart` on the section.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | Set `formatVersion` to `"0.18"`. Nothing else has to change: `apart` is optional, so every valid 0.17 package is a valid 0.18 package.                                                                                                                                                                                                                                                                                                                                                                                                               |
 | 0.19    | 2026-10-07 | Optional `derivedLabel` on the scores of a `scoreColumn`: a text key that labels the `derived` circle instead of `value.<derived>.name` (one short word for every score). The sheet model and `GET /api/drafts/:id/sheet` carry the filled text as `derivedLabel`, as before.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | Set `formatVersion` to `"0.19"`. Nothing else has to change: `derivedLabel` is optional, so every valid 0.18 package is a valid 0.19 package.                                                                                                                                                                                                                                                                                                                                                                                                        |
 | 0.20    | 2026-10-08 | Extensions ([17](#17-extensions)): `manifest.dependsOn` names the base a package extends. An extension adds things, choices (`flow.json` with only `choices`), values, glossary entries, sheet sections and card layouts, and joins base choices whose `options` select its things; it never changes the base. Keys are shared with the base, without a package prefix (the `<package>:<key>` form reserved in 0.19 is dropped). Texts missing in a base language come from the extension's first language, marked. A character switches extensions on one by one; the sheet says when it holds content that is not `publishable`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | Set `formatVersion` to `"0.20"`. Nothing else has to change: `dependsOn` is new and optional, so every valid 0.19 package is a valid 0.20 package.                                                                                                                                                                                                                                                                                                                                                                                                   |
+| 0.21    | 2026-10-09 | Tracks: levels in more than one thing ([9.7](#97-tracks-levels-in-more-than-one-thing)). `flow.level.tracks` (`choice`, optional `addRequiresCurrent`) names the choice whose things carry levels; the draft may store `tracks`, the track of each level from 2 on. For things that belong to a track, `atLevel` and tables by level in their grants count the level in that track; `level` stays the character level. New: `levelOf('<thing>')` in expressions; `addRequires` on a thing with the text `<thing>.addReason`; `only: "first" \| "added"` on grants; a value as a table by another value (`byValue`, `table`); `rankUpTo` in the `options` of a pick choice; `cardValues` on pick choices; `{ "tracks": true }` as a `summary.line` argument and a header field.                                                                                                                                                                                                                                                                                                                                           | Set `formatVersion` to `"0.21"`. Nothing else has to change: every field is optional, and without `flow.level.tracks` a character is computed as before, so every valid 0.20 package is a valid 0.21 package. Saved drafts stay valid: without `tracks` every level belongs to the first track.                                                                                                                                                                                                                                                      |
 | 0.8     | 2026-10-04 | Gather steps (`gather`, optional `together`: `sections` or one shared `list`) in `flow.steps`, optional `gather` on choices, optional text `choice.<id>.from`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           | Set `formatVersion` to `"0.8"`. Nothing else changes: a package without gather steps builds the same steps as before, so every valid 0.7 package is a valid 0.8 package.                                                                                                                                                                                                                                                                                                                                                                             |
 
 ## 16. A minimal package
@@ -1562,7 +1714,7 @@ language. The validator accepts it as is.
 
 ```json
 {
-  "formatVersion": "0.20",
+  "formatVersion": "0.21",
   "id": "tiny",
   "version": "1.0.0",
   "languages": ["en"],
@@ -1674,7 +1826,7 @@ stays free to share.
 
 ```json
 {
-  "formatVersion": "0.20",
+  "formatVersion": "0.21",
   "id": "demo-tides",
   "version": "0.1.0",
   "dependsOn": [{ "id": "demo", "minVersion": "0.1.0" }],
