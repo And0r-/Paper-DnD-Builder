@@ -90,7 +90,9 @@ describe("invitation link", () => {
     // 128 bits, base64url: 22 characters.
     expect(url).toMatch(/^http:\/\/builder\.test\/join\/[A-Za-z0-9_-]{22}$/);
     // The same link every time the game master looks; none for a player.
-    expect((await gm.call("GET", `/api/campaigns/${made.json.campaign.id}`)).json.campaign.inviteUrl).toBe(url);
+    expect((await gm.call("GET", `/api/campaigns/${made.json.campaign.id}`)).json.campaign.inviteUrl).toBe(
+      url,
+    );
     expect(await inviteToken(campaignId)).not.toBe(url.split("/join/")[1]);
     const asPlayer = (await player.call("GET", `/api/campaigns/${campaignId}`)).json.campaign;
     expect(asPlayer).not.toHaveProperty("inviteUrl");
@@ -101,7 +103,10 @@ describe("invitation link", () => {
     const token = await inviteToken(campaignId);
     const res = await new Client(server, "203.0.113.9").call("GET", `/api/invites/${token}`);
     expect(res.status).toBe(200);
-    expect(res.json).toEqual({ campaign: { id: campaignId, name: "Die Nebelrunde" }, gameMaster: { name: "lead" } });
+    expect(res.json).toEqual({
+      campaign: { id: campaignId, name: "Die Nebelrunde" },
+      gameMaster: { name: "lead" },
+    });
 
     for (const bad of ["AAAAAAAAAAAAAAAAAAAAAA", "short", `${token}x`]) {
       const missing = await stranger.call("GET", `/api/invites/${bad}`);
@@ -144,7 +149,9 @@ describe("invitation link", () => {
     expect(await inviteToken(campaignId)).toBe(fresh);
     expect((await stranger.call("GET", `/api/invites/${old}`)).status).toBe(404);
     expect((await stranger.call("POST", `/api/invites/${old}/join`)).status).toBe(404);
-    expect((await gm.call("GET", `/api/campaigns/${campaignId}`)).json.players).toMatchObject([{ id: playerId }]);
+    expect((await gm.call("GET", `/api/campaigns/${campaignId}`)).json.players).toMatchObject([
+      { id: playerId },
+    ]);
     await join(stranger, fresh);
   });
 
@@ -280,9 +287,7 @@ describe("who sees what", () => {
     expect(made.json.draft).toMatchObject({ level: 2, access: "gameMaster", owner: { name: "player" } });
     expect((await gm.call("DELETE", `${c}/players/${otherId}`)).status).toBe(204);
     expect((await gm.call("DELETE", `${c}/players/${otherId}`)).status).toBe(404);
-    expect(
-      (await gm.call("POST", `${c}/players/${otherId}/drafts`, { packageId: "demo" })).status,
-    ).toBe(404);
+    expect((await gm.call("POST", `${c}/players/${otherId}/drafts`, { packageId: "demo" })).status).toBe(404);
     expect((await gm.call("DELETE", c)).status).toBe(204);
     expect((await gm.call("GET", c)).status).toBe(404);
   });

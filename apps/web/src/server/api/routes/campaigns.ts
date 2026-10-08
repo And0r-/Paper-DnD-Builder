@@ -110,7 +110,13 @@ export const campaignRoutes: Route[] = [
       const body = await readJson(ctx.req, z.strictObject({ name: nameSchema }));
       const id = randomUUID();
       const made = await ctx.app.store.createCampaign(
-        { id, account_id: account.id, name: body.name, invite_token: newInviteToken(), created_at: ctx.app.now() },
+        {
+          id,
+          account_id: account.id,
+          name: body.name,
+          invite_token: newInviteToken(),
+          created_at: ctx.app.now(),
+        },
         MAX_CAMPAIGNS_PER_ACCOUNT,
       );
       if (!made) throw new HttpError(422, "tooManyCampaigns", { max: MAX_CAMPAIGNS_PER_ACCOUNT });
