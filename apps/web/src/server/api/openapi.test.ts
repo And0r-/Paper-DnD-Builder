@@ -240,6 +240,7 @@ describe("openapi.json", () => {
         "keyCannotMakeKeys",
         "keyCannotMakePasswords",
         "passwordNotFound",
+        "resetLinkInvalid",
         "lastPassword",
         "notFound",
         "draftNotFound",
@@ -394,6 +395,13 @@ async function walk(server: TestServer): Promise<void> {
     password: "anker-falke-wiese-7320",
   });
   const password = await signIn(c, "walker@example.org");
+  // A link back in: asked for, used once, refused the second time.
+  const lost = new Client(server, "198.51.100.41");
+  await lost.call("POST", "/api/auth/reset", { email: "nobody@example.org" });
+  await lost.call("POST", "/api/auth/reset", { email: "walker@example.org", language: "de" });
+  const token = /\/login\/reset\/([\w-]+)/.exec(server.mails.at(-1)!.text)![1];
+  const reset = (await lost.call("POST", "/api/auth/reset/use", { token })).json.password;
+  await lost.call("POST", "/api/auth/reset/use", { token });
   await call("POST", "/api/drafts", { packageId: "demo" }, { origin: "https://elsewhere.example" });
   await call("GET", "/api/nothing-here");
   await call("PUT", "/api/account");
@@ -414,6 +422,7 @@ async function walk(server: TestServer): Promise<void> {
   await call("GET", "/api/account/passwords");
   await call("DELETE", "/api/account/passwords/00000000-0000-4000-8000-000000000000");
   await call("DELETE", `/api/account/passwords/${paper.id}`);
+  await call("DELETE", `/api/account/passwords/${reset.id}`);
   const [first] = (await call("GET", "/api/account/passwords")).json.passwords;
   await call("DELETE", `/api/account/passwords/${first.id}`);
 
