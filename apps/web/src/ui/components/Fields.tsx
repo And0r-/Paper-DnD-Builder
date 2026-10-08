@@ -66,6 +66,45 @@ export const TextField = forwardRef<
   );
 });
 
+/** A list to choose from, as a form field: label above, a native select. */
+export function SelectField({
+  label,
+  value,
+  options,
+  onChange,
+  busy,
+}: {
+  label: ReactNode;
+  value: string;
+  options: readonly { value: string; label: string }[];
+  onChange: (value: string) => void;
+  busy?: boolean;
+}) {
+  const id = useId();
+  return (
+    <div className="field">
+      <label className="field__label" htmlFor={id}>
+        {label}
+      </label>
+      <div className="field__row">
+        <select
+          id={id}
+          className="field__input"
+          value={value}
+          aria-busy={busy}
+          onChange={(e) => onChange(e.currentTarget.value)}
+        >
+          {options.map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+          ))}
+        </select>
+      </div>
+    </div>
+  );
+}
+
 export interface SegmentOption<V extends string | number> {
   value: V;
   label: ReactNode;

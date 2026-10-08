@@ -316,7 +316,10 @@ export const draftRoutes: Route[] = [
       const body = await readJson(ctx.req, z.strictObject({ campaignId: z.string().regex(UUID).nullable() }));
       const set = await ctx.app.store.setDraftCampaign(row.id, viewer.id, body.campaignId);
       if (!set) throw new HttpError(404, "campaignNotFound");
-      return json(200, draftView({ ...row, campaign_id: body.campaignId }, ctx.app.packages.get(row.package_id)));
+      return json(
+        200,
+        draftView({ ...row, campaign_id: body.campaignId }, ctx.app.packages.get(row.package_id)),
+      );
     },
   },
   {

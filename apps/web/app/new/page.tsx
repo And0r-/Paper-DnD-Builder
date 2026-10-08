@@ -4,15 +4,29 @@
  * draft starts at once (flow spec 4.3, Hick's law). With several, the
  * player picks the game first; that cannot be changed later.
  *
+ * A player of a campaign first says which campaign the character is for
+ * (AND-231), with the campaign they joined last chosen: most come here
+ * straight from the invitation. Without a campaign the question is skipped.
+ *
  * `?campaign=<id>&player=<id>`: a game master builds for a player of their
- * campaign. The character is the player's from the start.
+ * campaign. The character is the player's from the start and belongs to
+ * that campaign.
  */
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useId, useRef, useState } from "react";
 import { useApp } from "../../src/ui/app-state.tsx";
-import { api, ApiError, type CampaignView, type DraftView, type PackageListEntry } from "../../src/ui/api.ts";
+import {
+  api,
+  ApiError,
+  type Campaign,
+  type CampaignView,
+  type DraftView,
+  type PackageListEntry,
+} from "../../src/ui/api.ts";
+import { loadPlayedCampaigns, NO_CAMPAIGN } from "../../src/ui/campaigns.ts";
 import { Button, ButtonLink } from "../../src/ui/components/Button.tsx";
 import { Callout, EmptyState, ErrorState, Loading } from "../../src/ui/components/Feedback.tsx";
+import { SelectField } from "../../src/ui/components/Fields.tsx";
 import { AppShell } from "../../src/ui/components/Shell.tsx";
 import { QuestionHeader, usePageTitle } from "../../src/ui/flow/frame.tsx";
 import { RequireAccount } from "../../src/ui/guards.tsx";
@@ -60,9 +74,13 @@ function NewCharacter() {
   const { t, lang } = useApp();
   const router = useRouter();
   const forPlayer = useForPlayer();
-  usePageTitle([t("new.question")]);
   const [list, setList] = useState<PackageListEntry[] | null>(null);
   const [failed, setFailed] = useState(false);
+  // The campaigns the viewer plays in; not asked when a game master builds for a player.
+  const [campaigns, setCampaigns] = useState<Campaign[] | null>(null);
+  const [campaignPick, setCampaignPick] = useState<string>();
+  /** The campaign the character is for once decided; NO_CAMPAIGN for none. */
+  const [campaign, setCampaign] = useState<string>();
   const [attempt, setAttempt] = useState(0);
   const [picked, setPicked] = useState<string>();
   const [busy, setBusy] = useState(false);
@@ -82,7 +100,7 @@ function NewCharacter() {
                 `/api/campaigns/${forPlayer.campaignId}/players/${forPlayer.playerId}/drafts`,
                 { packageId },
               )
-            : await api<DraftView>("POST", "/api/drafts", { packageId });
+            : await api<DraftView>("POST", "/api/drafts", { packageId, campaignId: campaign || null });
         router.replace(`/c/${r.draft.id}/level`);
       } catch {
         setProblem(t("common.loadError"));
@@ -90,10 +108,13 @@ function NewCharacter() {
         started.current = false;
       }
     },
-    [router, t, forPlayer],
+    [router, t, forPlayer, campaign],
   );
-  // Building for a player waits until the player is known.
-  const ready = forPlayer !== null && forPlayer !== "missing";
+  // Building for a player waits until the player is known; one's own waits for the campaign.
+  const own = forPlayer === undefined;
+  const ready = own ? campaign !== undefined : forPlayer !== null && forPlayer !== "missing";
+  const askCampaign = own && campaign === undefined && campaigns !== null && campaigns.length > 0;
+  usePageTitle([t(askCampaign ? "new.campaignQuestion" : "new.question")]);
 
   useEffect(() => {
     let live = true;
@@ -107,6 +128,24 @@ function NewCharacter() {
   }, [lang, attempt]);
 
   useEffect(() => {
+    if (forPlayer !== undefined) return;
+    let live = true;
+    loadPlayedCampaigns().then(
+      (c) => {
+        if (!live) return;
+        setCampaigns(c);
+        setCampaignPick(c[0]?.id ?? NO_CAMPAIGN);
+        // Nothing to ask: the character is in no campaign.
+        if (c.length === 0) setCampaign(NO_CAMPAIGN);
+      },
+      () => live && setFailed(true),
+    );
+    return () => {
+      live = false;
+    };
+  }, [forPlayer, attempt]);
+
+  useEffect(() => {
     if (list?.length === 1 && ready && !started.current) {
       started.current = true;
       void create(list[0]!.id);
@@ -114,6 +153,17 @@ function NewCharacter() {
   }, [list, create, ready]);
 
   const back = forPlayer && forPlayer !== "missing" ? `/campaigns/${forPlayer.campaignId}` : "/characters";
+  // After the campaign question, "Back" goes back to it.
+  const backButton =
+    own && campaigns && campaigns.length > 0 ? (
+      <Button variant="secondary" icon="arrowLeft" onClick={() => setCampaign(undefined)}>
+        {t("common.back")}
+      </Button>
+    ) : (
+      <ButtonLink href={back} variant="secondary" icon="arrowLeft">
+        {t("common.back")}
+      </ButtonLink>
+    );
 
   let content;
   if (forPlayer === "missing") {
@@ -123,7 +173,36 @@ function NewCharacter() {
       </EmptyState>
     );
   } else if (failed) content = <ErrorState onRetry={() => setAttempt((n) => n + 1)} />;
-  else if (!list || !ready || (list.length === 1 && !problem)) content = <Loading shape="page" count={2} />;
+  else if (askCampaign && campaigns) {
+    content = (
+      <form
+        className="new-campaign"
+        onSubmit={(e) => {
+          e.preventDefault();
+          setCampaign(campaignPick ?? NO_CAMPAIGN);
+        }}
+      >
+        <QuestionHeader id={headingId} question={t("new.campaignQuestion")} />
+        <SelectField
+          label={t("new.campaignLabel")}
+          value={campaignPick ?? NO_CAMPAIGN}
+          onChange={setCampaignPick}
+          options={[
+            ...campaigns.map((c) => ({ value: c.id, label: c.name })),
+            { value: NO_CAMPAIGN, label: t("new.noCampaign") },
+          ]}
+        />
+        <div className="step-footer__bar">
+          <ButtonLink href="/characters" variant="secondary" icon="arrowLeft">
+            {t("common.back")}
+          </ButtonLink>
+          <Button type="submit" iconAfter="arrowRight">
+            {t("common.next")}
+          </Button>
+        </div>
+      </form>
+    );
+  } else if (!list || !ready || (list.length === 1 && !problem)) content = <Loading shape="page" count={2} />;
   else if (list.length === 0) {
     content = (
       <EmptyState title={t("new.noneTitle")}>
@@ -179,9 +258,7 @@ function NewCharacter() {
         <p className="note">{t("new.note")}</p>
         {problem && <Callout tone="warning">{problem}</Callout>}
         <div className="step-footer__bar">
-          <ButtonLink href={back} variant="secondary" icon="arrowLeft">
-            {t("common.back")}
-          </ButtonLink>
+          {backButton}
           <Button type="submit" busy={busy} busyLabel={t("new.creating")} iconAfter="arrowRight">
             {t("new.start")}
           </Button>

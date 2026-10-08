@@ -104,6 +104,8 @@ export interface DraftApi {
    * the new level asks nothing, so the character is done again at once.
    */
   levelUp(level: number): Promise<"open" | "finished" | "failed">;
+  /** Puts the character into a campaign its owner plays in, or into none (null). False if that failed. */
+  setCampaign(campaignId: string | null): Promise<boolean>;
 }
 
 const Ctx = createContext<DraftApi | null>(null);
@@ -402,6 +404,21 @@ function ReadyDraft({
     [flush, setServer, setDoc],
   );
 
+  const setCampaign = useCallback(
+    async (campaignId: string | null): Promise<boolean> => {
+      try {
+        await api<DraftView>("PUT", `/api/drafts/${serverRef.current.draft.id}/campaign`, { campaignId });
+        // The version stays: only the campaign changes in what we hold, whatever is on its way.
+        serverRef.current = { ...serverRef.current, draft: { ...serverRef.current.draft, campaignId } };
+        setServer(serverRef.current);
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    [setServer],
+  );
+
   const value = useMemo<DraftApi>(
     () => ({
       lp,
@@ -419,8 +436,23 @@ function ReadyDraft({
       flush,
       finish,
       levelUp,
+      setCampaign,
     }),
-    [lp, server.draft, doc, ev, flow, saveState, rejected, notice, change, flush, finish, levelUp],
+    [
+      lp,
+      server.draft,
+      doc,
+      ev,
+      flow,
+      saveState,
+      rejected,
+      notice,
+      change,
+      flush,
+      finish,
+      levelUp,
+      setCampaign,
+    ],
   );
   return <Ctx.Provider value={value}>{render({ state: "ready", api: value })}</Ctx.Provider>;
 }

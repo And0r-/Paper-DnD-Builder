@@ -117,6 +117,8 @@ export interface DraftInfo {
   level: number;
   /** The level a raise started from, until the character is finished again. */
   levelBefore: number | null;
+  /** The campaign the character belongs to; null for none. */
+  campaignId: string | null;
   answers: Record<string, unknown>;
   createdAt: string;
   updatedAt: string;
@@ -144,6 +146,8 @@ export interface Campaign {
   gameMaster: { email: string };
   playerCount: number;
   createdAt: string;
+  /** When the viewer joined as a player; null for the game master. */
+  joinedAt: string | null;
 }
 
 export interface CampaignPlayer {
