@@ -99,6 +99,30 @@ describe("a sheet with two tracks, the head and shared things", () => {
     expect(h.fields.map((f) => f.label)).not.toContain(MESSAGES["en"]!.startedAs);
   });
 
+  it("leaves out the lead sentence of a calling that brought no row to the table", () => {
+    const doc = docs["herbalist-river-runner"]!;
+    const said = structuredClone(pkg);
+    said.texts["en"]!["calling.herbalist.knacks.change"] = "herbalist swaps";
+    said.texts["en"]!["calling.river-runner.knacks.change"] = "river runner swaps";
+    const lead = (p: ContentPackage) => {
+      const knacks = buildSheetModel(p, doc, { language: "en", createdAt }).sections.find(
+        (s) => s.id === "knacks",
+      );
+      if (knacks?.kind !== "featureTable") throw new Error("no knacks");
+      return knacks.lead;
+    };
+    expect([...lead(said)].sort()).toEqual(["herbalist swaps", "river runner swaps"]);
+
+    // Only the river runner's knacks in the table: the herbalist has nothing here to swap.
+    const ev = evaluateDraft(pkg, doc);
+    const runner = ev.things.filter((h) => h.track === "calling.river-runner" && h.id.startsWith("knack."));
+    expect(runner.length).toBeGreaterThan(0);
+    const section = said.sheet.sections.find((s) => s.id === "knacks");
+    if (section?.kind !== "featureTable") throw new Error("no knacks");
+    section.things = { ids: runner.map((h) => h.id) };
+    expect(lead(said)).toEqual(["river runner swaps"]);
+  });
+
   it("shows a thing that both callings grant once, under the calling that brought it first", () => {
     const shared = structuredClone(pkg);
     const herbalist = shared.things.find((t) => t.id === "calling.herbalist")!;

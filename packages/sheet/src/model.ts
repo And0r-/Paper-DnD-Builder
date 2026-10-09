@@ -601,10 +601,14 @@ export function buildSheetModel(
           };
         });
         const legend = signs.flatMap((m, i) => (used.has(i) ? [`${text(m.text)} = ${text(m.legend)}`] : []));
+        // A track that brought no row here has nothing in this table its sentence could be about.
+        const tracks = new Set(ev.tracks?.list.map((t) => t.thing) ?? []);
+        const rowTracks = new Set(held.flatMap((t) => heldById.get(t.id)?.track ?? []));
         const lead =
           s.lead === undefined
             ? []
             : heldOf(s.lead.things)
+                .filter((t) => !tracks.has(t.id) || rowTracks.has(t.id))
                 .map((t) => text(`${t.id}.${s.lead!.text}`))
                 .filter((l) => l !== "");
         // The hint explains the boxes (SPEC 13); without boxes it would point at nothing.
