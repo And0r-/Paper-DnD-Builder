@@ -321,6 +321,27 @@ describe("sheet model", () => {
     ]);
   });
 
+  it("writes the texts of a pick after the thing's name, in the table and in a section of answers", () => {
+    const herbalist = demoCharacter(pkg, 1, "Mira Fennwick", "calling.herbalist");
+    const texts = { "trait.far-lore": { first: "Salzmarschen", second: "Glut-Hügel" } };
+    const doc = {
+      ...herbalist,
+      answers: { ...herbalist.answers, "herb-craft": { pick: "trait.far-lore", texts } },
+    };
+    expect(evaluateDraft(pkg, doc).complete).toBe(true);
+    const listed = structuredClone(pkg);
+    listed.sheet.sections.push({ id: "craft", kind: "answers", span: 4, choices: ["herb-craft"] });
+    const model = buildSheetModel(listed, doc, { language: "de", createdAt });
+    const rows = model.sections.flatMap((s) => (s.kind === "featureTable" ? s.rows : []));
+    expect(rows.find((r) => r.id === "trait.far-lore")?.name).toBe("Fernkunde (Salzmarschen, Glut-Hügel)");
+    const answers = model.sections.find((s) => s.id === "craft");
+    expect(answers?.kind === "answers" && answers.rows[0]?.text).toBe("Fernkunde (Salzmarschen, Glut-Hügel)");
+    // Another pick: its texts stay in the answer for going back, the sheet names only what counts.
+    const leaf = { ...doc, answers: { ...doc.answers, "herb-craft": { pick: "trait.leaf-lore", texts } } };
+    const leafRows = sheet(leaf).sections.flatMap((s) => (s.kind === "featureTable" ? s.rows : []));
+    expect(leafRows.find((r) => r.id === "trait.leaf-lore")?.name).toBe("Blattkunde");
+  });
+
   it("does not depend on the PDF library", () => {
     const manifest = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"));
     const deps = { ...manifest.dependencies, ...manifest.devDependencies };
