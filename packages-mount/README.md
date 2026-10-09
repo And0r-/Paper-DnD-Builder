@@ -33,6 +33,7 @@ by one; a character without it does not see it.
    every character without it working as before.
 
 An extension whose licenses are not `publishable` holds content that may
-not be shared. Keep such a folder off public servers and out of public
-repositories; the sheet of a character that uses it says "not for
-sharing".
+not be published. Keep such a folder off public servers and out of public
+repositories. New characters have it switched on; its switch asks players
+who do not own the book to switch it off. The sheet of a character that
+uses it names where that content comes from.

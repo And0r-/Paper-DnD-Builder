@@ -184,8 +184,8 @@ test("a character without cards cannot tick them, and keeps the wish for the nex
   await signup(page, "print-nocards", "de");
   const id = await makeCharacter(page);
   await page.request.patch("/api/account/settings", { data: { print: { parts: ["sheet", "cards"] } } });
-  // The same package where nothing is a card.
-  await page.route(/\/api\/packages\/demo$/, async (route) => {
+  // The same package, with its extensions on (AND-330), where nothing is a card.
+  await page.route(/\/api\/packages\/demo(%2B[^/]*)?$/, async (route) => {
     const res = await route.fetch();
     const body = (await res.json()) as { package: { things: { card?: boolean }[] } };
     for (const t of body.package.things) delete t.card;

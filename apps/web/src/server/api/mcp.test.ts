@@ -416,7 +416,8 @@ describe("the HTTP server: a key per request, nothing kept between requests", ()
     expect((await owner.call("GET", `/api/drafts/${characterId}`)).json.draft.level).toBe(3);
 
     await call("get_character", { characterId });
-    const texts = fetched.filter((f) => f.startsWith("GET /api/packages/demo/texts/"));
+    // A new character has the demo's extension on: its package is the demo with it.
+    const texts = fetched.filter((f) => f.startsWith("GET /api/packages/demo%2Bdemo-tides/texts/"));
     expect(texts).toHaveLength(1);
   });
 

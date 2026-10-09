@@ -77,7 +77,7 @@ const listPackages = defineTool({
           extensionId: e.id,
           name: e.name,
           description: e.short,
-          ...(e.publishable ? {} : { notForSharing: true }),
+          ...(e.publishable ? {} : { ownersOnly: true }),
         })),
       })),
     };

@@ -87,8 +87,8 @@ for (const lang of ["de", "en"] as const) {
     await expectOneLanguage(page, lang);
     await shot(page, `61-fertig-mit-karten-${lang}`);
 
-    // The same package where nothing is a card: only the sheet is promised.
-    await page.route(/\/api\/packages\/demo$/, async (route) => {
+    // The same package, with its extensions on (AND-330), where nothing is a card: only the sheet is promised.
+    await page.route(/\/api\/packages\/demo(%2B[^/]*)?$/, async (route) => {
       const res = await route.fetch();
       const body = (await res.json()) as { package: { things: { card?: boolean }[] } };
       for (const t of body.package.things) delete t.card;

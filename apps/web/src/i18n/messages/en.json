@@ -148,7 +148,7 @@
   "extensions.on": "Add the extension: {name}",
   "extensions.otherLanguage": "Texts only in {language}",
   "extensions.someLanguage": "Some texts only in {language}",
-  "extensions.notForSharing": "Not for sharing",
+  "extensions.notForSharing": "Please switch this off if you do not own the expansion.",
   "extensions.inUse": "You can switch it off once you change these choices: {choices}.",
   "extensions.failed": "That did not work. Please try again.",
   "pick.counter": "{picked} of {count} chosen",

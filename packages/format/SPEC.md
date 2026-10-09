@@ -2052,17 +2052,20 @@ error in the extension, a key another extension of the same base already
 has) is not loaded; the builder writes why into its log and the base and
 the other extensions run as before.
 
-A character stores its base and the extensions switched on for it, none
-by default. Without extensions it is exactly a character of the base: no
-option, step, text or sheet line of an extension reaches it. An extension
-can be switched on at any time, also when raising the level; switching it
-off is possible while no answer of the character names a thing or choice
-of the extension.
+A character stores its base and the extensions switched on for it; a new
+character has every loaded extension of its base on unless it is started
+with a list of its own (an empty one for none). Without extensions it is
+exactly a character of the base: no option, step, text or sheet line of
+an extension reaches it. An extension can be switched on or off at any
+time, also when raising the level; switching it off is possible while no
+answer of the character names a thing or choice of the extension. The
+switch of an extension that is not `publishable` asks the player to
+switch it off if they do not own it.
 
 If the character uses an extension with a license that is not
 `publishable` and has something from it, the sheet and the PDF print a
-line: "Contains content from <the extension's `package.name`>, not for
-sharing." The words are the builder's.
+line: "Contains content from <the extension's `package.name`>." The words
+are the builder's.
 
 ## 18. Reserved for later versions
 
