@@ -1017,7 +1017,17 @@ part to one that adds it.
 gives the tracks with their levels, e.g. "Herbalist 3 / Lantern bearer
 2": the track with the most levels first, on a tie the earlier one; names
 joined by " / ". The default label of the header field is the title of
-the tracks choice.
+the tracks choice. A character with more than one track also gets a header
+field in the builder's own words ("Started as: Herbalist") that names the
+first track, since the order by levels does not show it: right after the
+tracks field, or first if there is none.
+
+On a `byRank` table whose rows come from more than one track, the rows
+are grouped by track first (most levels first, as above), by rank inside,
+and each heading names both ("Herbalist · Rank 1"). A row of no track
+comes after the tracks, headed by where it came from. A thing that two
+tracks grant (the same key) is had once, so it is one row, under the
+track that brought it first.
 
 ## 10. Texts
 

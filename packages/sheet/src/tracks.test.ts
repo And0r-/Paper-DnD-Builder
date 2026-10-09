@@ -5,6 +5,7 @@ import { DEMO_EXAMPLES_DIR } from "@builder/demo-package";
 import type { ContentPackage } from "@builder/format";
 import { beforeAll, describe, expect, it } from "vitest";
 import { buildSheetModel, type SheetModel } from "./index.ts";
+import { MESSAGES } from "./messages.ts";
 import { sheetModelSchema } from "./schema.ts";
 import { demoExample, demoWithTracksHead, loadDemoPackage } from "./testing.ts";
 
@@ -41,6 +42,30 @@ describe("a sheet with two tracks", () => {
       }
     });
 
+    it(`says in the head which calling came first, right after the callings (${name})`, () => {
+      const first = docs[name]!.answers["calling"] as { pick: string };
+      for (const language of Object.keys(expected[name]!.tracksLine)) {
+        const fields = header(sheet(name, language)).fields;
+        expect(fields[1]).toEqual({
+          label: MESSAGES[language]!.startedAs,
+          text: pkg.texts[language]![`${first.pick}.name`],
+        });
+      }
+    });
+
+    it(`lists the knacks in a block per calling, most levels first, ranks inside (${name})`, () => {
+      const m = sheet(name, "en");
+      const knacks = m.sections.find((s) => s.id === "knacks");
+      if (knacks?.kind !== "featureTable") throw new Error("no knacks");
+      const callings = expected[name]!.tracksLine["en"]!.split(" / ").map((c) => c.replace(/ \d+$/, ""));
+      const titles = [...new Set(knacks.rows.map((r) => r.group?.title ?? ""))];
+      // Each calling's groups follow each other, the one with more levels first.
+      const blockOf = titles.map((t) => callings.findIndex((c) => t.startsWith(`${c} · `)));
+      expect(blockOf).not.toContain(-1);
+      expect(blockOf).toEqual([...blockOf].sort());
+      expect(new Set(blockOf).size).toBe(2);
+    });
+
     it(`shows on each knack card the numbers of the choice it was picked in (${name})`, () => {
       const m = sheet(name, "en");
       for (const [id, { target, hit }] of Object.entries(expected[name]!.cards)) {
@@ -51,4 +76,38 @@ describe("a sheet with two tracks", () => {
       }
     });
   }
+});
+
+describe("a sheet with two tracks, the head and shared things", () => {
+  it("names the first calling first in the head when no field shows the callings", () => {
+    const plain = structuredClone(pkg);
+    const head = plain.sheet.sections.find((s) => s.kind === "header");
+    if (head?.kind === "header") head.fields = (head.fields ?? []).filter((f) => !("tracks" in f));
+    const h = header(buildSheetModel(plain, docs["herbalist-river-runner"]!, { language: "de", createdAt }));
+    if (h.kind !== "header") throw new Error("no header");
+    expect(h.fields[0]).toEqual({
+      label: MESSAGES["de"]!.startedAs,
+      text: pkg.texts["de"]!["calling.herbalist.name"],
+    });
+  });
+
+  it("does not name a first calling for a character with one", () => {
+    const one = structuredClone(docs["lantern-herbalist"]!);
+    one.tracks = one.tracks!.map(() => "calling.lantern-bearer");
+    const h = header(buildSheetModel(pkg, one, { language: "en", createdAt }));
+    if (h.kind !== "header") throw new Error("no header");
+    expect(h.fields.map((f) => f.label)).not.toContain(MESSAGES["en"]!.startedAs);
+  });
+
+  it("shows a thing that both callings grant once, under the calling that brought it first", () => {
+    const shared = structuredClone(pkg);
+    const herbalist = shared.things.find((t) => t.id === "calling.herbalist")!;
+    herbalist.grants = [...(herbalist.grants ?? []), { thing: "trait.steady-flame", atLevel: 2 }];
+    const m = buildSheetModel(shared, docs["lantern-herbalist"]!, { language: "en", createdAt });
+    const traits = m.sections.find((s) => s.id === "traits");
+    if (traits?.kind !== "featureTable") throw new Error("no traits");
+    const rows = traits.rows.filter((r) => r.id === "trait.steady-flame");
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.group?.title).toBe(pkg.texts["en"]!["calling.lantern-bearer.name"]);
+  });
 });
