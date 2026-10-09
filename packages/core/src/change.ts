@@ -4,9 +4,9 @@
  * the result and (later) tells everyone else watching the same draft.
  */
 import { declaredChoiceId, type ContentPackage } from "@builder/format/pure";
-import type { DraftChange, DraftDocument } from "./draft.ts";
+import type { DraftChange, DraftDocument, PickTexts } from "./draft.ts";
 import { evaluateDraft, trackThings, type Evaluation } from "./evaluate.ts";
-import { judgeAnswer, type Problem } from "./judge.ts";
+import { judgeAnswer, type ChoiceContext, type Problem } from "./judge.ts";
 import { assignPicks } from "./pool.ts";
 
 export type ChangeError =
@@ -84,6 +84,7 @@ export function applyChange(pkg: ContentPackage, doc: DraftDocument, change: Dra
     ...(state.min !== undefined ? { min: state.min } : {}),
     ...(state.max !== undefined ? { max: state.max } : {}),
     ...(state.raise ? { raise: state.raise } : {}),
+    ...(state.options ? textInputsOf(pkg, state.options) : {}),
   };
   const j = judgeAnswer(choice, change.answer, ctx);
   if (j.status === "invalid") {
@@ -218,6 +219,15 @@ export function levelUpState(ev: Evaluation, from: number): LevelUpState {
   };
 }
 
+/** The texts the offered things ask for when picked (`textInputs`), for judging an answer. */
+function textInputsOf(pkg: ContentPackage, options: readonly string[]): Pick<ChoiceContext, "textInputs"> {
+  const asked = new Set(options);
+  const inputs = pkg.things.flatMap((t) =>
+    t.textInputs && asked.has(t.id) ? [[t.id, t.textInputs] as const] : [],
+  );
+  return inputs.length > 0 ? { textInputs: new Map(inputs) } : {};
+}
+
 function applyPool(pkg: ContentPackage, doc: DraftDocument, stepId: string, picks: string[]): ChangeResult {
   const ev = evaluateDraft(pkg, doc);
   const pool = ev.steps.find((s) => s.id === stepId)?.pool;
@@ -234,11 +244,19 @@ function applyPool(pkg: ContentPackage, doc: DraftDocument, stepId: string, pick
   const at = assignPicks(slots, picks, keep);
   if (!at) return doesNotFit("notOffered");
   const answers = { ...doc.answers };
+  // Texts written for a pick go with it to whichever choice of the list holds it now.
+  const texts: PickTexts = {};
+  for (const c of pool.choices)
+    Object.assign(texts, (doc.answers[c.choice] as { texts?: PickTexts } | undefined)?.texts);
   pool.choices.forEach((c, i) => {
     const mine = picks.filter((p) => at.get(p) === i);
     const kind = ev.choices[c.choice]!.kind;
+    const own = Object.fromEntries(mine.flatMap((p) => (texts[p] ? [[p, texts[p]] as const] : [])));
+    const withTexts = Object.keys(own).length > 0 ? { texts: own } : {};
     if (mine.length === 0) delete answers[c.choice];
-    else answers[c.choice] = kind === "pickOne" ? { pick: mine[0] } : { picks: mine };
+    else
+      answers[c.choice] =
+        kind === "pickOne" ? { pick: mine[0], ...withTexts } : { picks: mine, ...withTexts };
   });
   return { ok: true, doc: { ...doc, answers } };
 }

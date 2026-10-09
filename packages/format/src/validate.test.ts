@@ -1206,3 +1206,51 @@ describe("sections apart (format 0.18)", () => {
     expect(messages(r).some((m) => m.startsWith("sheet.json sections[") && m.includes(".apart"))).toBe(true);
   });
 });
+
+describe("texts at an option (textInputs, format 0.22)", () => {
+  const farLore = (f: RawFiles) => thing(f, "talents-and-traits", "trait.far-lore");
+
+  it("accepts the demo's texts at an option, and a package without them", () => {
+    expect(mutate(() => {}).ok).toBe(true);
+    expect(mutate((f) => delete farLore(f).textInputs).ok).toBe(true);
+  });
+
+  it("needs a label in every language; the placeholder may be missing", () => {
+    const r = mutate((f) => {
+      delete texts(f, "de")["trait.far-lore.input.second.label"];
+      delete texts(f, "en")["trait.far-lore.input.first.placeholder"];
+    });
+    expect(messages(r)).toEqual([
+      'texts/de/ trait.far-lore.input.second.label: missing text (label of text "second" of "trait.far-lore")',
+    ]);
+  });
+
+  it.each<[string, unknown, string]>([
+    ["empty list", [], "Too small"],
+    [
+      "same id twice",
+      [
+        { id: "a", maxLength: 9 },
+        { id: "a", maxLength: 9 },
+      ],
+      "input ids must differ",
+    ],
+    ["no maxLength", [{ id: "a" }], "maxLength"],
+    ["too long", [{ id: "a", maxLength: 201 }], "Too big"],
+    ["unknown field", [{ id: "a", maxLength: 9, label: "Land" }], 'Unrecognized key: "label"'],
+  ])("rejects %s", (_name, inputs, expected) => {
+    const r = mutate((f) => (farLore(f).textInputs = inputs));
+    expect(r.ok).toBe(false);
+    expect(messages(r).some((m) => m.includes(".textInputs") && m.includes(expected))).toBe(true);
+  });
+
+  it("warns when no pick choice can give the thing", () => {
+    const r = mutate((f) => {
+      const c = f.get("flow.json").choices.find((x: { id: string }) => x.id === "herb-craft");
+      c.options.ids = ["trait.leaf-lore", "trait.root-lore"];
+    });
+    expect(messages(r, "warnings")).toContain(
+      "things/talents-and-traits.json [22].textInputs: no pickOne or pickMany choice offers the thing; its texts are asked only where it is picked",
+    );
+  });
+});

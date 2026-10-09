@@ -249,6 +249,16 @@ export function validatePackageFiles(files: PackageFiles): ValidationResult {
         (o.ids === undefined || o.ids.includes(t.id)) &&
         (o.tags ?? []).every((tag) => t.tags?.includes(tag)),
     );
+  // Things a pick choice can give (not only mark): where texts of a thing (`textInputs`) are asked.
+  let picked: Set<string> | undefined;
+  const pickedThings = () =>
+    (picked ??= new Set(
+      flow.choices.flatMap((c) =>
+        (c.kind === "pickOne" || c.kind === "pickMany") && !c.options.owned
+          ? resolveOptions(c.options).map((t) => t.id)
+          : [],
+      ),
+    ));
 
   // Tracks: the options of the choice flow.level.tracks names, and every thing that can
   // come through one of them (its grants, the options of the choices it grants, and so on).
@@ -564,6 +574,13 @@ export function validatePackageFiles(files: PackageFiles): ValidationResult {
         file,
         `${p}.repeatable`,
         "the thing grants no choice; picking it again changes nothing (a thing counts once)",
+      );
+    }
+    if (t.textInputs !== undefined && !pickedThings().has(t.id)) {
+      warn(
+        file,
+        `${p}.textInputs`,
+        "no pickOne or pickMany choice offers the thing; its texts are asked only where it is picked",
       );
     }
     if (t.card && !(t.kind in sheet.cards)) {
@@ -1048,6 +1065,10 @@ export function validatePackageFiles(files: PackageFiles): ValidationResult {
     needExplained(t.id, `thing ${lit(t.id)}`);
     if (t.addRequires !== undefined) need(`${t.id}.addReason`, `why ${lit(t.id)} cannot be added`);
     optional.add(`${t.id}.goodIf`).add(`${t.id}.rules`);
+    for (const input of t.textInputs ?? []) {
+      need(`${t.id}.input.${input.id}.label`, `label of text ${lit(input.id)} of ${lit(t.id)}`);
+      optional.add(`${t.id}.input.${input.id}.placeholder`);
+    }
   }
   for (const c of flow.choices) {
     need(`choice.${c.id}.title`, `step title of choice ${lit(c.id)}`);

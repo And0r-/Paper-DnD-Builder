@@ -10,8 +10,22 @@
 import { z } from "zod";
 import type { Choice } from "@builder/format/pure";
 
-export const pickOneAnswerSchema = z.strictObject({ pick: z.string().min(1).max(200) });
-export const pickManyAnswerSchema = z.strictObject({ picks: z.array(z.string().min(1).max(200)).max(200) });
+/**
+ * Texts written for picked things (`textInputs` of a thing), by thing and
+ * input key. Texts of things no longer picked stay, so picking again restores them.
+ */
+export const pickTextsSchema = z.record(
+  z.string().min(1).max(200),
+  z.record(z.string().min(1).max(200), z.string().max(1000)),
+);
+export const pickOneAnswerSchema = z.strictObject({
+  pick: z.string().min(1).max(200),
+  texts: pickTextsSchema.optional(),
+});
+export const pickManyAnswerSchema = z.strictObject({
+  picks: z.array(z.string().min(1).max(200)).max(200),
+  texts: pickTextsSchema.optional(),
+});
 export const distributeAnswerSchema = z.strictObject({
   /** Index into the choice's `methods`. */
   method: z.number().int().min(0),
@@ -20,6 +34,7 @@ export const distributeAnswerSchema = z.strictObject({
 export const numberAnswerSchema = z.strictObject({ value: z.number().finite() });
 export const textAnswerSchema = z.strictObject({ text: z.string().max(10_000) });
 
+export type PickTexts = z.infer<typeof pickTextsSchema>;
 export type PickOneAnswer = z.infer<typeof pickOneAnswerSchema>;
 export type PickManyAnswer = z.infer<typeof pickManyAnswerSchema>;
 export type DistributeAnswer = z.infer<typeof distributeAnswerSchema>;

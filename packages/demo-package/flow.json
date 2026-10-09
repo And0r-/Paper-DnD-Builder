@@ -805,7 +805,7 @@
       "kind": "pickOne",
       "source": "mistland",
       "options": {
-        "ids": ["trait.leaf-lore", "trait.root-lore"]
+        "ids": ["trait.leaf-lore", "trait.root-lore", "trait.far-lore"]
       },
       "recommend": [
         {
