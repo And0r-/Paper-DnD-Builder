@@ -353,7 +353,7 @@ a level left out goes there too. An empty list means one track, as before.
 | `options`     | For the next level (a raise): every thing of the tracks choice. A track the character has is always allowed. A new one needs its `addRequires` (with `addRequiresCurrent`, also those of the tracks it has) to hold now. |
 | `notMet`      | The things whose condition does not hold, the track itself first. The package's sentence for each is the text `<thing>.addReason`.                                                                                       |
 | `unfit`       | Added tracks whose condition no longer holds, checked as the character was before the level that added them. They still count; the character is not complete until the player resolves it.                               |
-| `unfitNotMet` | For each track in `unfit`: the things whose condition does not hold, as `notMet`. It may name only a track the character had, not the one added (a paladin's own condition fails, the warlock's holds).                  |
+| `unfitNotMet` | For each track in `unfit`: the things whose condition does not hold, as `notMet`. It may name only a track the character had, not the one added (the herbalist's own condition fails, the lantern bearer's holds).       |
 
 What else changes with more than one track:
 
