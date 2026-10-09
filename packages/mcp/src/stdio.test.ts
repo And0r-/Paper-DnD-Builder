@@ -47,9 +47,9 @@ describe("the stdio server", () => {
     }
   });
 
-  it("has the 14 tools, each described", () => {
+  it("has the 15 tools, each described", () => {
     expect(TOOLS.map((t) => t.name).sort()).toEqual(Object.keys(TOOL_DESCRIPTIONS).sort());
-    expect(TOOLS).toHaveLength(14);
+    expect(TOOLS).toHaveLength(15);
     for (const t of TOOLS) expect(t.description).toBe(TOOL_DESCRIPTIONS[t.name]);
   });
 

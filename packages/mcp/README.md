@@ -40,7 +40,7 @@ the unit conversion, to write package texts for the reader.
 
 `list_packages`, `list_characters`, `get_character`, `explain_value`,
 `list_open_choices`, `list_options`, `set_answer`, `answer_pool`,
-`start_character`, `set_level`, `set_tracks`, `level_up`, `finish_character`,
+`start_character`, `set_level`, `switch_package`, `set_tracks`, `level_up`, `finish_character`,
 `get_sheet`. With a package whose characters split their levels between
 several things (tracks), `get_character` shows them and which may be added
 next, `level_up` names the track of each new level and `set_tracks` sets
