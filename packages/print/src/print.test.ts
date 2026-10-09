@@ -146,6 +146,7 @@ function messageWords(language: string): Set<string> {
   const {
     startValue,
     page,
+    sheetPage,
     unitsUsed,
     createdOn,
     copyName,
@@ -161,6 +162,7 @@ function messageWords(language: string): Set<string> {
     ...Object.values(plain),
     startValue(""),
     page(1, 2),
+    sheetPage(1, 2),
     unitsUsed([]),
     createdOn(""),
     copyName(""),
