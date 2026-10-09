@@ -96,17 +96,17 @@ export default function OverviewPage() {
           <p>
             <Link href={openSteps[0]!.href}>{t("flow.goTo", { step: openSteps[0]!.title })}</Link>
           </p>
+          {/* Help belongs with what is still open; a finished character needs none (AND-331). */}
+          {draft.access === "owner" && (
+            <div className="overview-help">
+              <p>{t("overview.helpHint")}</p>
+              <HelpButton draftId={draft.id} />
+            </div>
+          )}
         </Callout>
       )}
 
       <CampaignField />
-
-      {draft.access === "owner" && (
-        <div className="overview-help">
-          <p>{t("overview.helpHint")}</p>
-          <HelpButton draftId={draft.id} />
-        </div>
-      )}
 
       <section className="values" aria-labelledby={`${headingId}-values`}>
         <h2 className="section-title" id={`${headingId}-values`}>
