@@ -2936,6 +2936,26 @@
                           "items": {
                             "type": "string"
                           }
+                        },
+                        "unfit": {
+                          "type": "array",
+                          "description": "Tracks whose condition no longer holds, each with the things whose condition does not hold (see `TracksState.unfitNotMet`). Only when there are any.",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "thing": {
+                                "type": "string"
+                              },
+                              "notMet": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              }
+                            },
+                            "required": ["thing", "notMet"],
+                            "additionalProperties": false
+                          }
                         }
                       }
                     }
@@ -9080,9 +9100,19 @@
               "type": "string"
             },
             "description": "Added tracks whose condition to be added no longer holds (checked as the character was before the level that added them). They still count; the character is not complete until this is empty."
+          },
+          "unfitNotMet": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "description": "For each track in `unfit`: the things whose condition does not hold, as `notMet`. It may name only a track the character had, not the one added."
           }
         },
-        "required": ["choice", "first", "levels", "list", "options", "unfit"],
+        "required": ["choice", "first", "levels", "list", "options", "unfit", "unfitNotMet"],
         "additionalProperties": false
       }
     }

@@ -27,13 +27,23 @@ import {
 } from "./model.ts";
 
 /**
- * Why a track may not be added, in the package's words: the sentence
- * `<thing>.addReason` of each thing whose condition does not hold.
+ * Why `thing` may not be added (or no longer fits), in the package's words:
+ * the sentence `<thing>.addReason` of each thing whose condition does not
+ * hold. A track the character already has is named with its sentence, so
+ * the reason is not taken for one about the track being added.
  */
-export function notMetText(lp: LoadedPackage, things: readonly string[] | undefined): string {
+export function notMetText(
+  lp: LoadedPackage,
+  t: ReturnType<typeof useApp>["t"],
+  thing: string,
+  things: readonly string[] | undefined,
+): string {
   return (things ?? [])
-    .map((id) => ptext(lp, `${id}.addReason`))
-    .filter((x): x is string => x !== undefined && x !== "")
+    .flatMap((id) => {
+      const reason = ptext(lp, `${id}.addReason`);
+      if (reason === undefined || reason === "") return [];
+      return [id === thing ? reason : t("tracks.step.notMetHad", { thing: thingName(lp, id), reason })];
+    })
     .join(" ");
 }
 
@@ -225,7 +235,9 @@ function RaiseRow({
                 }
                 checked={chosen === o.thing}
                 blocked={
-                  o.allowed ? undefined : t("tracks.raise.blocked", { reason: notMetText(lp, o.notMet) })
+                  o.allowed
+                    ? undefined
+                    : t("tracks.raise.blocked", { reason: notMetText(lp, t, o.thing, o.notMet) })
                 }
                 onPick={onPick}
               />
@@ -317,6 +329,7 @@ export function TrackStep({
   plan,
   options,
   unfit,
+  unfitNotMet,
   onChange,
 }: {
   lp: LoadedPackage;
@@ -326,6 +339,8 @@ export function TrackStep({
   options: readonly TrackOption[];
   /** Added tracks whose condition no longer holds (`evaluation.tracks.unfit`). */
   unfit: readonly string[];
+  /** What each of them misses (`evaluation.tracks.unfitNotMet`): it may be only a track it had. */
+  unfitNotMet: Readonly<Record<string, readonly string[]>>;
   onChange: (plan: TrackPlan) => void;
 }) {
   const { t, list } = useApp();
@@ -348,7 +363,7 @@ export function TrackStep({
               thing: thing(u),
               levelName: word,
               levels: list(levels.map(String)),
-              reason: notMetText(lp, [u]),
+              reason: notMetText(lp, t, u, unfitNotMet[u] ?? [u]),
             })}
           </Callout>
         );
@@ -413,7 +428,7 @@ export function TrackStep({
                   <li key={o.thing}>
                     {t("tracks.step.blockedLine", {
                       thing: thing(o.thing),
-                      reason: notMetText(lp, o.notMet),
+                      reason: notMetText(lp, t, o.thing, o.notMet),
                     })}
                   </li>
                 ))}

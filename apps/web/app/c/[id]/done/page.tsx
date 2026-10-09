@@ -56,7 +56,12 @@ export default function DonePage() {
     if (from === undefined) return undefined;
     const growth = levelGrowth(lp, ev);
     const ids = [
-      ...new Set([...lp.pkg.flow.summary.fields, ...growth.own, ...growth.byThing.flatMap((g) => g.values)]),
+      ...new Set([
+        ...lp.pkg.flow.summary.fields,
+        ...growth.own,
+        ...growth.shared,
+        ...growth.byThing.flatMap((g) => g.values),
+      ]),
     ].filter((id) => ptext(lp, `value.${id}.name`) !== undefined);
     return raiseNews(evaluateBefore(lp.pkg, doc, from), ev, ids);
   }, [from, lp, ev, doc]);

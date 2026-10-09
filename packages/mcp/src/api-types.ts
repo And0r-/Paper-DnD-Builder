@@ -165,6 +165,8 @@ export interface TracksState {
   list: Array<{ thing: string; levels: number; from: number; added: boolean }>;
   options: Array<{ thing: string; allowed: boolean; notMet?: string[] }>;
   unfit: string[];
+  /** For each track in `unfit`: the tracks whose condition does not hold (itself, or one it had). */
+  unfitNotMet?: Record<string, string[]>;
 }
 
 export interface LevelUpState {

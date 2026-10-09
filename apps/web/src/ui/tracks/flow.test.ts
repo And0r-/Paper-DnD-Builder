@@ -16,6 +16,7 @@ import { buildFlow, firstOpen, TRACKS_KEY } from "../flow/model.ts";
 import { evaluateBefore, flowOf } from "../flow/raise.ts";
 import type { LoadedPackage } from "../packages.ts";
 import { summarize } from "@builder/core";
+import { notMetText } from "./screens.tsx";
 
 const pkg = (await validatePackageDir(DEMO_PACKAGE_DIR)).package!;
 const texts: LoadedPackage["texts"] = {};
@@ -88,6 +89,77 @@ describe("tracks in the flow", () => {
     expect(growth.byThing.filter((g) => g.track === "calling.herbalist").map((g) => g.thing)).toEqual([
       "calling.herbalist",
     ]);
+  });
+
+  it("shows numbers two tracks share once, for the whole character, and numbers of one track's levels under it", async () => {
+    // Invented: each calling raises its own glow places by a table; the package counts
+    // `glowPlaces` for the character from them, and `lanternDice` follows the lantern levels alone.
+    const p = structuredClone(pkg);
+    p.values.push(
+      { id: "ownGlow", source: "mistland", default: 0 },
+      { id: "glowPlaces", source: "mistland", formula: "if(count('calling') > 1, glowLevel, ownGlow)" },
+      { id: "lanternDice", source: "mistland", formula: "levelOf('calling.lantern-bearer')" },
+    );
+    for (const c of ["calling.lantern-bearer", "calling.herbalist"])
+      p.things.find((x) => x.id === c)!.grants!.push({ value: "ownGlow", add: { byLevel: [1, 2, 3, 4, 5] } });
+    const named: LoadedPackage = {
+      pkg: p,
+      lang: "de",
+      texts: {
+        ...texts,
+        "value.ownGlow.name": "Eigene Glutplätze",
+        "value.glowPlaces.name": "Glutplätze",
+        "value.lanternDice.name": "Laternenwürfel",
+      },
+    };
+    const ev = evaluateDraft(p, await example("lantern-herbalist"));
+    const growth = levelGrowth(named, ev);
+    // Not the sum of both tables (3 + 2), but what the package counts.
+    expect(ev.values["ownGlow"]).toBe(5);
+    expect(growth.shared).toContain("glowPlaces");
+    expect(growth.shared).not.toContain("ownGlow");
+    expect(growth.byThing.flatMap((g) => g.values)).not.toContain("ownGlow");
+    // Levels of more than one calling (glow level) count for the whole character too.
+    expect(growth.shared).toContain("glowLevel");
+    expect(growth.byThing.find((g) => g.thing === "calling.lantern-bearer")!.values).toContain("lanternDice");
+    expect(growth.byThing.find((g) => g.thing === "calling.herbalist")!.values).not.toContain("lanternDice");
+
+    // One calling: a table by level stays the calling's.
+    const single = levelGrowth(
+      named,
+      evaluateDraft(p, { ...(await example("lantern-herbalist")), tracks: [] }),
+    );
+    expect(single.shared).toEqual([]);
+    expect(single.byThing.find((g) => g.thing === "calling.lantern-bearer")!.values).toEqual(
+      expect.arrayContaining(["ownGlow", "lanternDice"]),
+    );
+  });
+
+  it("names the condition that fails, also of a track the character had", async () => {
+    const doc = await example("lantern-herbalist");
+    // First the herbalist, then the lantern bearer: heart 12 is fine, wit 6 fails the herbalist.
+    const low: DraftDocument = {
+      ...doc,
+      answers: {
+        ...doc.answers,
+        calling: { pick: "calling.herbalist" },
+        scores: { method: 0, assign: { mightBase: 8, graceBase: 8, witBase: 6, heartBase: 12 } },
+      },
+      tracks: ["calling.herbalist", "calling.herbalist", "calling.lantern-bearer", "calling.lantern-bearer"],
+    };
+    const ev = evaluateDraft(pkg, low);
+    expect(ev.tracks!.unfit).toEqual(["calling.lantern-bearer"]);
+    const text = notMetText(
+      lp,
+      t,
+      "calling.lantern-bearer",
+      ev.tracks!.unfitNotMet["calling.lantern-bearer"],
+    );
+    expect(text).toBe(`Für Kräuterkundige, deine bisherige Wahl: ${texts["calling.herbalist.addReason"]}`);
+    expect(text).not.toContain(texts["calling.lantern-bearer.addReason"]!);
+    expect(notMetText(lp, t, "calling.herbalist", ["calling.herbalist"])).toBe(
+      texts["calling.herbalist.addReason"],
+    );
   });
 
   it("writes the head line with both tracks, most levels first", async () => {

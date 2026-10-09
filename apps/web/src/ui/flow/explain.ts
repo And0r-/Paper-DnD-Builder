@@ -322,8 +322,19 @@ export function originGroups(lp: LoadedPackage, ev: Evaluation, w: Words): Origi
 export interface LevelGrowth {
   /** Values that follow the level alone (a formula of the level, a table by level). */
   own: string[];
-  /** Values a held thing raises by a table by level, by that thing, and the track it came through. */
+  /**
+   * Values a held thing raises by a table by level, by that thing, and the
+   * track it came through. A value that follows the levels of one track
+   * alone (`levelOf` of that track) is grouped under that track.
+   */
   byThing: { thing: string; values: string[]; track?: string }[];
+  /**
+   * With more than one track: values that follow the levels of several
+   * tracks together, for the whole character. A value tracks each raise by a
+   * table of their own is shown as the named values that read it (places
+   * from a table for all tracks), not as the sum of those tables.
+   */
+  shared: string[];
 }
 
 /** Values each thing names in a stat (`"uses": {"value": "…"}`), by value. */
@@ -351,31 +362,80 @@ export function levelGrowth(lp: LoadedPackage, ev: Evaluation): LevelGrowth {
   const named = (id: string) => ptext(lp, `value.${id}.name`) !== undefined && (ev.values[id] ?? 0) !== 0;
   const users = statUsers(lp);
   const held = new Set(ev.things.map((h) => h.id));
+  const tracks = new Set(ev.tracks?.list.map((t) => t.thing) ?? []);
+  const refsOf = new Map(
+    lp.pkg.values.flatMap((v) =>
+      v.formula !== undefined ? [[v.id, collectRefs(parseExpr(v.formula))] as const] : [],
+    ),
+  );
+  /** The tracks the character has whose levels a value follows alone (`levelOf`, nothing else but the level). */
+  const byLevels = new Map<string, string[]>();
+  for (const [id, refs] of refsOf) {
+    if (refs.tracks.size === 0 || refs.things.size > 0 || refs.tags.size > 0) continue;
+    if ([...refs.values].some((v) => v !== "level")) continue;
+    byLevels.set(
+      id,
+      [...refs.tracks].filter((t) => tracks.has(t)),
+    );
+  }
   const own = lp.pkg.values
     .filter((v) => {
       if (v.byLevel !== undefined) {
         const by = users.get(v.id);
         return by === undefined || [...by].some((x) => held.has(x));
       }
-      if (v.formula === undefined) return false;
-      const refs = collectRefs(parseExpr(v.formula));
-      return refs.values.size === 1 && refs.values.has("level");
+      const refs = refsOf.get(v.id);
+      return (
+        refs !== undefined && refs.values.size === 1 && refs.values.has("level") && refs.tracks.size === 0
+      );
     })
     .map((v) => v.id)
     .filter(named);
   const things = new Map(lp.pkg.things.map((x) => [x.id, x]));
-  const byThing: LevelGrowth["byThing"] = [];
-  const taken = new Set(own);
-  for (const h of ev.things) {
-    const values = (things.get(h.id)?.grants ?? [])
+  const tables = (h: Evaluation["things"][number]) =>
+    (things.get(h.id)?.grants ?? [])
       .filter(
         (g) => g.value !== undefined && typeof g.add === "object" && grantAppliesFrom(ev, h, g) !== undefined,
       )
-      .map((g) => g.value!)
-      .filter((id) => named(id) && !taken.has(id));
-    for (const id of values) taken.add(id);
-    if (values.length > 0)
-      byThing.push({ thing: h.id, values, ...(h.track !== undefined && { track: h.track }) });
+      .map((g) => g.value!);
+  // A value the things of two tracks each raise by a table is the sum of the tables.
+  const raisedIn = new Map<string, Set<string>>();
+  for (const h of ev.things)
+    if (h.track !== undefined)
+      for (const id of tables(h)) raisedIn.set(id, (raisedIn.get(id) ?? new Set()).add(h.track));
+  const summed = new Set([...raisedIn].filter(([, ts]) => ts.size > 1).map(([id]) => id));
+  const shared: string[] = [];
+  const taken = new Set(own);
+  const share = (id: string) => {
+    if (taken.has(id) || !named(id)) return;
+    taken.add(id);
+    shared.push(id);
+  };
+  for (const id of summed) {
+    // Named values that read the sum, if the package has any, say what counts.
+    const readers = [...refsOf].filter(([r, refs]) => r !== id && refs.values.has(id)).map(([r]) => r);
+    for (const r of readers.length > 0 ? readers : [id]) share(r);
+    taken.add(id);
   }
-  return { own, byThing };
+  for (const [id, ts] of byLevels) if (ts.length > 1) share(id);
+  const byThing: LevelGrowth["byThing"] = [];
+  const add = (thing: string, values: string[], track: string | undefined) => {
+    const fresh = values.filter((id) => named(id) && !taken.has(id));
+    for (const id of fresh) taken.add(id);
+    if (fresh.length === 0) return;
+    const known = byThing.find((g) => g.thing === thing);
+    if (known) known.values.push(...fresh);
+    else byThing.push({ thing, values: fresh, ...(track !== undefined && { track }) });
+  };
+  for (const h of ev.things) {
+    add(h.id, tables(h), h.track);
+    // A track itself: the values that follow its levels alone.
+    if (tracks.has(h.id))
+      add(
+        h.id,
+        [...byLevels].filter(([, ts]) => ts.length === 1 && ts[0] === h.id).map(([id]) => id),
+        h.track,
+      );
+  }
+  return { own, byThing, shared };
 }

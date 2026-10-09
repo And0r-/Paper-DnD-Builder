@@ -291,7 +291,14 @@ export const edits = {
   finish: (): Edit => ({
     apply: (pkg, row) => {
       const ev = evaluateDraft(pkg, row.document);
-      if (!ev.complete) throw new HttpError(422, "incomplete", { open: ev.open });
+      if (!ev.complete) {
+        // Open choices, and tracks whose condition no longer holds (with what each misses).
+        const unfit = (ev.tracks?.unfit ?? []).map((thing) => ({
+          thing,
+          notMet: ev.tracks!.unfitNotMet[thing] ?? [thing],
+        }));
+        throw new HttpError(422, "incomplete", { open: ev.open, ...(unfit.length > 0 ? { unfit } : {}) });
+      }
       return { doc: row.document, finish: true };
     },
     cause: { type: "finished" },

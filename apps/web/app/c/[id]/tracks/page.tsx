@@ -56,6 +56,7 @@ export default function TracksPage() {
           plan={plan}
           options={tracks.options}
           unfit={tracks.unfit}
+          unfitNotMet={tracks.unfitNotMet}
           onChange={(next) => change({ type: "tracks", tracks: [...next.tracks] })}
         />
       ) : (

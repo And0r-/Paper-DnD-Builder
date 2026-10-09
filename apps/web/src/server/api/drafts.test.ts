@@ -117,6 +117,29 @@ describe("building a character over the API", () => {
     });
   });
 
+  it("refuses to finish while a track no longer fits, and names what it misses", async () => {
+    const created = await client.call("POST", "/api/drafts", { packageId: "demo", level: 3 });
+    const id = created.json.draft.id;
+    let version: number = created.json.draft.version;
+    const put = async (route: string, body: object) => {
+      const res = await client.call("PUT", `/api/drafts/${id}/${route}`, { version, ...body });
+      expect(res.status, JSON.stringify(res.json)).toBe(200);
+      version = res.json.draft.version;
+    };
+    await put("answers/calling", { answer: { pick: "calling.lantern-bearer" } });
+    // Wit 6: the herbalist added on level 2 needs 10.
+    await put("answers/scores", {
+      answer: { method: 0, assign: { mightBase: 8, graceBase: 8, witBase: 6, heartBase: 12 } },
+    });
+    await put("tracks", { tracks: ["calling.herbalist", "calling.herbalist"] });
+    const res = await client.call("POST", `/api/drafts/${id}/finish`, { version });
+    expect(res.status).toBe(422);
+    expect(res.json.error).toMatchObject({
+      code: "incomplete",
+      unfit: [{ thing: "calling.herbalist", notMet: ["calling.herbalist"] }],
+    });
+  });
+
   it("refuses answers that do not fit, with the reason", async () => {
     const created = await client.call("POST", "/api/drafts", { packageId: "demo" });
     const id = created.json.draft.id;
