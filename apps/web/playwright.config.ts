@@ -27,7 +27,11 @@ export default defineConfig({
     // Chromium for every project; the phone size comes from the device above.
     browserName: "chromium",
   },
-  projects: [{ name: "phone" }],
+  projects: [
+    { name: "phone" },
+    // Firefox handles clicks on nested cards its own way (AND-342): the click tests run there too.
+    { name: "firefox", testMatch: /card-click\.spec\.ts/, use: { ...devices["Desktop Firefox"] } },
+  ],
   webServer: {
     command: `next start -p ${PORT}`,
     url: `http://localhost:${PORT}/api/health`,
