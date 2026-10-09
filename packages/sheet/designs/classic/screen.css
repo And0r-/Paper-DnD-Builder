@@ -163,7 +163,8 @@
 }
 
 .csheet__box-remarks {
-  color: var(--color-ink-muted);
+  color: var(--color-ink);
+  font-weight: var(--weight-semibold);
   font-size: var(--text-xs);
   line-height: var(--text-xs-lh);
   text-align: center;
@@ -871,7 +872,7 @@
 
   /* What to mind when rolling, small under the number, as in the PDF. */
   .csheet__box-remarks {
-    color: #333;
+    color: #000;
     font-size: var(--cs-min);
     line-height: 1.15;
   }

@@ -425,10 +425,16 @@ function drawStatBoxes(c: Grid, boxes: StatBox[], x: number, y: number, w: numbe
   const n = boxes.length;
   const bw = (w - (n - 1) * 4) / n;
   // Where a number comes from goes first, then what to mind when rolling it, then what it is for: all small under the number.
+  // The remarks change how the number is rolled: they stand out, in the ink of the number.
+  const remark: TextStyle = { ...st.hint, font: "semibold", color: INK };
   const hints = boxes.map((b) =>
-    [b.parts ?? "", b.remarks ?? "", b.hint]
-      .flatMap((t) => pen.wrap(t, st.hint, bw - 3))
-      .filter((l) => l !== ""),
+    (
+      [
+        [b.parts ?? "", st.hint],
+        [b.remarks ?? "", remark],
+        [b.hint, st.hint],
+      ] as const
+    ).flatMap(([t, style]) => pen.wrap(t, style, bw - 3).flatMap((l) => (l === "" ? [] : [{ l, style }]))),
   );
   // Labels and hints are never cut: all boxes grow to the longest one.
   const labels = boxes.map((b) => pen.label(b.label, st.sectionTitle, bw - 3, 7, true));
@@ -494,7 +500,9 @@ function drawStatBoxes(c: Grid, boxes: StatBox[], x: number, y: number, w: numbe
     } else {
       pen.text(b.text, mid, top + 18, pen.fit(b.text, st.bigValue, bw - 4, 12), "center");
     }
-    hints[i]!.forEach((l, j) => pen.text(l, mid, top + squaresExtra + 23.8 + j * 2.7, st.hint, "center"));
+    hints[i]!.forEach(({ l, style }, j) =>
+      pen.text(l, mid, top + squaresExtra + 23.8 + j * 2.7, style, "center"),
+    );
   });
   return y + h;
 }
