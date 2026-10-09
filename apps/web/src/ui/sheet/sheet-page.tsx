@@ -16,7 +16,7 @@ import { cardCount } from "@builder/sheet/cards";
 import { screenDesign } from "@builder/sheet/designs/screens";
 import type { PrintPlaces } from "@builder/sheet/designs/screens";
 import { SHEET_DESIGNS, type PrintChoice } from "@builder/sheet/printouts";
-import { useEffect, useId, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import { api, type Account, type SheetDesignInfo } from "../api.ts";
 import { useApp } from "../app-state.tsx";
 import { Button, ButtonLink } from "../components/Button.tsx";
@@ -77,8 +77,8 @@ export function SheetPage() {
 
   const design = account?.print.design ?? SHEET_DESIGNS[0]!.id;
   const Design = screenDesign(design);
-  const nameOnSheet = useNameInView(sheet.model !== null, design);
   const places = usePrintPlaces(draft.id, sheet.model, design);
+  const nameOnSheet = useNameInView(sheet.model !== null && places !== WAITING, design);
   const finished = draft.status === "finished";
   const canRaise = finished && ev.level < lp.pkg.flow.level.max;
   const tools = {
@@ -122,7 +122,8 @@ export function SheetPage() {
           <Callout tone="info">{t("sheet.limit", { max: sheet.max })}</Callout>
         )}
         <SheetBody sheet={sheet} draftId={draft.id}>
-          {sheet.model && (
+          {sheet.model && places === WAITING && <Loading shape="page" count={3} />}
+          {sheet.model && places !== WAITING && (
             <SheetUiProvider sheet={sheet}>
               <Design model={sheet.model} ui={SHEET_UI} places={places} />
             </SheetUiProvider>
@@ -141,32 +142,92 @@ export function SheetPage() {
   );
 }
 
+/** The PDF's places of the first state shown are not known yet: the page's skeleton shows. */
+const WAITING = "waiting";
+/** No answer about the places in this time: the design breaks its pages by its own rule. */
+const PLACES_DEADLINE = 4000;
+const placesKey = (draftId: string, design: string) => `sheet-places:${draftId}:${design}`;
+
+function storedPlaces(key: string): PrintPlaces | null {
+  try {
+    const raw = sessionStorage.getItem(key);
+    return raw ? (JSON.parse(raw) as PrintPlaces) : null;
+  } catch {
+    return null;
+  }
+}
+
+function storePlaces(key: string, places: PrintPlaces): void {
+  try {
+    sessionStorage.setItem(key, JSON.stringify(places));
+  } catch {
+    // Storage off: the sheet waits for the places again when opened next time.
+  }
+}
+
 /**
  * Where the PDF breaks the pages of the sheet as shown, for the design to
- * break its pages on screen there too: asked a short pause after the model
- * or the design last changed. Null until known, or when asking failed (the design
- * then breaks by its own rule).
+ * break its pages on screen there too (AND-332: the sheet never shows breaks
+ * of its own first and then those of the PDF):
+ * - opened, the places last known in this tab for the character and the
+ *   design at once; else waiting (the page's skeleton) until they come;
+ * - asked at once when opened, then a short pause after the model or the
+ *   design last changed; the places of an earlier state hold till then;
+ * - no answer for the first state in time, or a failed one: the design's own
+ *   rule (null), and a late answer does not move the pages again.
  */
-function usePrintPlaces(draftId: string, model: SheetModel | null, design: string): PrintPlaces | null {
-  const [places, setPlaces] = useState<{ design: string; places: PrintPlaces } | null>(null);
+function usePrintPlaces(
+  draftId: string,
+  model: SheetModel | null,
+  design: string,
+): PrintPlaces | null | typeof WAITING {
+  const key = placesKey(draftId, design);
+  const [known, setKnown] = useState<{ key: string; places: PrintPlaces | null } | null>(null);
+  const stored = useMemo(() => storedPlaces(key), [key]);
+  // The keys with an answer, or past the deadline: later changes wait a short pause before asking.
+  const settled = useRef(new Set<string>());
   useEffect(() => {
     if (!model) return;
     let gone = false;
-    const timer = setTimeout(() => {
-      api<PrintPlaces>("POST", `/api/drafts/${draftId}/sheet-places`, { model, design })
-        .then((p) => !gone && setPlaces({ design, places: p }))
-        .catch(() => {});
-    }, 400);
+    let fellBack = false;
+    const first = !settled.current.has(key);
+    const fallBack = () => {
+      fellBack = true;
+      settled.current.add(key);
+      setKnown((k) => (k?.key === key ? k : { key, places: null }));
+    };
+    const deadline = first ? setTimeout(fallBack, PLACES_DEADLINE) : undefined;
+    const timer = setTimeout(
+      () => {
+        api<PrintPlaces>("POST", `/api/drafts/${draftId}/sheet-places`, { model, design })
+          .then((p) => {
+            if (gone) return;
+            clearTimeout(deadline);
+            storePlaces(key, p);
+            settled.current.add(key);
+            if (!fellBack) setKnown({ key, places: p });
+          })
+          .catch(() => {
+            if (gone || !first) return;
+            clearTimeout(deadline);
+            fallBack();
+          });
+      },
+      first ? 0 : 400,
+    );
     return () => {
       gone = true;
       clearTimeout(timer);
+      clearTimeout(deadline);
     };
-  }, [draftId, model, design]);
-  // The places of an earlier state of the model hold until the new ones come: a row more
-  // rarely moves a page break, and the pages do not jump twice.
-  return places?.design === design && places.places.sections.length === model?.sections.length
-    ? places.places
-    : null;
+  }, [draftId, model, design, key]);
+  if (!model) return null;
+  const fits = (p: PrintPlaces) => p.sections.length === model.sections.length;
+  if (known?.key === key) {
+    // A section more or less: the earlier places say nothing of it; the design's own rule till the new come.
+    return known.places && fits(known.places) ? known.places : null;
+  }
+  return stored && fits(stored) ? stored : WAITING;
 }
 
 /** Whether the name at the head of the sheet is on screen. */
