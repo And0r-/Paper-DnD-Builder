@@ -370,6 +370,19 @@
   flex: 1;
 }
 
+/* The package's line under an entry: small and muted, the row as tall as it needs. */
+.csheet__list-entry {
+  display: flex;
+  flex-direction: column;
+  padding-block: var(--space-1);
+}
+
+.csheet__list-detail {
+  color: var(--color-ink-muted);
+  font-size: var(--text-xs);
+  line-height: var(--text-xs-lh);
+}
+
 .csheet__answers {
   display: grid;
   gap: var(--space-2);
@@ -1148,6 +1161,12 @@
   /* One column, an entry a line, as in the PDF; at least 24 px to tap. */
   .csheet__list {
     --list-pitch: max(var(--cs-list-line), 25px);
+  }
+
+  .csheet__list-detail {
+    color: #333;
+    font-size: var(--cs-min);
+    line-height: 1.2;
   }
 
   .csheet__list li {

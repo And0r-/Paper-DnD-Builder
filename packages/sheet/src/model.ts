@@ -580,14 +580,19 @@ export function buildSheetModel(
           legend,
         };
       }
-      case "list":
+      case "list": {
+        const listed = heldOf(s.things);
+        // One line per thing, also for a counted one ("2 × Kit"): what one of them holds.
+        const details = s.detail === undefined ? [] : listed.map((t) => text(`${t.id}.${s.detail}`));
         return {
           ...base,
           kind: "list",
-          items: heldOf(s.things).map((t) => counted(t.id)),
+          items: listed.map((t) => counted(t.id)),
+          ...(details.some((d) => d !== "") ? { details } : {}),
           blankLines: s.blankLines,
           ...(s.blankLines > 0 ? { field: fieldId("sheet", s.id, "lines") } : {}),
         };
+      }
       case "answers":
         return {
           ...base,

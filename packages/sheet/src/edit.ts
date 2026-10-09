@@ -85,7 +85,11 @@ export function withRowAdded(model: SheetModel, index: number): SheetModel {
   if (!s) return model;
   switch (s.kind) {
     case "list":
-      return withSection(model, index, { ...s, items: [...s.items, ""] });
+      return withSection(model, index, {
+        ...s,
+        items: [...s.items, ""],
+        ...(s.details ? { details: [...s.details, ""] } : {}),
+      });
     case "statTable":
       return withSection(model, index, {
         ...s,
@@ -118,7 +122,11 @@ export function withRowRemoved(model: SheetModel, index: number, row: number): S
   if (!s) return model;
   switch (s.kind) {
     case "list":
-      return withSection(model, index, { ...s, items: s.items.filter((_, i) => i !== row) });
+      return withSection(model, index, {
+        ...s,
+        items: s.items.filter((_, i) => i !== row),
+        ...(s.details ? { details: s.details.filter((_, i) => i !== row) } : {}),
+      });
     case "statTable":
       return withSection(model, index, { ...s, rows: s.rows.filter((_, i) => i !== row) });
     case "featureTable":

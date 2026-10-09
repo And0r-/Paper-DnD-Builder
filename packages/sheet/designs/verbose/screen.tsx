@@ -645,13 +645,26 @@ function Feature({
   );
 }
 
+/** An entry of a list, with the package's line about it small under it (format 0.22); the line is not written on. */
+function ListEntry({ s, i, j, ui }: Props<"list"> & { j: number }) {
+  const entry = <ui.Text path={at(i, "items", j)} value={s.items[j]!} label={s.title} />;
+  const detail = s.details?.[j] ?? "";
+  if (detail === "") return entry;
+  return (
+    <div className="vsheet__list-entry">
+      {entry}
+      <span className="vsheet__list-detail">{detail}</span>
+    </div>
+  );
+}
+
 function List({ s, i, ui }: Props<"list">) {
   return (
     <div className="vsheet__list">
       <ul>
-        {s.items.map((item, j) => (
+        {s.items.map((_, j) => (
           <li key={j}>
-            <ui.Text path={at(i, "items", j)} value={item} label={s.title} />
+            <ListEntry s={s} i={i} j={j} ui={ui} />
             <ui.RemoveRow section={i} row={j} label={s.title} />
           </li>
         ))}

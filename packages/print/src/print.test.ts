@@ -2533,3 +2533,75 @@ describe("a character with two tracks", () => {
     if (process.env["PRINT_SAMPLE_OUT"]) writeFileSync(process.env["PRINT_SAMPLE_OUT"], pdf.bytes);
   });
 });
+
+describe("a line under a list entry (format 0.22)", () => {
+  const herbalist = () => demoCharacter(pkg, 3, "Mira Fennwick", "calling.herbalist");
+
+  it.each(["classic", "verbose"])(
+    "%s: prints the package's line small under its entry, and none under the others",
+    async (design) => {
+      const model = buildSheetModel(pkg, herbalist(), { language: "de", createdAt });
+      const gear = model.sections.find((s) => s.kind === "list")!;
+      if (gear.kind !== "list") throw new Error("no list");
+      const pdf = await renderPdf(model, { parts: ["sheet"], design });
+      const placed = (await positions(pdf)).flatMap((page, n) => page.map((p) => ({ ...p, page: n })));
+      const name = placed.find((p) => p.str === "Kräutertasche")!;
+      const line = placed.find((p) => p.str.startsWith("Getrocknetes Nebelblatt"))!;
+      expect(name).toBeDefined();
+      expect(line).toBeDefined();
+      // Under its name, on the same page, before the next entry; the length in the reader's units.
+      expect(line.page).toBe(name.page);
+      expect(line.y).toBeGreaterThan(name.y);
+      expect(Math.abs(line.x - name.x)).toBeLessThan(1);
+      const next = gear.items[gear.items.indexOf("Kräutertasche") + 1];
+      if (next !== undefined) expect(placed.find((p) => p.str === next)!.y).toBeGreaterThan(line.y);
+      const { text, minFontSize } = await extract(pdf);
+      expect(text).toContain("3 Meter Schilffaden");
+      expect(minFontSize).toBeGreaterThanOrEqual(6.99);
+      // Only the satchel has a line: the other entries print as before.
+      const others = gear.items.filter((i) => i !== "Kräutertasche");
+      expect(others.length).toBeGreaterThan(0);
+      for (const o of others) {
+        const at = placed.find((p) => p.str === o)!;
+        const below = placed.filter((p) => p.page === at.page && Math.abs(p.x - at.x) < 1 && p.y > at.y);
+        const nearest = below.sort((a, b) => a.y - b.y)[0];
+        if (nearest) expect(nearest.str.startsWith("Getrocknetes")).toBe(false);
+      }
+    },
+  );
+
+  it.each(["classic", "verbose"])(
+    "%s: keeps an entry and its line together when a long list goes on elsewhere",
+    async (design) => {
+      const model = buildSheetModel(pkg, herbalist(), { language: "de", createdAt });
+      const n = 70;
+      const items = Array.from({ length: n }, (_, i) => `Ding ${i + 1}`);
+      const details = items.map((_, i) => (i % 3 === 0 ? `Darin liegt Kiesel ${i + 1}` : ""));
+      const long: SheetModel = {
+        ...model,
+        sections: model.sections.map((s) => (s.kind === "list" ? { ...s, items, details } : s)),
+      };
+      const pdf = await renderPdf(long, { parts: ["sheet"], design });
+      const pages = await positions(pdf);
+      const where = (str: string) => {
+        for (const [page, items] of pages.entries()) {
+          const p = items.find((x) => x.str === str);
+          if (p) return { ...p, page };
+        }
+        throw new Error(`${str} is not printed`);
+      };
+      const { text } = await extract(pdf);
+      expect(text).toMatch(/\(FORTSETZUNG\)|· FORTSETZUNG/u);
+      details.forEach((d, i) => {
+        if (d === "") return;
+        const name = where(items[i]!);
+        const line = where(d);
+        // Same page and column, right under the name.
+        expect(line.page, d).toBe(name.page);
+        expect(Math.abs(line.x - name.x), d).toBeLessThan(1);
+        expect(line.y - name.y, d).toBeGreaterThan(0);
+        expect(line.y - name.y, d).toBeLessThan(6);
+      });
+    },
+  );
+});

@@ -234,11 +234,15 @@ function drawSection(c: Grid, s: Laid, x: number, top: number, w: number): numbe
       y = drawStatTable(c, s, x, y, w);
       break;
     case "list": {
-      for (const item of s.items) {
+      s.items.forEach((item, i) => {
         pen.text(item, x + 1, y + 4.3, pen.fit(item, st.body, w - 2));
-        pen.line(x, y + 6, x + w, y + 6, 0.3, "#BBB");
-        y += 6;
-      }
+        // The line under an entry (format 0.22): small, as wide as the section, the row as tall as it needs.
+        const detail = s.details?.[i] ?? "";
+        const bottom =
+          detail === "" ? y + 6 : pen.paragraph(detail, x + 1, y + 5.1, w - 2, st.hint, 1.2) + 0.9;
+        pen.line(x, bottom, x + w, bottom, 0.3, "#BBB");
+        y = bottom;
+      });
       if (s.blankLines > 0)
         pen.field(s.field, x, y, w, s.blankLines * g.writingLine, { text: s.written?.join("\n") ?? "" });
       for (let i = 0; i < s.blankLines; i++) {
@@ -578,6 +582,7 @@ function splitSection(s: Laid, n: number, m: Messages): [Laid, Laid] {
           ...head,
           kind: s.kind,
           items: s.items.slice(0, items),
+          ...(s.details ? { details: s.details.slice(0, items) } : {}),
           blankLines: blank,
           written: s.written?.slice(0, blank),
         },
@@ -585,6 +590,7 @@ function splitSection(s: Laid, n: number, m: Messages): [Laid, Laid] {
           ...tail,
           kind: s.kind,
           items: s.items.slice(items),
+          ...(s.details ? { details: s.details.slice(items) } : {}),
           blankLines: s.blankLines - blank,
           written: s.written?.slice(blank),
         },

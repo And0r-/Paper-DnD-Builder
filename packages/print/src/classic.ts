@@ -611,19 +611,33 @@ function listBlocks(c: Ctx, s: Section<"list">, room = 0): Block[] {
   const bandW = firstColumns(g).a.w + g.first.gap + firstColumns(g).b.w;
   const written = pen.wrap(pen.written(s.field), st.written, bandW - 1).filter((l) => l.trim() !== "");
   const entryLines = (t: string, w: number) => pen.wrap(t, st.body, w - 1);
-  const used = s.items.reduce((n, t) => n + entryLines(t, bandW).length, 0);
+  /** The line under an entry (format 0.22), in the smallest type, and how far it pushes the rule down. */
+  const detailOf = (i: number) => s.details?.[i] ?? "";
+  const detailHeight = (d: string, w: number) =>
+    d === "" ? 0 : pen.wrap(d, st.small, w - 1).length * pen.lineHeight(st.small, 1.15) + 0.9 + 1;
+  const used = s.items.reduce(
+    (n, t, i) => n + entryLines(t, bandW).length + Math.ceil(detailHeight(detailOf(i), bandW) / line),
+    0,
+  );
   // The flow leaves 0.6 mm after every block: the title, each entry, the empty lines.
   const fit = Math.max(0, Math.floor((room - g.titleHeight - 0.6 * (s.items.length + 2) - 1) / line));
   const blank = Math.max(written.length, room > 0 ? fit - used : s.blankLines);
-  const entries = s.items.map((t) =>
+  const entries = s.items.map((t, at) =>
     measured(c, s, (x, y, w) => {
       const lines = entryLines(t, w);
+      const detail = detailOf(at);
       lines.forEach((l, i) => {
         const base = y + (i + 1) * line - 1;
         pen.text(l, x + 0.5, base - 0.8, st.body);
-        pen.line(x, base, x + w, base, 0.4, RULE);
+        // With a line under it, the entry's rule goes under that line.
+        if (detail === "" || i < lines.length - 1) pen.line(x, base, x + w, base, 0.4, RULE);
       });
-      return lines.length * line;
+      if (detail === "") return lines.length * line;
+      // Where the rule would be, the line starts; the rule goes under it.
+      const top = y + lines.length * line - 1;
+      const base = pen.paragraph(detail, x + 0.5, top + 0.1, w - 1, st.small, 1.15) + 0.8;
+      pen.line(x, base, x + w, base, 0.4, RULE);
+      return base + 1 - y;
     }),
   );
   const blanks =

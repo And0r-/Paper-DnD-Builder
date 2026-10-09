@@ -76,4 +76,18 @@ describe("verbose on screen", () => {
     expect(html).toContain('lang="en"');
     expect(html).not.toMatch(/Gespielt von|Aktuell, mit Bleistift/);
   });
+
+  it("shows the package's line under a list entry small, not to write on (format 0.22)", async () => {
+    const pkg = await loadDemoPackage();
+    const doc = demoCharacter(pkg, 3, "Mira Fennwick", "calling.herbalist");
+    const model = buildSheetModel(pkg, doc, { language: "de", createdAt: new Date("2026-10-04T12:00:00Z") });
+    const html = renderToStaticMarkup(<VerboseSheet model={model} ui={ui} />);
+    const line = "Getrocknetes Nebelblatt, eine Knochennadel, 3 Meter Schilffaden, 3 kleine Tontöpfe.";
+    expect(html).toContain(
+      `<span data-path="[&quot;sections&quot;,${model.sections.findIndex((s) => s.kind === "list")},&quot;items&quot;,`,
+    );
+    expect(html.match(/vsheet__list-detail">([^<]*)</g)).toEqual([`vsheet__list-detail">${line}<`]);
+    // Without a line, an entry is as before.
+    expect(renderToStaticMarkup(<VerboseSheet model={models[0]!} ui={ui} />)).not.toContain("__list-entry");
+  });
 });
