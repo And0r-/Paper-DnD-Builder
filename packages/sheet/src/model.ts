@@ -370,7 +370,31 @@ export function buildSheetModel(
       hint: text(`sheet.${s.id}.hint`),
     };
     switch (s.kind) {
-      case "header":
+      case "header": {
+        const fields = (s.fields ?? []).map((f) => {
+          if ("things" in f)
+            return {
+              label: text(f.label ?? `kind.${f.things.kind}.name`),
+              text: heldOf(f.things)
+                .map((t) => thingName(t.id))
+                .join(", "),
+            };
+          if ("choice" in f)
+            return { label: text(f.label ?? `choice.${f.choice}.title`), text: answerText(f.choice) };
+          // The tracks with their levels, "A 3 / B 2" (SPEC 9.7); labelled like the tracks choice.
+          return {
+            label: text(f.label ?? `choice.${pkg.flow.level.tracks?.choice ?? ""}.title`),
+            text: tracksText(headTracks(ev), thingName, (n) => numberFormat.format(n)),
+          };
+        });
+        // More than one track: the head orders them by levels, so it also says which came first
+        // (SPEC 9.7) — right after the tracks field if there is one, else first.
+        const tracks = ev.tracks?.list ?? [];
+        if (tracks.length > 1)
+          fields.splice((s.fields ?? []).findIndex((f) => "tracks" in f) + 1, 0, {
+            label: messages.startedAs,
+            text: thingName(tracks[0]!.thing),
+          });
         return {
           ...base,
           kind: "header",
@@ -378,23 +402,9 @@ export function buildSheetModel(
           summary: text("summary.line", lineVars),
           packageName,
           playedByField: fieldId("sheet", s.id, "playedBy"),
-          fields: (s.fields ?? []).map((f) => {
-            if ("things" in f)
-              return {
-                label: text(f.label ?? `kind.${f.things.kind}.name`),
-                text: heldOf(f.things)
-                  .map((t) => thingName(t.id))
-                  .join(", "),
-              };
-            if ("choice" in f)
-              return { label: text(f.label ?? `choice.${f.choice}.title`), text: answerText(f.choice) };
-            // The tracks with their levels, "A 3 / B 2" (SPEC 9.7); labelled like the tracks choice.
-            return {
-              label: text(f.label ?? `choice.${pkg.flow.level.tracks?.choice ?? ""}.title`),
-              text: tracksText(headTracks(ev), thingName, (n) => numberFormat.format(n)),
-            };
-          }),
+          fields,
         };
+      }
       case "statBoxes": {
         // Two boxes of one value in a section are told apart by their place among the package's boxes, not the shown ones.
         const field = (b: (typeof s.boxes)[number]): string => {
@@ -526,6 +536,15 @@ export function buildSheetModel(
             .sort((a, b) => a.rank! - b.rank! || collator.compare(thingName(a.id), thingName(b.id)));
           held = [...ranked, ...held.filter((t) => t.rank === undefined)];
         }
+        // Rows from more than one track (SPEC 9.7): a block per track, most levels first, its ranks
+        // inside, so the player sees which track a row belongs to. A row of no track goes with
+        // where it came from, after the tracks.
+        const blockOf = new Map<string, string>();
+        if (s.byRank && new Set(held.flatMap((t) => heldById.get(t.id)?.track ?? [])).size > 1) {
+          for (const t of held) blockOf.set(t.id, heldById.get(t.id)?.track ?? origin(t.id));
+          const order = [...new Set([...headTracks(ev).map((t) => t.thing), ...blockOf.values()])];
+          held = order.flatMap((b) => held.filter((t) => blockOf.get(t.id) === b));
+        }
         // groupBy origin: groups in the order their first row came; inside a group, the order stays.
         const originOf = new Map(s.groupBy === "origin" ? held.map((t) => [t.id, origin(t.id)]) : []);
         if (s.groupBy === "origin") {
@@ -544,6 +563,11 @@ export function buildSheetModel(
           on.forEach((i) => used.add(i));
           const rank = s.byRank ? t.rank : undefined;
           const from = originOf.get(t.id);
+          const block = blockOf.get(t.id);
+          const rankTitle =
+            rank === undefined
+              ? ""
+              : text(`rank.${rank}.name`) || `${text("rank.name")} ${numberFormat.format(rank)}`;
           const note = s.note === undefined ? undefined : t.stats?.[s.note];
           const rowUses = uses(t, s.uses);
           place(note);
@@ -561,13 +585,19 @@ export function buildSheetModel(
             group:
               from !== undefined
                 ? { key: `origin-${from}`, title: thingName(from), hint: "" }
-                : rank === undefined
-                  ? null
-                  : {
-                      key: `rank-${rank}`,
-                      title: text(`rank.${rank}.name`) || `${text("rank.name")} ${numberFormat.format(rank)}`,
-                      hint: text(`sheet.${s.id}.rank.${rank}.hint`),
-                    },
+                : block !== undefined
+                  ? {
+                      key: rank === undefined ? `block-${block}` : `block-${block}-rank-${rank}`,
+                      title: [thingName(block), rankTitle].filter((x) => x !== "").join(" · "),
+                      hint: rank === undefined ? "" : text(`sheet.${s.id}.rank.${rank}.hint`),
+                    }
+                  : rank === undefined
+                    ? null
+                    : {
+                        key: `rank-${rank}`,
+                        title: rankTitle,
+                        hint: text(`sheet.${s.id}.rank.${rank}.hint`),
+                      },
           };
         });
         const legend = signs.flatMap((m, i) => (used.has(i) ? [`${text(m.text)} = ${text(m.legend)}`] : []));

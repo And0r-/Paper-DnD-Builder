@@ -15,6 +15,8 @@ export interface Messages {
   startValue: (n: string) => string;
   /** Character without a name yet. */
   unnamed: string;
+  /** Head of a character with more than one track: label of the track it began with. */
+  startedAs: string;
   page: (n: number, of: number) => string;
   /** Footer: which units the document uses, e.g. "meters, kilograms". */
   unitsUsed: (units: string[]) => string;
@@ -57,6 +59,7 @@ export const MESSAGES: Readonly<Record<string, Messages>> = {
     pencil: "Aktuell, mit Bleistift:",
     startValue: (n) => `Startwert ${n}`,
     unnamed: "Ohne Namen",
+    startedAs: "Angefangen als",
     page: (n, of) => `Seite ${n} von ${of}`,
     unitsUsed: (u) => `Einheiten: ${u.join(", ")}`,
     copyName: (d) => `Meine Fassung vom ${d}`,
@@ -86,6 +89,7 @@ export const MESSAGES: Readonly<Record<string, Messages>> = {
     pencil: "Current, in pencil:",
     startValue: (n) => `Start at ${n}`,
     unnamed: "No name yet",
+    startedAs: "Started as",
     page: (n, of) => `Page ${n} of ${of}`,
     unitsUsed: (u) => `Units: ${u.join(", ")}`,
     copyName: (d) => `My version of ${d}`,
@@ -115,6 +119,7 @@ export const MESSAGES: Readonly<Record<string, Messages>> = {
     pencil: "Actuel, au crayon :",
     startValue: (n) => `Départ à ${n}`,
     unnamed: "Pas encore de nom",
+    startedAs: "A débuté comme",
     page: (n, of) => `Page ${n} sur ${of}`,
     unitsUsed: (u) => `Unités : ${u.join(", ")}`,
     copyName: (d) => `Ma version du ${d}`,
@@ -145,6 +150,7 @@ export const MESSAGES: Readonly<Record<string, Messages>> = {
     pencil: "Attuale, a matita:",
     startValue: (n) => `Si parte da ${n}`,
     unnamed: "Ancora senza nome",
+    startedAs: "Ha iniziato come",
     page: (n, of) => `Pagina ${n} di ${of}`,
     unitsUsed: (u) => `Unità: ${u.join(", ")}`,
     copyName: (d) => `La mia versione del ${d}`,
@@ -174,6 +180,7 @@ export const MESSAGES: Readonly<Record<string, Messages>> = {
     pencil: "Actual, a lápiz:",
     startValue: (n) => `Empieza en ${n}`,
     unnamed: "Aún sin nombre",
+    startedAs: "Empezó como",
     page: (n, of) => `Página ${n} de ${of}`,
     unitsUsed: (u) => `Unidades: ${u.join(", ")}`,
     copyName: (d) => `Mi versión del ${d}`,
