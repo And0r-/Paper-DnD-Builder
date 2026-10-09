@@ -224,6 +224,15 @@ describe("two tracks", () => {
     expect(ev.values["currentSlotRank"]).toBe(2);
   });
 
+  it("asks levelOf() at the level of a step made once, not of the finished character", () => {
+    const p = structuredClone(pkg);
+    const cloak = p.things.find((t) => t.id === "item.travel-cloak")!;
+    cloak.requires = `levelOf('${L}') >= 2`;
+    // The gear is picked at level 1: the cloak needs 2 lantern bearer levels, even if the character is built at 3.
+    expect(evaluateDraft(p, build(L, [], { level: 3, p })).choices["gear"]!.options).not.toContain(cloak.id);
+    expect(evaluateDraft(pkg, build(L, [], { level: 3 })).choices["gear"]!.options).toContain(cloak.id);
+  });
+
   it("names the calling in the explanation of a value", () => {
     const ev = evaluateDraft(pkg, build(L, [L, L, H, H], { scores: LANTERN_AND_HERBS }));
     const parts = explainValue(pkg, ev, "stamina")!.parts;

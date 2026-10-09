@@ -949,9 +949,9 @@ function marksOnly(choice: Choice): boolean {
 /**
  * What a pick choice's `requires` and `recommend` see (SPEC 9.3). A pick
  * with a fixed count is made once, at the level of its step (a boon at
- * level 4): `level` and the values are those of that level, so a thing that
- * needs a higher level is not offered even if the character is built at
- * that level. `has()` and `count()` still see what the character has by the
+ * level 4): `level`, `levelOf()` and the values are those of that level,
+ * so a thing that needs a higher level is not offered even if the character
+ * is built at that level. `has()` and `count()` still see what the character has by the
  * time the step is asked, like the options do: a thing it gets at a later
  * level is neither offered nor recommended a second time. A pick whose
  * count is an expression or a table by level is the character's list at
@@ -961,7 +961,7 @@ function marksOnly(choice: Choice): boolean {
 function pickScope(choice: Choice, character: Character, atLevel: number): ExprScope {
   const once = choice.kind === "pickOne" || (choice.kind === "pickMany" && typeof choice.count === "number");
   if (!once || atLevel >= character.level) return character.scope;
-  return { ...character.scope, value: character.scopeAt(atLevel).value };
+  return { ...character.scopeAt(atLevel), has: character.scope.has, count: character.scope.count };
 }
 
 /**
