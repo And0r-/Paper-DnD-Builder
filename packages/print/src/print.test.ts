@@ -154,6 +154,7 @@ function messageWords(language: string): Set<string> {
     asOfLevel,
     count,
     notForSharing,
+    fromLevelsAs,
     ...plain
   } = m;
   return words([
@@ -167,6 +168,7 @@ function messageWords(language: string): Set<string> {
     copyFile("", ""),
     asOfLevel(4),
     notForSharing(""),
+    fromLevelsAs(""),
     count("2", ""),
   ]);
 }

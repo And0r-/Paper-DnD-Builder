@@ -12,8 +12,9 @@ import { describe, expect, it } from "vitest";
 import { translator } from "../../i18n/index.ts";
 import { summaryLineText } from "../characters.tsx";
 import { levelGrowth } from "../flow/explain.ts";
-import { buildFlow, firstOpen, TRACKS_KEY } from "../flow/model.ts";
+import { answerThings, buildFlow, firstOpen, TRACKS_KEY } from "../flow/model.ts";
 import { evaluateBefore, flowOf } from "../flow/raise.ts";
+import { measureContext } from "../package-text.ts";
 import type { LoadedPackage } from "../packages.ts";
 import { summarize } from "@builder/core";
 import { notMetText } from "./screens.tsx";
@@ -123,6 +124,15 @@ describe("tracks in the flow", () => {
     expect(growth.shared).toContain("glowLevel");
     expect(growth.byThing.find((g) => g.thing === "calling.lantern-bearer")!.values).toContain("lanternDice");
     expect(growth.byThing.find((g) => g.thing === "calling.herbalist")!.values).not.toContain("lanternDice");
+    // One calling's own glow places are not the character's: the overview names them nowhere,
+    // also not in the line of what that calling gives (AND-311).
+    expect(growth.summed).toEqual(["ownGlow"]);
+    const gifts = ev.choices["calling-gifts"]!;
+    expect(gifts.info!.values.map((v) => v.value)).toContain("ownGlow");
+    const skip = new Set([...growth.own, ...growth.shared, ...growth.summed]);
+    expect(
+      answerThings(named, measureContext(named, undefined), gifts, skip, ev.values)!.values.join(),
+    ).not.toContain("Eigene Glutplätze");
 
     // One calling: a table by level stays the calling's.
     const single = levelGrowth(
@@ -130,6 +140,7 @@ describe("tracks in the flow", () => {
       evaluateDraft(p, { ...(await example("lantern-herbalist")), tracks: [] }),
     );
     expect(single.shared).toEqual([]);
+    expect(single.summed).toEqual([]);
     expect(single.byThing.find((g) => g.thing === "calling.lantern-bearer")!.values).toEqual(
       expect.arrayContaining(["ownGlow", "lanternDice"]),
     );

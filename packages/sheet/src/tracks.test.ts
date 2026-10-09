@@ -135,3 +135,69 @@ describe("a sheet with two tracks, the head and shared things", () => {
     expect(rows[0]!.group?.title).toBe(pkg.texts["en"]!["calling.lantern-bearer.name"]);
   });
 });
+
+describe("a sheet with two tracks, dice of a kind", () => {
+  /** Invented: bramble dice add up the levels of every calling; the package's text names all three. */
+  const withDice = () => {
+    const p = structuredClone(pkg);
+    p.values.push({
+      id: "brambleDice",
+      source: "mistland",
+      formula:
+        "levelOf('calling.lantern-bearer') + levelOf('calling.herbalist') + levelOf('calling.river-runner')",
+    });
+    const boxes = p.sheet.sections.find((s) => s.kind === "statBoxes");
+    if (boxes?.kind !== "statBoxes") throw new Error("no boxes");
+    boxes.boxes.push({ value: "brambleDice", style: "boxes" });
+    for (const language of p.manifest.languages)
+      p.texts[language]!["value.brambleDice.explain"] = "Every calling. Of the package.";
+    return p;
+  };
+  const hint = (p: ContentPackage, doc: DraftDocument, language: string) =>
+    buildSheetModel(p, doc, { language, createdAt })
+      .sections.flatMap((s) => (s.kind === "statBoxes" ? s.boxes : []))
+      .find((b) => b.hint !== "" && b.field?.endsWith("brambleDice"))?.hint;
+  const named = (language: string, ids: string[]) =>
+    MESSAGES[language]!.fromLevelsAs(
+      new Intl.ListFormat(language, { type: "conjunction" }).format(
+        ids.map((id) => pkg.texts[language]![`${id}.name`] as string),
+      ),
+    );
+
+  it("names under the box only the callings the character has levels in, in every language", () => {
+    const p = withDice();
+    for (const language of p.manifest.languages) {
+      expect(hint(p, docs["lantern-herbalist"]!, language)).toBe(
+        named(language, ["calling.lantern-bearer", "calling.herbalist"]),
+      );
+      expect(hint(p, docs["herbalist-river-runner"]!, language)).toBe(
+        named(language, ["calling.herbalist", "calling.river-runner"]),
+      );
+    }
+  });
+
+  it("names the one calling of a character with one", () => {
+    const one = structuredClone(docs["lantern-herbalist"]!);
+    one.tracks = one.tracks!.map(() => "calling.lantern-bearer");
+    expect(hint(withDice(), one, "de")).toBe(named("de", ["calling.lantern-bearer"]));
+  });
+
+  it("has the words in every language of the builder", () => {
+    expect(Object.keys(MESSAGES).map((l) => MESSAGES[l]!.fromLevelsAs("X"))).toEqual([
+      "Aus deinen Stufen als X.",
+      "From your X levels.",
+      "De vos niveaux de X.",
+      "Dai tuoi livelli da X.",
+      "De tus niveles de X.",
+    ]);
+    expect(MESSAGES["fr"]!.fromLevelsAs("Arpenteur et Herboriste")).toBe(
+      "De vos niveaux d’Arpenteur et Herboriste.",
+    );
+  });
+
+  it("keeps the package's words for a value that is more than a sum of levels", () => {
+    const p = withDice();
+    p.values.find((v) => v.id === "brambleDice")!.formula += " + 1";
+    expect(hint(p, docs["lantern-herbalist"]!, "en")).toBe("Every calling.");
+  });
+});
