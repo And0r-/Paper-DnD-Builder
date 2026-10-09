@@ -75,6 +75,12 @@ export function ExtensionSwitches() {
             key={x.id}
             className={`option option--compact${on ? " option--checked" : ""}`}
             aria-busy={busy?.id === x.id || undefined}
+            onClick={(e) => {
+              // The whole card ticks, as on the choice screens (AND-342). The input's own
+              // click (also from its label) already did; a disabled input ignores the click.
+              if ((e.target as HTMLElement).closest("input, label")) return;
+              e.currentTarget.querySelector<HTMLInputElement>(".option__input")?.click();
+            }}
           >
             <div className="option__head">
               <input
