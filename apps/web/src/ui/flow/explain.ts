@@ -6,6 +6,7 @@
 import {
   explainValue,
   grantAppliesFrom,
+  ownLevelTracks,
   totalOf,
   type ChoiceState,
   type Evaluation,
@@ -14,6 +15,7 @@ import {
   type ValuePart,
 } from "@builder/core";
 import { collectRefs, parseExpr } from "@builder/format/pure";
+import { MESSAGES } from "@builder/sheet";
 import type { Translator } from "../../i18n/index.ts";
 import { choiceOf, choiceTexts, formatValue, ptext, thingName } from "../package-text.ts";
 import type { LoadedPackage } from "../packages.ts";
@@ -98,6 +100,23 @@ export function valueOrigin(
     return label ? w.t("explain.from", { source: label }) : undefined;
   }
   return sumText(lp, ctx, ev, valueId, exp.parts, w);
+}
+
+/**
+ * What a value is, in the words under it: the package's explanation, but
+ * for dice of a kind the character's own tracks, as on the sheet (AND-311):
+ * the package names every track that has them.
+ */
+export function valueExplain(
+  lp: LoadedPackage,
+  ev: Evaluation,
+  valueId: string,
+  list: Words["list"],
+): string | undefined {
+  const own = ownLevelTracks(lp.pkg, ev, valueId);
+  const words = MESSAGES[lp.lang];
+  if (own && words) return words.fromLevelsAs(list(own.map((id) => thingName(lp, id))));
+  return ptext(lp, `value.${valueId}.explain`);
 }
 
 export interface RowValues {

@@ -50,7 +50,14 @@ export {
 } from "./evaluate.ts";
 export { dependentValues } from "./depends.ts";
 export { fillPicks, type PoolSlot } from "./pool.ts";
-export { explainValue, totalOf, type PartSource, type ValueExplanation, type ValuePart } from "./explain.ts";
+export {
+  explainValue,
+  ownLevelTracks,
+  totalOf,
+  type PartSource,
+  type ValueExplanation,
+  type ValuePart,
+} from "./explain.ts";
 export {
   applyChange,
   headTracks,

@@ -11,7 +11,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { translator } from "../../i18n/index.ts";
 import { summaryLineText } from "../characters.tsx";
-import { levelGrowth } from "../flow/explain.ts";
+import { levelGrowth, valueExplain } from "../flow/explain.ts";
 import { answerThings, buildFlow, firstOpen, TRACKS_KEY } from "../flow/model.ts";
 import { evaluateBefore, flowOf } from "../flow/raise.ts";
 import { measureContext } from "../package-text.ts";
@@ -144,6 +144,38 @@ describe("tracks in the flow", () => {
     expect(single.byThing.find((g) => g.thing === "calling.lantern-bearer")!.values).toEqual(
       expect.arrayContaining(["ownGlow", "lanternDice"]),
     );
+  });
+
+  it("says under dice of a kind, for the whole character, only the tracks the character has (AND-317)", async () => {
+    // Invented: bramble dice add up the levels of every calling; the package's text names all three.
+    const p = structuredClone(pkg);
+    p.values.push({
+      id: "brambleDice",
+      source: "mistland",
+      formula:
+        "levelOf('calling.lantern-bearer') + levelOf('calling.herbalist') + levelOf('calling.river-runner')",
+    });
+    const named: LoadedPackage = {
+      pkg: p,
+      lang: "de",
+      texts: {
+        ...texts,
+        "value.brambleDice.name": "Dornenwürfel",
+        "value.brambleDice.explain": "Aus Stufen als Laternenträgerin, Kräuterkundige und Flussläuferin.",
+      },
+    };
+    const { list } = translator("de");
+    const doc = await example("lantern-herbalist");
+    const ev = evaluateDraft(p, doc);
+    expect(levelGrowth(named, ev).shared).toContain("brambleDice");
+    expect(valueExplain(named, ev, "brambleDice", list)).toBe(
+      "Aus deinen Stufen als Laternenträgerin und Kräuterkundige.",
+    );
+    // One calling: that one.
+    const one = evaluateDraft(p, { ...doc, tracks: doc.tracks!.map(() => "calling.lantern-bearer") });
+    expect(valueExplain(named, one, "brambleDice", list)).toBe("Aus deinen Stufen als Laternenträgerin.");
+    // Any other value keeps the package's words.
+    expect(valueExplain(named, ev, "guard", list)).toBe(texts["value.guard.explain"]);
   });
 
   it("names the condition that fails, also of a track the character had", async () => {

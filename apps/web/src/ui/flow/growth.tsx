@@ -12,10 +12,10 @@ import { RichText, useMeasure } from "../components/RichText.tsx";
 import { fillNodes, ThingLabel } from "../components/ThingName.tsx";
 import { formatValue, levelWord, ptext, thingName } from "../package-text.ts";
 import { useDraft } from "./draft-state.tsx";
-import { levelGrowth } from "./explain.ts";
+import { levelGrowth, valueExplain } from "./explain.ts";
 
 export function LevelGrowth() {
-  const { t } = useApp();
+  const { t, list } = useApp();
   const { lp, ev } = useDraft();
   const ctx = useMeasure(lp);
   const id = useId();
@@ -23,18 +23,21 @@ export function LevelGrowth() {
   if (growth.own.length === 0 && growth.byThing.length === 0 && growth.shared.length === 0) return null;
   const word = levelWord(lp);
   const because = t("growth.because", { levelName: word, level: ev.level });
-  const value = (v: string, from: string) => (
-    <li className="value" key={v}>
-      <span className="value__number">{formatValue(lp, ctx, v, ev.values[v] ?? 0)}</span>
-      <span className="value__name">{ptext(lp, `value.${v}.name`)}</span>
-      <span className="value__from">{from}</span>
-      {ptext(lp, `value.${v}.explain`) && (
-        <span className="value__explain">
-          <RichText lp={lp} text={ptext(lp, `value.${v}.explain`)} />
-        </span>
-      )}
-    </li>
-  );
+  const value = (v: string, from: string) => {
+    const explain = valueExplain(lp, ev, v, list);
+    return (
+      <li className="value" key={v}>
+        <span className="value__number">{formatValue(lp, ctx, v, ev.values[v] ?? 0)}</span>
+        <span className="value__name">{ptext(lp, `value.${v}.name`)}</span>
+        <span className="value__from">{from}</span>
+        {explain && (
+          <span className="value__explain">
+            <RichText lp={lp} text={explain} />
+          </span>
+        )}
+      </li>
+    );
+  };
   // With more than one track (concept AND-262, 6.4): what follows the whole
   // character first, then a block per track, most levels first.
   const split = (ev.tracks?.list.length ?? 0) > 1;

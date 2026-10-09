@@ -261,3 +261,29 @@ function sumRefs(e: Expr): string[] | undefined {
   }
   return undefined;
 }
+
+/**
+ * For a value that adds up the levels of tracks (dice of a kind, SPEC 9.7):
+ * those the character has levels in, in the formula's order. The package's
+ * own text names every track it counts; this is what the character has.
+ * Undefined for any other value, or if the character has none of them.
+ */
+export function ownLevelTracks(pkg: ContentPackage, ev: Evaluation, valueId: string): string[] | undefined {
+  const formula = pkg.values.find((v) => v.id === valueId)?.formula;
+  const tracks = formula === undefined ? undefined : levelSum(parseExpr(formula));
+  const scope = evaluationScope(pkg, ev);
+  const had = tracks?.filter((t) => (scope.levelOf?.(t) ?? 0) > 0) ?? [];
+  return had.length > 0 ? had : undefined;
+}
+
+/** The tracks a formula adds the levels of, if it is just that: "levelOf('a') + levelOf('b')". */
+function levelSum(e: Expr): string[] | undefined {
+  if (e.type === "call" && e.fn === "levelOf" && e.args.length === 1 && e.args[0]!.type === "str")
+    return [e.args[0]!.value];
+  if (e.type === "binary" && e.op === "+") {
+    const l = levelSum(e.left);
+    const r = levelSum(e.right);
+    return l && r ? [...l, ...r] : undefined;
+  }
+  return undefined;
+}
