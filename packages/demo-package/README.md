@@ -13,8 +13,6 @@ pnpm validate-package packages/demo-package
 Every feature of format 0.10 is used at least once (see
 [`packages/format/SPEC.md`](../format/SPEC.md)):
 
-<<<<<<< HEAD
-
 | Feature                               | Where                                                                                                                                                                                                                                                                       |
 | ------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 3 callings, 1 path each               | `things/callings-and-paths.json`; paths filtered with `requires`                                                                                                                                                                                                            |
@@ -30,6 +28,7 @@ Every feature of format 0.10 is used at least once (see
 | Extension (format 0.20)               | `extensions/demo-tides/`: one more path for river runners (`path.tide-warden`) and one talent, a value; texts in en and de, the rules text only in en (fallback); license not `publishable`. Check with `pnpm validate-package packages/demo-package/extensions/demo-tides` |
 | Tracks (format 0.21)                  | `flow.json` `level.tracks`: the calling carries levels, with `addRequiresCurrent`; each calling has `addRequires` and `<calling>.addReason` (`texts/*/tracks.json`). Example drafts in `examples/`                                                                          |
 | Line under a list entry (format 0.22) | `sheet.json` gear list `"detail": "contents"`; `item.herb-satchel.contents` (with `{{length:10}}`) is printed under the herb satchel                                                                                                                                        |
+| Texts at an option (format 0.22)      | `trait.far-lore` in `herb-craft` (herbalist) asks for two lands (`textInputs`); the sheet prints "Far Lore (…, …)" in `traits`                                                                                                                                              |
 | Shared slots by a value               | `glowLevel` = lantern bearer levels + half the herbalist levels (rounded up, `levelOf()`); `lanternSlots1` … `9` are tables by it (`byValue`), printed in `lantern-slots`                                                                                                   |
 | Slots of one calling                  | river runner: `currentSlots` and `currentSlotRank` as grant tables, so they count river runner levels; printed in `current-slots`                                                                                                                                           |
 | First or added calling                | `only: "first"`: stamina of level 1, starting gear, the full talent choice; `only: "added"`: a smaller stamina, `added-talent-<calling>`                                                                                                                                    |

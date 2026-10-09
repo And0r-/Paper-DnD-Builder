@@ -4,8 +4,8 @@
  * Used twice: by the evaluation (does a stored answer still fit?) and
  * before storing a new answer (reject what does not fit now).
  */
-import type { Choice } from "@builder/format/pure";
-import { answerSchemaFor, type Answer, type DistributeAnswer } from "./draft.ts";
+import type { Choice, TextInput } from "@builder/format/pure";
+import { answerSchemaFor, type Answer, type DistributeAnswer, type PickTexts } from "./draft.ts";
 
 /** Machine-readable reason why an answer does not fit. The UI words it. */
 export type Problem =
@@ -32,6 +32,8 @@ export interface ChoiceContext {
   max?: number;
   /** Distribute choices with `raise`: points in all and the most each target can take. */
   raise?: { points: number; most: Record<string, number> };
+  /** Pick choices: the texts a thing asks for when picked (`textInputs`), by thing. */
+  textInputs?: ReadonlyMap<string, readonly TextInput[]>;
 }
 
 export interface Judgement {
@@ -46,6 +48,8 @@ export interface Judgement {
   inputs?: Record<string, number>;
   /** Points the answer adds to values (distribute with `raise`). */
   raises?: Record<string, number>;
+  /** Pick choices: counted picks whose needed texts are still empty, in pick order. */
+  textsMissing?: string[];
 }
 
 const invalid = (problem: Problem, extra: Partial<Judgement> = {}): Judgement => ({
@@ -67,9 +71,9 @@ export function judgeAnswer(choice: Choice, raw: unknown, ctx: ChoiceContext): J
 
   switch (choice.kind) {
     case "pickOne": {
-      const { pick } = answer as { pick: string };
+      const { pick, texts } = answer as { pick: string; texts?: PickTexts };
       if (!(ctx.options ?? []).includes(pick)) return invalid("notOffered", { counted: [] });
-      return { status: "answered", counted: [pick] };
+      return judgeTexts({ status: "answered", counted: [pick] }, texts, ctx);
     }
     case "pickMany": {
       const { picks } = answer as { picks: string[] };
@@ -80,8 +84,10 @@ export function judgeAnswer(choice: Choice, raw: unknown, ctx: ChoiceContext): J
       if (new Set(picks).size !== picks.length) return invalid("duplicate", { counted });
       if (valid.length !== picks.length) return invalid("notOffered", { counted });
       if (picks.length > count) return invalid("tooMany", { counted });
-      if (picks.length === count || choice.upTo) return { status: "answered", counted };
-      return { status: "incomplete", counted, remaining: count - picks.length };
+      const { texts } = answer as { texts?: PickTexts };
+      if (picks.length === count || choice.upTo)
+        return judgeTexts({ status: "answered", counted }, texts, ctx);
+      return judgeTexts({ status: "incomplete", counted, remaining: count - picks.length }, texts, ctx);
     }
     case "distribute":
       return judgeDistribute(choice, answer as DistributeAnswer, ctx);
@@ -100,6 +106,22 @@ export function judgeAnswer(choice: Choice, raw: unknown, ctx: ChoiceContext): J
     case "info":
       return invalid("badShape");
   }
+}
+
+/** The texts of a counted pick (`textInputs`): too long or odd characters do not fit; a needed one left empty is not done yet. */
+function judgeTexts(j: Judgement, texts: PickTexts | undefined, ctx: ChoiceContext): Judgement {
+  const missing: string[] = [];
+  const counted = j.counted ?? [];
+  for (const thing of counted) {
+    for (const input of ctx.textInputs?.get(thing) ?? []) {
+      const text = (texts?.[thing]?.[input.id] ?? "").trim();
+      if ([...text].length > input.maxLength) return invalid("tooLong", { counted });
+      if (CONTROL.test(text) || /[\r\n]/.test(text)) return invalid("badCharacters", { counted });
+      if (text.length === 0 && !input.optional && !missing.includes(thing)) missing.push(thing);
+    }
+  }
+  if (missing.length === 0) return j;
+  return { ...j, status: "incomplete", textsMissing: missing, remaining: j.remaining ?? 0 };
 }
 
 function judgeDistribute(

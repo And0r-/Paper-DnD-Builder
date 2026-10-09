@@ -2646,3 +2646,21 @@ describe("a line under a list entry (format 0.22)", () => {
     },
   );
 });
+
+describe("texts of a pick after the name (textInputs)", () => {
+  it.each(["classic", "verbose"])(
+    "%s: prints the texts after the thing's name in its table",
+    async (design) => {
+      const herbalist = demoCharacter(pkg, 1, "Mira Fennwick", "calling.herbalist");
+      const texts = { "trait.far-lore": { first: "Salzmarschen", second: "Glut-Hügel" } };
+      const doc = {
+        ...herbalist,
+        answers: { ...herbalist.answers, "herb-craft": { pick: "trait.far-lore", texts } },
+      };
+      const model = buildSheetModel(pkg, doc, { language: "de", createdAt });
+      const pdf = await renderPdf(model, { parts: ["sheet"], design });
+      const { text } = await extract(pdf);
+      expect(text).toContain("Fernkunde (Salzmarschen, Glut-Hügel)");
+    },
+  );
+});

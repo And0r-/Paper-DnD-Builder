@@ -201,6 +201,7 @@ export function OptionCard({
   level,
   blocked,
   onToggle,
+  children,
 }: {
   lp: LoadedPackage;
   thing: Thing;
@@ -214,6 +215,8 @@ export function OptionCard({
   /** Why this option cannot be picked right now; it stays readable and focusable. */
   blocked?: string | undefined;
   onToggle: () => void;
+  /** Shown right under the option's name and sentence, e.g. the texts a pick asks for. */
+  children?: ReactNode;
 }) {
   const { t, list } = useApp();
   const explain = useExplain();
@@ -242,7 +245,8 @@ export function OptionCard({
       className={`option${checked ? " option--checked" : ""}${blocked ? " option--blocked" : ""}${pointedBy.length > 0 ? " option--pointed" : ""}`}
       onClick={(e) => {
         // The whole card picks the option, except its own buttons and links.
-        if ((e.target as HTMLElement).closest("button, a, input, label, select, textarea")) return;
+        if ((e.target as HTMLElement).closest("button, a, input, label, select, textarea, [data-pick-texts]"))
+          return;
         input.current?.click();
       }}
       onFocus={showExplain}
@@ -315,6 +319,7 @@ export function OptionCard({
       <p className="option__short" id={`${id}-short`}>
         <RichText lp={lp} text={ptext(lp, `${thing.id}.short`)} />
       </p>
+      {children}
       {goodIf && (
         <p className="option__goodif">
           <RichText lp={lp} text={goodIf} />
@@ -350,7 +355,9 @@ export function PickChoice({
     [state.options, lp],
   );
   const offered = new Set(state.options ?? []);
-  const answer = state.answer as { pick?: string; picks?: string[] } | undefined;
+  const answer = state.answer as PickAnswer | undefined;
+  // Texts written for a pick stay in the answer, so picking it again brings them back.
+  const kept = answer?.texts ? { texts: answer.texts } : {};
   const picked = single
     ? answer?.pick && offered.has(answer.pick)
       ? [answer.pick]
@@ -369,7 +376,7 @@ export function PickChoice({
   const toggle = (id: string) => {
     if (single) {
       const old = answer?.pick && answer.pick !== id ? answer.pick : undefined;
-      guard.request({ type: "answer", choice: choice.id, answer: { pick: id } }, () => ({
+      guard.request({ type: "answer", choice: choice.id, answer: { pick: id, ...kept } }, () => ({
         title: t("change.title", { step: stepName }),
         lead: old
           ? t("change.textPick", { new: thingName(lp, id), old: thingName(lp, old) })
@@ -385,7 +392,8 @@ export function PickChoice({
     }
     setFullHint(false);
     const picks = has ? picked.filter((p) => p !== id) : [...picked, id];
-    guard.request({ type: "answer", choice: choice.id, answer: picks.length > 0 ? { picks } : null }, () => ({
+    const next = picks.length > 0 ? { picks, ...kept } : null;
+    guard.request({ type: "answer", choice: choice.id, answer: next }, () => ({
       title: t("change.title", { step: stepName }),
       lead: t("change.textGeneric"),
       after: t("change.afterGeneric"),
@@ -468,13 +476,145 @@ export function PickChoice({
                 badge={state.badges?.[th.id]}
                 level={ev.level}
                 onToggle={() => toggle(th.id)}
-              />
+              >
+                {th.textInputs && picked.includes(th.id) && (
+                  <PickTexts choice={choice.id} thing={th} state={state} />
+                )}
+              </OptionCard>
             ))}
           </div>
         </div>
       ))}
       {guard.dialog}
     </fieldset>
+  );
+}
+
+type PickAnswer = { pick?: string; picks?: string[]; texts?: Record<string, Record<string, string>> };
+
+/**
+ * The texts a picked thing asks for (`textInputs`), right under it. Each
+ * field keeps its own text while you type and saves it as part of the
+ * choice's answer; a text from elsewhere is shown when you are not typing.
+ */
+export function PickTexts({ choice, thing, state }: { choice: string; thing: Thing; state: ChoiceState }) {
+  const { t } = useApp();
+  const { lp, change } = useDraft();
+  const answer = state.answer as PickAnswer | undefined;
+  const missing = state.textsMissing?.includes(thing.id) ?? false;
+  const save = (input: string, v: string) => {
+    const mine = { ...answer?.texts?.[thing.id] };
+    if (v.trim()) mine[input] = v;
+    else delete mine[input];
+    const texts = { ...answer?.texts, [thing.id]: mine };
+    if (Object.keys(mine).length === 0) delete texts[thing.id];
+    const { texts: _old, ...picks } = answer ?? {};
+    change({
+      type: "answer",
+      choice,
+      answer: Object.keys(texts).length > 0 ? { ...picks, texts } : picks,
+    });
+  };
+  return (
+    <div
+      className="option__texts"
+      role="group"
+      aria-label={t("pick.textsOf", { thing: thingName(lp, thing.id) })}
+      data-pick-texts={thing.id}
+    >
+      {(thing.textInputs ?? []).map((input, i) => (
+        <PickText
+          key={input.id}
+          id={`text-${choice}-${thing.id}-${input.id}`}
+          label={ptext(lp, `${thing.id}.input.${input.id}.label`) ?? input.id}
+          placeholder={ptext(lp, `${thing.id}.input.${input.id}.placeholder`)}
+          optional={input.optional ?? false}
+          maxLength={input.maxLength}
+          stored={answer?.texts?.[thing.id]?.[input.id] ?? ""}
+          // The first empty needed field is where "Next" sends you.
+          openTarget={
+            missing &&
+            !input.optional &&
+            (thing.textInputs ?? []).findIndex(
+              (x) => !x.optional && !answer?.texts?.[thing.id]?.[x.id]?.trim(),
+            ) === i
+          }
+          holdKey={`${choice}/${thing.id}/${input.id}`}
+          onSave={(v) => save(input.id, v)}
+        />
+      ))}
+    </div>
+  );
+}
+
+function PickText({
+  id,
+  label,
+  placeholder,
+  optional,
+  maxLength,
+  stored,
+  openTarget,
+  holdKey,
+  onSave,
+}: {
+  id: string;
+  label: string;
+  placeholder: string | undefined;
+  optional: boolean;
+  maxLength: number;
+  stored: string;
+  openTarget: boolean;
+  holdKey: string;
+  onSave: (v: string) => void;
+}) {
+  const { t } = useApp();
+  const { hold } = useDraft();
+  const [value, setValue] = useState(stored);
+  const focused = useRef(false);
+  const mine = useRef(stored);
+  // A text from elsewhere that came while you typed; shown when you leave the field.
+  const theirs = useRef<string | null>(null);
+  useEffect(() => {
+    if (stored === mine.current) return;
+    mine.current = stored;
+    if (focused.current) theirs.current = stored;
+    else setValue(stored);
+  }, [stored]);
+  const differs = storedText(value) !== stored;
+  useEffect(() => hold(holdKey, differs), [hold, holdKey, differs]);
+  useEffect(() => () => hold(holdKey, false), [hold, holdKey]);
+  const length = [...value.trim()].length;
+  const problem =
+    length > maxLength
+      ? t("text.tooLong", { max: maxLength })
+      : /[\r\n]/.test(value)
+        ? t("text.badCharacters")
+        : undefined;
+  return (
+    <TextField
+      id={id}
+      label={label}
+      labelExtra={optional ? `(${t("text.optional")})` : undefined}
+      placeholder={placeholder}
+      value={value}
+      error={problem}
+      maxLength={maxLength + 50}
+      autoComplete="off"
+      data-open-target={openTarget || undefined}
+      onChange={(e) => {
+        setValue(e.target.value);
+        mine.current = storedText(e.target.value);
+        theirs.current = null;
+        onSave(e.target.value);
+      }}
+      onFocus={() => (focused.current = true)}
+      onBlur={() => {
+        focused.current = false;
+        if (theirs.current !== null) setValue(theirs.current);
+        theirs.current = null;
+      }}
+    />
   );
 }
 

@@ -20,6 +20,7 @@ export {
   type NumberAnswer,
   type PickManyAnswer,
   type PickOneAnswer,
+  type PickTexts,
   type TextAnswer,
 } from "./draft.ts";
 export { evaluate, evaluateCondition, evaluateNumber, RuleError, type ExprScope } from "./expr.ts";

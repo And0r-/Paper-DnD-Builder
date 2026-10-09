@@ -178,6 +178,9 @@ export class ApiClient {
       units: structure.units as Units,
       language,
       preferred: account.units,
+      textInputs: new Map(
+        (structure.things ?? []).flatMap((t) => (t.textInputs ? [[t.id, t.textInputs] as const] : [])),
+      ),
     });
   }
 

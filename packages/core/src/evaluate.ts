@@ -60,6 +60,8 @@ export interface ChoiceState {
   upTo?: boolean;
   /** Picks or points still open; for the `missing` text. */
   remaining?: number;
+  /** Pick choices: picked things whose needed texts (`textInputs`) are still empty. */
+  textsMissing?: string[];
   /** Allowed range (number choices). */
   min?: number;
   max?: number;
@@ -190,6 +192,8 @@ export interface HeldThing {
   count?: number;
   /** The track it belongs to (SPEC 9.7): a track itself, or a thing that came through one. */
   track?: string;
+  /** The texts written when it was picked (`textInputs`), in the thing's order; empty ones left out. */
+  texts?: string[];
 }
 
 /** A track the character could take its next level in (SPEC 9.7). */
@@ -315,7 +319,7 @@ class Character {
   readonly clashes = new Map<string, string>();
 
   private readonly pkg: ContentPackage;
-  private readonly ix: Indexes;
+  readonly ix: Indexes;
   readonly level: number;
   /** The draft's `tracks`: the track of each level from 2 on. */
   private readonly entries: readonly string[] | undefined;
@@ -364,7 +368,7 @@ class Character {
    */
   give(
     id: string,
-    via: { pickedIn?: string; grantedBy?: string; everyone?: true },
+    via: { pickedIn?: string; grantedBy?: string; everyone?: true; texts?: string[] },
     step: string | undefined,
     atLevel: number,
     choices: Grant[],
@@ -1184,6 +1188,11 @@ function prepareChoice(
           });
       state.options = options;
       ctx.options = options;
+      const inputs = options.flatMap((o) => {
+        const l = indexes(pkg).things.get(o)?.textInputs;
+        return l ? [[o, l] as const] : [];
+      });
+      if (inputs.length > 0) ctx.textInputs = new Map(inputs);
       if (!owned) for (const o of options) character.offered.add(o);
       // Nothing to pick (a skill to deepen that the character does not have):
       // the choice is not asked, so it cannot hold the character back.
@@ -1334,6 +1343,7 @@ function answerChoice(
   }
   if (j.remaining !== undefined) state.remaining = j.remaining;
   else if (j.status !== "incomplete") delete state.remaining;
+  if (j.textsMissing) state.textsMissing = j.textsMissing;
   p.counted = j.counted ?? [];
   // Picks that fit count even if others in the same answer do not; inputs only from a fitting answer.
   for (const id of p.counted) {
@@ -1341,10 +1351,23 @@ function answerChoice(
     // A pick among what the character has marks the thing; it is not given a second time.
     if (marksOnly(choice)) character.mark(id, p.id);
     else if (p.id === character.tracksChoice) character.giveTracks(id, { pickedIn: p.id }, stepId, granted);
-    else character.give(id, { pickedIn: p.id }, stepId, state.atLevel, granted, 1, state.track);
+    else {
+      const texts = pickTexts(character.ix.things.get(id), state.answer, id);
+      const via = texts.length > 0 ? { pickedIn: p.id, texts } : { pickedIn: p.id };
+      character.give(id, via, stepId, state.atLevel, granted, 1, state.track);
+    }
   }
   if (j.status !== "invalid" && j.inputs) character.setInputs(j.inputs, p.id);
   if (j.status !== "invalid" && j.raises) character.addRaises(j.raises, p.id, state.atLevel);
+}
+
+/** The non-empty texts written for a picked thing, in the order of its `textInputs`. */
+function pickTexts(thing: Thing | undefined, answer: unknown, id: string): string[] {
+  const texts = (answer as { texts?: Record<string, Record<string, unknown>> } | undefined)?.texts?.[id];
+  return (thing?.textInputs ?? []).flatMap((input) => {
+    const text = texts?.[input.id];
+    return typeof text === "string" && text.trim() ? [text.trim()] : [];
+  });
 }
 
 /** What each target of a raise can take, worked out before the choice counts, at the choice's level. */

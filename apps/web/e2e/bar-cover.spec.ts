@@ -19,14 +19,14 @@ const SIZES = {
   desktop: { isMobile: false, hasTouch: false, deviceScaleFactor: 1, viewport: { width: 1280, height: 900 } },
 } as const;
 
-/** A level-3 herbalist with the given answers, made through the API. */
-async function herbalist(page: Page, answers: Record<string, unknown> = {}): Promise<string> {
+/** A herbalist (level 3 unless given) with the given answers, made through the API. */
+async function herbalist(page: Page, answers: Record<string, unknown> = {}, lvl = 3): Promise<string> {
   const created = await page.request.post("/api/drafts", { data: { packageId: "demo" } });
   expect(created.status()).toBe(201);
   let view = (await created.json()) as { draft: { id: string; version: number } };
   const id = view.draft.id;
   const level = await page.request.patch(`/api/drafts/${id}`, {
-    data: { version: view.draft.version, level: 3 },
+    data: { version: view.draft.version, level: lvl },
   });
   view = await level.json();
   for (const [choice, answer] of Object.entries({ calling: { pick: "calling.herbalist" }, ...answers })) {
@@ -66,8 +66,9 @@ for (const device of ["phone", "desktop"] as const) {
     test("a step that fits the window has no card under the bar", async ({ page, foreign }) => {
       void foreign;
       await signup(page, `fits-${device}`);
-      const id = await herbalist(page);
-      await page.goto(`/c/${id}/step/herb-craft`);
+      // The lantern bearer's vow at level 11: two cards. The herbalist's craft has a card that asks for texts and no longer fits.
+      const id = await herbalist(page, { calling: { pick: "calling.lantern-bearer" } }, 11);
+      await page.goto(`/c/${id}/step/lantern-vow`);
       const cards = page.locator(".step__content .option");
       await expect(cards).toHaveCount(2);
       if (device === "desktop") {

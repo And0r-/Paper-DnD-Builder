@@ -22,6 +22,7 @@ import {
 import type { Choice } from "@builder/format/pure";
 import { choiceOf, plist } from "../package-text.ts";
 import type { LoadedPackage } from "../packages.ts";
+import { onlyTextsMissing } from "./model.ts";
 
 /** Things the character has that did not come from one of `own` (choice ids); repeatable things never count. */
 export function heldElsewhere(lp: LoadedPackage, ev: Evaluation, own: ReadonlySet<string>): Set<string> {
@@ -52,6 +53,8 @@ export function suggestedAnswer(
   const rec = state.recommended;
   const answer = (a: unknown): DraftChange => ({ type: "answer", choice: state.id, answer: a });
   if ((def.kind === "pickOne" || def.kind === "pickMany") && Array.isArray(rec) && rec.length > 0) {
+    // Words the player writes for a pick (`textInputs`) cannot be chosen for them.
+    if (onlyTextsMissing(state)) return undefined;
     const count = def.kind === "pickOne" ? 1 : (state.count ?? rec.length);
     const picks = keptPicks(state).slice(0, count);
     // A pick among what the character has (`owned`) marks it; it is not given again.
@@ -62,7 +65,9 @@ export function suggestedAnswer(
       if (!picks.includes(id) && !skip.has(id)) picks.push(id);
     }
     if (picks.length === 0) return undefined;
-    return answer(def.kind === "pickOne" ? { pick: picks[0] } : { picks });
+    const texts = (state.answer as { texts?: unknown } | undefined)?.texts;
+    const kept = texts !== undefined ? { texts } : {};
+    return answer(def.kind === "pickOne" ? { pick: picks[0], ...kept } : { picks, ...kept });
   }
   if (def.kind === "distribute" && rec && !Array.isArray(rec)) return answer(rec);
   if (def.kind === "number" && def.default !== undefined) return answer({ value: def.default });
@@ -102,7 +107,8 @@ export function chooseForMe(
   if (!step) return undefined;
   const choices = step.choices.filter((c) => c in ev.choices);
   if (step.pool) {
-    if (choices.every((c) => isSettled(ev.choices[c]!))) return undefined;
+    const open = choices.map((c) => ev.choices[c]!).filter((c) => !isSettled(c));
+    if (open.every(onlyTextsMissing)) return undefined;
     const picks = suggestedPool(lp, ev, step.pool);
     return picks.length > 0 ? [{ type: "pool", step: stepId, picks }] : undefined;
   }
