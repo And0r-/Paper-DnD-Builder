@@ -180,6 +180,30 @@ the answer is `409 versionConflict` with the current state in
 `error.current` (optimistic locking). Opening and changing a draft also
 works for a [helper](#live-help) with `?help=<token>` (`access: "helper"`).
 
+#### Changes from several places
+
+Several people, windows and programs may change one draft (live help).
+The server never takes a change made on an old version, also not a list
+step's picks (`pools`): an answer or a list always replaces the whole
+answer, so a client that sent its old copy would undo what others did
+meanwhile. A client that gets `409 versionConflict`, or a newer `state`
+over the live channel while its own change is not saved yet (also after
+it was offline), puts its change on top of the current state and sends it
+again with the new version:
+
+- What it changed is still as it was before in `current`: send it.
+- Someone else changed the same answer (the same level, the tracks, a pick of
+  the same list step) meanwhile: theirs counts; drop yours and say so.
+- A `distribute` answer (numbers over several values, such as scores)
+  counts value by value: take `current`'s `assign`, set only the values you
+  changed, and send that. A value someone else changed meanwhile stays
+  theirs; yours to other values are saved next to it. Same `method` only:
+  another way of spreading counts as a new answer.
+
+The browser does exactly this (`src/ui/flow/rebase.ts`) and says what
+happened: "Changed elsewhere meanwhile: Scores (Might 9). Your choice is
+saved too."
+
 | Method & path                            | Body                                              | Result                                                                                                                                                                                                    |
 | ---------------------------------------- | ------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 🔒 `GET /api/drafts`                     | —                                                 | The account's own drafts with summaries (a game master finds the players' in the campaign).                                                                                                               |
@@ -611,8 +635,17 @@ player's character from the campaign ("Help out"). On the character, a
 row under the top bar shows who else is there and on which step, what
 they point at, the last hint and a lost connection; the step list marks
 where the others are. Changes go over the channel while someone else is
-there, over HTTP otherwise. Code: [`src/ui/live`](src/ui/live); browser test:
-[`e2e/live-help.spec.ts`](e2e/live-help.spec.ts).
+there, over HTTP otherwise. Every change made elsewhere shows at once, with
+a short line from `source` and `change` ("Changed over MCP: Level", "Vexa
+(game master) made a change: Folk", "Changed in another window"); the sheet
+reads the play state, a kept sheet or the original again, names the play
+state fields that changed ("Vexa (game master) made a change: Stamina") and
+shows "Here now" too. A field that still has the cursor takes the new value
+unless something written in it is not kept yet. An unsaved change
+of the window to the same question gives way to the stored one, and the
+line says so. Code: [`src/ui/live`](src/ui/live); browser tests:
+[`e2e/live-help.spec.ts`](e2e/live-help.spec.ts),
+[`e2e/live-sources.spec.ts`](e2e/live-sources.spec.ts).
 
 ### Where a change comes from
 
@@ -689,7 +722,7 @@ Every message has `type` and `draftId`.
 | `welcome`   | `you: Person`                                                                                                                                                                         | First, once connected.                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | `presence`  | `people: [Person]`                                                                                                                                                                    | When someone joins or leaves, or changes `step` or `point`; to everyone. In the order they joined.                                                                                                                                                                                                                                                                                                                                                                                         |
 | `state`     | `draft`, `packageAvailable`, `evaluation`, `summary`, `levelUp` (as `GET /api/drafts/:id`), `version`, `by`, `ref?`, `stale?`; after a change also `event`, `at`, `source`, `change?` | On joining; and after every change of the draft, by anyone, live, over the HTTP API or over MCP; to everyone. `event` is `changed` (`change`: `{ kind: "answer", choice }`, `{ kind: "pool", step }`, `{ kind: "tracks" }` or `{ kind: "level", level }`), `levelUp` (`change: { kind: "levelUp", level }`) or `finished`. `by: { id, name }` is the connection that changed it live, else `null`; `source` says who and how, for every change. `ref` only to the one who sent the change. |
-| `playState` | `version`, `at`, `source`, `change: { kind: "state" \| "clearChecks", stateVersion }`                                                                                                 | The play state was stored (`PUT /api/drafts/:id/state`); read it again if you show it.                                                                                                                                                                                                                                                                                                                                                                                                     |
+| `playState` | `version`, `at`, `source`, `change: { kind: "state" \| "clearChecks", stateVersion, fields, more }`                                                                                   |
 | `copies`    | `version`, `at`, `source`, `change: { kind: "copyCreated" \| "copyChanged" \| "copyDeleted", copyId }`                                                                                | A kept sheet was made, changed or deleted.                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | `campaign`  | `version`, `at`, `source`                                                                                                                                                             | The character moved into another campaign or none; a game master who lost it is closed with `4404` right after.                                                                                                                                                                                                                                                                                                                                                                            |
 | `deleted`   | `version`, `at`, `source`                                                                                                                                                             | The owner deleted the character; everyone is closed with `4404` right after. Do not reconnect.                                                                                                                                                                                                                                                                                                                                                                                             |

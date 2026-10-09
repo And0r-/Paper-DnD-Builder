@@ -7,13 +7,27 @@
  * the helper points at a card and sends a hint, which goes at a tap and
  * at the next step. Stopping the link puts the helper out at once. The
  * game master reaches a player's character from the campaign with "Help
- * out", without a link.
+ * out", without a link. Alone on a phone, a change by a program or MCP
+ * says where it came from and what: "Changed over MCP: Might", and the row
+ * lights up; "Show" brings it into view (AND-271).
  */
 import type { Browser, Page } from "@playwright/test";
 import de from "../src/i18n/messages/de.json" with { type: "json" };
-import { expect, expectOneLanguage, shot, signup, test } from "./helpers.ts";
+import { join } from "node:path";
+import {
+  accessKey,
+  expect,
+  expectOneLanguage,
+  makeCharacter,
+  mcp,
+  shot,
+  SHOTS,
+  signup,
+  test,
+} from "./helpers.ts";
 
 const DESKTOP = { width: 1366, height: 900 };
+const PHONE = { width: 390, height: 844 };
 const m = de;
 
 /** A second person in a browser of their own: own cookies, own address, desktop or phone. */
@@ -93,12 +107,14 @@ test("help link: owner on a phone, newcomer on a desktop, one character", async 
   await card(page, "folk.hillfolk").click();
   await expect(card(page, "folk.hillfolk")).toHaveClass(/option--checked/);
   await expect(card(p2, "folk.hillfolk")).toHaveClass(/option--checked/);
-  await expect(bar(p2)).toContainText(m["live.changedBy"].replace("{name}", "Lio"));
+  await expect(bar(p2)).toContainText(m["live.from.person"].replace("{who}", "Lio") + ": Herkunft");
 
   await card(p2, "folk.moorfolk").click();
   await expect(card(page, "folk.moorfolk")).toHaveClass(/option--checked/);
   await expect(card(page, "folk.hillfolk")).not.toHaveClass(/option--checked/);
-  await expect(bar(page)).toContainText(m["live.changedBy"].replace("{name}", "Mara"));
+  await expect(bar(page)).toContainText(
+    m["live.from.person"].replace("{who}", m["live.person.helper"].replace("{name}", "Mara")) + ": Herkunft",
+  );
   // The server's state counts: both read the same answer from it.
   const stored = (await (await page.request.get(`/api/drafts/${id}`)).json()) as {
     draft: { answers: Record<string, unknown> };
@@ -187,9 +203,94 @@ test("game master helps out from the campaign, without a link", async ({ page, b
 
   await card(page, "folk.hillfolk").click();
   await expect(card(player, "folk.hillfolk")).toHaveClass(/option--checked/);
-  await expect(bar(player)).toContainText(m["live.changedBy"].replace("{name}", "Kim"));
+  await expect(bar(player)).toContainText(
+    m["live.from.person"].replace("{who}", m["live.person.gameMaster"].replace("{name}", "Kim")) +
+      ": Herkunft",
+  );
   // The owner gets no pointing buttons: only who helps points.
   await expect(card(player, "folk.hillfolk").locator(".option__point")).toHaveCount(0);
   await expect(card(page, "folk.hillfolk").locator(".option__point")).toHaveCount(1);
   await shot(player, "live-06-spielleitung-hilft-handy");
+});
+
+test("alone on a phone: a change over MCP or with a key says where from and what, and the row lights up", async ({
+  page,
+  baseURL,
+  playwright,
+  foreign,
+}) => {
+  void foreign;
+  await page.setViewportSize(PHONE);
+  await signup(page, "Lio");
+  const id = await makeCharacter(page, false);
+  await page.goto(`/c/${id}/step/scores`);
+  const row = (target: string) => page.locator(`[data-target="${target}"]`);
+  const told = page.locator("[data-told]");
+  await expect(row("heartBase")).toBeVisible();
+  // Nobody else on the character: no row under the top bar.
+  await expect(bar(page)).toBeHidden();
+
+  const secret = await accessKey(page, baseURL!);
+  const program = await playwright.request.newContext({ baseURL: baseURL! });
+
+  // A language model over MCP raises one score: the line names the way and the score.
+  await mcp(program, secret, "set_answer", {
+    characterId: id,
+    choice: "scores",
+    answer: { method: 0, assign: { mightBase: 10, graceBase: 7, witBase: 9, heartBase: 11 } },
+  });
+  await expect(told).toHaveText(`${m["live.from.mcp"]}: Kraft`);
+  await expect(row("mightBase")).toContainText("10");
+  // The row lights up, the others do not.
+  await expect(row("mightBase")).toHaveCSS("animation-name", "live-flash");
+  await expect(row("graceBase")).toHaveCSS("animation-name", "none");
+  await expectOneLanguage(page, "de");
+  await page.screenshot({ path: join(SHOTS, "271-mcp-kraft-handy.png") });
+
+  // Scrolled to the top on a phone, the last score is out of view: "Show" brings it in and lights it.
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await mcp(program, secret, "set_answer", {
+    characterId: id,
+    choice: "scores",
+    answer: { method: 0, assign: { mightBase: 10, graceBase: 7, witBase: 8, heartBase: 11 } },
+  });
+  await expect(told).toHaveText(`${m["live.from.mcp"]}: Klugheit`);
+  await expect(row("witBase")).not.toBeInViewport();
+  await bar(page).getByRole("button", { name: m["live.told.show"] }).click();
+  await expect(row("witBase")).toBeInViewport();
+  await expect(row("witBase")).toHaveCSS("animation-name", "live-flash-again");
+  // The scroll is gentle: the picture waits until the page stands still.
+  await page.waitForFunction(
+    () =>
+      new Promise<boolean>((done) => {
+        const y = window.scrollY;
+        setTimeout(() => done(window.scrollY === y), 150);
+      }),
+  );
+  await page.screenshot({ path: join(SHOTS, "271-zeigen-handy.png") });
+
+  // A program with the same key, over the API: the same, in its words.
+  const now = (await (await page.request.get(`/api/drafts/${id}`)).json()) as { draft: { version: number } };
+  const r = await program.put(`/api/drafts/${id}/answers/scores`, {
+    headers: { authorization: `Bearer ${secret}` },
+    data: {
+      version: now.draft.version,
+      answer: { method: 0, assign: { mightBase: 10, graceBase: 6, witBase: 8, heartBase: 11 } },
+    },
+  });
+  expect(r.status()).toBe(200);
+  await expect(told).toHaveText(`${m["live.from.api"]}: Geschick`);
+  await expect(row("graceBase")).toHaveCSS("animation-name", "live-flash");
+  await page.screenshot({ path: join(SHOTS, "271-programm-geschick-handy.png") });
+
+  // The level: the top bar's level lights up.
+  await mcp(program, secret, "set_level", { characterId: id, level: 4 });
+  await expect(told).toHaveText(`${m["live.from.mcp"]}: Stufe`);
+  await expect(page.locator(".topbar__level")).toHaveCSS("animation-name", "live-flash");
+  await program.dispose();
+
+  // The line goes after a while; the row stays as it is.
+  await expect(told).toHaveCount(0, { timeout: 12_000 });
+  await expect(bar(page)).toBeHidden();
+  await shot(page, "271-danach-handy");
 });

@@ -60,7 +60,13 @@ export interface CharacterChanged {
   draftId: string;
   source: ChangeSource;
   change?:
-    | { kind: "state" | "clearChecks"; stateVersion: number }
+    | {
+        kind: "state" | "clearChecks";
+        stateVersion: number;
+        /** The fields whose value changed, at most `MAX_TOLD_FIELDS`; more changed when `more` is true. */
+        fields: string[];
+        more: boolean;
+      }
     | { kind: "copyCreated" | "copyChanged" | "copyDeleted"; copyId: string };
 }
 

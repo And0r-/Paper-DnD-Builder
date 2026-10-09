@@ -8,7 +8,12 @@
 import { sheetModelSchema } from "@builder/sheet";
 import { beforeEach, describe, expect, it } from "vitest";
 import { Client, signIn, startTestServer, type TestServer } from "../testing.ts";
-import { MAX_COPIES_PER_CHARACTER, MAX_COPY_BYTES } from "./routes/sheet-copies.ts";
+import {
+  MAX_COPIES_PER_CHARACTER,
+  MAX_COPY_BYTES,
+  MAX_TOLD_FIELDS,
+  changedFields,
+} from "./routes/sheet-copies.ts";
 
 let server: TestServer;
 let gm: Client;
@@ -442,6 +447,19 @@ describe("play state", () => {
       version: 2,
     });
     expect((await player.call("PUT", `${base()}/state`, { version: 1, clearChecks: true })).status).toBe(409);
+  });
+
+  it("names the fields a write changed, in order and at most a few", () => {
+    expect(
+      changedFields({ b: 1, a: "x", c: { checks: 1 } }, { a: "x", b: 2, c: { checks: 2 }, d: 0 }),
+    ).toEqual({
+      fields: ["b", "c", "d"],
+      more: false,
+    });
+    expect(changedFields({ gone: 1 }, {})).toEqual({ fields: ["gone"], more: false });
+    const many = Object.fromEntries(Array.from({ length: MAX_TOLD_FIELDS + 1 }, (_, i) => [`f${i}`, i]));
+    expect(changedFields({}, many)).toMatchObject({ more: true });
+    expect(changedFields({}, many).fields).toHaveLength(MAX_TOLD_FIELDS);
   });
 
   it("takes numbers, texts and counts of ticks only", async () => {

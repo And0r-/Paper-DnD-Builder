@@ -11,15 +11,56 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { DraftChange } from "@builder/core";
 import { ApiError, type DraftView } from "../api.ts";
+import { clientId } from "./client-id.ts";
 import { helpTokenFor } from "./help-token.ts";
 
 export type Role = "owner" | "gameMaster" | "helper";
+
+/** How someone is on the character, or how a change was made: in a browser, a program with a key, or MCP. */
+export type Via = "browser" | "api" | "mcp";
+
+/** Who made a change and how (API.md "Messages"). */
+export interface Source {
+  via: Via;
+  name: string;
+  role: Role;
+  /** The window's id, if a browser window made it. */
+  clientId: string | null;
+  connectionId: string | null;
+}
+
+/** What a change was about. */
+export type Change =
+  | { kind: "answer"; choice: string }
+  | { kind: "pool"; step: string }
+  /** The levels moved between tracks; the line names it as the level. */
+  | { kind: "tracks" }
+  | { kind: "level"; level: number }
+  | { kind: "levelUp"; level: number }
+  | {
+      kind: "state" | "clearChecks";
+      stateVersion: number;
+      /** The play state fields that changed, at most a few; `more`: others did too. */
+      fields?: string[];
+      more?: boolean;
+    }
+  | { kind: "copyCreated" | "copyChanged" | "copyDeleted"; copyId: string };
+
+/** A change of the character the channel tells, other than of the draft itself. */
+export interface OtherEvent {
+  type: "playState" | "copies" | "campaign" | "deleted";
+  version: number;
+  source: Source | null;
+  change?: Change;
+}
 
 export interface Person {
   /** The connection's id: one person in two tabs is there twice. */
   id: string;
   name: string;
   role: Role;
+  via: Via;
+  clientId: string | null;
   /** Where they are: a step key, "overview", "level", "done", "raise"; null before they said. */
   step: string | null;
   /** What they point at: an option's thing id; null for nothing. */
@@ -45,7 +86,16 @@ export type StateMessage = DraftView & {
   by: { id: string; name: string } | null;
   stale?: boolean;
   ref?: string;
+  /** Only after a change: what happened, who made it, and to what. */
+  event?: "changed" | "levelUp" | "finished";
+  source?: Source;
+  change?: Change;
 };
+
+/** A change made in this window (over HTTP or the channel): the screen has it already. */
+export function isOwn(source: Source | null | undefined): boolean {
+  return source?.clientId === clientId();
+}
 
 /** The state as GET /api/drafts/:id has it, without what the live channel adds. */
 export function viewOf(m: StateMessage): DraftView {
@@ -91,7 +141,8 @@ function liveUrl(draftId: string): string {
   const scheme = location.protocol === "https:" ? "wss" : "ws";
   return (
     `${scheme}://${location.host}/api/live/drafts/${encodeURIComponent(draftId)}` +
-    (token ? `?help=${encodeURIComponent(token)}` : "")
+    `?clientId=${clientId()}` +
+    (token ? `&help=${encodeURIComponent(token)}` : "")
   );
 }
 
@@ -100,6 +151,8 @@ export function useLiveChannel(
   handlers: {
     /** A new state of the character, from whoever changed it (also from this window over HTTP). */
     onState(m: StateMessage): void;
+    /** The play state, a kept sheet or the campaign changed, or the character was deleted. */
+    onEvent(m: OtherEvent): void;
     /** No reach (any more): the character is gone, or the help link ended. */
     onGone(code: number): void;
   },
@@ -180,6 +233,12 @@ export function useLiveChannel(
             on.current.onState(state);
             break;
           }
+          case "playState":
+          case "copies":
+          case "campaign":
+          case "deleted":
+            on.current.onEvent(m as unknown as OtherEvent);
+            break;
           case "error": {
             const ref = m["ref"];
             const w = typeof ref === "string" ? waiting.current.get(ref) : undefined;

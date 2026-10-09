@@ -763,6 +763,45 @@ export function buildSheetModel(
   };
 }
 
+/**
+ * What each field of a sheet is called on it ("Stamina", the row's or the
+ * card's name), so a screen can say which field someone else changed. A
+ * field without words of its own is named by its section.
+ */
+export function sheetFieldNames(
+  model: Pick<SheetModel, "language" | "sections" | "cards">,
+): Map<string, string> {
+  const out = new Map<string, string>();
+  const put = (field: string | undefined, ...names: string[]) => {
+    const name = names.find((n) => n !== "");
+    if (field && name && !out.has(field)) out.set(field, name);
+  };
+  for (const s of model.sections) {
+    switch (s.kind) {
+      case "header":
+        put(s.playedByField, (MESSAGES[model.language] ?? MESSAGES["en"]!).playedBy);
+        break;
+      case "statBoxes":
+        for (const b of s.boxes) put(b.field, b.label, s.title);
+        break;
+      case "checkList":
+        for (const i of s.items) put(i.field, i.name, s.title);
+        break;
+      case "featureTable":
+        for (const r of s.rows) put(r.usesField, r.name, s.title);
+        break;
+      case "list":
+      case "notes":
+        put(s.field, s.title);
+        break;
+      default:
+        break;
+    }
+  }
+  for (const c of model.cards) put(c.usesField, c.name);
+  return out;
+}
+
 /** Every field of a sheet, in the order they are on it: sheet first, then the cards. */
 export function sheetFields(model: Pick<SheetModel, "sections" | "cards">): string[] {
   const out: string[] = [];

@@ -11,7 +11,7 @@
  * group "Sheet" at the top of the app's menu. The language is the top
  * bar's, as on every screen: the sheet follows it from the app state.
  */
-import type { SheetModel } from "@builder/sheet";
+import { sheetFieldNames, type SheetModel } from "@builder/sheet";
 import { cardCount } from "@builder/sheet/cards";
 import { screenDesign } from "@builder/sheet/designs/screens";
 import type { PrintPlaces } from "@builder/sheet/designs/screens";
@@ -25,6 +25,7 @@ import { CompactSelect, type CompactOption } from "../components/Fields.tsx";
 import { PackageLanguageNote } from "../components/PackageLanguageNote.tsx";
 import { AppShell } from "../components/Shell.tsx";
 import { useDraft } from "../flow/draft-state.tsx";
+import { LiveBar } from "../live/live-bar.tsx";
 import { SaveLine as SaveStatusLine, usePageTitle } from "../flow/frame.tsx";
 import { ptext } from "../package-text.ts";
 import { PrintDialog } from "../flow/print-dialog.tsx";
@@ -54,8 +55,8 @@ function SaveLine({ sheet }: { sheet: SheetController }) {
 
 export function SheetPage() {
   const { t, account, setAccount } = useApp();
-  const { lp, ev, draft } = useDraft();
-  const sheet = useSheet(draft.id);
+  const { lp, ev, draft, listen } = useDraft();
+  const sheet = useSheet(draft.id, listen);
   const [printing, setPrinting] = useState(false);
   const [designs, setDesigns] = useState<SheetDesignInfo[]>(
     SHEET_DESIGNS.map((d) => ({ id: d.id, name: { ...d.name }, description: { ...d.description } })),
@@ -63,6 +64,9 @@ export function SheetPage() {
   const nameState = ev.choices[lp.pkg.flow.characterName];
   const name = (nameState?.answer as { text?: string } | undefined)?.text?.trim();
   usePageTitle([name ?? t("common.unnamed"), t("sheet.group")]);
+  // A change made elsewhere names the field as this sheet calls it: "Stamina".
+  const fieldNames = useMemo(() => (sheet.model ? sheetFieldNames(sheet.model) : null), [sheet.model]);
+  const fieldName = useMemo(() => (id: string) => fieldNames?.get(id) ?? null, [fieldNames]);
   const hasCards = useMemo(() => cardCount(lp.pkg, ev) > 0, [lp.pkg, ev]);
 
   useEffect(() => {
@@ -102,6 +106,7 @@ export function SheetPage() {
         </span>
       }
       status={<SaveLine sheet={sheet} />}
+      bar={<LiveBar fieldName={fieldName} />}
       tools={<SheetLists {...tools} />}
       menuExtra={<SheetTools {...tools} variant="menu" />}
       wide

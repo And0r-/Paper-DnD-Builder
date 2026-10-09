@@ -15,7 +15,11 @@
  * help link. The live channel (live/channel.ts) brings every new state
  * from the server; this window takes it and puts its own changes that are
  * still on their way back on top. After an answer the server's state
- * counts, always: there are never two truths.
+ * counts, always: there are never two truths. A change of this window to a
+ * question that someone else saved meanwhile gives way: the stored one
+ * counts, and the short line says so (AND-258). Numbers spread over several
+ * values count value by value, so a window back after a while offline sends
+ * only what it changed, never its old copy of the rest (rebase.ts, AND-270).
  */
 import {
   applyChange,
@@ -24,7 +28,7 @@ import {
   type DraftDocument,
   type Evaluation,
 } from "@builder/core";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   createContext,
   useCallback,
@@ -37,28 +41,38 @@ import {
 } from "react";
 import { useApp } from "../app-state.tsx";
 import { api, ApiError, type DraftInfo, type DraftView } from "../api.ts";
-import { useLiveChannel, viewOf, type LiveChannel } from "../live/channel.ts";
+import {
+  isOwn,
+  useLiveChannel,
+  viewOf,
+  type Change,
+  type LiveChannel,
+  type OtherEvent,
+  type Source,
+} from "../live/channel.ts";
+import { setFlash } from "../live/flash.ts";
 import { draftPath, forgetHelpToken, helpTokenFor } from "../live/help-token.ts";
 import { stepOfPath } from "../live/where.ts";
+import { changedParts, type Told } from "../live/words.ts";
 import { draftPackageKey, usePackage, type LoadedPackage } from "../packages.ts";
 import { buildFlow, stepDiff, stepTitle, type FlowEntry } from "./model.ts";
 import { planDiff, plannedDraft } from "./plan.ts";
 import { flowOf, type Raise } from "./raise.ts";
+import {
+  combine,
+  pendingOf,
+  rebaseQueue,
+  sameTarget,
+  toChange,
+  type Pending,
+  type QueueRebased,
+} from "./rebase.ts";
 import { answeredParts } from "./step-changes.ts";
 
-export type SaveState = "saved" | "saving" | "error" | "offline";
+/** "unsaved": all is saved, but a field shows text that is not (someone else changed it meanwhile). */
+export type SaveState = "saved" | "saving" | "error" | "offline" | "unsaved";
 
-type Pending = DraftChange;
-
-/** Two queued changes of the same thing: only the newer one needs to be sent. */
-function sameTarget(a: Pending, b: Pending): boolean {
-  if (a.type === "setLevel") return b.type === "setLevel";
-  if (a.type === "answer") return b.type === "answer" && a.choice === b.choice;
-  if (a.type === "tracks") return b.type === "tracks";
-  return b.type === "pool" && a.step === b.step;
-}
-
-function send(id: string, version: number, next: Pending): Promise<DraftView> {
+function send(id: string, version: number, next: DraftChange): Promise<DraftView> {
   switch (next.type) {
     case "setLevel":
       return api<DraftView>("PATCH", draftPath(id), { version, level: next.level });
@@ -76,6 +90,26 @@ function send(id: string, version: number, next: Pending): Promise<DraftView> {
       return api<DraftView>("PUT", draftPath(id, "/tracks"), { version, tracks: next.tracks });
   }
 }
+
+/** The short line about a change made elsewhere, with what it did to this window's own. */
+function toldOf(
+  source: Source | null,
+  event: Told["event"],
+  change: Change | undefined,
+  ...did: (QueueRebased | null)[]
+): Omit<Told, "seq"> {
+  const alongside = did.find((r) => r?.alongside)?.alongside?.values;
+  return {
+    source,
+    event,
+    change,
+    overruled: did.some((r) => r?.gaveWay),
+    ...(alongside ? { alongside } : {}),
+  };
+}
+
+/** What else the live channel tells, for a screen that shows more than the draft (the sheet). */
+export type LiveNews = OtherEvent | { type: "draft"; version: number };
 
 /** Titles of steps a change added or removed: counted steps, and parts of a step. */
 export interface StepNotice {
@@ -100,6 +134,11 @@ export interface DraftApi {
   raise: Raise | null;
   saveState: SaveState;
   /**
+   * A field says its text is not the saved one (on) or is again (off), so
+   * "Saved" is never said beside a field that shows something else.
+   */
+  hold(key: string, on: boolean): void;
+  /**
    * Set when a change was refused (by the server, or here because the
    * numbers do not fit); the screen shows it once. `problem` is the rule
    * core's reason, for words that say what to do.
@@ -122,8 +161,10 @@ export interface DraftApi {
   setCampaign(campaignId: string | null): Promise<boolean>;
   /** Who else is on the character, where, pointing at what; hints (live help). */
   live: LiveChannel;
-  /** Someone else just changed the character: their name, for a short line. */
-  changedBy: { name: string; seq: number } | null;
+  /** Someone else, another window or a program just changed the character: for a short line. */
+  told: Told | null;
+  /** Hears of every change made elsewhere; returns the way to stop. */
+  listen(f: (news: LiveNews) => void): () => void;
   /**
    * Switches the package's extensions for this character. The screen then
    * loads the package with them. "inUse": an answer still comes from one
@@ -144,13 +185,16 @@ const NUMBER_PROBLEMS = new Set(["overBudget", "outOfRange", "badAssignment"]);
 
 const BACKOFF_MS = [2000, 5000, 10000, 30000];
 
-function apply(pkg: LoadedPackage["pkg"], doc: DraftDocument, queue: readonly Pending[]): DraftDocument {
-  let d = doc;
-  for (const p of queue) {
-    const r = applyChange(pkg, d, p);
-    if (r.ok) d = r.doc;
-  }
-  return d;
+function stepper(pkg: LoadedPackage["pkg"]) {
+  return (doc: DraftDocument, c: DraftChange): DraftDocument => {
+    const r = applyChange(pkg, doc, c);
+    return r.ok ? r.doc : doc;
+  };
+}
+
+/** The server's state with this window's changes on their way on top, as far as they still fit. */
+function onTop(pkg: LoadedPackage["pkg"], doc: DraftDocument, queue: readonly Pending[]): DraftDocument {
+  return rebaseQueue(queue, doc, queue.length, stepper(pkg)).doc;
 }
 
 function docOf(view: DraftView): DraftDocument {
@@ -266,6 +310,16 @@ function ReadyDraft({
     [onServer],
   );
   const [saveState, setSaveState] = useState<SaveState>("saved");
+  const [held, setHeld] = useState<ReadonlySet<string>>(new Set());
+  const hold = useCallback((key: string, on: boolean) => {
+    setHeld((h) => {
+      if (h.has(key) === on) return h;
+      const next = new Set(h);
+      if (on) next.add(key);
+      else next.delete(key);
+      return next;
+    });
+  }, []);
   const [rejected, setRejected] = useState<{ problem?: string } | null>(null);
   const [notice, setNotice] = useState<StepNotice | null>(null);
 
@@ -277,22 +331,97 @@ function ReadyDraft({
   const pkg = lp.pkg;
 
   // ------------------------------------------------------------ live help
-  const [changedBy, setChangedBy] = useState<{ name: string; seq: number } | null>(null);
+  const [told, setTold] = useState<Told | null>(null);
+  const tell = useCallback(
+    (next: Omit<Told, "seq">) => setTold((c) => ({ ...next, seq: (c?.seq ?? 0) + 1 })),
+    [],
+  );
   const youId = useRef<string | null>(null);
+  const listeners = useRef(new Set<(news: LiveNews) => void>());
+  const listen = useCallback((f: (news: LiveNews) => void) => {
+    listeners.current.add(f);
+    return () => void listeners.current.delete(f);
+  }, []);
+  // The change being sent right now: the server answers for it, nothing else touches it.
+  const inFlight = useRef(false);
+  // The change on its way whose fate the line told already: its answer does not tell again.
+  const toldHead = useRef<Pending | null>(null);
+  // What a conflict did to ours before the channel said who made the other change.
+  const unsaid = useRef<QueueRebased | null>(null);
+  // Whoever made the newest change elsewhere; null when nobody said (this window was away).
+  const lastElsewhere = useRef<{ version: number; source: Source | null } | null>(null);
+  const connection = useRef<LiveChannel["connection"]>("connecting");
+  const deleted = useRef(false);
+  const router = useRouter();
+  /** Says what a newer state did to ours, made by `source` (null: not known). */
+  const say = useCallback(
+    (r: QueueRebased, source: Source | null) => {
+      const change: Change | undefined = r.choice ? { kind: "answer", choice: r.choice } : undefined;
+      tell(toldOf(source, "changed", change, r, null));
+    },
+    [tell],
+  );
   const live = useLiveChannel(initial.draft.id, {
     onState: (m) => {
+      const foreign = !isOwn(m.source) && !(m.by && m.by.id === youId.current);
+      const elsewhere = m.event !== undefined && foreign;
+      let news: QueueRebased | null = null;
+      // What in the answer changed, against what this window had: "Might", the card picked.
+      const parts =
+        elsewhere && m.change?.kind === "answer"
+          ? changedParts(serverRef.current.draft.answers[m.change.choice], m.draft.answers[m.change.choice])
+          : undefined;
       // Keep the highest version: an answer of ours may have brought it already.
-      if (m.draft.version <= serverRef.current.draft.version) return;
-      const v = viewOf(m);
-      serverRef.current = v;
-      setServer(v);
-      // Ours still on their way stay on top; saving sends them on this version.
-      setDoc(apply(pkg, docOf(v), queue.current));
-      if (m.by && m.by.id !== youId.current)
-        setChangedBy((c) => ({ name: m.by!.name, seq: (c?.seq ?? 0) + 1 }));
+      if (m.draft.version > serverRef.current.draft.version) {
+        const v = viewOf(m);
+        serverRef.current = v;
+        setServer(v);
+        if (foreign) {
+          // A state without a cause comes after joining again: who changed it meanwhile is not known.
+          lastElsewhere.current = { version: v.draft.version, source: elsewhere ? (m.source ?? null) : null };
+          // Ours not sent yet go on top of it; where someone else changed the same, theirs counts.
+          const r = rebaseQueue(queue.current, docOf(v), inFlight.current ? 1 : 0, stepper(pkg));
+          queue.current = r.queue;
+          if (r.gaveWay || r.alongside) {
+            news = r;
+            if (inFlight.current) toldHead.current = queue.current[0] ?? null;
+          }
+          for (const f of listeners.current) f({ type: "draft", version: v.draft.version });
+        }
+        setDoc(onTop(pkg, docOf(v), queue.current));
+      }
+      if (elsewhere && m.source) {
+        tell({ ...toldOf(m.source, m.event!, m.change, news, unsaid.current), parts });
+        unsaid.current = null;
+      } else if (news) say(news, null);
+    },
+    onEvent: (m) => {
+      if (m.type === "deleted") {
+        // Everyone is put out right after: back to the list, which says why.
+        deleted.current = true;
+        setFlash(t("live.deleted"));
+        router.replace("/characters");
+        return;
+      }
+      if (isOwn(m.source) || !m.source) return;
+      tell({ source: m.source, event: m.type, change: m.change, overruled: false });
+      if (m.type === "campaign") {
+        // The version stays; only where the character belongs changed.
+        void api<DraftView>("GET", draftPath(serverRef.current.draft.id)).then(
+          (v) => {
+            serverRef.current = {
+              ...serverRef.current,
+              draft: { ...serverRef.current.draft, campaignId: v.draft.campaignId },
+            };
+            setServer(serverRef.current);
+          },
+          () => {},
+        );
+      }
+      for (const f of listeners.current) f(m);
     },
     onGone: (code) => {
-      if (code !== 4404) return;
+      if (code !== 4404 || deleted.current) return;
       if (helpTokenFor(initial.draft.id) !== null) {
         forgetHelpToken(initial.draft.id);
         onGone("helpEnded");
@@ -302,6 +431,9 @@ function ReadyDraft({
   useEffect(() => {
     youId.current = live.you?.id ?? null;
   }, [live.you]);
+  useEffect(() => {
+    connection.current = live.connection;
+  }, [live.connection]);
   const sendChange = useRef(live.sendChange);
   useEffect(() => {
     sendChange.current = live.sendChange;
@@ -323,22 +455,50 @@ function ReadyDraft({
     let failures = 0;
     try {
       while (queue.current.length > 0) {
-        const next = queue.current[0]!;
         const id = serverRef.current.draft.id;
         const version = serverRef.current.draft.version;
+        const server = docOf(serverRef.current);
+        // Someone else may have changed the same meanwhile (also while this window was offline):
+        // ours goes on top of theirs, value by value, or gives way.
+        const r = rebaseQueue(queue.current.slice(0, 1), server, 0, stepper(pkg));
+        if ((r.gaveWay || r.alongside) && queue.current[0] !== toldHead.current) {
+          const last = lastElsewhere.current;
+          if (last && last.version >= version) say(r, last.source);
+          else if (connection.current !== "open") say(r, null);
+          // The channel tells who made it, right after.
+          else unsaid.current = r;
+        }
+        const head = r.queue[0];
+        if (!head) {
+          queue.current.shift();
+          setDoc(onTop(pkg, server, queue.current));
+          continue;
+        }
+        queue.current[0] = head;
+        const next = toChange(head, server);
+        inFlight.current = true;
         try {
           // Over the live channel while it is open, so the others learn who it was.
           const res = await (sendChange.current(version, next) ?? send(id, version, next));
-          serverRef.current = res;
-          setServer(res);
+          inFlight.current = false;
+          // The channel may have brought a newer state already.
+          if (res.draft.version > serverRef.current.draft.version) {
+            serverRef.current = res;
+            setServer(res);
+          }
           queue.current.shift();
           failures = 0;
           if (queue.current.length > 0) setSaveState("saving");
         } catch (error) {
+          inFlight.current = false;
           if (error instanceof ApiError && error.code === "versionConflict" && error.details["current"]) {
-            // Changed elsewhere (another tab): take the current state and send ours on top of it.
-            serverRef.current = error.details["current"] as DraftView;
-            setServer(serverRef.current);
+            // Changed elsewhere (another tab): take the current state; the next round puts ours on top.
+            const current = error.details["current"] as DraftView;
+            if (current.draft.version > serverRef.current.draft.version) {
+              serverRef.current = current;
+              setServer(current);
+            }
+            setDoc(onTop(pkg, docOf(serverRef.current), queue.current));
             continue;
           }
           if (
@@ -351,7 +511,7 @@ function ReadyDraft({
             queue.current.shift();
             const reason = error.details["reason"] as { problem?: unknown } | undefined;
             setRejected(typeof reason?.problem === "string" ? { problem: reason.problem } : {});
-            setDoc(apply(pkg, docOf(serverRef.current), queue.current));
+            setDoc(onTop(pkg, docOf(serverRef.current), queue.current));
             continue;
           }
           setSaveState(error instanceof ApiError && error.isNetwork ? "offline" : "error");
@@ -375,7 +535,7 @@ function ReadyDraft({
       clearTimeout(slow);
       running.current = false;
     }
-  }, [pkg, settle, setDoc, setServer]);
+  }, [pkg, settle, setDoc, setServer, say]);
 
   useEffect(() => {
     const online = () => wake.current?.();
@@ -418,6 +578,14 @@ function ReadyDraft({
         return false;
       }
       setRejected(null);
+      // What the window showed before, so saving can tell what someone else changed meanwhile.
+      const item = pendingOf(
+        c,
+        docRef.current,
+        c.type === "pool"
+          ? (evaluateDraft(pkg, docRef.current).steps.find((s) => s.id === c.step)?.choices ?? [])
+          : [],
+      );
       // The count follows the planned flow (plan.ts), so the note compares the plans:
       // it speaks exactly when "Step x of y" or "Part x of y" changes.
       const before = evaluateDraft(pkg, plannedDraft(lp, docRef.current));
@@ -439,11 +607,10 @@ function ReadyDraft({
       )
         setNotice({ ...diff, grown });
       setDoc(r.doc);
-      const item: Pending = c;
       // Typing sends many changes to one choice: keep only the newest one that is not on its way yet.
-      const from = running.current ? 1 : 0;
+      const from = inFlight.current ? 1 : 0;
       const same = queue.current.findIndex((p, i) => i >= from && sameTarget(p, item));
-      if (same >= 0) queue.current[same] = item;
+      if (same >= 0) queue.current[same] = combine(queue.current[same]!, item);
       else queue.current.push(item);
       void pump();
       return true;
@@ -537,7 +704,8 @@ function ReadyDraft({
       entries: flow.entries,
       allEntries: flow.all,
       raise: flow.raise,
-      saveState,
+      saveState: saveState === "saved" && held.size > 0 ? "unsaved" : saveState,
+      hold,
       rejected,
       clearRejected: () => setRejected(null),
       notice,
@@ -547,7 +715,8 @@ function ReadyDraft({
       levelUp,
       setCampaign,
       live,
-      changedBy,
+      told,
+      listen,
       setExtensions,
     }),
     [
@@ -557,6 +726,8 @@ function ReadyDraft({
       ev,
       flow,
       saveState,
+      held,
+      hold,
       rejected,
       notice,
       change,
@@ -565,7 +736,8 @@ function ReadyDraft({
       levelUp,
       setCampaign,
       live,
-      changedBy,
+      told,
+      listen,
       setExtensions,
     ],
   );
