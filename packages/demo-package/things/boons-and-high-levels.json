@@ -63,6 +63,16 @@
     ]
   },
   {
+    "id": "boon.keen-study",
+    "kind": "boon",
+    "source": "mistland",
+    "grants": [
+      {
+        "thing": "trait.keen-study"
+      }
+    ]
+  },
+  {
     "id": "boon.rooted-focus",
     "kind": "boon",
     "source": "mistland",
@@ -166,5 +176,29 @@
         "add": 2
       }
     ]
+  },
+  {
+    "id": "trait.keen-study",
+    "kind": "trait",
+    "source": "mistland",
+    "grants": [
+      {
+        "choice": "keen-study"
+      }
+    ]
+  },
+  {
+    "id": "trait.study-legends",
+    "kind": "trait",
+    "source": "mistland",
+    "tags": ["study"],
+    "requires": "has('talent.legends')"
+  },
+  {
+    "id": "trait.study-mending",
+    "kind": "trait",
+    "source": "mistland",
+    "tags": ["study"],
+    "requires": "has('talent.mending')"
   }
 ]

@@ -177,7 +177,6 @@
     "choice.rooted-focus.question": "Welche drei Kniffe hältst du bereit?",
     "choice.rooted-focus.intro": "Wähle drei Wurzelkniffe, die in deinem Kräuterbuch stehen. Geliehene Kniffe sind sowieso immer bereit.",
     "choice.rooted-focus.missing": "Wähle noch {{var:remaining}}.",
-
     "value.climbingRoll.name": "Klettern",
     "value.hagglingRoll.name": "Feilschen",
     "value.trackingRoll.name": "Spurenlesen",
@@ -191,6 +190,25 @@
     "value.boatHookHit.name": "Treffer mit dem Bootshaken",
     "value.boatHookHarm.name": "Schaden mit dem Bootshaken",
     "value.slingHit.name": "Treffer mit der Schleuder",
-    "value.slingHarm.name": "Schaden mit der Schleuder"
+    "value.slingHarm.name": "Schaden mit der Schleuder",
+    "boon.keen-study.name": "Gründliches Studium",
+    "boon.keen-study.short": "Eines deiner Talente wird tiefer.",
+    "boon.keen-study.explain.what": "Du studierst die alten Sagen oder die Heilkunde, bis du sie besser kennst als alle anderen.",
+    "boon.keen-study.explain.table": "Wähle Sagenkunde oder Heilkunde, wenn du das Talent hast. Ohne eines davon gibt dir diese Gabe nichts zu wählen.",
+    "trait.keen-study.name": "Gründliches Studium",
+    "trait.keen-study.short": "Du hast eines deiner Talente gründlich studiert.",
+    "trait.keen-study.explain.what": "Lange Abende mit Büchern und alten Leuten haben dich mehr gelehrt.",
+    "trait.keen-study.explain.table": "Wähle Sagenkunde oder Heilkunde, wenn du das Talent hast.",
+    "trait.study-legends.name": "Studierte Sagen",
+    "trait.study-legends.short": "Erinnerst du dich an eine Sage, würfelst du zweimal und nimmst das bessere Ergebnis.",
+    "trait.study-legends.explain.what": "Du kennst die alten Sagen auswendig.",
+    "trait.study-legends.explain.table": "Erinnerst du dich an eine Sage, würfelst du zweimal und nimmst das bessere Ergebnis.",
+    "trait.study-mending.name": "Studierte Heilkunde",
+    "trait.study-mending.short": "Behandelst du jemanden, würfelst du zweimal und nimmst das bessere Ergebnis.",
+    "trait.study-mending.explain.what": "Du kennst jedes Kraut und jeden Verband.",
+    "trait.study-mending.explain.table": "Behandelst du jemanden, würfelst du zweimal und nimmst das bessere Ergebnis.",
+    "choice.keen-study.title": "Studiertes Talent",
+    "choice.keen-study.question": "Welches Talent studierst du?",
+    "choice.keen-study.intro": "Wähle ein Talent, das du schon hast: Sagenkunde oder Heilkunde."
   }
 }

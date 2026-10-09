@@ -48,7 +48,7 @@ describe("demo package", () => {
     expect(count("folk")).toBe(3);
     expect(count("upbringing")).toBe(2);
     expect(count("knack")).toBe(29);
-    expect(count("boon")).toBe(6);
+    expect(count("boon")).toBe(7);
     expect(p.flow.level).toEqual({
       min: 1,
       max: 20,
