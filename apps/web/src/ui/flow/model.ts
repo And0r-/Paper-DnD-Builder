@@ -131,6 +131,14 @@ export function buildFlow(
     });
   };
   for (const s of ev.steps) {
+    // A choice where nothing can be picked is not asked, nor a step left without choices;
+    // the sheet says so on the thing that brought it.
+    const all = s.choices.filter((c) => c in ev.choices);
+    const asked = all.filter((c) => ev.choices[c]!.empty !== true);
+    if (all.length > 0 && asked.length === 0) {
+      if (s.id === tracksAfter) tracksDue = true;
+      continue;
+    }
     const gathered = gatherGroupOf(lp, s);
     const opens = s.origin === "flow" || (gathered !== undefined && gathered !== group);
     if (opens) pushTracks();
@@ -150,7 +158,7 @@ export function buildFlow(
       href: stepHref(draftId, s.id),
       title: stepTexts(lp, s, ev).title,
       status: s.status,
-      choices: s.choices.filter((c) => c in ev.choices),
+      choices: asked,
       section,
       part: 1,
       parts: 1,

@@ -696,6 +696,15 @@ Everything else (`count`, `recommend`, `badges`, `requires`) works as for
 other pick choices. An `owned` choice cannot be gathered in a `list`
 gather step: that list leaves out what the character has.
 
+**Nothing to pick.** A pick choice that offers no option when it is asked
+(every option's `requires` fails, or the character has none of the things
+an `owned` choice picks among) is not asked: its step is skipped, it is
+never open, and the character can be complete without it. A stored answer
+is kept but does not count until an option comes back. The sheet says that
+there was nothing to choose, on the row of the thing that granted the
+choice and as its answer in an `answers` section. A package that wants a
+fallback instead (any other option) offers it as an option.
+
 **Only what was picked in some choices** (`"ownedFrom": [<choice>, …]`
 next to `"owned": true`). The builder offers only the selected things the
 character picked in one of these choices (or in a copy of one); what came

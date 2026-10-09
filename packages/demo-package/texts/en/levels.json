@@ -177,7 +177,6 @@
     "choice.rooted-focus.question": "Which three knacks do you keep at hand?",
     "choice.rooted-focus.intro": "Pick three root knacks written in your herb book. Borrowed knacks are always at hand anyway.",
     "choice.rooted-focus.missing": "Pick {{var:remaining}} more.",
-
     "value.climbingRoll.name": "Climbing",
     "value.hagglingRoll.name": "Haggling",
     "value.trackingRoll.name": "Tracking",
@@ -191,6 +190,25 @@
     "value.boatHookHit.name": "Hit with the boat hook",
     "value.boatHookHarm.name": "Harm with the boat hook",
     "value.slingHit.name": "Hit with the sling",
-    "value.slingHarm.name": "Harm with the sling"
+    "value.slingHarm.name": "Harm with the sling",
+    "boon.keen-study.name": "Keen Study",
+    "boon.keen-study.short": "One of your talents grows deeper.",
+    "boon.keen-study.explain.what": "You study the old tales or the art of mending wounds until you know them better than anyone.",
+    "boon.keen-study.explain.table": "Pick Legends or Mending, if you have that talent. Without either, this boon gives you nothing to pick.",
+    "trait.keen-study.name": "Keen Study",
+    "trait.keen-study.short": "You studied one of your talents more deeply.",
+    "trait.keen-study.explain.what": "Long evenings with books and old people taught you more.",
+    "trait.keen-study.explain.table": "Pick Legends or Mending, if you have that talent.",
+    "trait.study-legends.name": "Studied Legends",
+    "trait.study-legends.short": "When you recall a legend, roll twice and take the better result.",
+    "trait.study-legends.explain.what": "You know the old tales by heart.",
+    "trait.study-legends.explain.table": "When you recall a legend, roll twice and take the better result.",
+    "trait.study-mending.name": "Studied Mending",
+    "trait.study-mending.short": "When you tend to someone, roll twice and take the better result.",
+    "trait.study-mending.explain.what": "You know every herb and every bandage.",
+    "trait.study-mending.explain.table": "When you tend to someone, roll twice and take the better result.",
+    "choice.keen-study.title": "Studied talent",
+    "choice.keen-study.question": "Which talent do you study?",
+    "choice.keen-study.intro": "Pick a talent you already have: Legends or Mending."
   }
 }

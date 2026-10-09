@@ -4,6 +4,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { beforeAll, describe, expect, it } from "vitest";
 import { buildSheetModel, sheetFieldNames, sheetFields, type SheetModel } from "./index.ts";
 import { sheetModelSchema } from "./schema.ts";
+import { MESSAGES } from "./messages.ts";
 import { demoCharacter, loadDemoPackage, raisedCharacter } from "./testing.ts";
 
 let pkg: ContentPackage;
@@ -281,6 +282,27 @@ describe("sheet model", () => {
       }),
     };
     expect(sheetModelSchema.safeParse(JSON.parse(JSON.stringify(old))).success).toBe(true);
+  });
+
+  it("says on the row of the thing that brought it that a choice had nothing to pick", () => {
+    // A river runner has neither Legends nor Mending: Keen Study finds nothing to study.
+    const runner = demoCharacter(pkg, 4, "Mira Fennwick", "calling.river-runner");
+    const doc = { ...runner, answers: { ...runner.answers, "boon-4": { pick: "boon.keen-study" } } };
+    expect(evaluateDraft(pkg, doc).complete).toBe(true);
+    for (const language of ["de", "en"]) {
+      const rows = sheet(doc, language).sections.flatMap((s) => (s.kind === "featureTable" ? s.rows : []));
+      expect(rows.find((r) => r.id === "trait.keen-study")?.note).toBe(MESSAGES[language]!.nothingToChoose);
+      expect(rows.filter((r) => r.note === MESSAGES[language]!.nothingToChoose)).toHaveLength(1);
+    }
+    // A section of answers that lists the choice says the same as its answer.
+    const listed = structuredClone(pkg);
+    listed.sheet.sections.push({ id: "study", kind: "answers", span: 4, choices: ["keen-study"] });
+    const answers = buildSheetModel(listed, doc, { language: "en", createdAt }).sections.find(
+      (s) => s.id === "study",
+    );
+    expect(answers?.kind === "answers" && answers.rows).toEqual([
+      { label: "Studied talent", text: MESSAGES["en"]!.nothingToChoose },
+    ]);
   });
 
   it("does not depend on the PDF library", () => {

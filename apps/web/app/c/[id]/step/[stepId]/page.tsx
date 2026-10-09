@@ -3,7 +3,7 @@
  * One step of the package's flow, in the shared frame. The step, its
  * question, options and explanations all come from the package.
  */
-import type { ChoiceState } from "@builder/core";
+import { isSettled, type ChoiceState } from "@builder/core";
 import type { Choice } from "@builder/format/pure";
 import { useParams } from "next/navigation";
 import { useId, useState } from "react";
@@ -26,10 +26,6 @@ import { StepFooter, StepFrame, StepShortcuts, usePageTitle } from "../../../../
 import { firstOpen, missingText } from "../../../../../src/ui/flow/model.ts";
 import { choiceOf, choiceTexts, stepTexts, thingName } from "../../../../../src/ui/package-text.ts";
 import { useMeasure } from "../../../../../src/ui/components/RichText.tsx";
-
-function settled(c: ChoiceState): boolean {
-  return c.status === "answered" || c.status === "info" || (c.optional && c.status === "missing");
-}
 
 export default function StepPage() {
   const { stepId } = useParams<{ stepId: string }>();
@@ -63,7 +59,7 @@ export default function StepPage() {
     .filter((x): x is { def: Choice; state: ChoiceState } => x.def !== undefined && x.state !== undefined);
   // A gather step always shows its choices as sections under its own question.
   const single = choices.length === 1 && step?.gather === undefined;
-  const open = choices.filter((c) => !settled(c.state));
+  const open = choices.filter((c) => !isSettled(c.state));
   const head = open[0];
   const way = head?.def.kind === "distribute" ? head.def.methods[ways[head.def.id] ?? 0] : undefined;
   const problem = !head

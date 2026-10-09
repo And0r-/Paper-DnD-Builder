@@ -8173,6 +8173,10 @@
             },
             "description": "pickOne, pickMany: the thing keys that may be picked now."
           },
+          "empty": {
+            "type": "boolean",
+            "description": "pickOne, pickMany: true when nothing may be picked now (`options` is empty). The choice is not asked, counts as settled and is never in `open`; a stored answer is kept but not judged until an option comes back."
+          },
           "count": {
             "type": "integer",
             "description": "pickMany: how many to pick."

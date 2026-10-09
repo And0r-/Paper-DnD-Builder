@@ -202,6 +202,22 @@ describe("printed character (demo package)", () => {
     },
   );
 
+  it.each(["verbose", "classic"])(
+    "%s: prints that a choice had nothing to pick, on the row of the thing that brought it",
+    async (design) => {
+      // A river runner has neither Legends nor Mending: Keen Study finds nothing to study.
+      const runner = demoCharacter(pkg, 4, "Mira Fennwick", "calling.river-runner");
+      const studied = { ...runner, answers: { ...runner.answers, "boon-4": { pick: "boon.keen-study" } } };
+      for (const language of ["de", "en"]) {
+        const model = buildSheetModel(pkg, studied, { language, createdAt });
+        const { text } = await extract(await renderPdf(model, { design }));
+        expect(text.replace(/\s+/gu, " "), `${design} ${language}`).toContain(
+          MESSAGES[language]!.nothingToChoose,
+        );
+      }
+    },
+  );
+
   it("German with meters: sheet and cards, all text extractable, nothing in English", async () => {
     const { model, pdf, extracted } = await print("de", { length: "m", weight: "kg" });
     const ev = evaluateDraft(pkg, doc);
