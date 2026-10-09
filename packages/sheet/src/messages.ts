@@ -50,6 +50,8 @@ export interface Messages {
   notForSharing: (names: string) => string;
   /** A choice with no option that fits the character: it was not asked (on its feature's row, or as its answer). */
   nothingToChoose: string;
+  /** Hint under the box of a value that adds up levels of tracks: the tracks the character has levels in. */
+  fromLevelsAs: (tracks: string) => string;
 }
 
 export const MESSAGES: Readonly<Record<string, Messages>> = {
@@ -82,6 +84,7 @@ export const MESSAGES: Readonly<Record<string, Messages>> = {
     noRulesTexts: "Dieser Charakter hat nichts mit einem Regeltext.",
     notForSharing: (names) => `Enthält Inhalt aus ${names}, nicht zur Weitergabe.`,
     nothingToChoose: "Nichts zu wählen: Keine Möglichkeit passt zu diesem Charakter.",
+    fromLevelsAs: (tracks) => `Aus deinen Stufen als ${tracks}.`,
   },
   en: {
     playedBy: "Played by",
@@ -112,6 +115,7 @@ export const MESSAGES: Readonly<Record<string, Messages>> = {
     noRulesTexts: "This character has nothing with a rules text.",
     notForSharing: (names) => `Contains content from ${names}, not for sharing.`,
     nothingToChoose: "Nothing to choose: no option fits this character.",
+    fromLevelsAs: (tracks) => `From your ${tracks} levels.`,
   },
   fr: {
     playedBy: "Joué par",
@@ -143,6 +147,7 @@ export const MESSAGES: Readonly<Record<string, Messages>> = {
     notForSharing: (names) =>
       `Contient du contenu ${/^[aeiouàâéèêîïôœ]/i.test(names) ? "d’" : "de "}${names}, pas pour le partage.`,
     nothingToChoose: "Rien à choisir : aucune option ne convient à ce personnage.",
+    fromLevelsAs: (tracks) => `De vos niveaux ${/^[aeiouàâéèêîïôœ]/i.test(tracks) ? "d’" : "de "}${tracks}.`,
   },
   it: {
     playedBy: "Giocato da",
@@ -173,6 +178,7 @@ export const MESSAGES: Readonly<Record<string, Messages>> = {
     noRulesTexts: "Questo personaggio non ha niente con un testo delle regole.",
     notForSharing: (names) => `Contiene contenuti da ${names}, non da condividere.`,
     nothingToChoose: "Niente da scegliere: nessuna opzione è adatta a questo personaggio.",
+    fromLevelsAs: (tracks) => `Dai tuoi livelli da ${tracks}.`,
   },
   es: {
     playedBy: "Jugado por",
@@ -203,6 +209,7 @@ export const MESSAGES: Readonly<Record<string, Messages>> = {
     noRulesTexts: "Este personaje no tiene nada con un texto de regla.",
     notForSharing: (names) => `Contiene contenido de ${names}, no para compartir.`,
     nothingToChoose: "Nada que elegir: ninguna opción encaja con este personaje.",
+    fromLevelsAs: (tracks) => `De tus niveles de ${tracks}.`,
   },
 };
 
