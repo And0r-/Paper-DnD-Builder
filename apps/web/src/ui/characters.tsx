@@ -4,7 +4,7 @@
  * its level), where it stands, and what one can do with it. Shared by
  * "My characters" and the campaign page of a game master.
  */
-import { evaluateDraft, tracksText } from "@builder/core";
+import { evaluateDraft, tracksText, type DraftSummary } from "@builder/core";
 import type { Translator } from "../i18n/index.ts";
 import { useApp } from "./app-state.tsx";
 import type { DraftListEntry } from "./api.ts";
@@ -52,29 +52,16 @@ export function describeCharacter(
     level: d.level,
     answers: d.answers,
     ...(d.levelBefore !== null && { levelBefore: d.levelBefore }),
+    ...(d.tracks !== undefined && d.tracks.length > 0 && { tracks: d.tracks }),
   };
   const ev = evaluateDraft(lp.pkg, doc);
   const { entries, raise } = flowOf(d.id, lp, doc, ev, t);
   const finished = d.status === "finished" && ev.complete;
-  // The line only makes sense once everything it names is chosen.
-  const vars: Record<string, string | number> = {};
-  let whole = true;
-  for (const [k, v] of Object.entries(d.summary?.line ?? {})) {
-    if (v === null) whole = false;
-    else
-      vars[k] =
-        typeof v === "string"
-          ? thingName(lp, v)
-          : typeof v === "number"
-            ? v
-            : tracksText(v, (id) => thingName(lp, id));
-  }
-  const ctx = measureContext(lp, undefined);
   const p = progressOf(entries);
   return {
     id: d.id,
     name,
-    line: whole ? plain(ctx, ptext(lp, "summary.line"), vars) : "",
+    line: summaryLineText(lp, d.summary?.line ?? {}),
     finished,
     status: finished
       ? t("characters.finished")
@@ -179,4 +166,22 @@ export function CharacterCard({
       </div>
     </article>
   );
+}
+
+/**
+ * The package's line about a character ("Lantern bearer 3 / Herbalist 2 ·
+ * level 5"), or "" while something it names is not chosen yet.
+ */
+export function summaryLineText(lp: LoadedPackage, line: DraftSummary["line"]): string {
+  const vars: Record<string, string | number> = {};
+  for (const [k, v] of Object.entries(line)) {
+    if (v === null) return "";
+    vars[k] =
+      typeof v === "string"
+        ? thingName(lp, v)
+        : typeof v === "number"
+          ? v
+          : tracksText(v, (id) => thingName(lp, id));
+  }
+  return plain(measureContext(lp, undefined), ptext(lp, "summary.line"), vars);
 }

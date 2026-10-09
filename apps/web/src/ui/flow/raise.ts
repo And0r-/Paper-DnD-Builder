@@ -52,9 +52,14 @@ function counted(entries: FlowEntry[], planned: FlowEntry[]): FlowEntry[] {
   });
 }
 
-/** The character as it was before the raise: same answers, the old level. */
+/** The character as it was before the raise: same answers, the old level, the tracks of its levels. */
 export function evaluateBefore(pkg: ContentPackage, doc: DraftDocument, from: number): Evaluation {
-  return evaluateDraft(pkg, { level: from, answers: doc.answers });
+  const tracks = doc.tracks?.slice(0, Math.max(0, from - 1));
+  return evaluateDraft(pkg, {
+    level: from,
+    answers: doc.answers,
+    ...(tracks !== undefined && tracks.length > 0 && { tracks }),
+  });
 }
 
 /**

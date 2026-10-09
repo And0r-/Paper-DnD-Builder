@@ -1,0 +1,189 @@
+/* Screens for more than one track (AND-276): level up, level by level,
+   overview and sheet. Phone first; spacing from the scale in tokens.css. */
+
+/* ------------------------------------------------------------ level up */
+
+/* One row per new level: a light box, so two rows read as two questions. */
+.tracks-row {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+
+.tracks-raise .tracks-row + .tracks-row {
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--color-line);
+}
+
+.tracks-row__title {
+  /* Floated, so the line between two rows runs above the title, not through it. */
+  float: left;
+  width: 100%;
+  padding: 0;
+  margin-bottom: var(--space-3);
+  font-size: var(--text-lg);
+  line-height: var(--text-lg-lh);
+  font-weight: var(--weight-bold);
+}
+
+/* ------------------------------------------------- step "level by level" */
+
+.tracks-step {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.tracks-all {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 2px solid var(--color-success);
+  border-radius: var(--radius-md);
+  background: var(--color-success-soft);
+}
+
+.tracks-all__line {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  font-size: var(--text-lg);
+  line-height: var(--text-lg-lh);
+  font-weight: var(--weight-semibold);
+}
+
+.tracks-all__line svg {
+  flex: none;
+  margin-top: 0.25rem;
+  color: var(--color-success);
+}
+
+.tracks-all__note {
+  color: var(--color-ink);
+}
+
+.tracks-split {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.tracks-split .section-title:focus {
+  outline: none;
+}
+
+.tracks-levels {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+/* Label and field on one line: the level number is short, the name gets the rest. */
+.tracks-level {
+  display: grid;
+  grid-template-columns: 5.5rem minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+}
+
+.tracks-level + .tracks-level {
+  border-top: 1px solid var(--color-line);
+}
+
+.tracks-level__number {
+  font-weight: var(--weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+
+.tracks-level__fixed {
+  display: flex;
+  flex-direction: column;
+  min-height: var(--control-height);
+  justify-content: center;
+}
+
+.tracks-level__fixed span {
+  font-size: var(--text-sm);
+  line-height: var(--text-sm-lh);
+  color: var(--color-ink-muted);
+}
+
+.tracks-level__select {
+  width: 100%;
+  min-height: var(--control-height);
+}
+
+/* A level whose track no longer fits: the colour and the field both say so. */
+.tracks-level--unfit {
+  background: var(--color-warning-soft);
+  box-shadow: inset 4px 0 0 var(--color-warning);
+}
+
+.tracks-level--unfit .tracks-level__select {
+  border-color: var(--color-warning);
+}
+
+.tracks-result {
+  font-size: var(--text-md);
+  line-height: var(--text-md-lh);
+  font-weight: var(--weight-semibold);
+}
+
+.tracks-refused {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-sunk);
+  color: var(--color-ink-muted);
+}
+
+.tracks-refused__title {
+  font-weight: var(--weight-semibold);
+  color: var(--color-ink);
+}
+
+.tracks-refused ul {
+  list-style: none;
+}
+
+/* ---------------------------------------------- overview, step questions */
+
+/* The head line under the overview's question: "A 3 / B 2 · level 5". */
+.overview-line {
+  font-size: var(--text-lg);
+  line-height: var(--text-lg-lh);
+  font-weight: var(--weight-semibold);
+  color: var(--color-ink);
+}
+
+/* "What grows with your level", one block per track after the whole character's numbers. */
+.growth__track {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+}
+
+.growth__track-title {
+  font-size: var(--text-md);
+  line-height: var(--text-md-lh);
+  font-weight: var(--weight-bold);
+  color: var(--color-ink);
+}
+
+/* A choice of an added track names it above its question. */
+.subquestion__track {
+  font-size: var(--text-sm);
+  line-height: var(--text-sm-lh);
+  font-weight: var(--weight-semibold);
+  color: var(--color-ink-muted);
+}

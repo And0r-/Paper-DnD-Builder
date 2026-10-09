@@ -19,11 +19,13 @@ import { usePageTitle } from "../../../../src/ui/flow/frame.tsx";
 import { firstOpen } from "../../../../src/ui/flow/model.ts";
 import { typedLevel } from "../../../../src/ui/flow/typed-level.ts";
 import { levelWord, ptext } from "../../../../src/ui/package-text.ts";
+import { levelOwners, planOf, type TrackPlan } from "../../../../src/ui/tracks/model.ts";
+import { TrackRaise } from "../../../../src/ui/tracks/screens.tsx";
 
 export default function RaisePage() {
   const { t } = useApp();
   const router = useRouter();
-  const { lp, ev, draft, raise, entries, change, flush, finish, levelUp } = useDraft();
+  const { lp, ev, doc, draft, raise, entries, change, flush, finish, levelUp } = useDraft();
   const headingRef = useRef<HTMLHeadingElement>(null);
   const legendId = useId();
   const otherId = useId();
@@ -44,6 +46,9 @@ export default function RaisePage() {
   const [stopFailed, setStopFailed] = useState(false);
   // After the raise the flow is the new one: go to its first step once it is there.
   const [go, setGo] = useState(false);
+  // With tracks (SPEC 9.7) a second question follows the level: where each new level goes.
+  const [asking, setAsking] = useState(false);
+  const plan = planOf(doc, ev);
   const nameState = ev.choices[lp.pkg.flow.characterName];
   const name = (nameState?.answer as { text?: string } | undefined)?.text?.trim() ?? "";
   const question = name
@@ -96,8 +101,36 @@ export default function RaisePage() {
   };
 
   const start = async () => {
+    if (plan && !asking) {
+      setFailed(false);
+      setAsking(true);
+      return;
+    }
+    await raiseTo();
+  };
+
+  /** Raises to `target`; with tracks, `chosen` says where every level up to there goes. */
+  const raiseTo = async (chosen?: TrackPlan) => {
     setBusy(true);
     setFailed(false);
+    if (raise && chosen) {
+      // Under way already: the level and the tracks are changes of the draft, as while building.
+      if (target !== raise.to) change({ type: "setLevel", level: target });
+      change({ type: "tracks", tracks: [...chosen.tracks] });
+      const ok = await flush();
+      setBusy(false);
+      if (ok) setGo(true);
+      else setFailed(true);
+      return;
+    }
+    if (chosen) {
+      const r = await levelUp(target, levelOwners(chosen).slice(base, target));
+      setBusy(false);
+      if (r === "failed") setFailed(true);
+      else if (r === "finished") router.push(`/c/${draft.id}/done?from=${base}&asked=0`);
+      else setGo(true);
+      return;
+    }
     if (raise && target < raise.to) {
       // Fewer levels than before: the answers of the levels left out stay remembered.
       change({ type: "setLevel", level: target });
@@ -133,6 +166,28 @@ export default function RaisePage() {
     }
     router.push(r === "ok" ? `/c/${draft.id}/done` : `/c/${draft.id}/overview`);
   };
+
+  if (asking && plan) {
+    // The plan before the raise, and the levels already given when the raise is under way.
+    const before: TrackPlan = { ...plan, level: base, tracks: plan.tracks.slice(0, base - 1) };
+    return (
+      <TrackRaise
+        lp={lp}
+        name={name}
+        plan={before}
+        {...(raise && { chosen: plan })}
+        to={target}
+        options={ev.tracks?.options ?? []}
+        busy={busy}
+        error={failed ? t("raise.error") : undefined}
+        onBack={() => {
+          setFailed(false);
+          setAsking(false);
+        }}
+        onGo={(chosen) => void raiseTo(chosen)}
+      />
+    );
+  }
 
   const invalid = typedLevel(text, min, max).invalid;
   const oneUp = Math.min(max, base + 1);

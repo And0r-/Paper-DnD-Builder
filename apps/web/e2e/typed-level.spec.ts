@@ -5,7 +5,7 @@
  * cut back to the range on leaving, as before.
  */
 import m from "../src/i18n/messages/de.json" with { type: "json" };
-import { expect, makeLeveled, shot, signup, test } from "./helpers.ts";
+import { expect, makeLeveled, raiseGo, shot, signup, test } from "./helpers.ts";
 
 test("new build: a typed level stands in the top bar before Next", async ({ page, foreign }) => {
   void foreign;
@@ -88,7 +88,7 @@ test("level up: the button and the hint name the typed level at once", async ({ 
   // The typed level is the one the raise goes to.
   await field.selectText();
   await field.pressSequentially("5");
-  await page.getByRole("button", { name: "Weiter zu Stufe 5" }).click();
+  await raiseGo(page, "Weiter zu Stufe 5");
   await expect(page.locator(".progress__text")).toContainText("Schritt 1 von");
   await expect(page.locator(".topbar__character")).toContainText("Stufe 5");
 });

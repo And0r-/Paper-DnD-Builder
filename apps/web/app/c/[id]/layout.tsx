@@ -11,12 +11,14 @@ import { EmptyState, ErrorState, Loading } from "../../../src/ui/components/Feed
 import { AppShell } from "../../../src/ui/components/Shell.tsx";
 import { DraftProvider } from "../../../src/ui/flow/draft-state.tsx";
 import { FlowLayout } from "../../../src/ui/flow/frame.tsx";
+import { TRACKS_KEY } from "../../../src/ui/flow/model.ts";
 import { RequireAccount } from "../../../src/ui/guards.tsx";
 
 function currentKey(pathname: string): string | undefined {
   const parts = pathname.split("/").filter(Boolean);
   if (parts[2] === "level") return "level";
   if (parts[2] === "overview") return "overview";
+  if (parts[2] === "tracks") return TRACKS_KEY;
   if (parts[2] === "step" && parts[3]) return decodeURIComponent(parts[3]);
   return undefined;
 }

@@ -24,7 +24,7 @@ import { PoolList, poolMissingText } from "../../../../../src/ui/flow/pool.tsx";
 import { ChoiceSource } from "../../../../../src/ui/flow/source.tsx";
 import { StepFooter, StepFrame, StepShortcuts, usePageTitle } from "../../../../../src/ui/flow/frame.tsx";
 import { firstOpen, missingText } from "../../../../../src/ui/flow/model.ts";
-import { choiceOf, choiceTexts, stepTexts } from "../../../../../src/ui/package-text.ts";
+import { choiceOf, choiceTexts, stepTexts, thingName } from "../../../../../src/ui/package-text.ts";
 import { useMeasure } from "../../../../../src/ui/components/RichText.tsx";
 
 function settled(c: ChoiceState): boolean {
@@ -170,6 +170,10 @@ export default function StepPage() {
               key={def.id}
               {...(def.kind !== "text" ? { "aria-labelledby": subId } : {})}
             >
+              {/* A choice of an added track says which, above its question (concept AND-262, 6.3). */}
+              {state.track !== undefined && state.track !== ev.tracks?.first && (
+                <p className="subquestion__track">{thingName(lp, state.track)}</p>
+              )}
               {def.kind !== "text" && (
                 <h2 className="subquestion__title" id={subId}>
                   {ct.question}

@@ -366,7 +366,7 @@ describe("a complete level 3 character", () => {
       name: "Mira Fennwick",
       level: 3,
       complete: true,
-      line: { calling: "calling.lantern-bearer", level: 3 },
+      line: { calling: [{ thing: "calling.lantern-bearer", levels: 3 }], level: 3 },
     });
   });
 });

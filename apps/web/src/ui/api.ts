@@ -153,6 +153,8 @@ export interface DraftInfo {
   /** The campaign the character belongs to; null for none. */
   campaignId: string | null;
   answers: Record<string, unknown>;
+  /** With tracks: the track of each level from 2 on; empty means every level in the first. */
+  tracks?: string[];
   createdAt: string;
   updatedAt: string;
   finishedAt: string | null;

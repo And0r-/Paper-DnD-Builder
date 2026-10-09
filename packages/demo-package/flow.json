@@ -885,7 +885,7 @@
     "fields": ["stamina", "guard", "pace", "luck"],
     "line": {
       "calling": {
-        "choice": "calling"
+        "tracks": true
       },
       "level": {
         "value": "level"

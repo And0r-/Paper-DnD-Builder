@@ -10,6 +10,7 @@ import "../src/ui/styles/base.css";
 import "../src/ui/styles/components.css";
 import "../src/ui/styles/flow.css";
 import "../src/ui/styles/sheet.css";
+import "../src/ui/styles/tracks.css";
 import "@builder/sheet/designs/verbose/screen.css";
 import "@builder/sheet/designs/classic/screen.css";
 
