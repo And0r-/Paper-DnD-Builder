@@ -20,9 +20,21 @@ export function LevelGrowth() {
   const ctx = useMeasure(lp);
   const id = useId();
   const growth = levelGrowth(lp, ev);
-  if (growth.own.length === 0 && growth.byThing.length === 0) return null;
+  if (growth.own.length === 0 && growth.byThing.length === 0 && growth.shared.length === 0) return null;
   const word = levelWord(lp);
   const because = t("growth.because", { levelName: word, level: ev.level });
+  const value = (v: string, from: string) => (
+    <li className="value" key={v}>
+      <span className="value__number">{formatValue(lp, ctx, v, ev.values[v] ?? 0)}</span>
+      <span className="value__name">{ptext(lp, `value.${v}.name`)}</span>
+      <span className="value__from">{from}</span>
+      {ptext(lp, `value.${v}.explain`) && (
+        <span className="value__explain">
+          <RichText lp={lp} text={ptext(lp, `value.${v}.explain`)} />
+        </span>
+      )}
+    </li>
+  );
   // With more than one track (concept AND-262, 6.4): what follows the whole
   // character first, then a block per track, most levels first.
   const split = (ev.tracks?.list.length ?? 0) > 1;
@@ -32,22 +44,15 @@ export function LevelGrowth() {
       <h2 className="section-title" id={id}>
         {t("growth.title", { levelName: word })}
       </h2>
-      {split && (growth.own.length > 0 || whole.length > 0) && (
+      {split && (growth.own.length > 0 || growth.shared.length > 0 || whole.length > 0) && (
         <h3 className="growth__track-title">{t("tracks.growth.whole")}</h3>
       )}
       <ul className="values__list">
-        {growth.own.map((v) => (
-          <li className="value" key={v}>
-            <span className="value__number">{formatValue(lp, ctx, v, ev.values[v] ?? 0)}</span>
-            <span className="value__name">{ptext(lp, `value.${v}.name`)}</span>
-            <span className="value__from">{because}</span>
-            {ptext(lp, `value.${v}.explain`) && (
-              <span className="value__explain">
-                <RichText lp={lp} text={ptext(lp, `value.${v}.explain`)} />
-              </span>
-            )}
-          </li>
-        ))}
+        {growth.own.map((v) => value(v, because))}
+        {/* Values of several tracks together (shared places): the whole character's level, not one track's. */}
+        {growth.shared.map((v) =>
+          value(v, t("tracks.growth.wholeBecause", { levelName: word, level: ev.level })),
+        )}
       </ul>
       {(split ? whole : growth.byThing).length > 0 && (
         <Groups groups={split ? whole : growth.byThing} because={because} />

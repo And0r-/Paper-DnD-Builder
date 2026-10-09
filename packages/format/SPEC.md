@@ -726,7 +726,8 @@ is picked in them.
 ```
 
 `recommend` is a list; the first entry whose `when` is true (or that has
-no `when`) is the recommendation. It drives the "recommended" badge and
+no `when`) and that has a pick still on offer is the recommendation; if
+none has one, the first entry whose `when` is true. It drives the "recommended" badge and
 the "choose for me" button. A `pickOne` recommends exactly one thing. For a
 `pickMany` the recommendation is the entry's offered picks, then the other
 options in order, cut to `count`: a count that grows with the level needs
@@ -997,6 +998,14 @@ answer of its own, even if the first track grants the same choice (two
 tracks may each give a bonus pick at their level 4). The first track
 keeps the plain choice ids, so no saved answer changes its key.
 
+**An option two tracks offer.** A thing the character has is not offered
+again, so two tracks whose choices offer the same thing (one stance both
+callings teach) never give it twice. If each track has a thing of its own
+for the same option, give each a `requires` that names the others
+(`"requires": "not has('stance.river-guard')"`): it is then not offered
+once the character has the other, a saved pick of it no longer fits, and
+the recommendation moves on (see `recommend` in 9.3).
+
 **Adding a track.** A track with `addRequires` may be added only while
 that expression is true; with `addRequiresCurrent: true`, the
 `addRequires` of every track the character already has must be true as
@@ -1004,7 +1013,12 @@ well. Both are checked for the character as it was before the level that
 adds the track. Further levels in a track the character already has are
 not checked. The text `<thing>.addReason` says in one sentence what is
 needed ("Needs wit 13 or more."); the builder shows it at a track that
-cannot be added.
+cannot be added, and also for a track the character already has whose
+condition fails, so the sentence should read right for both. With more
+than one track, the recommended assignment of a `distribute` choice
+(scores, recommended for one track) is reordered, the same numbers with
+the fewest points moved, until every track's condition holds, if some
+order does.
 
 **First or added** (`only` on grants, see [6](#grants)). A grant with
 `"only": "first"` applies only if its thing belongs to the first track;

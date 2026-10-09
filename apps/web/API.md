@@ -215,7 +215,7 @@ saved too."
 | 🔒 `PUT /api/drafts/:id/answers/:choice` | `{ version, answer }`                             | Answers one choice; `answer: null` removes it. `422 changeRejected` with the reason if it does not fit now.                                                                                               |
 | 🔒 `PUT /api/drafts/:id/tracks`          | `{ version, tracks }`                             | With tracks only: the track of each level from 2 on; see [Tracks](#tracks-levels-in-more-than-one-thing).                                                                                                 |
 | 🔒 `POST /api/drafts/:id/level-up`       | `{ version, level, tracks? }`                     | Raises a finished character; see [Raising a character](#raising-a-character).                                                                                                                             |
-| 🔒 `POST /api/drafts/:id/finish`         | `{ version }`                                     | Marks the character finished; `422 incomplete` with the open choices.                                                                                                                                     |
+| 🔒 `POST /api/drafts/:id/finish`         | `{ version }`                                     | Marks the character finished; `422 incomplete` with the open choices and the tracks that do not fit.                                                                                                      |
 | 🔒 `PUT /api/drafts/:id/campaign`        | `{ campaignId }`                                  | Owner only. Puts the character into a campaign you play in or lead, or into none (`null`). The `version` stays.                                                                                           |
 | 🔒 `DELETE /api/drafts/:id`              | —                                                 | `204`.                                                                                                                                                                                                    |
 
@@ -343,15 +343,17 @@ a level left out goes there too. An empty list means one track, as before.
     { "thing": "calling.river-runner", "allowed": false, "notMet": ["calling.river-runner"] },
     { "thing": "calling.herbalist", "allowed": true }
   ],
-  "unfit": []
+  "unfit": [],
+  "unfitNotMet": {}
 }
 ```
 
-| Field     | Meaning                                                                                                                                                                                                                  |
-| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `options` | For the next level (a raise): every thing of the tracks choice. A track the character has is always allowed. A new one needs its `addRequires` (with `addRequiresCurrent`, also those of the tracks it has) to hold now. |
-| `notMet`  | The things whose condition does not hold, the track itself first. The package's sentence for each is the text `<thing>.addReason`.                                                                                       |
-| `unfit`   | Added tracks whose condition no longer holds, checked as the character was before the level that added them. They still count; the character is not complete until the player resolves it.                               |
+| Field         | Meaning                                                                                                                                                                                                                  |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `options`     | For the next level (a raise): every thing of the tracks choice. A track the character has is always allowed. A new one needs its `addRequires` (with `addRequiresCurrent`, also those of the tracks it has) to hold now. |
+| `notMet`      | The things whose condition does not hold, the track itself first. The package's sentence for each is the text `<thing>.addReason`.                                                                                       |
+| `unfit`       | Added tracks whose condition no longer holds, checked as the character was before the level that added them. They still count; the character is not complete until the player resolves it.                               |
+| `unfitNotMet` | For each track in `unfit`: the things whose condition does not hold, as `notMet`. It may name only a track the character had, not the one added (the herbalist's own condition fails, the lantern bearer's holds).       |
 
 What else changes with more than one track:
 
@@ -958,7 +960,7 @@ Tests: [`sheet-copies.test.ts`](src/server/api/sheet-copies.test.ts).
 | `413`  | `copyTooLarge`           | A sheet copy's model over 512 KiB (`max`).                                                                                        |
 | `415`  | `jsonRequired`           | Body not `application/json`.                                                                                                      |
 | `422`  | `changeRejected`         | The rule core refused the change; `reason` is a `ChangeError` (below).                                                            |
-| `422`  | `incomplete`             | Finishing with open choices; `open` lists them.                                                                                   |
+| `422`  | `incomplete`             | Finishing with open choices; `open` lists them. With a track in `unfit`, also `unfit: [{ "thing", "notMet": [...] }]`.            |
 | `422`  | `languageNotSupported`   | The account's language cannot be printed with this package; `languages` lists those that can.                                     |
 | `422`  | `tooManyCampaigns`       | The account leads 50 campaigns (`max`).                                                                                           |
 | `422`  | `tooManyPlayers`         | The campaign has 50 players (`max`).                                                                                              |

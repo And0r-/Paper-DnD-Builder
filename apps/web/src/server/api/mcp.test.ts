@@ -548,6 +548,20 @@ describe("tracks over MCP", () => {
       expect(again.data.answered.map((a: { choice: string }) => a.choice)).toContain(
         "added-talent-herbalist@calling.herbalist",
       );
+
+      // Wit 6 no longer lets the herbalist be added: finishing says so, with the package's reason.
+      await call("set_answer", {
+        characterId,
+        choice: "scores",
+        answer: { method: 0, assign: { mightBase: 8, graceBase: 8, witBase: 6, heartBase: 12 } },
+      });
+      await answerAllOpen(call, characterId);
+      const unfit = await call("finish_character", { characterId });
+      expect(unfit.isError).toBe(true);
+      expect(unfit.data.message).toContain("no longer fits");
+      expect(unfit.data.tracks.noLongerFits).toEqual([
+        { thing: "calling.herbalist", name: "Herbalist", because: [expect.any(String)] },
+      ]);
     } finally {
       await rm(dir, { recursive: true, force: true });
     }

@@ -222,6 +222,12 @@ export interface TracksState {
    * the level that added them. They still count; the character is not complete.
    */
   unfit: string[];
+  /**
+   * For each track in `unfit`: the things whose `addRequires` does not hold
+   * then, as in {@link TrackOption.notMet} (the track itself first, then
+   * tracks it had). It may be only a track it had: the new one fits.
+   */
+  unfitNotMet: Record<string, string[]>;
 }
 
 export interface Evaluation {
@@ -442,6 +448,20 @@ class Character {
     return typeof src === "object"
       ? byLevel(this.pkg, src.byLevel, this.tableLevel(track, at))
       : evaluateNumber(src, this.scopeAt(at));
+  }
+
+  /** Runs `fn` with these inputs set for a moment (an assignment tried out), then puts back what was there. */
+  withInputs<T>(inputs: Record<string, number>, fn: () => T): T {
+    const before = new Map(this.inputs);
+    for (const [k, v] of Object.entries(inputs)) this.inputs.set(k, v);
+    this.memo.clear();
+    try {
+      return fn();
+    } finally {
+      this.inputs.clear();
+      for (const [k, v] of before) this.inputs.set(k, v);
+      this.memo.clear();
+    }
   }
 
   setInputs(inputs: Record<string, number>, choice: string): void {
@@ -888,27 +908,104 @@ function walk(
 function tracksState(pkg: ContentPackage, tracks: Tracks, character: Character): TracksState {
   const levels = character.levels;
   const list = trackList(levels);
-  const things = indexes(pkg).things;
-  /** `thing` and, with `addRequiresCurrent`, the tracks in `had` whose `addRequires` fails at level `at`. */
-  const notMet = (thing: string, had: readonly string[], at: number): string[] => {
-    const scope = character.scopeAt(at);
-    return [thing, ...(tracks.addRequiresCurrent ? had : [])].filter((t) => {
-      const req = things.get(t)?.addRequires;
-      return req !== undefined && !evaluateCondition(req, scope);
-    });
-  };
   const current = list.map((t) => t.thing);
   const options = [...trackThings(pkg)].map((thing): TrackOption => {
     if (levels.length === 0 || current.includes(thing)) return { thing, allowed: true };
-    const missing = notMet(thing, current, character.level);
+    const missing = notMet(pkg, tracks, character, thing, current, character.level);
     return missing.length > 0 ? { thing, allowed: false, notMet: missing } : { thing, allowed: true };
   });
-  const unfit = list
-    .filter(
-      (t) => t.added && notMet(t.thing, [...new Set(levels.slice(0, t.from - 1))], t.from - 1).length > 0,
-    )
-    .map((t) => t.thing);
-  return { choice: tracks.choice, first: levels[0] ?? null, levels: [...levels], list, options, unfit };
+  const unfitNotMet = unfitTracks(pkg, tracks, character);
+  return {
+    choice: tracks.choice,
+    first: levels[0] ?? null,
+    levels: [...levels],
+    list,
+    options,
+    unfit: Object.keys(unfitNotMet),
+    unfitNotMet,
+  };
+}
+
+/** `thing` and, with `addRequiresCurrent`, the tracks in `had` whose `addRequires` fails at level `at`. */
+function notMet(
+  pkg: ContentPackage,
+  tracks: Tracks,
+  character: Character,
+  thing: string,
+  had: readonly string[],
+  at: number,
+): string[] {
+  const things = indexes(pkg).things;
+  const scope = character.scopeAt(at);
+  return [thing, ...(tracks.addRequiresCurrent ? had : [])].filter((t) => {
+    const req = things.get(t)?.addRequires;
+    return req !== undefined && !evaluateCondition(req, scope);
+  });
+}
+
+/** Added tracks that do not fit, each with what is not met (see {@link TracksState.unfitNotMet}). */
+function unfitTracks(pkg: ContentPackage, tracks: Tracks, character: Character): Record<string, string[]> {
+  const levels = character.levels;
+  const out: Record<string, string[]> = {};
+  for (const t of trackList(levels)) {
+    if (!t.added) continue;
+    const missing = notMet(
+      pkg,
+      tracks,
+      character,
+      t.thing,
+      [...new Set(levels.slice(0, t.from - 1))],
+      t.from - 1,
+    );
+    if (missing.length > 0) out[t.thing] = missing;
+  }
+  return out;
+}
+
+/**
+ * With more than one track, the package's assignment (made for one track,
+ * say) may leave another track's `addRequires` unmet. The recommendation is
+ * then the nearest reordering of the same numbers (fewest points moved) that
+ * the method takes and with which every track fits; the package's own if none does.
+ */
+function fitTracks(
+  pkg: ContentPackage,
+  choice: Extract<Choice, { kind: "distribute" }>,
+  method: number,
+  assign: Record<string, number>,
+  character: Character,
+): Record<string, number> {
+  const tracks = pkg.flow.level.tracks;
+  if (!tracks || trackList(character.levels).length < 2) return assign;
+  const fits = (a: Record<string, number>) =>
+    character.withInputs(a, () => Object.keys(unfitTracks(pkg, tracks, character)).length === 0);
+  if (fits(assign)) return assign;
+  const keys = Object.keys(assign).filter((k) => choice.targets.includes(k));
+  // Every order of many targets would be too many to try (8 are 40320).
+  if (keys.length > MOST_TARGETS) return assign;
+  const tries = permutations(keys.map((k) => assign[k]!))
+    .map((values) => {
+      const a = { ...assign };
+      keys.forEach((k, i) => (a[k] = values[i]!));
+      return { a, moved: keys.reduce((n, k) => n + Math.abs(a[k]! - assign[k]!), 0) };
+    })
+    .sort((x, y) => x.moved - y.moved);
+  for (const { a } of tries.slice(1, MOST_REORDERINGS))
+    if (judgeAnswer(choice, { method, assign: a }, {}).status !== "invalid" && fits(a)) return a;
+  return assign;
+}
+
+/** Reorderings tried for {@link fitTracks}, nearest first: plenty for a handful of targets. */
+const MOST_REORDERINGS = 200;
+/** Most targets {@link fitTracks} reorders. */
+const MOST_TARGETS = 7;
+
+/** Every order of `values`, the given one first. */
+function permutations(values: readonly number[]): number[][] {
+  if (values.length <= 1) return [[...values]];
+  return values.flatMap((v, i) =>
+    permutations([...values.slice(0, i), ...values.slice(i + 1)]).map((rest) => [v, ...rest]),
+  );
 }
 
 /**
@@ -1100,7 +1197,18 @@ function prepareChoice(
         ctx.count = state.count;
         state.remaining = state.count;
       }
-      const rec = choice.recommend?.find((r) => r.when === undefined || evaluateCondition(r.when, at));
+      // The first recommendation whose condition holds and that still has a
+      // pick on offer: one whose picks the character may not take (a style it
+      // has from another track) gives way to the next.
+      let rec: NonNullable<typeof choice.recommend>[number] | undefined;
+      for (const r of choice.recommend ?? []) {
+        if (r.when !== undefined && !evaluateCondition(r.when, at)) continue;
+        rec ??= r;
+        if (r.pick.some((p) => options.includes(p))) {
+          rec = r;
+          break;
+        }
+      }
       let recommended = rec?.pick.filter((p) => options.includes(p));
       // A count that grows with the level would need a recommendation per
       // count: the package's picks come first, the options fill up the rest.
@@ -1158,7 +1266,8 @@ function prepareChoice(
         const method = choice.methods.findIndex(
           (_, i) => judgeAnswer(choice, { method: i, assign: rec.assign }, {}).status !== "invalid",
         );
-        if (method >= 0) state.recommended = { method, assign: rec.assign };
+        if (method >= 0)
+          state.recommended = { method, assign: fitTracks(pkg, choice, method, rec.assign, character) };
       }
       const first = choice.methods[0];
       if (first?.method === "pointBuy") state.remaining = first.budget;

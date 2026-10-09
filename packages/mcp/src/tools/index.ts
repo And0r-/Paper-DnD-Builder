@@ -447,6 +447,9 @@ const setLevel = defineTool({
  */
 function tracksInWords(tracks: NonNullable<Evaluation["tracks"]>, words: Words) {
   const reason = (id: string) => words.text(`${id}.addReason`) ?? words.name(id);
+  /** The reasons for `thing`; one of a track the character already has names that track. */
+  const because = (thing: string, ids: readonly string[]) =>
+    ids.map((id) => (id === thing ? reason(id) : `${words.name(id)}: ${reason(id)}`));
   return {
     choice: tracks.choice,
     levels: tracks.list.map((t) => ({
@@ -460,11 +463,15 @@ function tracksInWords(tracks: NonNullable<Evaluation["tracks"]>, words: Words) 
       thing: o.thing,
       name: words.name(o.thing),
       allowed: o.allowed,
-      ...(o.notMet ? { because: o.notMet.map(reason) } : {}),
+      ...(o.notMet ? { because: because(o.thing, o.notMet) } : {}),
     })),
     ...(tracks.unfit.length > 0
       ? {
-          noLongerFits: tracks.unfit.map((id) => ({ thing: id, name: words.name(id), because: reason(id) })),
+          noLongerFits: tracks.unfit.map((id) => ({
+            thing: id,
+            name: words.name(id),
+            because: because(id, tracks.unfitNotMet?.[id] ?? [id]),
+          })),
         }
       : {}),
   };
@@ -554,11 +561,17 @@ const finishCharacter = defineTool({
     } catch (e) {
       if (e instanceof ApiError && e.code === "incomplete") {
         const [view, words] = await viewWithWords(client, characterId);
+        const ev = evaluationOf(view);
+        const unfit = ev.tracks && ev.tracks.unfit.length > 0;
         return {
           isError: true,
           data: {
-            message: "The character is not finished: these choices still need an answer.",
-            openChoices: openChoices(evaluationOf(view), words),
+            message: unfit
+              ? "The character is not finished: a track no longer fits its condition (see tracks.noLongerFits)" +
+                (ev.open.length > 0 ? ", and these choices still need an answer." : ".")
+              : "The character is not finished: these choices still need an answer.",
+            openChoices: openChoices(ev, words),
+            ...(unfit ? { tracks: tracksInWords(ev.tracks!, words) } : {}),
           },
         };
       }

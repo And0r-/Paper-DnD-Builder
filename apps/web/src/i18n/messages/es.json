@@ -711,6 +711,7 @@
   "tracks.step.notPossible": "{thing} (no es posible)",
   "tracks.step.blockedTitle": "Lo que no es posible",
   "tracks.step.blockedLine": "{thing}: {reason}",
+  "tracks.step.notMetHad": "Para {thing}, que ya tienes: {reason}",
   "tracks.step.result": "Resultado: {line}",
   "tracks.step.reset": "Otra vez todo como {thing}",
   "tracks.step.unfitTitle": "Esto ya no encaja",
