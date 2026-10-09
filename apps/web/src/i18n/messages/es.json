@@ -671,7 +671,7 @@
   "tracks.raise.blocked": "No es posible: {reason}",
   "tracks.raise.after": "Después: {line}.",
   "tracks.raise.afterNote": "Después solo respondes lo que es nuevo.",
-  "tracks.step.title": "{levelName} a {levelName}",
+  "tracks.step.title": "De dónde viene cada {levelName}",
   "tracks.step.question": "¿De dónde viene cada {levelName}?",
   "tracks.step.intro": "La mayoría de los personajes se quedan con una elección. Si tu máster lo permite, puedes repartir.",
   "tracks.step.all": "{levelName} 1 a {level}: todo como {thing}.",
@@ -691,13 +691,8 @@
   "tracks.growth.wholeBecause": "porque {levelName} {level} en total",
   "tracks.growth.track": "{thing}, {levelName} {level}",
   "tracks.growth.picks": "Elegido: {list}",
-  "tracks.preview.title": "Vista previa con datos de ejemplo",
-  "tracks.preview.note": "Los números son ejemplos. Aquí no se guarda nada.",
-  "tracks.preview.sample": "Ejemplo",
-  "tracks.preview.screen": "Pantalla",
-  "tracks.preview.raise": "Subir de nivel",
-  "tracks.preview.step": "Paso al crear",
-  "tracks.preview.overview": "Resumen",
-  "tracks.preview.sheet": "Hoja",
-  "tracks.preview.unfit": "Ya no encaja"
+  "flow.trackLevel": "{thing}, {levelName} {level}",
+  "tracks.ofTrack": "{title} ({thing})",
+  "tracks.step.noFirst": "Primero elige en el paso «{step}».",
+  "tracks.growth.because": "porque {thing} en {levelName} {level}"
 }

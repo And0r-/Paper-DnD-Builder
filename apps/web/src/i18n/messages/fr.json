@@ -671,7 +671,7 @@
   "tracks.raise.blocked": "Impossible : {reason}",
   "tracks.raise.after": "Ensuite : {line}.",
   "tracks.raise.afterNote": "Ensuite, tu réponds seulement à ce qui est nouveau.",
-  "tracks.step.title": "{levelName} par {levelName}",
+  "tracks.step.title": "D’où vient chaque {levelName}",
   "tracks.step.question": "D’où vient chaque {levelName} ?",
   "tracks.step.intro": "La plupart des personnages restent sur un seul choix. Si ton meneur de jeu l’accepte, tu peux répartir.",
   "tracks.step.all": "{levelName} 1 à {level} : tout comme {thing}.",
@@ -691,13 +691,8 @@
   "tracks.growth.wholeBecause": "car {levelName} {level} en tout",
   "tracks.growth.track": "{thing}, {levelName} {level}",
   "tracks.growth.picks": "Choisi : {list}",
-  "tracks.preview.title": "Aperçu avec des données d’exemple",
-  "tracks.preview.note": "Les nombres sont des exemples. Rien n’est enregistré ici.",
-  "tracks.preview.sample": "Exemple",
-  "tracks.preview.screen": "Écran",
-  "tracks.preview.raise": "Monter de niveau",
-  "tracks.preview.step": "Étape de création",
-  "tracks.preview.overview": "Vue d’ensemble",
-  "tracks.preview.sheet": "Fiche",
-  "tracks.preview.unfit": "Ne va plus"
+  "flow.trackLevel": "{thing}, {levelName} {level}",
+  "tracks.ofTrack": "{title} ({thing})",
+  "tracks.step.noFirst": "Choisis d’abord à l’étape « {step} ».",
+  "tracks.growth.because": "car {thing} au {levelName} {level}"
 }

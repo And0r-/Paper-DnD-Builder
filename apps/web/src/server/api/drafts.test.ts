@@ -92,7 +92,7 @@ describe("building a character over the API", () => {
       name: "Mira Fennwick",
       level: 3,
       complete: true,
-      line: { calling: "calling.lantern-bearer", level: 3 },
+      line: { calling: [{ thing: "calling.lantern-bearer", levels: 3 }], level: 3 },
     });
 
     const stored = await server.db.query<{ t: string }>("SELECT jsonb_typeof(document) AS t FROM drafts");

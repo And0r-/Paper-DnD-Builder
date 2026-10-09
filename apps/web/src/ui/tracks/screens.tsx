@@ -1,12 +1,13 @@
 "use client";
 /**
- * The screens for more than one track (concept AND-262, section 6), on
- * plain props: a loaded package, the character's plan and what the core
- * would say about each track. No draft, no server; AND-251 feeds them from
- * the rule core. Words like "calling" come from the package; the builder's
- * own sentences never name one.
+ * The screens for more than one track (concept AND-262, section 6): the
+ * level-up question and the builder's step "Your levels". They work on the
+ * character's plan and on what the rule core says about each track
+ * (`evaluation.tracks`). Words like "calling" come from the package; the
+ * builder's own sentences never name one.
  */
-import { Fragment, useEffect, useId, useRef, useState } from "react";
+import type { TrackOption } from "@builder/core";
+import { useEffect, useId, useRef, useState } from "react";
 import { useApp } from "../app-state.tsx";
 import { Button } from "../components/Button.tsx";
 import { Callout } from "../components/Feedback.tsx";
@@ -16,16 +17,25 @@ import type { LoadedPackage } from "../packages.ts";
 import {
   allFirst,
   headLine,
-  headOrder,
   isSingle,
   levelOwners,
   nextTrackLevel,
   trackLevels,
   unfitLevels,
   withLevel,
-  type TrackOption,
   type TrackPlan,
 } from "./model.ts";
+
+/**
+ * Why a track may not be added, in the package's words: the sentence
+ * `<thing>.addReason` of each thing whose condition does not hold.
+ */
+export function notMetText(lp: LoadedPackage, things: readonly string[] | undefined): string {
+  return (things ?? [])
+    .map((id) => ptext(lp, `${id}.addReason`))
+    .filter((x): x is string => x !== undefined && x !== "")
+    .join(" ");
+}
 
 interface Common {
   lp: LoadedPackage;
@@ -44,14 +54,22 @@ export function TrackRaise({
   lp,
   name,
   plan,
+  chosen,
   to,
   options,
+  busy = false,
+  error,
   onBack,
   onGo,
 }: Common & {
   plan: TrackPlan;
   to: number;
   options: readonly TrackOption[];
+  /** The plan to start from when the raise is under way already (its levels as chosen then). */
+  chosen?: TrackPlan;
+  busy?: boolean;
+  /** Shown above the buttons when going on failed. */
+  error?: string | undefined;
   onBack: () => void;
   onGo: (plan: TrackPlan) => void;
 }) {
@@ -62,9 +80,11 @@ export function TrackRaise({
   const thing = (id: string) => thingName(lp, id);
   // Default for every new level: the track of the level before it.
   const [next, setNext] = useState<TrackPlan>(() => {
-    let p = plan;
-    const last = levelOwners(plan).at(-1)!;
-    for (let l = plan.level + 1; l <= to; l++) p = withLevel(p, l, last);
+    const start = chosen
+      ? { ...chosen, level: Math.min(chosen.level, to), tracks: chosen.tracks.slice(0, to - 1) }
+      : plan;
+    let p = start;
+    for (let l = start.level + 1; l <= to; l++) p = withLevel(p, l, levelOwners(p).at(-1)!);
     return p;
   });
   useEffect(() => headingRef.current?.focus(), []);
@@ -108,11 +128,17 @@ export function TrackRaise({
         {t("tracks.raise.afterNote")}
       </Callout>
 
+      {error && (
+        <Callout tone="danger" role="alert">
+          {error}
+        </Callout>
+      )}
+
       <div className="raise__actions">
         <Button variant="secondary" icon="arrowLeft" onClick={onBack}>
           {t("common.back")}
         </Button>
-        <Button iconAfter="arrowRight" onClick={() => onGo(next)}>
+        <Button iconAfter="arrowRight" onClick={() => onGo(next)} busy={busy} busyLabel={t("raise.going")}>
           {t("raise.go", { levelName, level: to })}
         </Button>
       </div>
@@ -198,7 +224,9 @@ function RaiseRow({
                     : (ptext(lp, `${o.thing}.short`) ?? "")
                 }
                 checked={chosen === o.thing}
-                blocked={o.allowed ? undefined : t("tracks.raise.blocked", { reason: o.reason ?? "" })}
+                blocked={
+                  o.allowed ? undefined : t("tracks.raise.blocked", { reason: notMetText(lp, o.notMet) })
+                }
                 onPick={onPick}
               />
             ))}
@@ -275,30 +303,29 @@ function TrackCard({
   );
 }
 
-/* ------------------------------------------------- step "level by level" */
+/* ------------------------------------------------------ step "your levels" */
 
 /**
- * The builder step after the track choice when a character starts above
- * level 1 (concept 6.2). Closed: one sentence, everything in the first
- * track, nothing to do. Open: one row per level from 2 on.
+ * The builder's step after the tracks choice when a character starts above
+ * level 1 (concept 6.2), under the step's own question. Closed: one
+ * sentence, everything in the first track, nothing to do. Open: one row per
+ * level from 2 on.
  */
 export function TrackStep({
   lp,
   choice,
   plan,
   options,
-  unfit = [],
-  changedFrom,
+  unfit,
   onChange,
 }: {
   lp: LoadedPackage;
-  /** The package's track choice (its title names the step the first track comes from). */
+  /** The package's tracks choice (its title names the step the first track comes from). */
   choice: string;
   plan: TrackPlan;
   options: readonly TrackOption[];
-  unfit?: readonly { thing: string; reason: string }[];
-  /** The first track before the player changed it, for the one sentence that says so. */
-  changedFrom?: string;
+  /** Added tracks whose condition no longer holds (`evaluation.tracks.unfit`). */
+  unfit: readonly string[];
   onChange: (plan: TrackPlan) => void;
 }) {
   const { t, list } = useApp();
@@ -312,28 +339,16 @@ export function TrackStep({
   const choiceTitle = ptext(lp, `choice.${choice}.title`) ?? "";
   return (
     <div className="tracks-step">
-      <div className="question">
-        <h1 className="question__title" tabIndex={-1}>
-          {t("tracks.step.question", { levelName: word })}
-        </h1>
-        <p className="question__intro">{t("tracks.step.intro")}</p>
-      </div>
-
-      {changedFrom && changedFrom !== plan.first && (
-        <Callout tone="info" role="status">
-          {t("tracks.step.firstChanged", { old: thing(changedFrom), new: thing(plan.first) })}
-        </Callout>
-      )}
       {unfit.map((u) => {
-        const levels = unfitLevels(plan, new Set([u.thing]));
+        const levels = unfitLevels(plan, new Set([u]));
         if (levels.length === 0) return null;
         return (
-          <Callout key={u.thing} tone="warning" title={t("tracks.step.unfitTitle")}>
+          <Callout key={u} tone="warning" title={t("tracks.step.unfitTitle")}>
             {t("tracks.step.unfitText", {
-              thing: thing(u.thing),
+              thing: thing(u),
               levelName: word,
               levels: list(levels.map(String)),
-              reason: u.reason,
+              reason: notMetText(lp, [u]),
             })}
           </Callout>
         );
@@ -371,7 +386,7 @@ export function TrackStep({
             </li>
             {owners.slice(1).map((owner, i) => {
               const level = i + 2;
-              const bad = unfit.some((u) => u.thing === owner);
+              const bad = unfit.includes(owner);
               return (
                 <li className={`tracks-level${bad ? " tracks-level--unfit" : ""}`} key={level}>
                   <LevelSelect
@@ -396,7 +411,10 @@ export function TrackStep({
               <ul>
                 {refused.map((o) => (
                   <li key={o.thing}>
-                    {t("tracks.step.blockedLine", { thing: thing(o.thing), reason: o.reason ?? "" })}
+                    {t("tracks.step.blockedLine", {
+                      thing: thing(o.thing),
+                      reason: notMetText(lp, o.notMet),
+                    })}
                   </li>
                 ))}
               </ul>
@@ -469,152 +487,10 @@ function LevelSelect({
   );
 }
 
-/* ------------------------------------------------------ overview, sheet */
-
 /** "A 3 / B 2" (concept 6.5); one track alone is only its name. */
 export function levelLine(lp: LoadedPackage, plan: TrackPlan, t: ReturnType<typeof useApp>["t"]): string {
   const levelName = ptext(lp, "level.name") ?? "";
   if (isSingle(plan))
     return `${thingName(lp, plan.first)}, ${t("flow.atLevel", { levelName, level: plan.level })}`;
   return headLine(plan, (id) => thingName(lp, id));
-}
-
-/** One block of numbers: for the whole character, or for one track. */
-export interface GrowthBlock {
-  thing?: string;
-  numbers: { value: string; shown: string }[];
-  picks?: string[];
-}
-
-/**
- * "What grows with your level", split by track (concept 6.4): the numbers
- * of the whole character first (they follow the character level), then one
- * block per track, in the order of the head line.
- */
-export function TrackGrowth({
-  lp,
-  plan,
-  blocks,
-}: {
-  lp: LoadedPackage;
-  plan: TrackPlan;
-  blocks: GrowthBlock[];
-}) {
-  const { t, list } = useApp();
-  const id = useId();
-  const levelName = ptext(lp, "level.name") ?? "";
-  const word = levelWord(lp);
-  const whole = blocks.find((b) => !b.thing);
-  const order = headOrder(plan);
-  return (
-    <section className="growth tracks-growth" aria-labelledby={id}>
-      <h2 className="section-title" id={id}>
-        {t("growth.title", { levelName: word })}
-      </h2>
-      {whole && (
-        <div className="tracks-growth__block">
-          <h3 className="tracks-growth__title">{t("tracks.growth.whole")}</h3>
-          <p className="tracks-growth__because">
-            {t("tracks.growth.wholeBecause", { levelName: word, level: plan.level })}
-          </p>
-          <Numbers lp={lp} numbers={whole.numbers} />
-        </div>
-      )}
-      {order.map((tl) => {
-        const b = blocks.find((x) => x.thing === tl.thing);
-        if (!b) return null;
-        return (
-          <div className="tracks-growth__block" key={tl.thing}>
-            <h3 className="tracks-growth__title">
-              {t("tracks.growth.track", { thing: thingName(lp, tl.thing), levelName, level: tl.levels })}
-            </h3>
-            <Numbers lp={lp} numbers={b.numbers} />
-            {b.picks && b.picks.length > 0 && (
-              <p className="tracks-growth__picks">
-                {t("tracks.growth.picks", { list: list(b.picks.map((p) => thingName(lp, p))) })}
-              </p>
-            )}
-          </div>
-        );
-      })}
-    </section>
-  );
-}
-
-function Numbers({ lp, numbers }: { lp: LoadedPackage; numbers: GrowthBlock["numbers"] }) {
-  return (
-    <dl className="tracks-numbers">
-      {numbers.map((n) => (
-        <Fragment key={n.value}>
-          <dt>{ptext(lp, `value.${n.value}.name`) ?? n.value}</dt>
-          <dd>{n.shown}</dd>
-        </Fragment>
-      ))}
-    </dl>
-  );
-}
-
-/**
- * The head of the character on the overview, the list and the sheet:
- * name, then "A 3 / B 2" and the character level.
- */
-export function TrackHead({ lp, name, plan }: Common & { plan: TrackPlan }) {
-  const { t } = useApp();
-  const levelName = ptext(lp, "level.name") ?? "";
-  return (
-    <div className="tracks-head">
-      <p className="tracks-head__name">{name || t("common.unnamed")}</p>
-      <p className="tracks-head__line">
-        <span>{headLine(plan, (id) => thingName(lp, id))}</span>
-        <span className="tracks-head__level">{t("flow.atLevel", { levelName, level: plan.level })}</span>
-      </p>
-    </div>
-  );
-}
-
-/**
- * The sheet with two tracks, as a sketch for the PDF (concept 6.6): the
- * head, the numbers of the whole character once, then one box per track
- * with its own numbers and what was chosen through it.
- */
-export function TrackSheet({ lp, name, plan, blocks }: Common & { plan: TrackPlan; blocks: GrowthBlock[] }) {
-  const { t } = useApp();
-  const levelName = ptext(lp, "level.name") ?? "";
-  const whole = blocks.find((b) => !b.thing);
-  return (
-    <article className="tracks-sheet">
-      <header className="tracks-sheet__head">
-        <p className="tracks-sheet__name">{name || t("common.unnamed")}</p>
-        <p className="tracks-sheet__line">{headLine(plan, (id) => thingName(lp, id))}</p>
-        <p className="tracks-sheet__level">{t("flow.atLevel", { levelName, level: plan.level })}</p>
-      </header>
-      {whole && (
-        <section className="tracks-sheet__box tracks-sheet__box--whole">
-          <h2 className="tracks-sheet__title">{t("tracks.growth.whole")}</h2>
-          <Numbers lp={lp} numbers={whole.numbers} />
-        </section>
-      )}
-      <div className="tracks-sheet__boxes">
-        {headOrder(plan).map((tl) => {
-          const b = blocks.find((x) => x.thing === tl.thing);
-          if (!b) return null;
-          return (
-            <section className="tracks-sheet__box" key={tl.thing}>
-              <h2 className="tracks-sheet__title">
-                {t("tracks.growth.track", { thing: thingName(lp, tl.thing), levelName, level: tl.levels })}
-              </h2>
-              <Numbers lp={lp} numbers={b.numbers} />
-              {b.picks && (
-                <ul className="tracks-sheet__picks">
-                  {b.picks.map((p) => (
-                    <li key={p}>{thingName(lp, p)}</li>
-                  ))}
-                </ul>
-              )}
-            </section>
-          );
-        })}
-      </div>
-    </article>
-  );
 }

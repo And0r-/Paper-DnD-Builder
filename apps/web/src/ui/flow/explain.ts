@@ -5,6 +5,7 @@
  */
 import {
   explainValue,
+  grantAppliesFrom,
   totalOf,
   type ChoiceState,
   type Evaluation,
@@ -321,8 +322,8 @@ export function originGroups(lp: LoadedPackage, ev: Evaluation, w: Words): Origi
 export interface LevelGrowth {
   /** Values that follow the level alone (a formula of the level, a table by level). */
   own: string[];
-  /** Values a held thing raises by a table by level, by that thing. */
-  byThing: { thing: string; values: string[] }[];
+  /** Values a held thing raises by a table by level, by that thing, and the track it came through. */
+  byThing: { thing: string; values: string[]; track?: string }[];
 }
 
 /** Values each thing names in a stat (`"uses": {"value": "…"}`), by value. */
@@ -367,11 +368,14 @@ export function levelGrowth(lp: LoadedPackage, ev: Evaluation): LevelGrowth {
   const taken = new Set(own);
   for (const h of ev.things) {
     const values = (things.get(h.id)?.grants ?? [])
-      .filter((g) => g.value !== undefined && typeof g.add === "object" && (g.atLevel ?? 1) <= ev.level)
+      .filter(
+        (g) => g.value !== undefined && typeof g.add === "object" && grantAppliesFrom(ev, h, g) !== undefined,
+      )
       .map((g) => g.value!)
       .filter((id) => named(id) && !taken.has(id));
     for (const id of values) taken.add(id);
-    if (values.length > 0) byThing.push({ thing: h.id, values });
+    if (values.length > 0)
+      byThing.push({ thing: h.id, values, ...(h.track !== undefined && { track: h.track }) });
   }
   return { own, byThing };
 }

@@ -26,7 +26,8 @@ function mutate(change: (files: RawFiles) => void): ValidationResult {
 /**
  * The demo without anything that needs tracks, as a package before 0.21
  * would be: no flow.level.tracks, no addRequires (nor its texts), no
- * `only`, and `level` where the demo asks `levelOf()`.
+ * `only`, `level` where the demo asks `levelOf()`, and a summary line
+ * that names the calling instead of the tracks.
  */
 function withoutTracks(f: RawFiles): void {
   for (const [name, content] of f) {
@@ -43,6 +44,8 @@ function withoutTracks(f: RawFiles): void {
     f.set(name, plain);
   }
   delete flow(f).level.tracks;
+  // The summary line names the tracks; without them it names the choice's answer.
+  flow(f).summary.line.calling = { choice: "calling" };
 }
 /** Like `mutate`, starting from the demo without tracks. */
 function mutatePlain(change: (files: RawFiles) => void): ValidationResult {

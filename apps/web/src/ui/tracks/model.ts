@@ -1,21 +1,11 @@
 /**
- * Tracks on screen (more than one calling for one character), before the
- * rule core knows them. The shapes follow the approved concept (AND-262,
- * sections 1, 3 and 6): the draft keeps `tracks`, one thing per character
+ * Tracks on screen (levels split between more than one thing of one
+ * choice, SPEC 9.7). The draft keeps `tracks`, one thing per character
  * level from level 2 on; level 1 always belongs to the first track, the
- * answer of the track choice. Everything here is pure, so the screens can
- * run on sample data now and on the core's answers later (AND-251).
+ * answer of the tracks choice. Pure helpers on that list, for the screens
+ * that change it before the rule core has seen the change.
  */
-
-/** What the core will say about a track for the next level. */
-export interface TrackOption {
-  /** The thing that would get the level. */
-  thing: string;
-  /** False when its requirement to be added is not met (checked as the character was before). */
-  allowed: boolean;
-  /** Why not, in the package language, one or two short sentences. */
-  reason?: string;
-}
+import type { DraftDocument, Evaluation } from "@builder/core";
 
 /** The levels of a character, as the draft keeps them. */
 export interface TrackPlan {
@@ -120,4 +110,11 @@ function trimmed(tracks: string[], first: string): string[] {
   const out = [...tracks];
   while (out.length > 0 && out.at(-1) === first) out.pop();
   return out;
+}
+
+/** The plan of a draft as the rule core sees it; undefined without tracks or a first track. */
+export function planOf(doc: DraftDocument, ev: Evaluation): TrackPlan | undefined {
+  const first = ev.tracks?.first;
+  if (first === undefined || first === null) return undefined;
+  return { level: ev.level, first, tracks: doc.tracks ?? [] };
 }

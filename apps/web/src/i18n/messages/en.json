@@ -671,7 +671,7 @@
   "tracks.raise.blocked": "Not possible: {reason}",
   "tracks.raise.after": "Afterwards: {line}.",
   "tracks.raise.afterNote": "Then you only answer what is new.",
-  "tracks.step.title": "{levelName} by {levelName}",
+  "tracks.step.title": "Where each {levelName} comes from",
   "tracks.step.question": "Where does each {levelName} come from?",
   "tracks.step.intro": "Most characters stay with one choice. If your game master allows it, you can split.",
   "tracks.step.all": "{levelName} 1 to {level}: all as {thing}.",
@@ -691,13 +691,8 @@
   "tracks.growth.wholeBecause": "because {levelName} {level} in all",
   "tracks.growth.track": "{thing}, {levelName} {level}",
   "tracks.growth.picks": "Chosen: {list}",
-  "tracks.preview.title": "Preview with sample data",
-  "tracks.preview.note": "The numbers are examples. Nothing is saved here.",
-  "tracks.preview.sample": "Example",
-  "tracks.preview.screen": "Screen",
-  "tracks.preview.raise": "Level up",
-  "tracks.preview.step": "Step when creating",
-  "tracks.preview.overview": "Overview",
-  "tracks.preview.sheet": "Sheet",
-  "tracks.preview.unfit": "No longer fits"
+  "flow.trackLevel": "{thing}, {levelName} {level}",
+  "tracks.ofTrack": "{title} ({thing})",
+  "tracks.step.noFirst": "First choose in the step “{step}”.",
+  "tracks.growth.because": "because {thing} at {levelName} {level}"
 }

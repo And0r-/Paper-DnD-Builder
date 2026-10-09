@@ -116,7 +116,8 @@ export interface DraftApi {
    * Raises the character to a higher level on the server. "finished" when
    * the new level asks nothing, so the character is done again at once.
    */
-  levelUp(level: number): Promise<"open" | "finished" | "failed">;
+  /** With tracks: `tracks` names the track of each new level, in order (`POST …/level-up`). */
+  levelUp(level: number, tracks?: string[]): Promise<"open" | "finished" | "failed">;
   /** Puts the character into a campaign its owner plays in, or into none (null). False if that failed. */
   setCampaign(campaignId: string | null): Promise<boolean>;
   /** Who else is on the character, where, pointing at what; hints (live help). */
@@ -153,8 +154,14 @@ function apply(pkg: LoadedPackage["pkg"], doc: DraftDocument, queue: readonly Pe
 }
 
 function docOf(view: DraftView): DraftDocument {
-  const { level, levelBefore, answers } = view.draft;
-  return levelBefore === null ? { level, answers } : { level, levelBefore, answers };
+  const { level, levelBefore, answers, tracks } = view.draft;
+  // An empty list of tracks says the same as none: every level in the first track.
+  return {
+    level,
+    ...(levelBefore !== null && { levelBefore }),
+    answers,
+    ...(tracks !== undefined && tracks.length > 0 && { tracks }),
+  };
 }
 
 export type DraftLoad =
@@ -468,12 +475,13 @@ function ReadyDraft({
   }, [flush, setServer, setDoc]);
 
   const levelUp = useCallback(
-    async (level: number): Promise<"open" | "finished" | "failed"> => {
+    async (level: number, tracks?: string[]): Promise<"open" | "finished" | "failed"> => {
       if (!(await flush())) return "failed";
       try {
         const res = await api<DraftView>("POST", draftPath(serverRef.current.draft.id, "/level-up"), {
           version: serverRef.current.draft.version,
           level,
+          ...(tracks !== undefined && { tracks }),
         });
         serverRef.current = res;
         setServer(res);

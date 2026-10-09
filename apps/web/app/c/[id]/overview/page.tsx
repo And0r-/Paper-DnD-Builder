@@ -4,6 +4,7 @@
  * step in a sentence with a way to change it, the main values, and what is
  * still open. Finishing works once nothing required is open.
  */
+import { headTracks, summarize, tracksText } from "@builder/core";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useId, useState, type ReactNode } from "react";
@@ -20,18 +21,26 @@ import {
   ProgressHeader,
   QuestionHeader,
   useFooterDock,
+  trackLevelText,
   usePageTitle,
 } from "../../../../src/ui/flow/frame.tsx";
 import { distributeLines, levelGrowth, valueOrigin } from "../../../../src/ui/flow/explain.ts";
-import { answerThings, describeAnswer, OVERVIEW_KEY, positionOf } from "../../../../src/ui/flow/model.ts";
+import {
+  answerThings,
+  asks,
+  describeAnswer,
+  OVERVIEW_KEY,
+  positionOf,
+} from "../../../../src/ui/flow/model.ts";
 import { LevelGrowth } from "../../../../src/ui/flow/growth.tsx";
 import { Origins } from "../../../../src/ui/flow/origins.tsx";
 import { HelpButton } from "../../../../src/ui/live/help-dialog.tsx";
-import { choiceOf, choiceTexts, formatValue, ptext } from "../../../../src/ui/package-text.ts";
+import { summaryLineText } from "../../../../src/ui/characters.tsx";
+import { choiceOf, choiceTexts, formatValue, ptext, thingName } from "../../../../src/ui/package-text.ts";
 
 export default function OverviewPage() {
   const { t, tc, list } = useApp();
-  const { lp, ev, entries, allEntries, draft, raise, finish } = useDraft();
+  const { lp, doc, ev, entries, allEntries, draft, raise, finish } = useDraft();
   const ctx = useMeasure(lp);
   const router = useRouter();
   const headingId = useId();
@@ -44,8 +53,9 @@ export default function OverviewPage() {
 
   // Numbers of the section "what grows with your level" are not repeated in the lines below.
   const growth = levelGrowth(lp, ev);
+  const line = ev.tracks ? summaryLineText(lp, summarize(lp.pkg, doc, ev).line) : "";
   const grown = new Set([...growth.own, ...growth.byThing.flatMap((g) => g.values)]);
-  const openSteps = entries.filter((e) => e.kind === "step" && e.status !== "done");
+  const openSteps = entries.filter((e) => asks(e) && e.status !== "done");
   // During a level up the earlier steps stay here, to look at and to change.
   const steps = allEntries.filter((e) => e.kind !== "overview");
   // Each score is summed up once, at the first step that sets it; later steps show their part.
@@ -71,6 +81,8 @@ export default function OverviewPage() {
     <div className="step">
       <ProgressHeader entry={entry} />
       <QuestionHeader id={headingId} question={t("overview.question")} intro={t("overview.intro")} />
+      {/* With tracks the levels are split: the head says how ("Lantern bearer 3 / Herbalist 2"). */}
+      {line && <p className="overview-line">{line}</p>}
 
       {openSteps.length > 0 && (
         <Callout tone="warning" title={t("overview.openTitle")}>
@@ -123,49 +135,61 @@ export default function OverviewPage() {
           const lines: ReactNode[] =
             s.kind === "level"
               ? [String(ev.level)]
-              : s.choices.flatMap((c): ReactNode[] => {
-                  const state = ev.choices[c]!;
-                  const choice = choiceOf(lp, c);
-                  const assign = (state.answer as { assign?: Record<string, number> } | undefined)?.assign;
-                  // Each score on its own line: the whole sum once ("15 from … + 2 from … = 17"), later only "+ 2".
-                  if (choice?.kind === "distribute" && assign && state.status !== "invalid") {
-                    // Raised values: only those that got points.
-                    const raise = choice.methods[0]?.method === "raise";
-                    const targets = raise
-                      ? choice.targets.filter((v) => (assign[v] ?? 0) > 0)
-                      : choice.targets;
-                    return distributeLines(lp, ctx, ev, state, targets, assign, { t, list }, summed);
-                  }
-                  // Names of things explain themselves on hover and tap: their text is not on this screen.
-                  const named = answerThings(lp, ctx, state, grown, ev.values);
-                  const text =
-                    named && named.things.length + named.values.length > 0
-                      ? listNodes(t, [
-                          ...named.things.map((id) => <ThingName key={id} lp={lp} id={id} />),
-                          ...named.values,
-                        ])
-                      : describeAnswer(lp, ctx, state, list, grown, ev.values);
-                  const prefix = s.choices.length > 1 ? `${choiceTexts(lp, c, state, ctx).title}: ` : "";
-                  return [
-                    <>
-                      {prefix}
-                      {text ??
-                        (state.optional && state.status === "missing"
-                          ? t("overview.leftEmpty")
-                          : t("overview.nothingChosen"))}
-                    </>,
-                  ];
-                });
+              : s.kind === "tracks"
+                ? [ev.tracks ? tracksText(headTracks(ev), (id) => thingName(lp, id)) : ""]
+                : s.choices.flatMap((c): ReactNode[] => {
+                    const state = ev.choices[c]!;
+                    const choice = choiceOf(lp, c);
+                    const assign = (state.answer as { assign?: Record<string, number> } | undefined)?.assign;
+                    // Each score on its own line: the whole sum once ("15 from … + 2 from … = 17"), later only "+ 2".
+                    if (choice?.kind === "distribute" && assign && state.status !== "invalid") {
+                      // Raised values: only those that got points.
+                      const raise = choice.methods[0]?.method === "raise";
+                      const targets = raise
+                        ? choice.targets.filter((v) => (assign[v] ?? 0) > 0)
+                        : choice.targets;
+                      return distributeLines(lp, ctx, ev, state, targets, assign, { t, list }, summed);
+                    }
+                    // Names of things explain themselves on hover and tap: their text is not on this screen.
+                    const named = answerThings(lp, ctx, state, grown, ev.values);
+                    const text =
+                      named && named.things.length + named.values.length > 0
+                        ? listNodes(t, [
+                            ...named.things.map((id) => <ThingName key={id} lp={lp} id={id} />),
+                            ...named.values,
+                          ])
+                        : describeAnswer(lp, ctx, state, list, grown, ev.values);
+                    // A choice of an added track says which: its title is the same as in the first one.
+                    const title = choiceTexts(lp, c, state, ctx).title;
+                    const added = state.track !== undefined && state.track !== ev.tracks?.first;
+                    const prefix =
+                      s.choices.length > 1
+                        ? `${added ? t("tracks.ofTrack", { title, thing: thingName(lp, state.track!) }) : title}: `
+                        : "";
+                    return [
+                      <>
+                        {prefix}
+                        {text ??
+                          (state.optional && state.status === "missing"
+                            ? t("overview.leftEmpty")
+                            : t("overview.nothingChosen"))}
+                      </>,
+                    ];
+                  });
           return (
             <li key={s.key} className={`summary__item summary__item--${s.status}`}>
               <div className="summary__text">
                 <h2 className="summary__title">
                   {s.status !== "done" && <span className="summary__flag">! </span>}
                   {s.title}
-                  {s.atLevel > lp.pkg.flow.level.min && (
-                    <span className="summary__level">
-                      {t("flow.atLevel", { levelName: ptext(lp, "level.name") ?? "", level: s.atLevel })}
-                    </span>
+                  {s.track !== undefined ? (
+                    <span className="summary__level">{trackLevelText(lp, t, s)}</span>
+                  ) : (
+                    s.atLevel > lp.pkg.flow.level.min && (
+                      <span className="summary__level">
+                        {t("flow.atLevel", { levelName: ptext(lp, "level.name") ?? "", level: s.atLevel })}
+                      </span>
+                    )
                   )}
                 </h2>
                 {lines.map((l, i) => (

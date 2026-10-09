@@ -12,16 +12,25 @@ import {
 } from "@builder/core";
 import type { ContentPackage } from "@builder/format/pure";
 import type { Translator } from "../../i18n/index.ts";
-import { choiceOf, choiceTexts, grantedValue, plain, ptext, stepTexts, thingName } from "../package-text.ts";
+import {
+  choiceOf,
+  choiceTexts,
+  grantedValue,
+  levelWord,
+  plain,
+  ptext,
+  stepTexts,
+  thingName,
+} from "../package-text.ts";
 import type { LoadedPackage } from "../packages.ts";
 import type { Count } from "./plan.ts";
 
 export type EntryStatus = "done" | "open" | "needsAttention";
 
 export interface FlowEntry {
-  /** "level", the step id, or "overview". */
+  /** "level", the step id, the builder's step for the levels ({@link TRACKS_KEY}), or "overview". */
   key: string;
-  kind: "level" | "step" | "overview";
+  kind: "level" | "step" | "tracks" | "overview";
   href: string;
   title: string;
   status: EntryStatus;
@@ -50,13 +59,23 @@ export interface FlowEntry {
    * total stands from the start instead of growing with each answer.
    */
   count?: Count;
+  /**
+   * A step of a track the character added (SPEC 9.7): that track, and the
+   * level in it at which the step is asked. Lists and headers then say
+   * "Herbalist, level 2" instead of the character level.
+   */
+  track?: string;
+  trackLevel?: number;
 }
 
 export const LEVEL_KEY = "level";
 export const OVERVIEW_KEY = "overview";
+/** The builder's own step "Your levels" (concept AND-262, 6.2); no package id has an "@". */
+export const TRACKS_KEY = "@tracks";
 
 export function stepHref(draftId: string, key: string): string {
   if (key === LEVEL_KEY) return `/c/${draftId}/level`;
+  if (key === TRACKS_KEY) return `/c/${draftId}/tracks`;
   if (key === OVERVIEW_KEY) return `/c/${draftId}/overview`;
   return `/c/${draftId}/step/${encodeURIComponent(key)}`;
 }
@@ -85,9 +104,36 @@ export function buildFlow(
   let section = 0;
   let sectionKey = LEVEL_KEY;
   let group: string | undefined;
+  const tracks = ev.tracks;
+  // The step for the levels comes right after the step of the tracks choice, from level 2 on.
+  const tracksAfter =
+    tracks && ev.level >= 2 ? ev.steps.findLast((s) => s.choices.includes(tracks.choice))?.id : undefined;
+  let tracksDue = false;
+  // After the step of the tracks choice and what it brought along, as a step of its own.
+  const pushTracks = () => {
+    if (!tracksDue || !tracks) return;
+    tracksDue = false;
+    section++;
+    sectionKey = TRACKS_KEY;
+    group = undefined;
+    entries.push({
+      key: TRACKS_KEY,
+      kind: "tracks",
+      href: stepHref(draftId, TRACKS_KEY),
+      title: t("tracks.step.title", { levelName: levelWord(lp) }),
+      status: tracks.first === null ? "open" : tracks.unfit.length > 0 ? "needsAttention" : "done",
+      choices: [],
+      section,
+      part: 1,
+      parts: 1,
+      sectionKey,
+      atLevel: lp.pkg.flow.level.min,
+    });
+  };
   for (const s of ev.steps) {
     const gathered = gatherGroupOf(lp, s);
     const opens = s.origin === "flow" || (gathered !== undefined && gathered !== group);
+    if (opens) pushTracks();
     // The group changes only with a new section: a part that a gathered step
     // brought along (a raise after a boon) keeps the group, so the next step
     // of that group joins the same section, and the count stays the same when
@@ -111,8 +157,13 @@ export function buildFlow(
       sectionKey,
       atLevel: s.atLevel,
       ...(sectionTitle !== undefined && { sectionTitle }),
+      ...(s.track !== undefined &&
+        s.track !== tracks?.first &&
+        s.trackLevel !== undefined && { track: s.track, trackLevel: s.trackLevel }),
     });
+    if (s.id === tracksAfter) tracksDue = true;
   }
+  pushTracks();
   entries.push({
     key: OVERVIEW_KEY,
     kind: "overview",
@@ -235,7 +286,12 @@ export function progressFraction(entries: FlowEntry[], entry: FlowEntry): number
 
 /** Where "keep building" leads: the first step that is not done, else the overview. */
 export function firstOpen(entries: FlowEntry[]): FlowEntry {
-  return entries.find((e) => e.kind === "step" && e.status !== "done") ?? entries.at(-1)!;
+  return entries.find((e) => asks(e) && e.status !== "done") ?? entries.at(-1)!;
+}
+
+/** A step that asks something: one of the package's, or the builder's step for the levels. */
+export function asks(e: FlowEntry): boolean {
+  return e.kind === "step" || e.kind === "tracks";
 }
 
 /**
@@ -247,7 +303,7 @@ export function firstOpen(entries: FlowEntry[]): FlowEntry {
 export function nextOpen(all: FlowEntry[], entries: FlowEntry[], key: string): FlowEntry {
   const asked = new Set(entries.map((e) => e.key));
   const after = all.slice(all.findIndex((e) => e.key === key) + 1);
-  return after.find((e) => e.kind === "step" && e.status !== "done" && asked.has(e.key)) ?? entries.at(-1)!;
+  return after.find((e) => asks(e) && e.status !== "done" && asked.has(e.key)) ?? entries.at(-1)!;
 }
 
 /** Position for "Step 3 of 7": the first open step. */

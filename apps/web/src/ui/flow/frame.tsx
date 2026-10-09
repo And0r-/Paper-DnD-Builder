@@ -17,7 +17,7 @@ import {
   useTransition,
   type ReactNode,
 } from "react";
-import type { CountedKey } from "../../i18n/index.ts";
+import type { CountedKey, Translator } from "../../i18n/index.ts";
 import { useApp } from "../app-state.tsx";
 import { Button, ButtonLink } from "../components/Button.tsx";
 import { Callout } from "../components/Feedback.tsx";
@@ -28,7 +28,8 @@ import { AppShell } from "../components/Shell.tsx";
 import { takeJoined } from "../joined.ts";
 import { HelpDialog } from "../live/help-dialog.tsx";
 import { LiveBar, useOthers } from "../live/live-bar.tsx";
-import { levelWord, ptext } from "../package-text.ts";
+import { levelWord, ptext, thingName } from "../package-text.ts";
+import type { LoadedPackage } from "../packages.ts";
 import { useDraft, type SaveState } from "./draft-state.tsx";
 import { levelHeading, levelSpan } from "./level-runs.ts";
 import { nextOpen, OVERVIEW_KEY, positionOf, progressFraction, type FlowEntry } from "./model.ts";
@@ -259,15 +260,24 @@ function LevelRuns({
     <ol className="steplist__parts">
       {goneAfter(gone, undefined, leaving)}
       {items.map((e, i) => {
-        const heading = levelHeading(i === 0 ? from : items[i - 1]!.atLevel, e.atLevel, min);
+        const prev = i === 0 ? undefined : items[i - 1]!;
+        // A step of an added track says its track and the level in it ("Herbalist, level 2").
+        const heading =
+          e.track !== undefined
+            ? prev?.track !== e.track || prev.trackLevel !== e.trackLevel
+              ? "track"
+              : undefined
+            : levelHeading(prev?.track !== undefined ? -1 : (prev?.atLevel ?? from), e.atLevel, min);
         return (
           <Fragment key={e.key}>
             <li className="steplist__item">
               {heading && (
                 <p className="steplist__level">
-                  {heading === "from"
-                    ? t("flow.fromLevel", { levelName: word, level: e.atLevel })
-                    : t("flow.atLevel", { levelName: ptext(lp, "level.name") ?? "", level: e.atLevel })}
+                  {heading === "track"
+                    ? trackLevelText(lp, t, e)
+                    : heading === "from"
+                      ? t("flow.fromLevel", { levelName: word, level: e.atLevel })
+                      : t("flow.atLevel", { levelName: ptext(lp, "level.name") ?? "", level: e.atLevel })}
                 </p>
               )}
               <StepLink
@@ -371,6 +381,7 @@ function StepItem({
         <StepLink
           entry={red ? { ...red, title: head.title } : head}
           current={current}
+          note={head.track !== undefined ? trackLevelText(lp, t, head) : undefined}
           mark={mark}
           who={who}
         />
@@ -537,9 +548,11 @@ export function ProgressHeader({ entry }: { entry: FlowEntry }) {
   const part = pos.parts > 1 ? t("flow.part", pos) : undefined;
   // A step a higher level brings says which level: the boons of levels 4 and 8 look alike.
   const level =
-    entry.atLevel > lp.pkg.flow.level.min
-      ? t("flow.atLevel", { levelName: ptext(lp, "level.name") ?? "", level: entry.atLevel })
-      : undefined;
+    entry.track !== undefined
+      ? trackLevelText(lp, t, entry)
+      : entry.atLevel > lp.pkg.flow.level.min
+        ? t("flow.atLevel", { levelName: ptext(lp, "level.name") ?? "", level: entry.atLevel })
+        : undefined;
   const percent = Math.round(progressFraction(entries, entry) * 100);
   const full = [text, pos.sectionTitle, part, level].filter(Boolean).join(" · ");
   return (
@@ -1013,4 +1026,20 @@ export function StepShortcuts({
       <LaterLink entry={entry} />
     </div>
   );
+}
+
+/**
+ * "Herbalist, level 2": the level of a step of a track the character added,
+ * counted in that track (concept AND-262, 6.3).
+ */
+export function trackLevelText(
+  lp: LoadedPackage,
+  t: Translator["t"],
+  e: Pick<FlowEntry, "track" | "trackLevel">,
+) {
+  return t("flow.trackLevel", {
+    thing: thingName(lp, e.track ?? ""),
+    levelName: ptext(lp, "level.name") ?? "",
+    level: e.trackLevel ?? 1,
+  });
 }
