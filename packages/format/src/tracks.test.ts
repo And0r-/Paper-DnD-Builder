@@ -176,6 +176,16 @@ describe("addRequires (format 0.21)", () => {
     ]);
   });
 
+  it("rejects a link or a placeholder in the reason, which is shown as plain text", () => {
+    const r = mutate((f) => {
+      f.get("texts/de/tracks.json").entries["calling.herbalist.addReason"] =
+        "Braucht [[glossary:guard|Klugheit]] 10.";
+    });
+    expect(messages(r)).toEqual([
+      "texts/de/tracks.json entries.calling.herbalist.addReason: is shown as plain text; write it without [[glossary:…]] links and {{…}} placeholders",
+    ]);
+  });
+
   it("rejects it on a thing that is not a track, and without tracks", () => {
     const onPath = mutate((f) => {
       withTracks(f);

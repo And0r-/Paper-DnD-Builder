@@ -1285,6 +1285,15 @@ export function validatePackageFiles(files: PackageFiles): ValidationResult {
           }
           throw e;
         }
+        // The reason a track cannot be added is shown and sent (API) as plain text: a link or a
+        // placeholder would appear as raw markup (AND-304).
+        if (key.endsWith(".addReason") && parts.some((part) => part.type !== "text")) {
+          err(
+            file,
+            p,
+            "is shown as plain text; write it without [[glossary:…]] links and {{…}} placeholders",
+          );
+        }
         for (const part of parts) {
           // A stat text gets its variables from the stat's `vars`; any other name stays empty.
           const supplied = statTextVars.get(key);
