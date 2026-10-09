@@ -287,7 +287,10 @@ interface DraftView {
   evaluation: {
     complete: boolean;
     steps: { id: string; choices: string[]; pool?: { recommended: string[] } }[];
-    choices: Record<string, { id: string; kind: string; status: string; recommended?: unknown }>;
+    choices: Record<
+      string,
+      { id: string; kind: string; status: string; empty?: boolean; recommended?: unknown }
+    >;
   };
 }
 
@@ -338,7 +341,8 @@ export async function answerRecommended(
   }
   for (let guard = 0; guard < 200 && !view.evaluation.complete; guard++) {
     const ev = view.evaluation;
-    const waits = (c: string) => ev.choices[c]!.kind !== "info" && ev.choices[c]!.status !== "answered";
+    const waits = (c: string) =>
+      ev.choices[c]!.kind !== "info" && ev.choices[c]!.status !== "answered" && ev.choices[c]!.empty !== true;
     const step = ev.steps.find((s) => s.choices.some(waits))!;
     if (step.id === stopAt) break;
     if (step.pool) {

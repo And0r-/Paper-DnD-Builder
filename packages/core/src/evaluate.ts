@@ -49,6 +49,12 @@ export interface ChoiceState {
   answer?: unknown;
   /** Things that may be picked now (pick choices). */
   options?: string[];
+  /**
+   * Pick choices: nothing fits now (no option at all), so there is nothing
+   * to ask. The choice counts as settled and a stored answer is kept but
+   * not judged; it counts again once an option comes back.
+   */
+  empty?: boolean;
   /** How many to pick (pickMany). */
   count?: number;
   upTo?: boolean;
@@ -923,8 +929,14 @@ function withinRank(
   return (id) => (things.get(id)?.rank ?? 0) <= top;
 }
 
-function isSettled(c: ChoiceState): boolean {
-  return c.status === "answered" || c.status === "info" || (c.optional && c.status === "missing");
+/** Needs no answer now: answered, only shown, nothing to pick, or optional and left open. */
+export function isSettled(c: ChoiceState): boolean {
+  return (
+    c.status === "answered" ||
+    c.status === "info" ||
+    c.empty === true ||
+    (c.optional && c.status === "missing")
+  );
 }
 
 /** A choice worked out against the character so far, before its answer counts. */
@@ -1076,6 +1088,12 @@ function prepareChoice(
       state.options = options;
       ctx.options = options;
       if (!owned) for (const o of options) character.offered.add(o);
+      // Nothing to pick (a skill to deepen that the character does not have):
+      // the choice is not asked, so it cannot hold the character back.
+      if (options.length === 0) {
+        state.empty = true;
+        prepared.hasAnswer = false;
+      }
       if (choice.kind === "pickMany") {
         state.count = character.amount(choice.count, character.level, track);
         state.upTo = choice.upTo ?? false;
@@ -1264,7 +1282,7 @@ export function fillRaise(
 
 /** The shared list of a list step, after its answers counted. */
 function poolFor(pkg: ContentPackage, prepared: Prepared[], before: HeldThing[]): PoolState {
-  const picks = prepared.filter((p) => p.state.options);
+  const picks = prepared.filter((p) => p.state.options && !p.state.empty);
   const options = [...new Set(picks.flatMap((p) => p.state.options!))];
   const slots: PoolSlot[] = picks.map((p) => ({
     count: p.state.count ?? 1,

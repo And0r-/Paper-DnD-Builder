@@ -766,6 +766,21 @@
       ]
     },
     {
+      "id": "keen-study",
+      "kind": "pickOne",
+      "source": "mistland",
+      "options": {
+        "kind": "trait",
+        "tags": ["study"]
+      },
+      "recommend": [
+        {
+          "pick": ["trait.study-legends"]
+        }
+      ],
+      "gather": "mastery"
+    },
+    {
       "id": "lantern-vow",
       "kind": "pickOne",
       "source": "mistland",

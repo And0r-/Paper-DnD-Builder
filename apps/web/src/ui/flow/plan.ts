@@ -8,7 +8,7 @@
 import {
   applyChange,
   evaluateDraft,
-  type ChoiceState,
+  isSettled,
   type DraftChange,
   type DraftDocument,
   type Evaluation,
@@ -20,10 +20,6 @@ import type { FlowEntry } from "./model.ts";
 
 /** Rounds of filling at most: each round reaches the choices the last one brought. */
 const ROUNDS = 12;
-
-function settled(c: ChoiceState): boolean {
-  return c.status === "answered" || c.status === "info" || (c.optional && c.status === "missing");
-}
 
 const plans = new WeakMap<LoadedPackage["pkg"], WeakMap<DraftDocument, DraftDocument>>();
 
@@ -60,7 +56,7 @@ export function plannedDraft(lp: LoadedPackage, doc: DraftDocument): DraftDocume
     for (const step of ev.steps) {
       if (step.status === "done") continue;
       if (step.pool) {
-        if (step.choices.some((c) => ev.choices[c] && !settled(ev.choices[c]))) {
+        if (step.choices.some((c) => ev.choices[c] && !isSettled(ev.choices[c]))) {
           pools.push({ type: "pool", step: step.id, picks: suggestedPool(lp, ev, step.pool) });
         }
         continue;
@@ -99,7 +95,8 @@ function suggestion(
 ): DraftChange | undefined {
   const state = ev.choices[id];
   const def = choiceOf(lp, id);
-  if (!state || !def || settled(state) || state.status === "invalid" || def.kind === "text") return undefined;
+  if (!state || !def || isSettled(state) || state.status === "invalid" || def.kind === "text")
+    return undefined;
   const rec = state.recommended;
   const known = Array.isArray(rec) ? rec.length > 0 : rec !== undefined;
   const away = heldElsewhere(lp, ev, new Set([id]));

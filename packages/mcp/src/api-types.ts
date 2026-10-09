@@ -129,6 +129,8 @@ export interface ChoiceState {
   problem?: string;
   answer?: unknown;
   options?: string[];
+  /** Pick choices with nothing to pick now: not asked, never open. */
+  empty?: boolean;
   count?: number;
   upTo?: boolean;
   remaining?: number;

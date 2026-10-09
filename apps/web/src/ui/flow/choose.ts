@@ -12,6 +12,7 @@ import {
   applyChange,
   evaluateDraft,
   fillPicks,
+  isSettled,
   type ChoiceState,
   type DraftChange,
   type DraftDocument,
@@ -84,10 +85,6 @@ export function suggestedPool(lp: LoadedPackage, ev: Evaluation, pool: PoolState
   );
 }
 
-function settled(c: ChoiceState): boolean {
-  return c.status === "answered" || c.status === "info" || (c.optional && c.status === "missing");
-}
-
 /**
  * Every change "choose for me" makes on step `stepId`, in order, or
  * undefined if it cannot answer all that is open there. Choices of one
@@ -105,11 +102,11 @@ export function chooseForMe(
   if (!step) return undefined;
   const choices = step.choices.filter((c) => c in ev.choices);
   if (step.pool) {
-    if (choices.every((c) => settled(ev.choices[c]!))) return undefined;
+    if (choices.every((c) => isSettled(ev.choices[c]!))) return undefined;
     const picks = suggestedPool(lp, ev, step.pool);
     return picks.length > 0 ? [{ type: "pool", step: stepId, picks }] : undefined;
   }
-  const open = choices.filter((c) => !settled(ev.choices[c]!));
+  const open = choices.filter((c) => !isSettled(ev.choices[c]!));
   if (open.length === 0) return undefined;
   const changes: DraftChange[] = [];
   let d = doc;
