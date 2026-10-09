@@ -1,6 +1,10 @@
+import { DEMO_PACKAGE_DIR } from "@builder/demo-package";
 import { renderPdf } from "@builder/print";
 import { sheetFields, sheetModelSchema, type PrintPart, type SheetModel } from "@builder/sheet";
-import { beforeEach, describe, expect, it } from "vitest";
+import { cp, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { Client, signIn, startTestServer, type TestServer } from "../testing.ts";
 import { fileNames } from "./routes/print.ts";
 
@@ -63,6 +67,53 @@ async function character(finish = true, level = 3): Promise<string> {
 }
 
 const latin1 = async (res: Response) => Buffer.from(await res.arrayBuffer()).toString("latin1");
+
+describe("a package in five languages", () => {
+  const LANGUAGES = ["de", "en", "es", "fr", "it"];
+  let dir: string;
+
+  // The demo package with three more text sets, copies of its English ones:
+  // the builder must not care which languages a package brings.
+  beforeAll(async () => {
+    dir = await mkdtemp(path.join(tmpdir(), "demo-five-"));
+    await cp(DEMO_PACKAGE_DIR, dir, {
+      recursive: true,
+      filter: (src) =>
+        !src.includes("node_modules") && !src.startsWith(path.join(DEMO_PACKAGE_DIR, "extensions")),
+    });
+    const manifest = path.join(dir, "manifest.json");
+    const m = JSON.parse(await readFile(manifest, "utf8"));
+    await writeFile(manifest, JSON.stringify({ ...m, languages: LANGUAGES }));
+    const units = path.join(dir, "units.json");
+    const u = JSON.parse(await readFile(units, "utf8"));
+    for (const l of ["es", "fr", "it"]) u.languageDefaults[l] = u.languageDefaults.de;
+    await writeFile(units, JSON.stringify(u));
+    for (const l of ["es", "fr", "it"])
+      await cp(path.join(dir, "texts/en"), path.join(dir, "texts", l), { recursive: true });
+  });
+  afterAll(() => rm(dir, { recursive: true, force: true }));
+
+  beforeEach(async () => {
+    server = await startTestServer({ packagesDir: dir });
+    client = new Client(server);
+    await signIn(client, "player@example.org", "de");
+  });
+
+  it("stores each language and prints sheet and PDF in it", async () => {
+    const list = await client.call("GET", "/api/packages");
+    expect(list.json.packages[0].languages).toEqual(LANGUAGES);
+    const id = await character();
+    for (const language of LANGUAGES) {
+      expect((await client.call("PATCH", "/api/account/settings", { language })).status).toBe(200);
+      const sheet = await client.call("GET", `/api/drafts/${id}/sheet`);
+      expect(sheet.status, language).toBe(200);
+      expect(sheet.json.language, language).toBe(language);
+      const pdf = await client.request("GET", `/api/drafts/${id}/pdf`);
+      expect(pdf.status, language).toBe(200);
+      expect(await latin1(pdf), language).toContain(`/Lang (${language})`);
+    }
+  });
+});
 
 describe("file names", () => {
   it("say the design, and the fallback shortens only the character's name, at a word's end", () => {

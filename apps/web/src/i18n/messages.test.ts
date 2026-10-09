@@ -1,3 +1,4 @@
+import { PRINT_LANGUAGES } from "@builder/sheet";
 import { describe, expect, it } from "vitest";
 import { fill, MESSAGES, pickLanguage, translator, UI_LANGUAGES } from "./index.ts";
 
@@ -49,6 +50,10 @@ describe("screen texts", () => {
 
   it("has all five languages", () => {
     expect([...UI_LANGUAGES].sort()).toEqual(["de", "en", "es", "fr", "it"]);
+  });
+
+  it("offers only languages the sheet and the PDF have page words for", () => {
+    expect(PRINT_LANGUAGES).toEqual(expect.arrayContaining([...UI_LANGUAGES]));
   });
 
   it("picks the language from Accept-Language", () => {

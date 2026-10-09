@@ -27,6 +27,7 @@ import { printChoiceOf } from "@builder/sheet/printouts";
 import { z } from "zod";
 import type { App } from "../app.ts";
 import { HttpError } from "../api/http.ts";
+import { DEFAULT_LANGUAGE, UI_LANGUAGES } from "../../i18n/index.ts";
 import { MailNotConfiguredError, resetMail, type Mail } from "../mail.ts";
 import type { AccountRow, PasswordOrigin } from "../store.ts";
 import {
@@ -39,9 +40,11 @@ import {
 import { LIMITS, type Limit } from "./rate-limit.ts";
 import { newSessionToken, SESSION_MS, sessionId } from "./session.ts";
 
-/** Languages the builder's own screens and mails exist in. */
-export const UI_LANGUAGES = ["de", "en", "fr", "it", "es"] as const;
-export const DEFAULT_LANGUAGE = "de";
+/**
+ * Languages the builder's own screens and mails exist in: one list, the
+ * screens', so a language added there is one an account can choose.
+ */
+export { DEFAULT_LANGUAGE, UI_LANGUAGES };
 
 /** Enough for every device and a copy on paper; stops a loop from filling the table. */
 export const MAX_PASSWORDS_PER_ACCOUNT = 10;
