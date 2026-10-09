@@ -141,7 +141,7 @@ export function PrintDialog({
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = fileNameOf(res.headers.get("content-disposition"), `${name || "character"}.pdf`);
+      a.download = fileNameOf(res.headers.get("content-disposition"), `${name || "character"}.pdf`, lang);
       a.click();
       setTimeout(() => URL.revokeObjectURL(url), 10_000);
       setPdf("idle");

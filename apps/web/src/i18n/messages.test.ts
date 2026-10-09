@@ -37,6 +37,25 @@ describe("screen texts", () => {
     expect(fill("{levelName} {level}", "en", { levelName: "level", level: 3 })).toBe("Level 3");
   });
 
+  it("elides a French de, le, la or que before a filled word with a vowel", () => {
+    expect(fill("de {source}", "fr", { source: "Armure Lanterne" })).toBe("d’Armure Lanterne");
+    expect(fill("De {source}", "fr", { source: "Équipement de départ" })).toBe("D’Équipement de départ");
+    expect(fill("{n} de {source}", "fr", { n: 16, source: "Origine" })).toBe("16 d’Origine");
+    expect(fill("avec le {levelName}", "fr", { levelName: "échelon" })).toBe("avec l’échelon");
+    expect(fill("parce que {name} part", "fr", { name: "Iris" })).toBe("parce qu’Iris part");
+    // Not before a consonant, not before "h" (it depends on the word), not inside a word, not in Italian.
+    expect(fill("de {source}", "fr", { source: "Classe" })).toBe("de Classe");
+    expect(fill("de {source}", "fr", { source: "Hache" })).toBe("de Hache");
+    expect(fill("garde {name}", "fr", { name: "Iris" })).toBe("garde Iris");
+    expect(fill("de {n}", "fr", { n: 8 })).toBe("de 8");
+    expect(fill("de {source}", "it", { source: "Armatura" })).toBe("de Armatura");
+  });
+
+  it("French speaks to the reader with vous, never with tu", () => {
+    const tu = /(^|[^\p{L}])(tu|te|toi|ton|ta|tes|t’)(?![\p{L}])/iu;
+    for (const [key, text] of Object.entries(MESSAGES.fr)) expect(text, key).not.toMatch(tu);
+  });
+
   it("counts and lists", () => {
     const de = translator("de");
     expect(de.tc("dist.left", 1)).toBe("Noch 1 Punkt übrig");

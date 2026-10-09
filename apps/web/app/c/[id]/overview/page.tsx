@@ -182,6 +182,8 @@ export default function OverviewPage() {
                 <h2 className="summary__title">
                   {s.status !== "done" && <span className="summary__flag">! </span>}
                   {s.title}
+                  {/* A real space: read aloud or copied, "Subclass Level 3" is not "SubclassLevel 3". */}
+                  {(s.track !== undefined || s.atLevel > lp.pkg.flow.level.min) && " "}
                   {s.track !== undefined ? (
                     <span className="summary__level">{trackLevelText(lp, t, s)}</span>
                   ) : (

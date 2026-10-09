@@ -1449,7 +1449,7 @@
 
 /* The level a step comes at, next to its title in the overview. */
 .summary__level {
-  margin-left: var(--space-2);
+  margin-left: var(--space-1);
   padding: 0 var(--space-2);
   border-radius: var(--radius-sm);
   background: var(--color-surface-sunk);

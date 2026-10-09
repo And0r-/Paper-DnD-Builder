@@ -10,16 +10,16 @@ import { readFile } from "node:fs/promises";
 import { expect, SCREEN, shot, signup, test } from "./helpers.ts";
 
 const RUNS = [
-  { lang: "fr", locale: "fr-FR", name: "Élodie Peña" },
-  { lang: "it", locale: "it-IT", name: "Niccolò Peña" },
-  { lang: "es", locale: "es-ES", name: "Begoña Núñez" },
+  { lang: "fr", locale: "fr-FR", name: "Élodie Peña", file: "Elodie Pena" },
+  { lang: "it", locale: "it-IT", name: "Niccolò Peña", file: "Niccolo Pena" },
+  { lang: "es", locale: "es-ES", name: "Begoña Núñez", file: "Begona Nunez" },
 ] as const;
 
 async function heading(page: Page): Promise<string> {
   return (await page.getByRole("heading", { level: 1 }).first().textContent())?.trim() ?? "";
 }
 
-for (const { lang, locale, name: fullName } of RUNS) {
+for (const { lang, locale, name: fullName, file: fileName } of RUNS) {
   test.describe(lang, () => {
     test.use({ locale });
 
@@ -82,7 +82,8 @@ for (const { lang, locale, name: fullName } of RUNS) {
       await dialog.getByRole("button", { name: m["print.download"], exact: true }).click();
       const done = await file;
       // The game has no French, so the printout is all English: one language per document.
-      expect(done.suggestedFilename()).toBe(`${fullName} - Detailed - Sheet, Cards.pdf`);
+      // The name is ASCII: a browser without a UTF-8 locale saved "Élodie" as "download", without ".pdf".
+      expect(done.suggestedFilename()).toBe(`${fileName} - Detailed - Sheet, Cards.pdf`);
       const pdf = await readFile((await done.path())!);
       expect(pdf.subarray(0, 5).toString("latin1")).toBe("%PDF-");
     });

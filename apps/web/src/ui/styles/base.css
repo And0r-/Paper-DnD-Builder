@@ -224,6 +224,16 @@ h1[tabindex="-1"]:focus,
   padding: var(--space-1) 0;
 }
 
+/*
+ * The tool's own name wraps rather than ending in "…": "Créateur de
+ * personnage" next to the menu and the language on a phone. A character's
+ * name stays on one line; it is the user's and can be any length.
+ */
+.topbar__title--app {
+  white-space: normal;
+  text-wrap: balance;
+}
+
 .topbar__title a {
   color: inherit;
   text-decoration: none;

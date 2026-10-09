@@ -119,7 +119,7 @@ export const MESSAGES: Readonly<Record<string, Messages>> = {
     asOfLevel: (n) => `état au niveau ${n}`,
     createdOn: (d) => `Créé le ${d}`,
     cards: "Cartes",
-    printHint: "Imprime en taille réelle (100 %). Découpe le long des lignes.",
+    printHint: "Imprimez en taille réelle (100 %). Découpez le long des lignes.",
     atTheTable: "À la table",
     rulesText: "Texte de règle",
     continued: "Suite",
@@ -131,7 +131,8 @@ export const MESSAGES: Readonly<Record<string, Messages>> = {
     rulesTexts: "Textes de règles",
     rulesTextsTitle: "Textes de règles à relire",
     noRulesTexts: "Ce personnage n’a rien avec un texte de règle.",
-    notForSharing: (names) => `Contient du contenu de ${names}, pas pour le partage.`,
+    notForSharing: (names) =>
+      `Contient du contenu ${/^[aeiouàâéèêîïôœ]/i.test(names) ? "d’" : "de "}${names}, pas pour le partage.`,
   },
   it: {
     playedBy: "Giocato da",

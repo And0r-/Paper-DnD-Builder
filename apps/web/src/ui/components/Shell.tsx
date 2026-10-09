@@ -71,7 +71,7 @@ export function AppShell({
         <span className="topbar__menu-word">{t("menu.open")}</span>
         {menuMark}
       </button>
-      <div className="topbar__title">
+      <div className={title === undefined ? "topbar__title topbar__title--app" : "topbar__title"}>
         {title ?? (
           <Explained hint={t("app.about")}>
             <Link href="/characters">{t("app.name")}</Link>

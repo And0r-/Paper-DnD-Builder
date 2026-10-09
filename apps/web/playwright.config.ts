@@ -26,8 +26,6 @@ export default defineConfig({
     ...devices["Pixel 7"],
     // Chromium for every project; the phone size comes from the device above.
     browserName: "chromium",
-    // A UTF-8 locale for the browser: without one Chromium saves "Ausführlich.pdf" as "download".
-    launchOptions: { env: { ...process.env, LANG: "C.UTF-8", LC_ALL: "C.UTF-8" } },
   },
   projects: [{ name: "phone" }],
   webServer: {
