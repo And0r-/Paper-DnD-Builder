@@ -45,6 +45,15 @@ export interface PackageStructure {
   units: unknown;
   values: unknown;
   flow: { choices: FlowChoice[]; level?: { min?: number; max?: number; default?: number } };
+  /** Only what a tool needs of each thing: the texts a pick of it asks for. */
+  things?: { id: string; textInputs?: TextInput[] }[];
+}
+
+/** A text the player writes when picking a thing (format `textInputs`). */
+export interface TextInput {
+  id: string;
+  maxLength: number;
+  optional?: boolean;
 }
 
 export interface Summary {
@@ -134,6 +143,8 @@ export interface ChoiceState {
   count?: number;
   upTo?: boolean;
   remaining?: number;
+  /** Picked things whose needed texts (`textInputs`) are still empty. */
+  textsMissing?: string[];
   min?: number;
   max?: number;
   recommended?: string[] | { method: number; assign: Record<string, number> };
