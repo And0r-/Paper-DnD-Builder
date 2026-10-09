@@ -6268,6 +6268,9 @@
                           "hint": {
                             "type": "string"
                           },
+                          "parts": {
+                            "type": "string"
+                          },
                           "field": {
                             "type": "string",
                             "minLength": 1
