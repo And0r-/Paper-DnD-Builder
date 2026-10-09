@@ -541,6 +541,9 @@ async function walk(server: TestServer): Promise<void> {
     .json;
   await call("PUT", `/api/drafts/${id}/campaign`, { campaignId: null }, k);
   await call("PUT", `/api/drafts/${id}/campaign`, { campaignId: "00000000-0000-4000-8000-000000000000" }, k);
+  // Its own package again changes nothing; one that is not loaded is refused.
+  await call("PUT", `/api/drafts/${id}/package`, { version: view.draft.version, packageId: "demo" }, k);
+  await call("PUT", `/api/drafts/${id}/package`, { version: view.draft.version, packageId: "nothing" }, k);
   await call("DELETE", `/api/drafts/${id}`, undefined, k);
 
   // A campaign, led by the walker, with a player who has a character.

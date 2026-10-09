@@ -2817,6 +2817,162 @@
         }
       }
     },
+    "/api/drafts/{id}/package": {
+      "put": {
+        "operationId": "switchPackage",
+        "summary": "Build the character with another package",
+        "tags": ["Characters"],
+        "description": "Every answer goes, even under the same choice id: the draft is then what `POST /api/drafts` makes for the new package, at the same level (moved into the new package's range), in the same campaign. Tracks and a raise under way go with the answers. A finished character is a draft again. Help links, sheet copies and the play state stay. The same package as now: nothing changes, not even the `version`. The owner and a game master building a player's character may; a help link does not reach this route.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Draft id (a UUID).",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "version": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "The draft version the change was made on (optimistic locking)."
+                  },
+                  "packageId": {
+                    "type": "string",
+                    "maxLength": 100,
+                    "description": "A package from `GET /api/packages`."
+                  },
+                  "extensions": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "maxItems": 20,
+                    "description": "Extensions of the new package to switch on; every loaded one if left out."
+                  }
+                },
+                "required": ["version", "packageId"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The draft with the new package's steps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DraftView"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadBody"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/CrossSite"
+          },
+          "404": {
+            "description": "`draftNotFound` (also someone else's character, or one reached by help link only), `packageNotFound`, `extensionNotFound` (not an extension of the new package)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "enum": ["draftNotFound", "packageNotFound", "extensionNotFound"]
+                        },
+                        "extension": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`versionConflict`, `packageUnavailable` (the new package with these extensions cannot be put together)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "enum": ["versionConflict", "packageUnavailable"]
+                        },
+                        "current": {
+                          "$ref": "#/components/schemas/DraftView"
+                        },
+                        "packageId": {
+                          "type": "string"
+                        },
+                        "extensions": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "$ref": "#/components/responses/BodyTooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/JsonRequired"
+          },
+          "422": {
+            "description": "`changeRejected`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "enum": ["changeRejected"]
+                        },
+                        "reason": {
+                          "$ref": "#/components/schemas/ChangeError"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
     "/api/drafts/{id}/finish": {
       "post": {
         "operationId": "finish",

@@ -546,12 +546,14 @@ export class Store {
       now: Date;
       /** New extensions; left as they are if undefined. */
       extensions?: string[] | undefined;
+      /** Another package for the draft; left as it is if undefined. */
+      packageId?: string | undefined;
     },
   ): Promise<DraftRow | undefined> {
     const rows = await this.db.query<DraftRow>(
       `UPDATE drafts
        SET document = $4::jsonb, finished_at = $5, package_version = $6, updated_at = $7, version = version + 1,
-         extensions = COALESCE($8::text[], extensions)
+         extensions = COALESCE($8::text[], extensions), package_id = COALESCE($9, package_id)
        WHERE id = $1 AND account_id = $2 AND version = $3
        RETURNING ${DRAFT_COLUMNS}`,
       [
@@ -563,6 +565,7 @@ export class Store {
         next.packageVersion,
         next.now,
         next.extensions ?? null,
+        next.packageId ?? null,
       ],
     );
     return rows[0];
