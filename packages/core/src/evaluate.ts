@@ -981,6 +981,8 @@ function fitTracks(
     character.withInputs(a, () => Object.keys(unfitTracks(pkg, tracks, character)).length === 0);
   if (fits(assign)) return assign;
   const keys = Object.keys(assign).filter((k) => choice.targets.includes(k));
+  // Every order of many targets would be too many to try (8 are 40320).
+  if (keys.length > MOST_TARGETS) return assign;
   const tries = permutations(keys.map((k) => assign[k]!))
     .map((values) => {
       const a = { ...assign };
@@ -995,6 +997,8 @@ function fitTracks(
 
 /** Reorderings tried for {@link fitTracks}, nearest first: plenty for a handful of targets. */
 const MOST_REORDERINGS = 200;
+/** Most targets {@link fitTracks} reorders. */
+const MOST_TARGETS = 7;
 
 /** Every order of `values`, the given one first. */
 function permutations(values: readonly number[]): number[][] {
