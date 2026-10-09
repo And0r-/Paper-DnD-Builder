@@ -12,9 +12,9 @@ import en from "../src/i18n/messages/en.json" with { type: "json" };
 import { animationsDone, expect, expectOneLanguage, makeCharacter, shot, signup, test } from "./helpers.ts";
 
 const MESSAGES = { de, en };
-/** The part words in file names, as the server's print words have them. */
+/** The part words in file names, as the server's print words have them, without letters beyond ASCII. */
 const FILE_WORDS = {
-  de: { sheet: "Bogen", cards: "Karten", texts: "Regeltexte", design: "Ausführlich" },
+  de: { sheet: "Bogen", cards: "Karten", texts: "Regeltexte", design: "Ausfuehrlich" },
   en: { sheet: "Sheet", cards: "Cards", texts: "Rules texts", design: "Detailed" },
 };
 
@@ -201,7 +201,7 @@ test("a character without cards cannot tick them, and keeps the wish for the nex
   await shot(page, "96-download-dialog-ohne-karten-de");
   const file = page.waitForEvent("download");
   await dialog.getByRole("button", { name: m["print.download"], exact: true }).click();
-  expect((await file).suggestedFilename()).toBe("Mira - Ausführlich - Bogen.pdf");
+  expect((await file).suggestedFilename()).toBe("Mira - Ausfuehrlich - Bogen.pdf");
   await expect
     .poll(
       async () =>
