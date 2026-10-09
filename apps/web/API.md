@@ -218,6 +218,7 @@ saved too."
 | 🔒 `POST /api/drafts/:id/level-up`       | `{ version, level, tracks? }`                     | Raises a finished character; see [Raising a character](#raising-a-character).                                                                                                                                          |
 | 🔒 `POST /api/drafts/:id/finish`         | `{ version }`                                     | Marks the character finished; `422 incomplete` with the open choices and the tracks that do not fit.                                                                                                                   |
 | 🔒 `PUT /api/drafts/:id/campaign`        | `{ campaignId }`                                  | Owner only. Puts the character into a campaign you play in or lead, or into none (`null`). The `version` stays.                                                                                                        |
+| 🔒 `PUT /api/drafts/:id/package`         | `{ version, packageId, extensions? }`             | Builds the character with another package; see [Another package](#another-package). `extensions`: left out, all of them; `[]`, none.                                                                                   |
 | 🔒 `DELETE /api/drafts/:id`              | —                                                 | `204`.                                                                                                                                                                                                                 |
 
 Answer shapes by choice kind: `pickOne` `{ "pick": "thing.key" }`,
@@ -249,6 +250,31 @@ the id `<choice>@<where the thing was picked>`, for example
 those of the declared choice (`copyOf` in the evaluation). Copies of a choice
 with `options.owned` (format 0.14) do not offer what another copy marked,
 and the repeatable thing is not offered again once nothing is left to mark.
+
+### Another package
+
+`PUT /api/drafts/:id/package` builds a character with another package from
+now on (say another edition of the same game). Every answer goes: the steps
+of one package are not those of another, so none is carried over, not even
+under the same choice id. Afterwards the draft is what `POST /api/drafts`
+makes for the new package, at the same level (moved into the new package's
+range if it lies outside), in the same campaign, with the same owner. Tracks
+and a raise under way go with the answers; the name, too, where it is a
+choice of the package. A finished character is a draft again. Help links,
+kept sheet copies and the play state stay as they are: a copy keeps the sheet
+it was made from.
+
+- `extensions`: the new package's extensions to switch on; left out, every
+  loaded one of it. `404 extensionNotFound` for one that is not the new
+  package's.
+- `404 packageNotFound` if no such package is loaded.
+- The same package as now: `200`, nothing changes, not even the `version`;
+  switch extensions with `PATCH /api/drafts/:id`.
+- The owner and a game master building a player's character may; a help
+  link does not reach this route (`404 draftNotFound`, as for someone else's
+  character).
+- The answer is the whole draft, as `GET /api/drafts/:id`, with the new
+  package's steps.
 
 ### Fields of `evaluation` for levels (format 0.9)
 
@@ -912,11 +938,11 @@ Tests: [`sheet-copies.test.ts`](src/server/api/sheet-copies.test.ts).
 
 ## Server
 
-| Method & path           | Result                                                                                                                                                                                                                                                         |
-| ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `GET /api/health`       | `{ "status": "ok", "packages": [{ "id", "version", "formatVersion" }], "warnings": [] }` while the process serves requests, also without packages. `warnings` names rejected package folders, an empty package list or a failed start. Public; used by Docker. |
-| `GET /api/openapi.json` | `openapi.json` as it is in the repository. Public.                                                                                                                                                                                                             |
-| `GET /api/docs`         | The API reference (Scalar), an HTML page: every route to read and to try with an access key. Public.                                                                                                                                                           |
+| Method & path           | Result                                                                                                                                                                                                                                                                                                                                                                                                      |
+| ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /api/health`       | `{ "status": "ok", "packages": [{ "id", "version", "formatVersion", "kind", "extends"? }], "warnings": [] }` while the process serves requests, also without packages. `packages` lists the bases (`kind: "base"`), then the extensions (`kind: "extension"`, `extends`: the id of their base). `warnings` names rejected package folders, an empty package list or a failed start. Public; used by Docker. |
+| `GET /api/openapi.json` | `openapi.json` as it is in the repository. Public.                                                                                                                                                                                                                                                                                                                                                          |
+| `GET /api/docs`         | The API reference (Scalar), an HTML page: every route to read and to try with an access key. Public.                                                                                                                                                                                                                                                                                                        |
 
 ## Error codes
 
@@ -943,7 +969,7 @@ Tests: [`sheet-copies.test.ts`](src/server/api/sheet-copies.test.ts).
 | `404`  | `passwordNotFound`       | No password with this id in this account.                                                                                         |
 | `404`  | `resetLinkInvalid`       | The link back in is unknown, used already or older than 30 minutes.                                                               |
 | `404`  | `packageNotFound`        | No loaded package with this id.                                                                                                   |
-| `404`  | `extensionNotFound`      | No loaded extension of the draft's package with this id; `extension` names it.                                                    |
+| `404`  | `extensionNotFound`      | No loaded extension of the draft's package (or the package switched to) with this id; `extension` names it.                       |
 | `404`  | `languageNotFound`       | The package has no texts in this language.                                                                                        |
 | `404`  | `helpLinkNotFound`       | No character has this help link (unknown, replaced, withdrawn or older than 12 hours).                                            |
 | `404`  | `inviteNotFound`         | No campaign has this invitation link (unknown, or replaced by a new one).                                                         |

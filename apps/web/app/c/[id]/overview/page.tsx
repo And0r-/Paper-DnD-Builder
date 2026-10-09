@@ -7,13 +7,10 @@
 import { headTracks, summarize, tracksText } from "@builder/core";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useId, useState, type ReactNode } from "react";
-import type { Campaign } from "../../../../src/ui/api.ts";
+import { useId, useState, type ReactNode } from "react";
 import { useApp } from "../../../../src/ui/app-state.tsx";
-import { loadMemberCampaigns, NO_CAMPAIGN } from "../../../../src/ui/campaigns.ts";
 import { Button, ButtonLink } from "../../../../src/ui/components/Button.tsx";
 import { Callout } from "../../../../src/ui/components/Feedback.tsx";
-import { SelectField } from "../../../../src/ui/components/Fields.tsx";
 import { RichText, useMeasure } from "../../../../src/ui/components/RichText.tsx";
 import { listNodes, ThingName } from "../../../../src/ui/components/ThingName.tsx";
 import { useDraft } from "../../../../src/ui/flow/draft-state.tsx";
@@ -28,6 +25,7 @@ import { distributeLines, levelGrowth, valueOrigin } from "../../../../src/ui/fl
 import {
   answerThings,
   asks,
+  CAMPAIGN_KEY,
   describeAnswer,
   OVERVIEW_KEY,
   positionOf,
@@ -40,7 +38,7 @@ import { choiceOf, choiceTexts, formatValue, ptext, thingName } from "../../../.
 
 export default function OverviewPage() {
   const { t, tc, list } = useApp();
-  const { lp, doc, ev, entries, allEntries, draft, raise, finish } = useDraft();
+  const { lp, doc, ev, entries, allEntries, draft, raise, finish, campaigns } = useDraft();
   const ctx = useMeasure(lp);
   const router = useRouter();
   const headingId = useId();
@@ -96,16 +94,14 @@ export default function OverviewPage() {
           <p>
             <Link href={openSteps[0]!.href}>{t("flow.goTo", { step: openSteps[0]!.title })}</Link>
           </p>
+          {/* Help belongs with what is still open; a finished character needs none (AND-331). */}
+          {draft.access === "owner" && (
+            <div className="overview-help">
+              <p>{t("overview.helpHint")}</p>
+              <HelpButton draftId={draft.id} />
+            </div>
+          )}
         </Callout>
-      )}
-
-      <CampaignField />
-
-      {draft.access === "owner" && (
-        <div className="overview-help">
-          <p>{t("overview.helpHint")}</p>
-          <HelpButton draftId={draft.id} />
-        </div>
       )}
 
       <section className="values" aria-labelledby={`${headingId}-values`}>
@@ -138,50 +134,54 @@ export default function OverviewPage() {
 
       <ul className="summary">
         {steps.map((s) => {
+          // The campaign is changed on its step only (AND-333): here it is a line like any other.
           const lines: ReactNode[] =
-            s.kind === "level"
-              ? [String(ev.level)]
-              : s.kind === "tracks"
-                ? [ev.tracks ? tracksText(headTracks(ev), (id) => thingName(lp, id)) : ""]
-                : s.choices.flatMap((c): ReactNode[] => {
-                    const state = ev.choices[c]!;
-                    const choice = choiceOf(lp, c);
-                    const assign = (state.answer as { assign?: Record<string, number> } | undefined)?.assign;
-                    // Each score on its own line: the whole sum once ("15 from … + 2 from … = 17"), later only "+ 2".
-                    if (choice?.kind === "distribute" && assign && state.status !== "invalid") {
-                      // Raised values: only those that got points.
-                      const raise = choice.methods[0]?.method === "raise";
-                      const targets = raise
-                        ? choice.targets.filter((v) => (assign[v] ?? 0) > 0)
-                        : choice.targets;
-                      return distributeLines(lp, ctx, ev, state, targets, assign, { t, list }, summed);
-                    }
-                    // Names of things explain themselves on hover and tap: their text is not on this screen.
-                    const named = answerThings(lp, ctx, state, grown, ev.values);
-                    const text =
-                      named && named.things.length + named.values.length > 0
-                        ? listNodes(t, [
-                            ...named.things.map((id) => <ThingName key={id} lp={lp} id={id} />),
-                            ...named.values,
-                          ])
-                        : describeAnswer(lp, ctx, state, list, grown, ev.values);
-                    // A choice of an added track says which: its title is the same as in the first one.
-                    const title = choiceTexts(lp, c, state, ctx).title;
-                    const added = state.track !== undefined && state.track !== ev.tracks?.first;
-                    const prefix =
-                      s.choices.length > 1
-                        ? `${added ? t("tracks.ofTrack", { title, thing: thingName(lp, state.track!) }) : title}: `
-                        : "";
-                    return [
-                      <>
-                        {prefix}
-                        {text ??
-                          (state.optional && state.status === "missing"
-                            ? t("overview.leftEmpty")
-                            : t("overview.nothingChosen"))}
-                      </>,
-                    ];
-                  });
+            s.key === CAMPAIGN_KEY
+              ? [campaigns.find((c) => c.id === draft.campaignId)?.name ?? t("new.noCampaign")]
+              : s.kind === "level"
+                ? [String(ev.level)]
+                : s.kind === "tracks"
+                  ? [ev.tracks ? tracksText(headTracks(ev), (id) => thingName(lp, id)) : ""]
+                  : s.choices.flatMap((c): ReactNode[] => {
+                      const state = ev.choices[c]!;
+                      const choice = choiceOf(lp, c);
+                      const assign = (state.answer as { assign?: Record<string, number> } | undefined)
+                        ?.assign;
+                      // Each score on its own line: the whole sum once ("15 from … + 2 from … = 17"), later only "+ 2".
+                      if (choice?.kind === "distribute" && assign && state.status !== "invalid") {
+                        // Raised values: only those that got points.
+                        const raise = choice.methods[0]?.method === "raise";
+                        const targets = raise
+                          ? choice.targets.filter((v) => (assign[v] ?? 0) > 0)
+                          : choice.targets;
+                        return distributeLines(lp, ctx, ev, state, targets, assign, { t, list }, summed);
+                      }
+                      // Names of things explain themselves on hover and tap: their text is not on this screen.
+                      const named = answerThings(lp, ctx, state, grown, ev.values);
+                      const text =
+                        named && named.things.length + named.values.length > 0
+                          ? listNodes(t, [
+                              ...named.things.map((id) => <ThingName key={id} lp={lp} id={id} />),
+                              ...named.values,
+                            ])
+                          : describeAnswer(lp, ctx, state, list, grown, ev.values);
+                      // A choice of an added track says which: its title is the same as in the first one.
+                      const title = choiceTexts(lp, c, state, ctx).title;
+                      const added = state.track !== undefined && state.track !== ev.tracks?.first;
+                      const prefix =
+                        s.choices.length > 1
+                          ? `${added ? t("tracks.ofTrack", { title, thing: thingName(lp, state.track!) }) : title}: `
+                          : "";
+                      return [
+                        <>
+                          {prefix}
+                          {text ??
+                            (state.optional && state.status === "missing"
+                              ? t("overview.leftEmpty")
+                              : t("overview.nothingChosen"))}
+                        </>,
+                      ];
+                    });
           return (
             <li key={s.key} className={`summary__item summary__item--${s.status}`}>
               <div className="summary__text">
@@ -238,56 +238,6 @@ export default function OverviewPage() {
           </div>
         </div>
       </div>
-    </div>
-  );
-}
-
-/**
- * Which campaign the character belongs to; its owner changes it here, saved
- * at once. Shown only to an owner who plays in or leads a campaign, or whose
- * character is in one.
- */
-function CampaignField() {
-  const { t } = useApp();
-  const { draft, setCampaign } = useDraft();
-  const [campaigns, setCampaigns] = useState<Campaign[]>();
-  const [busy, setBusy] = useState(false);
-  const [failed, setFailed] = useState(false);
-  const owner = draft.access === "owner";
-
-  useEffect(() => {
-    if (!owner) return;
-    let live = true;
-    // Without the list there is nothing to choose from; the field stays away.
-    loadMemberCampaigns().then(
-      (c) => live && setCampaigns(c),
-      () => undefined,
-    );
-    return () => {
-      live = false;
-    };
-  }, [owner]);
-
-  if (!owner || !campaigns || (campaigns.length === 0 && !draft.campaignId)) return null;
-  const known = campaigns.some((c) => c.id === draft.campaignId);
-  return (
-    <div className="overview-campaign">
-      <SelectField
-        label={t("overview.campaign")}
-        value={known ? draft.campaignId! : NO_CAMPAIGN}
-        busy={busy}
-        onChange={async (v) => {
-          setBusy(true);
-          setFailed(false);
-          setFailed(!(await setCampaign(v || null)));
-          setBusy(false);
-        }}
-        options={[
-          ...campaigns.map((c) => ({ value: c.id, label: c.name })),
-          { value: NO_CAMPAIGN, label: t("new.noCampaign") },
-        ]}
-      />
-      {failed && <Callout tone="warning">{t("save.error")}</Callout>}
     </div>
   );
 }

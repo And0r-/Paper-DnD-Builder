@@ -181,9 +181,24 @@ interface Flow {
   under: boolean;
   /** The rest of the apart part (after its box rows) is short: one column. */
   apartOne: boolean;
+  /** The part whose spill last moved back to page 1, to tell a move back that did not fit. */
+  back: "right" | "band" | null;
+  /** Spills ("part:section:row") a move back did not fit after: nothing comes back from them for this model. */
+  held: string[];
 }
 
-const NO_FLOW: Flow = { right: null, band: null, lines: {}, breaks: [], under: false, apartOne: false };
+const NO_FLOW: Flow = {
+  right: null,
+  band: null,
+  lines: {},
+  breaks: [],
+  under: false,
+  apartOne: false,
+  back: null,
+  held: [],
+};
+/** Steps measured before the page shows; more go one per frame. */
+const STEPS_UNSEEN = 12;
 const DESK = "(min-width: 900px)";
 /** As in the PDF: an apart part under 40 % of a page goes under the page before; a rest up to 90 mm is one column. */
 const SHORT_APART = 0.4;
@@ -194,26 +209,37 @@ const SHORT_REST = 90;
  * screen: what does not fit on page 1 (column C, the band under A and B)
  * goes on at the top of page 2 under its title marked as continued; a
  * section going on in a page's second column gets that title there too;
- * a short apart part goes under page 2. One step per frame until nothing
- * moves; a change to the model starts over. On a phone, nothing of this.
+ * a short apart part goes under page 2. The first steps before the page
+ * shows, then one per frame until nothing moves; a change to the model
+ * starts over. A row that came back to page 1 and did not fit stays on
+ * page 2 (the screen's sections are measured on page 2, in a column of
+ * another width, so the two measures may never agree: AND-332). On a phone,
+ * nothing of this.
  */
 function useFlow(box: RefObject<HTMLElement | null>, model: SheetModel, plan: ClassicPlan): Flow {
   const [state, setState] = useState<{ model: SheetModel; flow: Flow }>({ model, flow: NO_FLOW });
-  const flow = state.model === model ? state.flow : { ...state.flow, breaks: [] };
+  const flow = state.model === model ? state.flow : { ...state.flow, breaks: [], back: null, held: [] };
+  const unseen = useRef({ model, steps: 0 });
   useLayoutEffect(() => {
     const el = box.current;
     if (!el) return;
     const desk = window.matchMedia(DESK);
     let frame = 0;
+    const step = () => {
+      const next = desk.matches ? nextFlow(el, model, plan, flow) : NO_FLOW;
+      if (state.model !== model || JSON.stringify(next) !== JSON.stringify(flow))
+        setState({ model, flow: next });
+    };
     const measure = () => {
       cancelAnimationFrame(frame);
-      frame = requestAnimationFrame(() => {
-        const next = desk.matches ? nextFlow(el, model, plan, flow) : NO_FLOW;
-        if (state.model !== model || JSON.stringify(next) !== JSON.stringify(flow))
-          setState({ model, flow: next });
-      });
+      frame = requestAnimationFrame(step);
     };
-    measure();
+    // Before the browser paints: no page shows rows that are about to move.
+    if (unseen.current.model !== model) unseen.current = { model, steps: 0 };
+    if (unseen.current.steps < STEPS_UNSEEN) {
+      unseen.current.steps++;
+      step();
+    } else measure();
     const seen = new ResizeObserver(measure);
     seen.observe(el);
     desk.addEventListener("change", measure);
@@ -264,7 +290,9 @@ function nextFlow(el: HTMLElement, model: SheetModel, plan: ClassicPlan, now: Fl
   // The foot of page 1's content on A4, whatever the page grew to: above the footer and the gap before it.
   const gap = parseFloat(getComputedStyle(first).rowGap) || 0;
   const limit = rect(first).top + (G.page.height - G.margin) * mm - rect(foot).height - gap;
-  const next: Flow = { ...now, lines: { ...now.lines } };
+  const next: Flow = { ...now, lines: { ...now.lines }, back: null, held: [...now.held] };
+  const spillKey = (key: string, spill: Spill | null) =>
+    spill ? `${key}:${spill.section}:${spill.row}` : "";
 
   // Page 1: column C and the band end above the footer.
   const units = (container: Element | null) =>
@@ -306,6 +334,8 @@ function nextFlow(el: HTMLElement, model: SheetModel, plan: ClassicPlan, now: Fl
       const row = out.r.dataset["row"] === undefined ? 0 : Number(out.r.dataset["row"]);
       const firstRow = here.find((u) => u.sec === out.sec && u.r.dataset["row"] !== undefined);
       next[key] = { section: i, row: out.r === firstRow?.r ? 0 : row };
+      // Out again right after coming back: from here, nothing more comes back.
+      if (now.back === key) next.held.push(spillKey(key, next[key]));
       continue;
     }
     // Room left: lines taken away come back one by one, then what went on to page 2.
@@ -322,7 +352,7 @@ function nextFlow(el: HTMLElement, model: SheetModel, plan: ClassicPlan, now: Fl
       }
       continue;
     }
-    if (!spill) continue;
+    if (!spill || now.held.includes(spillKey(key, spill))) continue;
     // The next unit that went on comes back if it fits.
     const bottom = Math.max(container ? rect(container).top : 0, contentEnd);
     const back = later(list, spill)[0];
@@ -344,6 +374,7 @@ function nextFlow(el: HTMLElement, model: SheetModel, plan: ClassicPlan, now: Fl
       if (between + head + rect(back.r).height + tail + 2 <= limit - bottom) {
         const after = list[list.indexOf(i) + 1];
         next[key] = end ? (after === undefined ? null : { section: after, row: 0 }) : { section: i, row };
+        next.back = key;
       }
     }
   }
@@ -594,6 +625,11 @@ function Box({
       {b.text !== "" && b.style !== "circles" && (
         <p className="csheet__box-value">
           <ui.Text path={[...path, "text"]} value={b.text} label={b.label} />
+        </p>
+      )}
+      {(b.remarks ?? "") !== "" && (
+        <p className="csheet__box-remarks">
+          <ui.Text path={[...path, "remarks"]} value={b.remarks!} label={b.label} />
         </p>
       )}
       {b.field && max > 0 && (

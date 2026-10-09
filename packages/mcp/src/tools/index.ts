@@ -441,6 +441,23 @@ const setLevel = defineTool({
   },
 });
 
+const switchPackage = defineTool({
+  name: "switch_package",
+  description: T.switch_package,
+  input: {
+    characterId,
+    packageId: z.string().min(1).describe(D.packageId),
+    extensions: z.array(z.string().min(1)).max(20).optional().describe(D.switchExtensions),
+  },
+  async run(client, { characterId, packageId, extensions }) {
+    const result = await client.change(characterId, "PUT", `/api/drafts/${enc(characterId)}/package`, {
+      packageId,
+      ...(extensions !== undefined ? { extensions } : {}),
+    });
+    return { data: changeOutcome(result, await client.words(draftPackage(result.view.draft))) };
+  },
+});
+
 /**
  * The tracks of a character in words: each with its levels, and for the
  * next level which may be added, with the package's reason where not.
@@ -636,6 +653,7 @@ export const TOOLS: readonly Tool[] = [
   answerPool,
   startCharacter,
   setLevel,
+  switchPackage,
   setTracks,
   levelUp,
   finishCharacter,

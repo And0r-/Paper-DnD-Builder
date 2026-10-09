@@ -8,7 +8,7 @@ import { evaluateDraft, type DraftDocument, type Evaluation } from "@builder/cor
 import type { ContentPackage } from "@builder/format/pure";
 import type { Translator } from "../../i18n/index.ts";
 import type { LoadedPackage } from "../packages.ts";
-import { buildFlow, type FlowEntry } from "./model.ts";
+import { buildFlow, withLeads, type FlowEntry, type LeadStep } from "./model.ts";
 import { countByPlan, plannedDraft } from "./plan.ts";
 
 /** A raise under way: from the level the character was finished at, to the level now. */
@@ -21,6 +21,8 @@ export interface Raise {
  * The flow of a draft: every step (`all`, for the overview), and the steps
  * to go through (`entries`), which during a raise are only the new ones.
  * Each entry to go through carries its count by the planned flow (plan.ts).
+ * The builder's steps before the game (`leads`) stand in front; a raise
+ * does not ask them again.
  */
 export function flowOf(
   draftId: string,
@@ -28,11 +30,13 @@ export function flowOf(
   doc: DraftDocument,
   ev: Evaluation,
   t: Translator["t"],
+  leads: readonly LeadStep[] = [],
 ): { all: FlowEntry[]; entries: FlowEntry[]; raise: Raise | null } {
-  const all = buildFlow(draftId, lp, ev, t);
+  const min = lp.pkg.flow.level.min;
+  const all = withLeads(draftId, buildFlow(draftId, lp, ev, t), leads, min);
   const plan = plannedDraft(lp, doc);
   const planEv = plan === doc ? ev : evaluateDraft(lp.pkg, plan);
-  const planAll = plan === doc ? all : buildFlow(draftId, lp, planEv, t);
+  const planAll = plan === doc ? all : withLeads(draftId, buildFlow(draftId, lp, planEv, t), leads, min);
   const from = doc.levelBefore;
   if (from === undefined || from >= doc.level) return { all, entries: counted(all, planAll), raise: null };
   const before = evaluateBefore(lp.pkg, doc, from);

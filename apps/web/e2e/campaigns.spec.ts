@@ -117,9 +117,9 @@ test("game master, newcomer, player with an account and a stranger", async ({ pa
   const shown = p2.getByRole("region", { name: m["password.welcome"].replace("{name}", newcomer) });
   await expect(shown.locator(".copy-text__value")).not.toBeEmpty();
   await shown.getByRole("button", { name: m["password.done"] }).click();
-  // Straight on to a new character: the campaign question is answered by the invitation, and the
-  // first step says once where one plays now.
-  await p2.waitForURL(/\/c\/[0-9a-f-]+\/level$/);
+  // Straight on to a new character: its first step "Campaign" is answered by the invitation and
+  // says once where one plays now (AND-333).
+  await p2.waitForURL(/\/c\/[0-9a-f-]+\/campaign$/);
   const joinedNote = p2
     .getByRole("status")
     .filter({ hasText: m["new.joined"].replace("{name}", campaignName) });
@@ -201,7 +201,7 @@ test("game master, newcomer, player with an account and a stranger", async ({ pa
   await expect(p3.getByRole("heading", { level: 1, name: m["characters.title"] })).toBeVisible();
   await p3.goto(invite.path);
   await p3.getByRole("button", { name: m["join.join"] }).click();
-  await p3.waitForURL(/\/c\/[0-9a-f-]+\/level$/);
+  await p3.waitForURL(/\/c\/[0-9a-f-]+\/campaign$/);
   await expect(p3.getByText(m["new.joined"].replace("{name}", campaignName))).toBeVisible();
   // Opening it again: already in, with a way to build another character for it.
   await p3.goto(invite.path);
@@ -215,7 +215,7 @@ test("game master, newcomer, player with an account and a stranger", async ({ pa
   await noAxeViolations(p3);
   await shot(p3, "95-einladung-schon-dabei");
   await p3.getByRole("link", { name: m["characters.new"] }).click();
-  await p3.waitForURL(/\/c\/[0-9a-f-]+\/level$/);
+  await p3.waitForURL(/\/c\/[0-9a-f-]+\/campaign$/);
 
   // The game master's own link says so, and leads to the campaign.
   await page.goto(invite.path);
@@ -310,7 +310,7 @@ test("en: campaigns in English only, phone and desktop", async ({ page, foreign 
   await p2.getByLabel(m["login.nameLabel"]).fill("Jo");
   await p2.getByRole("button", { name: m["login.start"] }).click();
   await p2.getByRole("button", { name: m["password.done"] }).click();
-  await p2.waitForURL(/\/c\/[0-9a-f-]+\/level$/);
+  await p2.waitForURL(/\/c\/[0-9a-f-]+\/campaign$/);
   await expect(p2.getByText(m["new.joined"].replace("{name}", "Thursday group"))).toBeVisible();
   await expectOneLanguage(p2, "en");
   await guest.close();

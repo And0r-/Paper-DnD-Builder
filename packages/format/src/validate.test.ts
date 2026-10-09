@@ -325,6 +325,16 @@ describe("cross-file rules", () => {
       'texts/en/ sheet.primary.nerve: missing text (label of box "nerve" in sheet section "primary")',
     ],
     [
+      "box remark without text",
+      (f) => delete texts(f, "de")["sheet.primary.guard.steady"],
+      'texts/de/ sheet.primary.guard.steady: missing text (remark of box "guard" in sheet section "primary")',
+    ],
+    [
+      "box remark on an unknown thing",
+      (f) => (f.get("sheet.json").sections[1].boxes[1].remarks[0].when = "has('trait.stone-stedy')"),
+      `sheet.json sections[1].boxes[1].remarks[0].when: expression "has('trait.stone-stedy')" asks has("trait.stone-stedy") but there is no such thing`,
+    ],
+    [
       "mark sign without text",
       (f) => delete texts(f, "de")["sheet.knacks.mark.steady"],
       'texts/de/ sheet.knacks.mark.steady: missing text (sign of a mark in sheet section "knacks")',

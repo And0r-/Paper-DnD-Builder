@@ -11,7 +11,7 @@ import type { DraftListEntry } from "./api.ts";
 import { Button, ButtonLink } from "./components/Button.tsx";
 import { Icon } from "./components/Icon.tsx";
 import { Menu, MenuSeparator } from "./components/Menu.tsx";
-import { firstOpen, progressOf } from "./flow/model.ts";
+import { firstOpen, progressOf, type LeadStep } from "./flow/model.ts";
 import { flowOf } from "./flow/raise.ts";
 import { levelWord, measureContext, plain, ptext, thingName } from "./package-text.ts";
 import { draftPackageKey, loadPackage, type LoadedPackage } from "./packages.ts";
@@ -44,6 +44,8 @@ export function describeCharacter(
   d: DraftListEntry,
   lp: LoadedPackage | undefined,
   t: Translator["t"],
+  /** The builder's steps before the game, as the character's flow has them (the campaign). */
+  leads: readonly LeadStep[] = [],
 ): CharacterItem {
   const name = d.summary?.name || t("common.unnamed");
   if (!lp)
@@ -55,7 +57,7 @@ export function describeCharacter(
     ...(d.tracks !== undefined && d.tracks.length > 0 && { tracks: d.tracks }),
   };
   const ev = evaluateDraft(lp.pkg, doc);
-  const { entries, raise } = flowOf(d.id, lp, doc, ev, t);
+  const { entries, raise } = flowOf(d.id, lp, doc, ev, t, leads);
   const finished = d.status === "finished" && ev.complete;
   const p = progressOf(entries);
   return {

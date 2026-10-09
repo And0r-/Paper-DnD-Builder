@@ -11,6 +11,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useApp } from "../../../src/ui/app-state.tsx";
 import { api, ApiError, type CampaignPlayer, type CampaignView } from "../../../src/ui/api.ts";
+import { campaignLeads } from "../../../src/ui/campaigns.ts";
 import { CharacterCard, describeCharacter, packagesFor } from "../../../src/ui/characters.tsx";
 import { Button, ButtonLink } from "../../../src/ui/components/Button.tsx";
 import { ConfirmDialog } from "../../../src/ui/components/Dialog.tsx";
@@ -122,7 +123,12 @@ function CampaignScreen() {
                     <li key={d.id}>
                       <CharacterCard
                         heading="h3"
-                        item={describeCharacter(d, data.packages.get(draftPackageKey(d)), t)}
+                        item={describeCharacter(
+                          d,
+                          data.packages.get(draftPackageKey(d)),
+                          t,
+                          campaignLeads(t, d, true),
+                        )}
                       />
                     </li>
                   ))}
@@ -175,7 +181,12 @@ function CampaignScreen() {
                               <CharacterCard
                                 heading="h4"
                                 helpOut
-                                item={describeCharacter(d, data.packages.get(draftPackageKey(d)), t)}
+                                item={describeCharacter(
+                                  d,
+                                  data.packages.get(draftPackageKey(d)),
+                                  t,
+                                  campaignLeads(t, d, true),
+                                )}
                               />
                             </li>
                           ))}

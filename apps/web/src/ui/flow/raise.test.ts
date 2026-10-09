@@ -14,7 +14,9 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { translator } from "../../i18n/index.ts";
 import type { LoadedPackage } from "../packages.ts";
+import { campaignLeads } from "../campaigns.ts";
 import { levelGrowth } from "./explain.ts";
+import { CAMPAIGN_KEY, firstOpen, LEVEL_KEY, positionOf } from "./model.ts";
 import { evaluateBefore, flowOf, raiseNews } from "./raise.ts";
 
 const pkg = (await validatePackageDir(DEMO_PACKAGE_DIR)).package!;
@@ -155,5 +157,47 @@ describe("the flow of a level up", () => {
     expect(growth.byThing.find((b) => b.thing === "calling.herbalist")?.values).toContain("bloomWardUses");
     expect(grown(growth).filter((v) => v === "bloomWardUses")).toEqual(["bloomWardUses"]);
     expect(new Set(grown(growth)).size).toBe(grown(growth).length);
+  });
+});
+
+describe('the step "Campaign" (AND-333)', () => {
+  const leads = campaignLeads(t, { access: "owner", campaignId: null }, true);
+
+  it("stands first, is counted, and is never open", () => {
+    const created = newDraft(pkg, 3);
+    if (!created.ok) throw new Error("newDraft");
+    const doc = created.doc;
+    const ev = evaluateDraft(pkg, doc);
+    const plain = flowOf("x", lp, doc, ev, t).entries;
+    const { entries, all } = flowOf("x", lp, doc, ev, t, leads);
+    expect(entries.map((e) => e.key)).toEqual([CAMPAIGN_KEY, ...plain.map((e) => e.key)]);
+    expect(all[0]).toMatchObject({ key: CAMPAIGN_KEY, kind: "lead", href: "/c/x/campaign", status: "done" });
+    const first = positionOf(entries, entries[0]!);
+    expect(first).toMatchObject({ current: 1, total: positionOf(plain, plain[0]!).total + 1 });
+    expect(first.sectionTitle).toBe(t("new.campaignLabel"));
+    expect(
+      positionOf(
+        entries,
+        entries.find((e) => e.key === LEVEL_KEY)!,
+      ).current,
+    ).toBe(2);
+    // "Keep building" goes to the first open step of the game, never to the campaign.
+    expect(firstOpen(entries).key).toBe(firstOpen(plain).key);
+  });
+
+  it("is not asked again by a level up, and stays on the overview", () => {
+    const doc = built(1);
+    const r = levelUp(pkg, doc, 2);
+    if (!r.ok) throw new Error("levelUp");
+    const { entries, all } = flowOf("x", lp, r.doc, evaluateDraft(pkg, r.doc), t, leads);
+    expect(entries.map((e) => e.key)).not.toContain(CAMPAIGN_KEY);
+    expect(all[0]!.key).toBe(CAMPAIGN_KEY);
+  });
+
+  it("is there only for whoever is in a campaign", () => {
+    expect(campaignLeads(t, { access: "owner", campaignId: null }, false)).toEqual([]);
+    expect(campaignLeads(t, { access: "owner", campaignId: "c" }, false)).toHaveLength(1);
+    expect(campaignLeads(t, { access: "gameMaster", campaignId: "c" }, false)).toHaveLength(1);
+    expect(campaignLeads(t, { access: "helper", campaignId: "c" }, true)).toEqual([]);
   });
 });

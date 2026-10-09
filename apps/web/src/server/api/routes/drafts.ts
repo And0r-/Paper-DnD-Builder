@@ -146,9 +146,12 @@ function checkExtensions(app: App, packageId: string, ids: readonly string[]): s
   return [...new Set(ids)].sort();
 }
 
-/** All loaded extensions of the package: a new character has them switched on unless it names its own. */
-export function extensionsOf(app: App, packageId: string): string[] {
-  return [...app.packages.extensions.values()].filter((e) => e.base === packageId).map((e) => e.id);
+/** The extensions a character of `packageId` has unless it names its own: every loaded one of the package. */
+export function defaultExtensions(app: App, packageId: string): string[] {
+  return [...app.packages.extensions.entries()]
+    .filter(([, ext]) => ext.base === packageId)
+    .map(([id]) => id)
+    .sort();
 }
 
 /** What a change does to the draft: the new document, and whether that finishes the character. */
@@ -167,6 +170,11 @@ export type DraftEdit = (
 export interface Edit {
   apply: DraftEdit;
   cause: DraftCause;
+  /**
+   * Another package for the character, with its extensions: `apply` then
+   * gets that package, and the draft's own need not be loaded.
+   */
+  switchTo?: { packageId: string; extensions: string[] };
 }
 
 export type Committed =
@@ -192,13 +200,18 @@ export async function commitChange(
 ): Promise<Committed> {
   // The draft stays its owner's, whoever changes it.
   const accountId = row.account_id;
-  const pkg = packageOf(app, row);
+  const target = edit.switchTo;
+  const pkg = target
+    ? packageOf(app, { package_id: target.packageId, extensions: target.extensions })
+    : packageOf(app, row);
   if (row.version !== expectedVersion) return { ok: false, current: row };
   const edited = edit.apply(pkg, row);
+  const extensions = target?.extensions ?? edited.extensions;
   const next = edited.extensions ? packageOf(app, { ...row, extensions: edited.extensions }) : pkg;
   const complete = evaluateDraft(next, edited.doc).complete;
   const now = app.now();
-  const finishedAt = edited.finish ? now : complete ? row.finished_at : null;
+  // Another package makes a new character: never finished by the switch itself.
+  const finishedAt = edited.finish ? now : complete && !target ? row.finished_at : null;
   // A raise ends when the character is finished again.
   const { levelBefore: _, ...rest } = edited.doc;
   const doc = finishedAt ? rest : edited.doc;
@@ -207,7 +220,8 @@ export async function commitChange(
     finishedAt,
     packageVersion: pkg.manifest.version,
     now,
-    extensions: edited.extensions,
+    extensions,
+    packageId: target?.packageId,
   });
   if (!updated) {
     // Changed between our read and our write.
@@ -308,6 +322,23 @@ export const edits = {
     },
     cause: { type: "finished" },
   }),
+  /**
+   * The character is built with another package from now on. Every answer
+   * belongs to the package it was given in and goes, even under the same
+   * choice id: a package's steps do not carry over to another one. What
+   * stays is what the builder itself holds: the level (within the new
+   * package's range), the campaign, the owner, help links and sheet copies.
+   */
+  switchPackage: (packageId: string, extensions: string[]): Edit => ({
+    switchTo: { packageId, extensions },
+    apply: (pkg, row) => {
+      const { min, max } = pkg.flow.level;
+      const r = newDraft(pkg, Math.min(max, Math.max(min, row.document.level)));
+      if (!r.ok) throw new HttpError(422, "changeRejected", { reason: r.error });
+      return { doc: r.doc };
+    },
+    cause: { type: "changed" },
+  }),
 };
 
 /** The bodies of the changing routes; the live channel's messages carry the same fields. */
@@ -323,6 +354,12 @@ export const changeBodies = {
     tracks: z.array(z.string().min(1).max(200)).max(1000).optional(),
   }),
   finish: z.strictObject({ version }),
+  switchPackage: z.strictObject({
+    version,
+    packageId: z.string().max(100),
+    /** Extensions of the new package to switch on; every loaded one if left out. */
+    extensions: extensionsSchema.optional(),
+  }),
 };
 
 export const newDraftSchema = z.strictObject({
@@ -357,7 +394,7 @@ export async function createDraft(
   const extensions = checkExtensions(
     ctx.app,
     body.packageId,
-    body.extensions ?? extensionsOf(ctx.app, body.packageId),
+    body.extensions ?? defaultExtensions(ctx.app, body.packageId),
   );
   const pkg = packageOf(ctx.app, { package_id: body.packageId, extensions });
   const r = newDraft(pkg, body.level);
@@ -526,6 +563,26 @@ export const draftRoutes: Route[] = [
         200,
         draftView({ ...row, campaign_id: body.campaignId }, ctx.app.packages.get(packageKeyOf(row))),
       );
+    },
+  },
+  {
+    // Build the character with another package. Every answer goes, a
+    // finished character is a draft again (see `edits.switchPackage`). The
+    // owner and a game master building for a player may; a help link does not reach it.
+    method: "PUT",
+    path: "/api/drafts/:id/package",
+    handler: async (ctx) => {
+      const { row } = await loadDraft(ctx);
+      const body = await readJson(ctx.req, changeBodies.switchPackage);
+      if (body.packageId === row.package_id) {
+        // Nothing changes, its version neither; the extensions change with PATCH.
+        return json(200, draftView(row, ctx.app.packages.get(packageKeyOf(row))));
+      }
+      if (!ctx.app.packages.packages.has(body.packageId)) throw new HttpError(404, "packageNotFound");
+      const extensions = body.extensions
+        ? checkExtensions(ctx.app, body.packageId, body.extensions)
+        : defaultExtensions(ctx.app, body.packageId);
+      return change(ctx, body.version, edits.switchPackage(body.packageId, extensions));
     },
   },
   {
