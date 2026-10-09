@@ -24,7 +24,8 @@ export function PageFooter({
   total: number;
   prefix: string;
 }) {
-  const words = footerWords(model, page, total);
+  // The screen shows the sheet alone: its count says so ("Sheet, page 1 of 5").
+  const words = footerWords(model, page, total, undefined, "sheet");
   // Without pages (a phone), no page number.
   const { who, rest } = total > 0 ? words : { ...words, rest: words.rest.slice(0, -1) };
   return (

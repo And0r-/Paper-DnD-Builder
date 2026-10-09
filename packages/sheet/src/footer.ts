@@ -6,7 +6,9 @@
  * first: the copy's date and time tell copies apart and stay whole. On
  * screen a copy is named by the minute it was made, as in its PDF and the
  * version menu ("Meine Fassung vom 7. Oktober, 13:15"), in the reader's
- * time zone; the PDF passes the name it printed.
+ * time zone; the PDF passes the name it printed. The PDF counts all its
+ * pages (sheet, cards, rules texts: "page 1 of 11"); the screen shows the
+ * sheet alone and says so ("Sheet, page 1 of 5"): the numbers are the same.
  */
 import { copyWhen } from "./copy-name.ts";
 import { MESSAGES } from "./messages.ts";
@@ -17,10 +19,11 @@ export function footerWords(
   page: number,
   total: number,
   copyName?: string,
+  counts: "document" | "sheet" = "document",
 ): { who: string; rest: string[] } {
   const m = MESSAGES[model.language];
   copyName ??= model.origin.kind === "copy" ? shownCopyName(model.language, model.origin) : "";
-  const pageOf = m ? [m.page(page, total)] : [];
+  const pageOf = m ? [(counts === "sheet" ? m.sheetPage : m.page)(page, total)] : [];
   const rest =
     model.origin.kind === "copy"
       ? [copyName, ...(m ? [m.asOfLevel(model.origin.fromLevel)] : []), model.unitsLine, ...pageOf]

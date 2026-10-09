@@ -18,6 +18,11 @@ export interface Messages {
   /** Head of a character with more than one track: label of the track it began with. */
   startedAs: string;
   page: (n: number, of: number) => string;
+  /**
+   * Footer on screen: the screen shows the sheet alone, so its count says so
+   * ("Sheet, page 1 of 5"). The PDF counts all its pages, cards and texts too.
+   */
+  sheetPage: (n: number, of: number) => string;
   /** Footer: which units the document uses, e.g. "meters, kilograms". */
   unitsUsed: (units: string[]) => string;
   createdOn: (date: string) => string;
@@ -63,6 +68,7 @@ export const MESSAGES: Readonly<Record<string, Messages>> = {
     unnamed: "Ohne Namen",
     startedAs: "Angefangen als",
     page: (n, of) => `Seite ${n} von ${of}`,
+    sheetPage: (n, of) => `Bogen, Seite ${n} von ${of}`,
     unitsUsed: (u) => `Einheiten: ${u.join(", ")}`,
     copyName: (d) => `Meine Fassung vom ${d}`,
     copyNameAt: (d, t) => `Meine Fassung vom ${d}, ${t}`,
@@ -94,6 +100,7 @@ export const MESSAGES: Readonly<Record<string, Messages>> = {
     unnamed: "No name yet",
     startedAs: "Started as",
     page: (n, of) => `Page ${n} of ${of}`,
+    sheetPage: (n, of) => `Sheet, page ${n} of ${of}`,
     unitsUsed: (u) => `Units: ${u.join(", ")}`,
     copyName: (d) => `My version of ${d}`,
     copyNameAt: (d, t) => `My version of ${d}, ${t}`,
@@ -125,6 +132,7 @@ export const MESSAGES: Readonly<Record<string, Messages>> = {
     unnamed: "Pas encore de nom",
     startedAs: "A débuté comme",
     page: (n, of) => `Page ${n} sur ${of}`,
+    sheetPage: (n, of) => `Fiche, page ${n} sur ${of}`,
     unitsUsed: (u) => `Unités : ${u.join(", ")}`,
     copyName: (d) => `Ma version du ${d}`,
     copyNameAt: (d, t) => `Ma version du ${d}, ${t}`,
@@ -157,6 +165,7 @@ export const MESSAGES: Readonly<Record<string, Messages>> = {
     unnamed: "Ancora senza nome",
     startedAs: "Ha iniziato come",
     page: (n, of) => `Pagina ${n} di ${of}`,
+    sheetPage: (n, of) => `Scheda, pagina ${n} di ${of}`,
     unitsUsed: (u) => `Unità: ${u.join(", ")}`,
     copyName: (d) => `La mia versione del ${d}`,
     copyNameAt: (d, t) => `La mia versione del ${d}, ${t}`,
@@ -188,6 +197,7 @@ export const MESSAGES: Readonly<Record<string, Messages>> = {
     unnamed: "Aún sin nombre",
     startedAs: "Empezó como",
     page: (n, of) => `Página ${n} de ${of}`,
+    sheetPage: (n, of) => `Hoja, página ${n} de ${of}`,
     unitsUsed: (u) => `Unidades: ${u.join(", ")}`,
     copyName: (d) => `Mi versión del ${d}`,
     copyNameAt: (d, t) => `Mi versión del ${d}, ${t}`,
