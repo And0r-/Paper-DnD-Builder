@@ -186,7 +186,12 @@ function smallBox(c: Ctx, b: StatBox, x: number, y: number, w: number, h: number
     pen.field(b.field, x + 1, y + 4.4, w - 2, Math.max(1, room - 4), { text: now });
     if (now !== "") pen.text(now, x + w / 2, y + room - 0.5, pen.fit(now, st.pencil, w - 2), "center");
   } else {
-    pen.text(b.text, x + w / 2, y + room / 2 + 2.2, pen.fit(b.text, st.mid, w - 2), "center");
+    // What to mind when rolling it goes small under the number, which moves up a little for it.
+    const remarks = b.remarks ?? "";
+    const lift = remarks === "" ? 0 : 1.4;
+    pen.text(b.text, x + w / 2, y + room / 2 + 2.2 - lift, pen.fit(b.text, st.mid, w - 2), "center");
+    if (remarks !== "")
+      pen.text(remarks, x + w / 2, y + room - 0.2, pen.fit(remarks, st.small, w - 2), "center");
   }
 }
 

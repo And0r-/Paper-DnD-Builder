@@ -424,9 +424,11 @@ function drawStatBoxes(c: Grid, boxes: StatBox[], x: number, y: number, w: numbe
   const { pen, g, st } = c;
   const n = boxes.length;
   const bw = (w - (n - 1) * 4) / n;
-  // Where a number comes from goes first, then what it is for: both small under the number.
+  // Where a number comes from goes first, then what to mind when rolling it, then what it is for: all small under the number.
   const hints = boxes.map((b) =>
-    [b.parts ?? "", b.hint].flatMap((t) => pen.wrap(t, st.hint, bw - 3)).filter((l) => l !== ""),
+    [b.parts ?? "", b.remarks ?? "", b.hint]
+      .flatMap((t) => pen.wrap(t, st.hint, bw - 3))
+      .filter((l) => l !== ""),
   );
   // Labels and hints are never cut: all boxes grow to the longest one.
   const labels = boxes.map((b) => pen.label(b.label, st.sectionTitle, bw - 3, 7, true));

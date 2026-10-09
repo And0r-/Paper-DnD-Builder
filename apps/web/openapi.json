@@ -6271,6 +6271,9 @@
                           "parts": {
                             "type": "string"
                           },
+                          "remarks": {
+                            "type": "string"
+                          },
                           "field": {
                             "type": "string",
                             "minLength": 1

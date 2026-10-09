@@ -162,6 +162,13 @@
   font-weight: var(--weight-bold);
 }
 
+.csheet__box-remarks {
+  color: var(--color-ink-muted);
+  font-size: var(--text-xs);
+  line-height: var(--text-xs-lh);
+  text-align: center;
+}
+
 /* Scores */
 
 .csheet__scores {
@@ -860,6 +867,13 @@
     overflow-wrap: normal;
     hyphens: manual;
     font-size: min(var(--cs-label), 11cqi);
+  }
+
+  /* What to mind when rolling, small under the number, as in the PDF. */
+  .csheet__box-remarks {
+    color: #333;
+    font-size: var(--cs-min);
+    line-height: 1.15;
   }
 
   /* The boxes at the table in rows as in the PDF, whatever section they come from: the numbers,

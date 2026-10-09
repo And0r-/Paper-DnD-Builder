@@ -29,7 +29,8 @@
         },
         {
           "value": "guard",
-          "style": "number"
+          "style": "number",
+          "remarks": [{ "text": "sheet.primary.guard.steady", "when": "has('trait.stone-steady')" }]
         },
         {
           "value": "pace",
