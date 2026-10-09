@@ -2,7 +2,8 @@
 /**
  * A new character. With one game loaded, this screen is skipped and the
  * draft starts at once (flow spec 4.3, Hick's law). With several, the
- * player picks the game first; that cannot be changed later.
+ * player picks the rules first. They can be changed later on the step
+ * "Rules" (AND-336), so nothing here says it is for good.
  *
  * The campaign is not asked here: it is the first step of the character
  * (AND-333), changeable like any other. A member of a campaign (player or
@@ -23,6 +24,7 @@ import { api, ApiError, type CampaignView, type DraftView, type PackageListEntry
 import { loadMemberCampaigns } from "../../src/ui/campaigns.ts";
 import { Button, ButtonLink } from "../../src/ui/components/Button.tsx";
 import { Callout, EmptyState, ErrorState, Loading } from "../../src/ui/components/Feedback.tsx";
+import { PackageCards } from "../../src/ui/components/PackageCards.tsx";
 import { PackageLanguageNote } from "../../src/ui/components/PackageLanguageNote.tsx";
 import { AppShell } from "../../src/ui/components/Shell.tsx";
 import { QuestionHeader, usePageTitle } from "../../src/ui/flow/frame.tsx";
@@ -117,7 +119,7 @@ function NewCharacter() {
   );
   // Building for a player waits until the player is known; one's own waits for the campaigns.
   const ready = forPlayer === undefined ? start !== undefined : forPlayer !== null && forPlayer !== "missing";
-  usePageTitle([t("new.question")]);
+  usePageTitle([t("rules.question")]);
 
   useEffect(() => {
     let live = true;
@@ -183,46 +185,17 @@ function NewCharacter() {
     const foreign = list.find((p) => p.language !== lang);
     content = (
       <form
+        className="new-rules"
         onSubmit={(e) => {
           e.preventDefault();
           if (!picked) setProblem(t("new.pickOne"));
           else void create(picked);
         }}
       >
-        <QuestionHeader id={headingId} question={t("new.question")} intro={t("new.intro")} />
+        <QuestionHeader id={headingId} question={t("rules.question")} intro={t("rules.intro")} />
         {forPlayer && <Callout tone="info">{t("new.forPlayer", { name: forPlayer.name })}</Callout>}
-        <fieldset className="options" aria-labelledby={headingId}>
-          <div className="options__list">
-            {list.map((p) => (
-              <label
-                key={p.id}
-                className={`option option--simple${picked === p.id ? " option--checked" : ""}`}
-              >
-                <span className="option__head">
-                  <input
-                    className="option__input"
-                    type="radio"
-                    name="package"
-                    value={p.id}
-                    checked={picked === p.id}
-                    onChange={() => setPicked(p.id)}
-                  />
-                  <span className="option__mark" aria-hidden="true" />
-                  <span className="option__name" lang={p.language}>
-                    {p.name}
-                  </span>
-                </span>
-                {p.short && (
-                  <span className="option__short" lang={p.language}>
-                    {p.short}
-                  </span>
-                )}
-              </label>
-            ))}
-          </div>
-        </fieldset>
+        <PackageCards list={list} picked={picked} onPick={setPicked} labelledBy={headingId} />
         {foreign && <PackageLanguageNote shown={foreign.language} />}
-        <p className="note">{t("new.note")}</p>
         {problem && <Callout tone="warning">{problem}</Callout>}
         <div className="step-footer__bar">
           <ButtonLink href={back} variant="secondary" icon="arrowLeft">

@@ -1564,6 +1564,13 @@
 }
 
 /* The builder's step "Campaign" (AND-333): one field, or the answer to look at. */
+/* "New character": question, cards and Start spaced like a page (AND-336). */
+.new-rules {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
 .campaign-step {
   display: flex;
   flex-direction: column;

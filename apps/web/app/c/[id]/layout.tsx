@@ -11,7 +11,7 @@ import { EmptyState, ErrorState, Loading } from "../../../src/ui/components/Feed
 import { AppShell } from "../../../src/ui/components/Shell.tsx";
 import { DraftProvider } from "../../../src/ui/flow/draft-state.tsx";
 import { FlowLayout } from "../../../src/ui/flow/frame.tsx";
-import { CAMPAIGN_KEY, TRACKS_KEY } from "../../../src/ui/flow/model.ts";
+import { CAMPAIGN_KEY, RULES_KEY, TRACKS_KEY } from "../../../src/ui/flow/model.ts";
 import { RequireAccount } from "../../../src/ui/guards.tsx";
 
 function currentKey(pathname: string): string | undefined {
@@ -20,6 +20,7 @@ function currentKey(pathname: string): string | undefined {
   if (parts[2] === "overview") return "overview";
   if (parts[2] === "tracks") return TRACKS_KEY;
   if (parts[2] === "campaign") return CAMPAIGN_KEY;
+  if (parts[2] === "rules") return RULES_KEY;
   if (parts[2] === "step" && parts[3]) return decodeURIComponent(parts[3]);
   return undefined;
 }

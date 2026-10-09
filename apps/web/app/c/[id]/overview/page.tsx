@@ -29,6 +29,7 @@ import {
   describeAnswer,
   OVERVIEW_KEY,
   positionOf,
+  RULES_KEY,
 } from "../../../../src/ui/flow/model.ts";
 import { LevelGrowth } from "../../../../src/ui/flow/growth.tsx";
 import { Origins } from "../../../../src/ui/flow/origins.tsx";
@@ -134,54 +135,56 @@ export default function OverviewPage() {
 
       <ul className="summary">
         {steps.map((s) => {
-          // The campaign is changed on its step only (AND-333): here it is a line like any other.
+          // Campaign and rules are changed on their steps only (AND-333, AND-336): here each is a line.
           const lines: ReactNode[] =
             s.key === CAMPAIGN_KEY
               ? [campaigns.find((c) => c.id === draft.campaignId)?.name ?? t("new.noCampaign")]
-              : s.kind === "level"
-                ? [String(ev.level)]
-                : s.kind === "tracks"
-                  ? [ev.tracks ? tracksText(headTracks(ev), (id) => thingName(lp, id)) : ""]
-                  : s.choices.flatMap((c): ReactNode[] => {
-                      const state = ev.choices[c]!;
-                      const choice = choiceOf(lp, c);
-                      const assign = (state.answer as { assign?: Record<string, number> } | undefined)
-                        ?.assign;
-                      // Each score on its own line: the whole sum once ("15 from … + 2 from … = 17"), later only "+ 2".
-                      if (choice?.kind === "distribute" && assign && state.status !== "invalid") {
-                        // Raised values: only those that got points.
-                        const raise = choice.methods[0]?.method === "raise";
-                        const targets = raise
-                          ? choice.targets.filter((v) => (assign[v] ?? 0) > 0)
-                          : choice.targets;
-                        return distributeLines(lp, ctx, ev, state, targets, assign, { t, list }, summed);
-                      }
-                      // Names of things explain themselves on hover and tap: their text is not on this screen.
-                      const named = answerThings(lp, ctx, state, grown, ev.values);
-                      const text =
-                        named && named.things.length + named.values.length > 0
-                          ? listNodes(t, [
-                              ...named.things.map((id) => <ThingName key={id} lp={lp} id={id} />),
-                              ...named.values,
-                            ])
-                          : describeAnswer(lp, ctx, state, list, grown, ev.values);
-                      // A choice of an added track says which: its title is the same as in the first one.
-                      const title = choiceTexts(lp, c, state, ctx).title;
-                      const added = state.track !== undefined && state.track !== ev.tracks?.first;
-                      const prefix =
-                        s.choices.length > 1
-                          ? `${added ? t("tracks.ofTrack", { title, thing: thingName(lp, state.track!) }) : title}: `
-                          : "";
-                      return [
-                        <>
-                          {prefix}
-                          {text ??
-                            (state.optional && state.status === "missing"
-                              ? t("overview.leftEmpty")
-                              : t("overview.nothingChosen"))}
-                        </>,
-                      ];
-                    });
+              : s.key === RULES_KEY
+                ? [ptext(lp, "package.name") ?? ""]
+                : s.kind === "level"
+                  ? [String(ev.level)]
+                  : s.kind === "tracks"
+                    ? [ev.tracks ? tracksText(headTracks(ev), (id) => thingName(lp, id)) : ""]
+                    : s.choices.flatMap((c): ReactNode[] => {
+                        const state = ev.choices[c]!;
+                        const choice = choiceOf(lp, c);
+                        const assign = (state.answer as { assign?: Record<string, number> } | undefined)
+                          ?.assign;
+                        // Each score on its own line: the whole sum once ("15 from … + 2 from … = 17"), later only "+ 2".
+                        if (choice?.kind === "distribute" && assign && state.status !== "invalid") {
+                          // Raised values: only those that got points.
+                          const raise = choice.methods[0]?.method === "raise";
+                          const targets = raise
+                            ? choice.targets.filter((v) => (assign[v] ?? 0) > 0)
+                            : choice.targets;
+                          return distributeLines(lp, ctx, ev, state, targets, assign, { t, list }, summed);
+                        }
+                        // Names of things explain themselves on hover and tap: their text is not on this screen.
+                        const named = answerThings(lp, ctx, state, grown, ev.values);
+                        const text =
+                          named && named.things.length + named.values.length > 0
+                            ? listNodes(t, [
+                                ...named.things.map((id) => <ThingName key={id} lp={lp} id={id} />),
+                                ...named.values,
+                              ])
+                            : describeAnswer(lp, ctx, state, list, grown, ev.values);
+                        // A choice of an added track says which: its title is the same as in the first one.
+                        const title = choiceTexts(lp, c, state, ctx).title;
+                        const added = state.track !== undefined && state.track !== ev.tracks?.first;
+                        const prefix =
+                          s.choices.length > 1
+                            ? `${added ? t("tracks.ofTrack", { title, thing: thingName(lp, state.track!) }) : title}: `
+                            : "";
+                        return [
+                          <>
+                            {prefix}
+                            {text ??
+                              (state.optional && state.status === "missing"
+                                ? t("overview.leftEmpty")
+                                : t("overview.nothingChosen"))}
+                          </>,
+                        ];
+                      });
           return (
             <li key={s.key} className={`summary__item summary__item--${s.status}`}>
               <div className="summary__text">

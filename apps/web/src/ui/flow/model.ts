@@ -1,6 +1,6 @@
 /**
  * The guided flow as the screens see it: the builder's own steps before
- * the game (the campaign), level, the package's steps as the rule core
+ * the game (the campaign, the rules), level, the package's steps as the rule core
  * derives them, then the overview. Plus what a change would
  * break, so the screen can ask before it happens (flow spec 2.5).
  */
@@ -31,7 +31,7 @@ export type EntryStatus = "done" | "open" | "needsAttention";
 export interface FlowEntry {
   /**
    * "level", the step id, the builder's step for the levels ({@link TRACKS_KEY}),
-   * a builder's step before the game ({@link CAMPAIGN_KEY}), or "overview".
+   * a builder's step before the game ({@link CAMPAIGN_KEY}, {@link RULES_KEY}), or "overview".
    */
   key: string;
   kind: "lead" | "level" | "step" | "tracks" | "overview";
@@ -78,9 +78,12 @@ export const OVERVIEW_KEY = "overview";
 export const TRACKS_KEY = "@tracks";
 /** The builder's step "Campaign" (AND-333): which campaign the character is for. */
 export const CAMPAIGN_KEY = "@campaign";
+/** The builder's step "Rules" (AND-336): which package the character is built with. */
+export const RULES_KEY = "@rules";
 
 export function stepHref(draftId: string, key: string): string {
   if (key === CAMPAIGN_KEY) return `/c/${draftId}/campaign`;
+  if (key === RULES_KEY) return `/c/${draftId}/rules`;
   if (key === LEVEL_KEY) return `/c/${draftId}/level`;
   if (key === TRACKS_KEY) return `/c/${draftId}/tracks`;
   if (key === OVERVIEW_KEY) return `/c/${draftId}/overview`;
@@ -203,8 +206,8 @@ export function buildFlow(
 
 /**
  * A builder's step before the game's own (AND-333): not from the package,
- * and never open, so it never holds up the sheet. The campaign is one;
- * the choice of rules may stand beside it.
+ * and never open, so it never holds up the sheet: the campaign, and the
+ * choice of rules after it.
  */
 export interface LeadStep {
   key: string;
