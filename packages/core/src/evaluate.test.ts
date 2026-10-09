@@ -156,6 +156,16 @@ describe("options", () => {
     });
   });
 
+  it("recommends the first option of a single pick whose recommended thing is not on offer (AND-317)", () => {
+    // Like a skill to double that the character must already have: the package's pick is not among them.
+    const p: ContentPackage = structuredClone(pkg);
+    p.things.find((t) => t.id === "folk.moorfolk")!.requires = "level >= 2";
+    const at1 = evaluateDraft(p, draft(1)).choices["folk"]!;
+    expect(at1.options).not.toContain("folk.moorfolk");
+    expect(at1.recommended).toEqual([at1.options![0]]);
+    expect(at1.recommended).not.toEqual(evaluateDraft(pkg, draft(1)).choices["folk"]!.recommended);
+  });
+
   it("counts a tag from an earlier answer and switches to the text variant whose condition holds", () => {
     const calling = { pick: "calling.river-runner" };
     const moor = evaluateDraft(pkg, draft(1, { folk: { pick: "folk.moorfolk" }, calling }));
