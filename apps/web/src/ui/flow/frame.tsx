@@ -32,7 +32,14 @@ import { levelWord, ptext, thingName } from "../package-text.ts";
 import type { LoadedPackage } from "../packages.ts";
 import { useDraft, type SaveState } from "./draft-state.tsx";
 import { levelHeading, levelSpan } from "./level-runs.ts";
-import { nextOpen, OVERVIEW_KEY, positionOf, progressFraction, type FlowEntry } from "./model.ts";
+import {
+  CAMPAIGN_KEY,
+  nextOpen,
+  OVERVIEW_KEY,
+  positionOf,
+  progressFraction,
+  type FlowEntry,
+} from "./model.ts";
 import {
   answeredParts,
   stepChange,
@@ -423,7 +430,12 @@ export function FlowLayout({ current, children }: { current: string | undefined;
   const wide = useWide();
   const [askingHelp, setAskingHelp] = useState(false);
   // Phones show the long explanation inside each card instead ("Learn more").
-  const showAside = wide && current !== undefined && current !== OVERVIEW_KEY && current !== "level";
+  const showAside =
+    wide &&
+    current !== undefined &&
+    current !== OVERVIEW_KEY &&
+    current !== "level" &&
+    current !== CAMPAIGN_KEY;
   useEffect(() => setContent(null), [current]);
   return (
     <ChangeCtx.Provider value={change}>

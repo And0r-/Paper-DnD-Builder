@@ -4,14 +4,13 @@
  * draft starts at once (flow spec 4.3, Hick's law). With several, the
  * player picks the game first; that cannot be changed later.
  *
- * A member of a campaign (player or game master) first says which campaign
- * the character is for (AND-231, AND-234), with the campaign they joined last chosen: most come here
- * straight from the invitation. Without a campaign the question is skipped.
- * `?campaign=<id>` alone chooses that campaign instead (from the invitation
- * page, AND-237) and counts as the answer: the question is skipped, "Back"
- * still leads to it, and "no campaign" stays a choice there (AND-241).
- * With `&joined` (just joined from the invitation) the first screen says
- * once that one plays in that campaign now.
+ * The campaign is not asked here: it is the first step of the character
+ * (AND-333), changeable like any other. A member of a campaign (player or
+ * game master) starts there, with the campaign they joined last chosen:
+ * most come here straight from the invitation. `?campaign=<id>` chooses
+ * that campaign instead (from the invitation page, AND-237). With `&joined`
+ * (just joined from the invitation) that step says once that one plays in
+ * that campaign now. Without a campaign there is no such step.
  *
  * `?campaign=<id>&player=<id>`: a game master builds for a player of their
  * campaign. The character is the player's from the start and belongs to
@@ -20,18 +19,10 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useId, useRef, useState } from "react";
 import { useApp } from "../../src/ui/app-state.tsx";
-import {
-  api,
-  ApiError,
-  type Campaign,
-  type CampaignView,
-  type DraftView,
-  type PackageListEntry,
-} from "../../src/ui/api.ts";
-import { loadMemberCampaigns, NO_CAMPAIGN } from "../../src/ui/campaigns.ts";
+import { api, ApiError, type CampaignView, type DraftView, type PackageListEntry } from "../../src/ui/api.ts";
+import { loadMemberCampaigns } from "../../src/ui/campaigns.ts";
 import { Button, ButtonLink } from "../../src/ui/components/Button.tsx";
 import { Callout, EmptyState, ErrorState, Loading } from "../../src/ui/components/Feedback.tsx";
-import { SelectField } from "../../src/ui/components/Fields.tsx";
 import { PackageLanguageNote } from "../../src/ui/components/PackageLanguageNote.tsx";
 import { AppShell } from "../../src/ui/components/Shell.tsx";
 import { QuestionHeader, usePageTitle } from "../../src/ui/flow/frame.tsx";
@@ -86,14 +77,13 @@ function NewCharacter() {
   const justJoined = params.has("joined");
   const [list, setList] = useState<PackageListEntry[] | null>(null);
   const [failed, setFailed] = useState(false);
-  // The campaigns the viewer plays in or leads; not asked when a game master builds for a player.
-  const [campaigns, setCampaigns] = useState<Campaign[] | null>(null);
-  const [campaignPick, setCampaignPick] = useState<string>();
-  /** The campaign the character is for once decided; NO_CAMPAIGN for none. */
-  const [campaign, setCampaign] = useState<string>();
-  /** The campaign just joined, while it is the one chosen: "You now play in …". */
-  const [joinedName, setJoinedName] = useState<string>();
-  const joined = joinedName !== undefined && campaign === preferred ? joinedName : undefined;
+  /**
+   * Where the character starts, once known: in the campaign joined last or
+   * the one the invitation named (null: in none, or the viewer is in no
+   * campaign), and the name of a campaign just joined ("You now play in …").
+   * Not asked when a game master builds for a player.
+   */
+  const [start, setStart] = useState<{ campaign: string | null; step: boolean; joined?: string }>();
   const [attempt, setAttempt] = useState(0);
   const [picked, setPicked] = useState<string>();
   const [busy, setBusy] = useState(false);
@@ -113,22 +103,21 @@ function NewCharacter() {
                 `/api/campaigns/${forPlayer.campaignId}/players/${forPlayer.playerId}/drafts`,
                 { packageId },
               )
-            : await api<DraftView>("POST", "/api/drafts", { packageId, campaignId: campaign || null });
-        if (joined) rememberJoined(r.draft.id, joined);
-        router.replace(`/c/${r.draft.id}/level`);
+            : await api<DraftView>("POST", "/api/drafts", { packageId, campaignId: start?.campaign ?? null });
+        if (start?.joined) rememberJoined(r.draft.id, start.joined);
+        // A member of a campaign starts at the step "Campaign", to see where the character goes.
+        router.replace(`/c/${r.draft.id}/${start?.step ? "campaign" : "level"}`);
       } catch {
         setProblem(t("common.loadError"));
         setBusy(false);
         started.current = false;
       }
     },
-    [router, t, forPlayer, campaign, joined],
+    [router, t, forPlayer, start],
   );
-  // Building for a player waits until the player is known; one's own waits for the campaign.
-  const own = forPlayer === undefined;
-  const ready = own ? campaign !== undefined : forPlayer !== null && forPlayer !== "missing";
-  const askCampaign = own && campaign === undefined && campaigns !== null && campaigns.length > 0;
-  usePageTitle([t(askCampaign ? "new.campaignQuestion" : "new.question")]);
+  // Building for a player waits until the player is known; one's own waits for the campaigns.
+  const ready = forPlayer === undefined ? start !== undefined : forPlayer !== null && forPlayer !== "missing";
+  usePageTitle([t("new.question")]);
 
   useEffect(() => {
     let live = true;
@@ -147,15 +136,12 @@ function NewCharacter() {
     loadMemberCampaigns().then(
       (c) => {
         if (!live) return;
-        setCampaigns(c);
         const named = c.find((x) => x.id === preferred);
-        setCampaignPick((named ?? c[0])?.id ?? NO_CAMPAIGN);
-        // Nothing to ask: the character is in no campaign. From an invitation: answered already.
-        if (c.length === 0) setCampaign(NO_CAMPAIGN);
-        else if (named) {
-          setCampaign(named.id);
-          if (justJoined) setJoinedName(named.name);
-        }
+        setStart({
+          campaign: (named ?? c[0])?.id ?? null,
+          step: c.length > 0,
+          ...(named && justJoined && { joined: named.name }),
+        });
       },
       () => live && setFailed(true),
     );
@@ -172,17 +158,6 @@ function NewCharacter() {
   }, [list, create, ready]);
 
   const back = forPlayer && forPlayer !== "missing" ? `/campaigns/${forPlayer.campaignId}` : "/characters";
-  // After the campaign question, "Back" goes back to it.
-  const backButton =
-    own && campaigns && campaigns.length > 0 ? (
-      <Button variant="secondary" icon="arrowLeft" onClick={() => setCampaign(undefined)}>
-        {t("common.back")}
-      </Button>
-    ) : (
-      <ButtonLink href={back} variant="secondary" icon="arrowLeft">
-        {t("common.back")}
-      </ButtonLink>
-    );
 
   let content;
   if (forPlayer === "missing") {
@@ -192,36 +167,7 @@ function NewCharacter() {
       </EmptyState>
     );
   } else if (failed) content = <ErrorState onRetry={() => setAttempt((n) => n + 1)} />;
-  else if (askCampaign && campaigns) {
-    content = (
-      <form
-        className="new-campaign"
-        onSubmit={(e) => {
-          e.preventDefault();
-          setCampaign(campaignPick ?? NO_CAMPAIGN);
-        }}
-      >
-        <QuestionHeader id={headingId} question={t("new.campaignQuestion")} />
-        <SelectField
-          label={t("new.campaignLabel")}
-          value={campaignPick ?? NO_CAMPAIGN}
-          onChange={setCampaignPick}
-          options={[
-            ...campaigns.map((c) => ({ value: c.id, label: c.name })),
-            { value: NO_CAMPAIGN, label: t("new.noCampaign") },
-          ]}
-        />
-        <div className="step-footer__bar">
-          <ButtonLink href="/characters" variant="secondary" icon="arrowLeft">
-            {t("common.back")}
-          </ButtonLink>
-          <Button type="submit" iconAfter="arrowRight">
-            {t("common.next")}
-          </Button>
-        </div>
-      </form>
-    );
-  } else if (!list || !ready || (list.length === 1 && !problem)) content = <Loading shape="page" count={2} />;
+  else if (!list || !ready || (list.length === 1 && !problem)) content = <Loading shape="page" count={2} />;
   else if (list.length === 0) {
     content = (
       <EmptyState title={t("new.noneTitle")}>
@@ -243,11 +189,6 @@ function NewCharacter() {
           else void create(picked);
         }}
       >
-        {joined && (
-          <Callout tone="success" role="status">
-            {t("new.joined", { name: joined })}
-          </Callout>
-        )}
         <QuestionHeader id={headingId} question={t("new.question")} intro={t("new.intro")} />
         {forPlayer && <Callout tone="info">{t("new.forPlayer", { name: forPlayer.name })}</Callout>}
         <fieldset className="options" aria-labelledby={headingId}>
@@ -284,7 +225,9 @@ function NewCharacter() {
         <p className="note">{t("new.note")}</p>
         {problem && <Callout tone="warning">{problem}</Callout>}
         <div className="step-footer__bar">
-          {backButton}
+          <ButtonLink href={back} variant="secondary" icon="arrowLeft">
+            {t("common.back")}
+          </ButtonLink>
           <Button type="submit" busy={busy} busyLabel={t("new.creating")} iconAfter="arrowRight">
             {t("new.start")}
           </Button>

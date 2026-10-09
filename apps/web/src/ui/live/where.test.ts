@@ -6,6 +6,7 @@ describe("where someone is on a character", () => {
     expect(stepOfPath("/c/abc/step/folk")).toBe("folk");
     expect(stepOfPath("/c/abc/step/boon-raise%40boon-8")).toBe("boon-raise@boon-8");
     expect(stepOfPath("/c/abc/overview")).toBe("overview");
+    expect(stepOfPath("/c/abc/campaign")).toBe("@campaign");
     expect(stepOfPath("/c/abc/done")).toBe("done");
     expect(stepOfPath("/characters")).toBeNull();
   });
