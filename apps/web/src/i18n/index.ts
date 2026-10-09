@@ -60,12 +60,43 @@ export function formatNumber(lang: string, n: number): string {
   return new Intl.NumberFormat(lang).format(n);
 }
 
+/** French words that lose their vowel before one: "de Armure" is "d’Armure", "le Écu" is "l’Écu". */
+const ELIDED: Record<string, string> = {
+  de: "d",
+  De: "D",
+  le: "l",
+  Le: "L",
+  la: "l",
+  La: "L",
+  que: "qu",
+  Que: "Qu",
+};
+
+/**
+ * French elision where a placeholder meets a word of the template: the
+ * package's word is only known when filled. A word starting with "h" keeps
+ * its "de" ("de Hache"): the rule depends on the word, and a missing
+ * apostrophe reads better than a wrong one.
+ */
+function elide(template: string, lang: string, vars: Vars): string {
+  if (lang !== "fr") return template;
+  return template.replace(
+    /(^|[^\p{L}’'])(de|De|le|Le|la|La|que|Que) \{(\w+)\}/gu,
+    (whole, before: string, word: string, name: string) => {
+      const v = vars[name];
+      return typeof v === "string" && /^[aeiouàâäéèêëîïôöùûüœæ]/iu.test(v)
+        ? `${before}${ELIDED[word]}’{${name}}`
+        : whole;
+    },
+  );
+}
+
 /**
  * Fills the placeholders. A text that starts with one starts with a capital:
  * a word put in small for the middle of a sentence ("level") may open one.
  */
 export function fill(template: string, lang: string, vars: Vars = {}, capital = true): string {
-  const out = template.replace(/\{(\w+)\}/g, (whole, name: string) => {
+  const out = elide(template, lang, vars).replace(/\{(\w+)\}/g, (whole, name: string) => {
     const v = vars[name];
     if (v === undefined) return whole;
     return typeof v === "number" ? formatNumber(lang, v) : v;

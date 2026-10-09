@@ -79,11 +79,11 @@ const RESET_WORDS: Readonly<Record<string, ResetWords>> = {
     notYou: "You did not ask for this? Then delete this email. Nothing will happen.",
   },
   fr: {
-    subject: "Ton lien pour te connecter",
-    one: "Avec ce lien, tu reviens dans ton compte :",
-    many: "Avec ces liens, tu reviens dans tes comptes, un lien par compte :",
-    rules: (m) => `Le lien marche ${m} minutes et une seule fois. Il te montre un nouveau mot de passe.`,
-    notYou: "Tu n'as rien demandé ? Alors efface ce message. Il ne se passe rien.",
+    subject: "Votre lien pour vous connecter",
+    one: "Avec ce lien, vous revenez dans votre compte :",
+    many: "Avec ces liens, vous revenez dans vos comptes, un lien par compte :",
+    rules: (m) => `Le lien marche ${m} minutes et une seule fois. Il vous montre un nouveau mot de passe.`,
+    notYou: "Vous n’avez rien demandé ? Alors effacez ce message. Il ne se passe rien.",
   },
   it: {
     subject: "Il tuo link per accedere",
