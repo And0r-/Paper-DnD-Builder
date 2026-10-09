@@ -32,15 +32,7 @@ import { levelWord, ptext, thingName } from "../package-text.ts";
 import type { LoadedPackage } from "../packages.ts";
 import { useDraft, type SaveState } from "./draft-state.tsx";
 import { levelHeading, levelSpan } from "./level-runs.ts";
-import {
-  CAMPAIGN_KEY,
-  nextOpen,
-  OVERVIEW_KEY,
-  positionOf,
-  progressFraction,
-  RULES_KEY,
-  type FlowEntry,
-} from "./model.ts";
+import { nextOpen, positionOf, progressFraction, type FlowEntry } from "./model.ts";
 import {
   answeredParts,
   stepChange,
@@ -430,14 +422,6 @@ export function FlowLayout({ current, children }: { current: string | undefined;
       : "";
   const wide = useWide();
   const [askingHelp, setAskingHelp] = useState(false);
-  // Phones show the long explanation inside each card instead ("Learn more").
-  const showAside =
-    wide &&
-    current !== undefined &&
-    current !== OVERVIEW_KEY &&
-    current !== "level" &&
-    current !== CAMPAIGN_KEY &&
-    current !== RULES_KEY;
   useEffect(() => setContent(null), [current]);
   return (
     <ChangeCtx.Provider value={change}>
@@ -480,8 +464,11 @@ export function FlowLayout({ current, children }: { current: string | undefined;
             </>
           }
           sidebar={wide ? <StepList current={current} /> : undefined}
+          // Phones show the long explanation inside each card instead ("Learn more").
+          // Wide screens keep the column on every step, even one without options, so
+          // the step list and the question never move between steps (AND-344).
           aside={
-            showAside ? (
+            wide ? (
               <div className="explain-panel" aria-live="off">
                 {content ?? <p className="explain-panel__empty">{t("option.explainEmpty")}</p>}
               </div>
