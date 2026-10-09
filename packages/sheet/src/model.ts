@@ -804,12 +804,13 @@ export function buildSheetModel(
     });
   }
 
-  // Content of an extension that may not be shared, if the character has any (SPEC 17.7).
+  // Content of an extension that is not publishable, if the character has any (SPEC 17.7):
+  // named only when the character has a thing from it, not when it is merely switched on.
   const had = new Set(ev.things.map((h) => h.id));
   const closed = (pkg.extensions ?? [])
     .filter((x) => !x.publishable && x.things.some((id) => had.has(id)))
     .map((x) => x.name[language] ?? x.id);
-  const notForSharing = closed.length > 0 ? messages.notForSharing(list.format(closed)) : "";
+  const fromExtensions = closed.length > 0 ? messages.fromExtensions(list.format(closed)) : "";
 
   return {
     version: 1,
@@ -828,7 +829,7 @@ export function buildSheetModel(
     packageName,
     units,
     unitsLine,
-    attribution: [text("sheet.attribution"), notForSharing].filter((l) => l !== "").join(" "),
+    attribution: [text("sheet.attribution"), fromExtensions].filter((l) => l !== "").join(" "),
     createdOn: messages.createdOn(
       new Intl.DateTimeFormat(language, { dateStyle: "medium" }).format(createdAt),
     ),

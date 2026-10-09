@@ -146,7 +146,7 @@
   "extensions.on": "Erweiterung dazu: {name}",
   "extensions.otherLanguage": "Texte nur auf {language}",
   "extensions.someLanguage": "Manche Texte nur auf {language}",
-  "extensions.notForSharing": "Nicht zur Weitergabe",
+  "extensions.notForSharing": "Bitte ausschalten, wenn du die Erweiterung nicht besitzt.",
   "extensions.inUse": "Ausschalten geht erst, wenn du diese Wahlen änderst: {choices}.",
   "extensions.failed": "Das hat nicht geklappt. Versuch es noch einmal.",
   "pick.counter": "{picked} von {count} gewählt",

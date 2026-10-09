@@ -146,7 +146,7 @@
   "extensions.on": "Añadir la extensión: {name}",
   "extensions.otherLanguage": "Textos solo en {language}",
   "extensions.someLanguage": "Algunos textos solo en {language}",
-  "extensions.notForSharing": "No para compartir",
+  "extensions.notForSharing": "Por favor, desactiva esto si no tienes la expansión.",
   "extensions.inUse": "Podrás quitarla cuando cambies estas elecciones: {choices}.",
   "extensions.failed": "No ha funcionado. Inténtalo de nuevo.",
   "pick.counter": "{picked} de {count} elegidos",
