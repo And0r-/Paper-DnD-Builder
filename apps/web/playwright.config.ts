@@ -41,6 +41,8 @@ export default defineConfig({
   },
   projects: [
     { name: "phone", testIgnore: /rules-step\.spec\.ts$/ },
+    // Firefox handles clicks on nested cards its own way (AND-342): the click tests run there too.
+    { name: "firefox", testMatch: /card-click\.spec\.ts/, use: { ...devices["Desktop Firefox"] } },
     {
       name: "two-games",
       testMatch: /rules-step\.spec\.ts$/,

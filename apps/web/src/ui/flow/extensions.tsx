@@ -1,10 +1,11 @@
 "use client";
 /**
  * Extensions of the character's package (SPEC 17): one switch each, under
- * the level. Shown only when the package has an extension. Off by default;
- * it can be switched on later, also when raising the level. It goes off
- * only while no answer comes from it; until then the switch says which
- * choices to change first.
+ * the level. Shown only when the package has an extension. On by default
+ * (the owner's decision, AND-330): an extension from a book the player
+ * does not own asks to be switched off. It can be switched on again later,
+ * also when raising the level. It goes off only while no answer comes from
+ * it; until then the switch says which choices to change first.
  */
 import { useEffect, useId, useState } from "react";
 import { answersFromExtension } from "@builder/core";
@@ -74,6 +75,12 @@ export function ExtensionSwitches() {
             key={x.id}
             className={`option option--compact${on ? " option--checked" : ""}`}
             aria-busy={busy?.id === x.id || undefined}
+            onClick={(e) => {
+              // The whole card ticks, as on the choice screens (AND-342). The input's own
+              // click (also from its label) already did; a disabled input ignores the click.
+              if ((e.target as HTMLElement).closest("input, label")) return;
+              e.currentTarget.querySelector<HTMLInputElement>(".option__input")?.click();
+            }}
           >
             <div className="option__head">
               <input

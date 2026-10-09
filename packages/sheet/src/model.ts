@@ -296,6 +296,11 @@ export function buildSheetModel(
     return ev.things.filter((h) => selected.has(h.id)).map((h) => things.get(h.id)!);
   };
   const heldById = new Map(ev.things.map((h) => [h.id, h]));
+  /** The name with the texts written when it was picked (`textInputs`): "Far Lore (Salt Marshes, Ember Hills)". */
+  const heldName = (id: string): string => {
+    const texts = heldById.get(id)?.texts ?? [];
+    return texts.length > 0 ? `${thingName(id)} (${texts.join(", ")})` : thingName(id);
+  };
   /** Values the sheet shows somewhere: only these are named as depending on another. The level is in the header. */
   const placed = new Set<string>(["level"]);
   const place = (v: StatValue | undefined, swap: Swap = {}): void => {
@@ -333,7 +338,7 @@ export function buildSheetModel(
   /** "8 × Rope"; just the name for one. */
   const counted = (id: string): string => {
     const n = heldById.get(id)?.count ?? 1;
-    return n > 1 ? messages.count(numberFormat.format(n), thingName(id)) : thingName(id);
+    return n > 1 ? messages.count(numberFormat.format(n), heldName(id)) : heldName(id);
   };
   /**
    * What brought a thing to the character: followed up through the things
@@ -402,7 +407,7 @@ export function buildSheetModel(
             return {
               label: text(f.label ?? `kind.${f.things.kind}.name`),
               text: heldOf(f.things)
-                .map((t) => thingName(t.id))
+                .map((t) => heldName(t.id))
                 .join(", "),
             };
           if ("choice" in f)
@@ -510,7 +515,7 @@ export function buildSheetModel(
           if (!byHand && !shownAs.has(total.value)) shownAs.set(total.value, thingName(t.id));
           return {
             id: t.id,
-            name: thingName(t.id),
+            name: heldName(t.id),
             marked: held.has(t.id),
             strong: held.has(t.id) && strong.has(t.id),
             note: note === undefined ? "" : statText(note),
@@ -537,7 +542,7 @@ export function buildSheetModel(
           columns: s.columns.map((c) => text(`stat.${c.stat}.name`)),
           wrap: s.columns.map((c) => c.wrap === true),
           rows: heldOf(s.things).map((t) => ({
-            name: thingName(t.id),
+            name: heldName(t.id),
             // Numbers only: a table row is one line, so a few weapons still fit beside other boxes.
             cells: s.columns.map((c) => {
               const v = t.stats?.[c.stat];
@@ -607,7 +612,7 @@ export function buildSheetModel(
           if (s.uses !== undefined) place(t.stats?.[s.uses]);
           return {
             id: t.id,
-            name: thingName(t.id),
+            name: heldName(t.id),
             marks: on.map((i) => text(signs[i]!.text)).join(" "),
             note: [note === undefined ? "" : statText(note), emptyBy.has(t.id) ? nothingToChoose : ""]
               .filter((n) => n !== "")
@@ -703,8 +708,8 @@ export function buildSheetModel(
     if (state.status !== "answered") return "";
     const a = state.answer as Record<string, unknown>;
     if (typeof a["text"] === "string") return a["text"].trim();
-    if (typeof a["pick"] === "string") return thingName(a["pick"]);
-    if (Array.isArray(a["picks"])) return (a["picks"] as string[]).map(thingName).join(", ");
+    if (typeof a["pick"] === "string") return heldName(a["pick"]);
+    if (Array.isArray(a["picks"])) return (a["picks"] as string[]).map(heldName).join(", ");
     if (typeof a["value"] === "number") {
       const choice = pkg.flow.choices.find((c) => c.id === choiceId);
       const unit = choice?.kind === "number" ? valueDefs.get(choice.target)?.unit : undefined;
@@ -809,12 +814,13 @@ export function buildSheetModel(
     });
   }
 
-  // Content of an extension that may not be shared, if the character has any (SPEC 17.7).
+  // Content of an extension that is not publishable, if the character has any (SPEC 17.7):
+  // named only when the character has a thing from it, not when it is merely switched on.
   const had = new Set(ev.things.map((h) => h.id));
   const closed = (pkg.extensions ?? [])
     .filter((x) => !x.publishable && x.things.some((id) => had.has(id)))
     .map((x) => x.name[language] ?? x.id);
-  const notForSharing = closed.length > 0 ? messages.notForSharing(list.format(closed)) : "";
+  const fromExtensions = closed.length > 0 ? messages.fromExtensions(list.format(closed)) : "";
 
   return {
     version: 1,
@@ -833,7 +839,7 @@ export function buildSheetModel(
     packageName,
     units,
     unitsLine,
-    attribution: [text("sheet.attribution"), notForSharing].filter((l) => l !== "").join(" "),
+    attribution: [text("sheet.attribution"), fromExtensions].filter((l) => l !== "").join(" "),
     createdOn: messages.createdOn(
       new Intl.DateTimeFormat(language, { dateStyle: "medium" }).format(createdAt),
     ),

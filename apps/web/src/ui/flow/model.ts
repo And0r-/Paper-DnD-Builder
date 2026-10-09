@@ -503,6 +503,19 @@ export function answerThings(
   }
 }
 
+/** The texts written when a held thing was picked, as the sheet writes them after its name: " (Salt Marshes, Ember Hills)". */
+export function heldTexts(ev: Evaluation, id: string): string {
+  const texts = ev.things.find((h) => h.id === id)?.texts ?? [];
+  return texts.length > 0 ? ` (${texts.join(", ")})` : "";
+}
+
+/** Every pick of the choice is there; what is open are texts a picked thing asks for (`textInputs`). */
+export function onlyTextsMissing(state: ChoiceState): boolean {
+  return (
+    state.status === "incomplete" && (state.textsMissing?.length ?? 0) > 0 && (state.remaining ?? 0) === 0
+  );
+}
+
 /** "Choose 1 more talent" from the package, or the builder's own words. */
 export function missingText(
   lp: LoadedPackage,
@@ -511,6 +524,9 @@ export function missingText(
   t: Translator["t"],
 ): string {
   if (state.status === "invalid") return t("flow.needsAttention");
+  // Every pick is there, only texts a pick asks for are empty: the package's words are about picks.
+  if (onlyTextsMissing(state))
+    return t("pick.textsMissing", { thing: state.textsMissing!.map((id) => thingName(lp, id)).join(", ") });
   const own = choiceTexts(lp, state.id, state, ctx).missing;
   const count = state.count ?? 0;
   const remaining = state.remaining ?? count;

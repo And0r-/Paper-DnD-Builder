@@ -133,6 +133,23 @@ export function createApp(parts: AppParts): App {
   };
 }
 
+/**
+ * Switches every loaded extension on for each character of its package,
+ * once per database (AND-330): new characters have them on by default, and
+ * the ones from before get the same. Switching one on changes no answer.
+ * Waits while no extension is loaded at all, so a start without them does
+ * not use the step up.
+ */
+export async function switchOnExtensionsOnce(app: App): Promise<void> {
+  const byBase: Record<string, string[]> = {};
+  for (const e of app.packages.extensions.values()) (byBase[e.base] ??= []).push(e.id);
+  if (Object.keys(byBase).length === 0) return;
+  const changed = await app.store.switchOnExtensionsOnce("extensions-on", byBase, app.now());
+  if (changed.length > 0) {
+    console.log(`Drafts: switched the loaded extensions on for ${changed.length} character(s), once.`);
+  }
+}
+
 // One app per server process; kept on globalThis so dev hot reloads reuse it.
 const holder = globalThis as unknown as { __builderApp?: Promise<App> };
 
@@ -145,7 +162,7 @@ export function getApp(): Promise<App> {
     if (!outbox && (!config.smtp || !config.mailFrom)) {
       console.error("Mail: SMTP_HOST or MAIL_FROM is not set; game masters cannot add players by address.");
     }
-    return createApp({
+    const app = createApp({
       config,
       // Local trials and browser tests only; see local-backends.ts.
       db:
@@ -155,6 +172,8 @@ export function getApp(): Promise<App> {
       packages,
       mailer: outbox ? outboxMailer(outbox) : createSmtpMailer(config.smtp, config.mailFrom),
     });
+    await switchOnExtensionsOnce(app);
+    return app;
   })();
   return holder.__builderApp;
 }

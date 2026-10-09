@@ -13,7 +13,9 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { translator } from "../../i18n/index.ts";
 import type { LoadedPackage } from "../packages.ts";
+import { measureContext } from "../package-text.ts";
 import { chooseForMe } from "./choose.ts";
+import { missingText } from "./model.ts";
 import { flowOf } from "./raise.ts";
 
 const pkg = (await validatePackageDir(DEMO_PACKAGE_DIR)).package!;
@@ -151,5 +153,35 @@ describe("choose for me", () => {
     )!.pool!;
     for (const p of was) expect(pool.picks).toContain(p);
     expect(pool.remaining).toBe(0);
+  });
+});
+
+describe("choose for me and texts at an option", () => {
+  const FAR = "trait.far-lore";
+  const start = () => {
+    const d = newDraft(pkg, 1);
+    if (!d.ok) throw new Error("no draft");
+    return apply(d.doc, { type: "answer", choice: "calling", answer: { pick: "calling.herbalist" } });
+  };
+
+  it("cannot write a pick's texts: with the pick there and only texts open, it offers nothing", () => {
+    const doc = apply(start(), { type: "answer", choice: "herb-craft", answer: { pick: FAR } });
+    const ev = evaluateDraft(pkg, doc);
+    expect(ev.choices["herb-craft"]!.textsMissing).toEqual([FAR]);
+    expect(chooseForMe(lp, doc, ev, "herb-craft", () => 0)).toBeUndefined();
+    expect(missingText(lp, measureContext(lp, undefined), ev.choices["herb-craft"]!, t)).toBe(
+      "Schreib noch in die leeren Felder bei Fernkunde.",
+    );
+  });
+
+  it("keeps the texts written for another pick when it picks the package's recommendation", () => {
+    const texts = { [FAR]: { first: "Salzmarschen" } };
+    const doc = start();
+    // The stored answer is a pick that no longer fits; its texts stay with the new one.
+    const stale = { ...doc, answers: { ...doc.answers, "herb-craft": { pick: "trait.nowhere", texts } } };
+    const changes = chooseForMe(lp, stale, evaluateDraft(pkg, stale), "herb-craft", () => 0);
+    expect(changes).toEqual([
+      { type: "answer", choice: "herb-craft", answer: { pick: "trait.leaf-lore", texts } },
+    ]);
   });
 });

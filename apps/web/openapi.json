@@ -1584,7 +1584,7 @@
                       "type": "string"
                     },
                     "maxItems": 20,
-                    "description": "Extensions of the package to switch on; none if left out."
+                    "description": "Extensions of the package to switch on: all of its loaded extensions if left out, none if empty."
                   },
                   "campaignId": {
                     "anyOf": [
@@ -5046,7 +5046,7 @@
                       "type": "string"
                     },
                     "maxItems": 20,
-                    "description": "Extensions of the package to switch on; none if left out."
+                    "description": "Extensions of the package to switch on: all of its loaded extensions if left out, none if empty."
                   },
                   "campaignId": {
                     "anyOf": [
@@ -8326,6 +8326,13 @@
           "track": {
             "type": "string",
             "description": "The track it belongs to: a track itself, or a thing that came through one (package format SPEC 9.7)."
+          },
+          "texts": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The texts written when it was picked (its `textInputs`), trimmed, in the thing's order; empty ones left out."
           }
         },
         "required": ["id", "kind", "atLevel"],
@@ -8462,6 +8469,13 @@
           "track": {
             "type": "string",
             "description": "The track the choice came through (package format SPEC 9.7); a choice of an added track is a copy `<choice>@<track>`."
+          },
+          "textsMissing": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Pick choices: picked things whose needed texts (`textInputs`) are still empty; the choice is `incomplete` until they are written."
           }
         },
         "required": ["id", "kind", "step", "optional", "status", "atLevel"],
@@ -8714,6 +8728,17 @@
             "properties": {
               "pick": {
                 "type": "string"
+              },
+              "texts": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string",
+                    "maxLength": 1000
+                  }
+                },
+                "description": "Texts written for picked things (the thing's `textInputs`), by thing and input key. Texts of a thing not picked now are kept."
               }
             },
             "required": ["pick"],
@@ -8728,6 +8753,17 @@
                 "items": {
                   "type": "string"
                 }
+              },
+              "texts": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string",
+                    "maxLength": 1000
+                  }
+                },
+                "description": "Texts written for picked things (the thing's `textInputs`), by thing and input key. Texts of a thing not picked now are kept."
               }
             },
             "required": ["picks"],

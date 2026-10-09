@@ -449,7 +449,11 @@ async function walk(server: TestServer): Promise<void> {
   const k = { authorization: `Bearer ${key}` };
   await call("POST", "/api/drafts", { packageId: "nothing" }, k);
   await call("POST", "/api/drafts", { packageId: "demo", level: 999 }, k);
+  // Without `extensions`, all of the package's extensions are on; an empty list, none.
+  const none = (await call("POST", "/api/drafts", { packageId: "demo", extensions: [] }, k)).json;
+  expect(none.draft.extensions).toEqual([]);
   let view = (await call("POST", "/api/drafts", { packageId: "demo", level: 2 }, k)).json;
+  expect(view.draft.extensions).toEqual(["demo-tides"]);
   const id: string = view.draft.id;
   await call("GET", `/api/drafts/${id}`, undefined, k);
   await call("GET", "/api/drafts/00000000-0000-4000-8000-000000000000", undefined, k);

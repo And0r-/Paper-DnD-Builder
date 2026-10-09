@@ -51,8 +51,11 @@ export interface Messages {
   rulesTextsTitle: string;
   /** The rules texts part of a character that has no thing with a text. */
   noRulesTexts: string;
-  /** After the package's attribution: the character has content of an extension that may not be shared (SPEC 17.7). */
-  notForSharing: (names: string) => string;
+  /**
+   * After the package's attribution: the character has content of an extension that is not
+   * publishable (SPEC 17.7). Names where it comes from; sharing the character is fine (AND-330).
+   */
+  fromExtensions: (names: string) => string;
   /** A choice with no option that fits the character: it was not asked (on its feature's row, or as its answer). */
   nothingToChoose: string;
   /** Hint under the box of a value that adds up levels of tracks: the tracks the character has levels in. */
@@ -88,7 +91,7 @@ export const MESSAGES: Readonly<Record<string, Messages>> = {
     rulesTexts: "Regeltexte",
     rulesTextsTitle: "Regeltexte zum Nachlesen",
     noRulesTexts: "Dieser Charakter hat nichts mit einem Regeltext.",
-    notForSharing: (names) => `Enthält Inhalt aus ${names}, nicht zur Weitergabe.`,
+    fromExtensions: (names) => `Enthält Inhalt aus ${names}.`,
     nothingToChoose: "Nichts zu wählen: Keine Möglichkeit passt zu diesem Charakter.",
     fromLevelsAs: (tracks) => `Aus deinen Stufen als ${tracks}.`,
   },
@@ -120,7 +123,7 @@ export const MESSAGES: Readonly<Record<string, Messages>> = {
     rulesTexts: "Rules texts",
     rulesTextsTitle: "Rules texts to read up on",
     noRulesTexts: "This character has nothing with a rules text.",
-    notForSharing: (names) => `Contains content from ${names}, not for sharing.`,
+    fromExtensions: (names) => `Contains content from ${names}.`,
     nothingToChoose: "Nothing to choose: no option fits this character.",
     fromLevelsAs: (tracks) => `From your ${tracks} levels.`,
   },
@@ -152,8 +155,8 @@ export const MESSAGES: Readonly<Record<string, Messages>> = {
     rulesTexts: "Textes de règles",
     rulesTextsTitle: "Textes de règles à relire",
     noRulesTexts: "Ce personnage n’a rien avec un texte de règle.",
-    notForSharing: (names) =>
-      `Contient du contenu ${/^[aeiouàâéèêîïôœ]/i.test(names) ? "d’" : "de "}${names}, pas pour le partage.`,
+    fromExtensions: (names) =>
+      `Contient du contenu ${/^[aeiouàâéèêîïôœ]/i.test(names) ? "d’" : "de "}${names}.`,
     nothingToChoose: "Rien à choisir : aucune option ne convient à ce personnage.",
     fromLevelsAs: (tracks) => `De vos niveaux ${/^[aeiouàâéèêîïôœ]/i.test(tracks) ? "d’" : "de "}${tracks}.`,
   },
@@ -185,7 +188,7 @@ export const MESSAGES: Readonly<Record<string, Messages>> = {
     rulesTexts: "Testi delle regole",
     rulesTextsTitle: "Testi delle regole da rileggere",
     noRulesTexts: "Questo personaggio non ha niente con un testo delle regole.",
-    notForSharing: (names) => `Contiene contenuti da ${names}, non da condividere.`,
+    fromExtensions: (names) => `Contiene contenuti da ${names}.`,
     nothingToChoose: "Niente da scegliere: nessuna opzione è adatta a questo personaggio.",
     fromLevelsAs: (tracks) => `Dai tuoi livelli da ${tracks}.`,
   },
@@ -217,7 +220,7 @@ export const MESSAGES: Readonly<Record<string, Messages>> = {
     rulesTexts: "Textos de reglas",
     rulesTextsTitle: "Textos de reglas para consultar",
     noRulesTexts: "Este personaje no tiene nada con un texto de regla.",
-    notForSharing: (names) => `Contiene contenido de ${names}, no para compartir.`,
+    fromExtensions: (names) => `Contiene contenido de ${names}.`,
     nothingToChoose: "Nada que elegir: ninguna opción encaja con este personaje.",
     fromLevelsAs: (tracks) => `De tus niveles de ${tracks}.`,
   },

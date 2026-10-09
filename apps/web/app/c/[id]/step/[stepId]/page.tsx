@@ -23,7 +23,7 @@ import { useDraft } from "../../../../../src/ui/flow/draft-state.tsx";
 import { PoolList, poolMissingText } from "../../../../../src/ui/flow/pool.tsx";
 import { ChoiceSource } from "../../../../../src/ui/flow/source.tsx";
 import { StepFooter, StepFrame, StepShortcuts, usePageTitle } from "../../../../../src/ui/flow/frame.tsx";
-import { firstOpen, missingText } from "../../../../../src/ui/flow/model.ts";
+import { firstOpen, missingText, onlyTextsMissing } from "../../../../../src/ui/flow/model.ts";
 import { choiceOf, choiceTexts, stepTexts, thingName } from "../../../../../src/ui/package-text.ts";
 import { useMeasure } from "../../../../../src/ui/components/RichText.tsx";
 
@@ -64,7 +64,7 @@ export default function StepPage() {
   const way = head?.def.kind === "distribute" ? head.def.methods[ways[head.def.id] ?? 0] : undefined;
   const problem = !head
     ? undefined
-    : pool && head.state.status !== "invalid"
+    : pool && head.state.status !== "invalid" && !onlyTextsMissing(head.state)
       ? poolMissingText(lp, ctx, ev, pool, t, list)
       : way?.method === "array" && head.state.status !== "invalid"
         ? t("dist.arrayMissing")
@@ -77,7 +77,8 @@ export default function StepPage() {
   const canChoose =
     open.length > 0 &&
     (pool
-      ? pool.recommended.length > 0 || pool.picks.length > 0
+      ? (pool.recommended.length > 0 || pool.picks.length > 0) &&
+        !open.every((c) => onlyTextsMissing(c.state))
       : open.every((c) => suggestedAnswer(lp, c.def, c.state, new Set()) !== undefined));
   const chooseForMe = canChoose
     ? () => chooseForMeChanges(lp, doc, ev, entry.key)?.forEach((c) => change(c))
