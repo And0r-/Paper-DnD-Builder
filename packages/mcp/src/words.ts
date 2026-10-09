@@ -5,7 +5,7 @@
  * tool shows comes from here; nothing is filled from another language.
  */
 import { convertAmount, parseTemplate, type Units } from "@builder/format/pure";
-import type { ChoiceState, TextValue, TrackLevels } from "./api-types.ts";
+import type { ChoiceState, TextInput, TextValue, TrackLevels } from "./api-types.ts";
 
 export interface WordsContext {
   texts: Readonly<Record<string, TextValue>>;
@@ -13,6 +13,8 @@ export interface WordsContext {
   language: string;
   /** The account's unit per dimension; a missing one follows the language. */
   preferred: Readonly<Record<string, string>>;
+  /** The texts a pick of a thing asks for, by thing. */
+  textInputs?: ReadonlyMap<string, readonly TextInput[]>;
 }
 
 type Vars = Readonly<Record<string, string | number>>;
@@ -60,6 +62,16 @@ export class Words {
 
   step(id: string, field: string): string | null {
     return this.text(`step.${id}.${field}`);
+  }
+
+  /** The texts a pick of a thing asks for, each with its label; empty if it asks for none. */
+  textInputs(key: string) {
+    return (this.ctx.textInputs?.get(key) ?? []).map((i) => ({
+      input: i.id,
+      label: this.text(`${key}.input.${i.id}.label`) ?? i.id,
+      maxLength: i.maxLength,
+      ...(i.optional ? { optional: true } : {}),
+    }));
   }
 
   /** "Name, short, what it is, what you do with it, who it suits" of a thing. */

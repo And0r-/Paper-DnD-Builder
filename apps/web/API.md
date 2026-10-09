@@ -227,6 +227,18 @@ Answer shapes by choice kind: `pickOne` `{ "pick": "thing.key" }`,
 `number` `{ "value": 20 }`, `text` `{ "text": "..." }`. `info` choices take
 no answer. A partial `pickMany` answer is allowed; the choice stays open.
 
+**Texts at an option** (format `textInputs`): a pick answer may carry the
+texts the player writes for picked things, by thing and input key:
+`{ "pick": "trait.far-lore", "texts": { "trait.far-lore": { "first": "Salt Marshes", "second": "Ember Hills" } } }`
+(`pickMany` the same, next to `picks`). Until every needed text of a pick
+is written, the choice is `incomplete` with `textsMissing` (the picked
+things that still need one) and `remaining: 0`; a text over its
+`maxLength` or with a line break or control character is refused
+(`tooLong`, `badCharacters`). Texts of a thing that is not picked are kept,
+so picking it again restores them. The evaluation's `things` carry the
+trimmed texts as `texts`, and the sheet writes them after the name. Live
+help sends the same answer in its `answer` message.
+
 **Raising values** (format 0.9, a `distribute` choice whose method is
 `raise`): the same shape, `{ "method": 0, "assign": { "heart": 2 } }` or
 `{ "method": 0, "assign": { "wit": 1, "heart": 1 } }`. `assign` names only

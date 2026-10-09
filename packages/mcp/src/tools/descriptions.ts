@@ -43,7 +43,8 @@ export const TOOL_DESCRIPTIONS = {
     "Answer one choice of a character, or remove its answer with answer null. The shape follows the " +
     'choice\'s kind (see list_options): pickOne {"pick": "<option id>"}, pickMany {"picks": [...]}, ' +
     'distribute {"method": <index>, "assign": {"<value id>": <number>}}, number {"value": <number>}, ' +
-    'text {"text": "..."}. If the rules refuse the answer, the result says why and nothing changes. ' +
+    'text {"text": "..."}. An option with asksForTexts also needs "texts": {"<option id>": {"<input>": "..."}} ' +
+    "in the same answer (send the picks again with it). If the rules refuse the answer, the result says why and nothing changes. " +
     "An answer can change what is asked after it, never what comes before.",
   answer_pool:
     "Answer all choices of a step that share one list of options at once: give every pick of the step and " +

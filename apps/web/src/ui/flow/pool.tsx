@@ -17,7 +17,7 @@ import { fillNodes, listNodes, ThingName } from "../components/ThingName.tsx";
 import { useMeasure } from "../components/RichText.tsx";
 import { plain, ptext, thingName } from "../package-text.ts";
 import type { LoadedPackage } from "../packages.ts";
-import { OptionCard } from "./choices.tsx";
+import { OptionCard, PickTexts } from "./choices.tsx";
 import { longListGroups, SEARCH_FROM } from "./long-list.ts";
 import { useDraft } from "./draft-state.tsx";
 import { useGuardedChange } from "./guard.tsx";
@@ -154,6 +154,11 @@ export function PoolList({
   const badges = Object.assign({}, ...states.map((s) => s.badges ?? {})) as Record<string, string>;
   const blocked = new Set(pool.blocked);
   const stepName = stepTitle(lp, ev, step.id);
+  /** The choice of the list a pick counts for: its texts are part of that choice's answer. */
+  const holder = (id: string): ChoiceState | undefined => {
+    const c = pool.choices.find((x) => x.picks.includes(id));
+    return c ? ev.choices[c.choice] : undefined;
+  };
 
   // Why an option is greyed: the only sources that offer it are full.
   const reason = (id: string): string | undefined => {
@@ -267,7 +272,11 @@ export function PoolList({
                 level={ev.level}
                 blocked={reason(th.id)}
                 onToggle={() => toggle(th.id)}
-              />
+              >
+                {th.textInputs && holder(th.id) && (
+                  <PickTexts choice={holder(th.id)!.id} thing={th} state={holder(th.id)!} />
+                )}
+              </OptionCard>
             ))}
           </div>
         </div>

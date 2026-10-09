@@ -234,6 +234,19 @@ export const statValueSchema = z.union(
   },
 );
 
+/**
+ * A free text the player writes when picking the thing, e.g. two folks a
+ * hunter knows best. Label: `<thing>.input.<id>.label`; optional hint in the
+ * empty field: `<thing>.input.<id>.placeholder`.
+ */
+export const textInputSchema = z.strictObject({
+  id,
+  /** Most characters. */
+  maxLength: z.number().int().min(1).max(200),
+  /** The pick counts without it. Default: the text is needed. */
+  optional: z.boolean().optional(),
+});
+
 export const thingSchema = z.strictObject({
   id,
   kind: id,
@@ -263,6 +276,16 @@ export const thingSchema = z.strictObject({
    * Each pick asks the choices it grants anew, as copies `<choice>@<where picked>`.
    */
   repeatable: z.boolean().optional(),
+  /**
+   * Texts the player writes when picking the thing in a pickOne or pickMany
+   * choice, shown with its name on the sheet: "Name (text, text)".
+   */
+  textInputs: z
+    .array(textInputSchema)
+    .min(1)
+    .max(4)
+    .refine((l) => new Set(l.map((i) => i.id)).size === l.length, { message: "input ids must differ" })
+    .optional(),
 });
 
 export const thingsFileSchema = z.array(thingSchema);
@@ -771,6 +794,7 @@ export type Amount = z.infer<typeof amountSchema>;
 export type StatValue = z.infer<typeof statValueSchema>;
 export type FilledText = z.infer<typeof filledText>;
 export type Thing = z.infer<typeof thingSchema>;
+export type TextInput = z.infer<typeof textInputSchema>;
 export type OptionSource = z.infer<typeof optionSourceSchema>;
 export type ChoiceOptions = z.infer<typeof choiceOptionsSchema>;
 export type Choice = z.infer<typeof choiceSchema>;

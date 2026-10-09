@@ -664,6 +664,17 @@
   display: block;
 }
 
+/* The texts a picked option asks for, right under its sentence. */
+.option__texts {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  max-width: 65ch;
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-border);
+  cursor: auto;
+}
+
 /* Large screens show the long explanation in the right column instead. */
 @media (min-width: 1024px) {
   .shell--columns .option__more {

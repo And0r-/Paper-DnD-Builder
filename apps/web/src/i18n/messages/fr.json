@@ -159,6 +159,8 @@
   "pick.noResults": "Rien trouvé. Essayez un autre mot.",
   "pick.missing": "Choisissez encore {remaining}. Vous en avez {picked} sur {count}.",
   "pick.missingOne": "Choisissez encore une possibilité.",
+  "pick.textsMissing": "Remplissez encore les champs vides sous {thing}.",
+  "pick.textsOf": "Ces champs appartiennent à {thing}.",
   "pick.noOptions": "Il n’y a rien à choisir ici pour l’instant.",
   "pool.total": "Vous choisissez {count} : {sources}.",
   "pool.countFrom": "{count} {from}",

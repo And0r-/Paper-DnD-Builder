@@ -36,8 +36,14 @@ const level = z.number().int().describe(D.level);
 
 const answer = z
   .union([
-    z.strictObject({ pick: z.string() }),
-    z.strictObject({ picks: z.array(z.string()) }),
+    z.strictObject({
+      pick: z.string(),
+      texts: z.record(z.string(), z.record(z.string(), z.string())).optional(),
+    }),
+    z.strictObject({
+      picks: z.array(z.string()),
+      texts: z.record(z.string(), z.record(z.string(), z.string())).optional(),
+    }),
     z.strictObject({ method: z.number().int().min(0), assign: z.record(z.string(), z.number().int()) }),
     z.strictObject({ value: z.number() }),
     z.strictObject({ text: z.string() }),
@@ -331,18 +337,25 @@ function pickDetails(words: Words, c: ChoiceState, pool: { recommended?: string[
     ...(c.count !== undefined ? { count: c.count, ...(c.upTo ? { fewerIsFine: true } : {}) } : {}),
     ...(c.remaining !== undefined ? { remaining: c.remaining } : {}),
     ...(c.held?.length ? { alreadyHas: c.held.map((t) => words.name(t)) } : {}),
+    ...(c.textsMissing?.length ? { textsMissingFor: c.textsMissing } : {}),
     ...(pool ? { sharedListStep: c.step } : {}),
     options: (c.options ?? []).map((o) => {
       const rank = recommended.indexOf(o);
       const badge = c.badges?.[o];
+      const texts = words.textInputs(o);
       return {
         option: o,
         ...words.thing(o),
         ...(rank >= 0 ? { recommended: rank + 1 } : {}),
         ...(badge ? { badge: words.text(badge) ?? badge } : {}),
+        ...(texts.length > 0 ? { asksForTexts: texts } : {}),
       };
     }),
-    answerShape: c.kind === "pickOne" ? '{"pick": "<option id>"}' : '{"picks": ["<option id>", ...]}',
+    answerShape:
+      (c.kind === "pickOne" ? '{"pick": "<option id>"' : '{"picks": ["<option id>", ...]') +
+      ((c.options ?? []).some((o) => words.textInputs(o).length > 0)
+        ? ', "texts": {"<option id>": {"<input>": "..."}}} (texts only for picked options with asksForTexts)'
+        : "}"),
   };
 }
 

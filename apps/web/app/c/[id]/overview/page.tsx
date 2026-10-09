@@ -7,7 +7,7 @@
 import { headTracks, summarize, tracksText } from "@builder/core";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useId, useState, type ReactNode } from "react";
+import { Fragment, useId, useState, type ReactNode } from "react";
 import { useApp } from "../../../../src/ui/app-state.tsx";
 import { Button, ButtonLink } from "../../../../src/ui/components/Button.tsx";
 import { Callout } from "../../../../src/ui/components/Feedback.tsx";
@@ -27,6 +27,7 @@ import {
   asks,
   CAMPAIGN_KEY,
   describeAnswer,
+  heldTexts,
   OVERVIEW_KEY,
   positionOf,
 } from "../../../../src/ui/flow/model.ts";
@@ -161,7 +162,12 @@ export default function OverviewPage() {
                       const text =
                         named && named.things.length + named.values.length > 0
                           ? listNodes(t, [
-                              ...named.things.map((id) => <ThingName key={id} lp={lp} id={id} />),
+                              ...named.things.map((id) => (
+                                <Fragment key={id}>
+                                  <ThingName lp={lp} id={id} />
+                                  {heldTexts(ev, id)}
+                                </Fragment>
+                              )),
                               ...named.values,
                             ])
                           : describeAnswer(lp, ctx, state, list, grown, ev.values);
