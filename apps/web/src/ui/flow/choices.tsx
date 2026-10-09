@@ -1167,7 +1167,7 @@ export function TextChoice({
     if ((focused.current || theirs) && storedText(value) !== stored) {
       const c = told?.change;
       const from =
-        told && c?.kind === "answer" && c.choice === choice.id
+        told?.source && c?.kind === "answer" && c.choice === choice.id
           ? fromText(told.source, viewer, t)
           : t("text.elsewhere");
       setTheirs({ text: stored, from });

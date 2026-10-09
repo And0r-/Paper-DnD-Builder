@@ -31,6 +31,21 @@ describe("pendingOf", () => {
 });
 
 describe("rebase", () => {
+  it("sends the tracks unless someone else moved them meanwhile", () => {
+    const before: DraftDocument = { level: 3, answers: {}, tracks: ["a", "a"] };
+    const p = pendingOf({ type: "tracks", tracks: ["a", "b"] }, before);
+    expect(p).toEqual({ type: "tracks", tracks: ["a", "b"], base: ["a", "a"] });
+    expect(rebase(p, { ...before, level: 4 }).next).toBe(p);
+    expect(toChange(p, before)).toEqual({ type: "tracks", tracks: ["a", "b"] });
+    expect(rebase(p, { ...before, tracks: ["b", "b"] })).toEqual({
+      next: null,
+      gaveWay: true,
+      alongside: {},
+    });
+    expect(rebase(p, { ...before, tracks: ["a", "b"] }).gaveWay).toBe(false);
+    expect(sameTarget(p, { type: "tracks", tracks: [], base: [] })).toBe(true);
+  });
+
   it("puts our value on top of a value someone else changed meanwhile (AND-270)", () => {
     // A is offline and lowers wits; B raises brawn meanwhile.
     const a = pendingOf(

@@ -33,6 +33,8 @@ export interface Source {
 export type Change =
   | { kind: "answer"; choice: string }
   | { kind: "pool"; step: string }
+  /** The levels moved between tracks; the line names it as the level. */
+  | { kind: "tracks" }
   | { kind: "level"; level: number }
   | { kind: "levelUp"; level: number }
   | {

@@ -113,6 +113,7 @@ export function whatText(
       return words.step(c.step);
     case "level":
     case "levelUp":
+    case "tracks":
       return words.level;
     case "state":
     case "clearChecks":

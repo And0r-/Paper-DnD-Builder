@@ -31,7 +31,9 @@ export type Pending =
       base: Record<string, number>;
     }
   /** `base`: the answers of the step's choices before. */
-  | { type: "pool"; step: string; picks: string[]; base: Record<string, unknown> };
+  | { type: "pool"; step: string; picks: string[]; base: Record<string, unknown> }
+  /** The track of each level from 2 on; `base`: the tracks before. */
+  | { type: "tracks"; tracks: string[]; base: string[] };
 
 /** What a newer state of the server did to a change still on its way. */
 export interface Rebased {
@@ -74,6 +76,8 @@ export function pendingOf(c: DraftChange, doc: DraftDocument, poolChoices: reado
   switch (c.type) {
     case "setLevel":
       return { type: "setLevel", level: c.level, base: doc.level };
+    case "tracks":
+      return { type: "tracks", tracks: c.tracks, base: doc.tracks ?? [] };
     case "pool":
       return {
         type: "pool",
@@ -106,6 +110,7 @@ export function pendingOf(c: DraftChange, doc: DraftDocument, poolChoices: reado
 /** Two changes of the same thing: only one needs to be sent. */
 export function sameTarget(a: Pending, b: Pending): boolean {
   if (a.type === "setLevel") return b.type === "setLevel";
+  if (a.type === "tracks") return b.type === "tracks";
   if (a.type === "pool") return b.type === "pool" && a.step === b.step;
   return (b.type === "answer" || b.type === "assign") && a.choice === b.choice;
 }
@@ -153,6 +158,11 @@ export function rebase(p: Pending, doc: DraftDocument): Rebased {
     case "setLevel":
       if (doc.level === p.level) return drop(false);
       return doc.level === p.base ? keep : drop(true);
+    case "tracks": {
+      const now = doc.tracks ?? [];
+      if (same(now, p.tracks)) return drop(false);
+      return same(now, p.base) ? keep : drop(true);
+    }
     case "answer": {
       const now = doc.answers[p.choice];
       if (same(now, p.answer)) return drop(false);
@@ -187,6 +197,8 @@ export function toChange(p: Pending, doc: DraftDocument): DraftChange {
   switch (p.type) {
     case "setLevel":
       return { type: "setLevel", level: p.level };
+    case "tracks":
+      return { type: "tracks", tracks: p.tracks };
     case "pool":
       return { type: "pool", step: p.step, picks: p.picks };
     case "answer":
@@ -230,7 +242,13 @@ export function rebaseQueue(
     const values = Object.keys(r.alongside).length > 0 ? r.alongside : null;
     if (r.gaveWay) out.gaveWay = true;
     if (values && !out.alongside && p.type === "assign") out.alongside = { choice: p.choice, values };
-    if ((r.gaveWay || values) && out.choice === null && p.type !== "setLevel" && p.type !== "pool")
+    if (
+      (r.gaveWay || values) &&
+      out.choice === null &&
+      p.type !== "setLevel" &&
+      p.type !== "pool" &&
+      p.type !== "tracks"
+    )
       out.choice = p.choice;
     if (r.next) out.doc = apply(out.doc, toChange(r.next, out.doc));
   });
