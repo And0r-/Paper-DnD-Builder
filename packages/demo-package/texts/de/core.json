@@ -214,6 +214,7 @@
     "value.borrowedKnackHit.name": "Treffer geliehener Kunststücke",
     "sheet.primary.title": "Am Tisch",
     "sheet.primary.nerve": "Mut",
+    "sheet.primary.guard.steady": "Umgeworfen? Zweimal würfeln.",
     "sheet.scores.title": "Grundwerte",
     "sheet.scores.hint": "Die Zahl im Kreis zählst du zu passenden Würfen dazu.",
     "sheet.talents.title": "Talente",

@@ -1654,6 +1654,27 @@ describe("what a game master would otherwise write on the sheet by hand (demo pa
     }
   });
 
+  it("prints a box's remark small under its number in both designs, on as many pages as without it", async () => {
+    const remarked: ContentPackage = structuredClone(pkg);
+    const primary = remarked.sheet.sections.find((s) => s.id === "primary")!;
+    if (primary.kind !== "statBoxes") throw new Error("primary is a row of boxes");
+    primary.boxes.find((b) => b.value === "guard")!.remarks = [
+      { text: "sheet.primary.guard.steady", when: "level >= 1" },
+    ];
+    for (const design of ["verbose", "classic"] as const) {
+      const options = { parts: ["sheet"], design } as const;
+      const plain = await extract(
+        await renderPdf(buildSheetModel(pkg, doc, { language: "de", createdAt }), options),
+      );
+      const model = buildSheetModel(remarked, doc, { language: "de", createdAt });
+      const extracted = await extract(await renderPdf(model, options));
+      expect(plain.text, design).not.toContain("Umgeworfen?");
+      expect(extracted.text, design).toContain("Umgeworfen? Zweimal würfeln.");
+      expect(extracted.pages, design).toBe(plain.pages);
+      expect(extracted.minFontSize, design).toBeGreaterThanOrEqual(7);
+    }
+  });
+
   it("marks a talent the character has a flair for a second time, and says so in the legend", () => {
     const model = buildSheetModel(pkg, doc, { language: "de" });
     const talents = section(model, "talents", "checkList");

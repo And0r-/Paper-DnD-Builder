@@ -63,6 +63,12 @@
   line-height: var(--text-xs-lh);
 }
 
+/* What to mind when rolling the number stands out from where it comes from. */
+.vsheet__box-remarks {
+  color: var(--color-ink);
+  font-weight: var(--weight-semibold);
+}
+
 .vsheet__hint {
   margin-top: var(--space-2);
 }
@@ -746,6 +752,10 @@
     font-size: max(var(--vs-hint), 12px);
   }
 
+  .vsheet__box-remarks {
+    color: #000;
+  }
+
   /* Placed on pages: each section where the PDF's rule puts it, the pages drawn behind. */
   .vsheet--paged .vsheet__page {
     display: block;
@@ -866,7 +876,8 @@
     margin-top: auto;
   }
 
-  /* Where the number comes from and what it is for keep together at the bottom. */
+  /* Where the number comes from, what to mind and what it is for keep together at the bottom. */
+  .vsheet__box-parts + .vsheet__box-parts,
   .vsheet__box-parts + .vsheet__box-hint {
     margin-top: 0;
   }

@@ -642,6 +642,15 @@ export const sectionSchema = z.discriminatedUnion("kind", [
           text: filledText.optional(),
           /** Box is printed only while this expression is true; the other boxes close up. */
           when: expr.optional(),
+          /**
+           * Short words printed small under the box's number, each while its
+           * `when` is true, e.g. that the roll is made twice. After where the
+           * number comes from, if it says that.
+           */
+          remarks: z
+            .array(z.strictObject({ text: textKey, when: expr }))
+            .min(1)
+            .optional(),
         }),
       )
       .min(1)

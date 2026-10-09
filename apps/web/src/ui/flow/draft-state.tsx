@@ -40,7 +40,8 @@ import {
   type ReactNode,
 } from "react";
 import { useApp } from "../app-state.tsx";
-import { api, ApiError, type DraftInfo, type DraftView } from "../api.ts";
+import { api, ApiError, type Campaign, type DraftInfo, type DraftView } from "../api.ts";
+import { campaignLeads, loadMemberCampaigns } from "../campaigns.ts";
 import {
   isOwn,
   useLiveChannel,
@@ -159,6 +160,11 @@ export interface DraftApi {
   levelUp(level: number, tracks?: string[]): Promise<"open" | "finished" | "failed">;
   /** Puts the character into a campaign its owner plays in, or into none (null). False if that failed. */
   setCampaign(campaignId: string | null): Promise<boolean>;
+  /**
+   * The campaigns the viewer plays in or leads, the one joined last first:
+   * what the step "Campaign" offers, and its names. Empty if they could not be loaded.
+   */
+  campaigns: readonly Campaign[];
   /** Who else is on the character, where, pointing at what; hints (live help). */
   live: LiveChannel;
   /** Someone else, another window or a program just changed the character: for a short line. */
@@ -227,6 +233,8 @@ export function DraftProvider({
 }) {
   const { lang, t } = useApp();
   const [view, setView] = useState<DraftView | null>(null);
+  // The step "Campaign" stands in the list from the start, so the list never jumps.
+  const [campaigns, setCampaigns] = useState<Campaign[] | null>(null);
   const [loadError, setLoadError] = useState<"notFound" | "helpEnded" | "error" | null>(null);
   const [attempt, setAttempt] = useState(0);
 
@@ -248,6 +256,11 @@ export function DraftProvider({
         } else setLoadError("notFound");
       },
     );
+    // Without the list there is nothing to choose from: the step stays away, the rest works.
+    loadMemberCampaigns().then(
+      (c) => live && setCampaigns(c),
+      () => live && setCampaigns([]),
+    );
     return () => {
       live = false;
     };
@@ -259,7 +272,7 @@ export function DraftProvider({
   if (loadError === "notFound") load = { state: "notFound" };
   else if (loadError === "helpEnded") load = { state: "helpEnded" };
   else if (loadError === "error") load = { state: "error", retry: () => setAttempt((n) => n + 1) };
-  else if (!view) load = { state: "loading" };
+  else if (!view || !campaigns) load = { state: "loading" };
   else if (!view.packageAvailable) load = { state: "packageUnavailable" };
   else if (pkg.state === "error") load = { state: "error", retry: pkg.retry };
   else if (pkg.state === "loading") load = { state: "loading" };
@@ -270,6 +283,7 @@ export function DraftProvider({
         onServer={setView}
         onGone={setLoadError}
         lp={pkg.value}
+        campaigns={campaigns}
         t={t}
         render={children}
       />
@@ -282,6 +296,7 @@ function ReadyDraft({
   onServer,
   onGone,
   lp,
+  campaigns,
   t,
   render,
 }: {
@@ -291,6 +306,7 @@ function ReadyDraft({
   /** The live channel says there is no reach (any more). */
   onGone: (why: "notFound" | "helpEnded") => void;
   lp: LoadedPackage;
+  campaigns: Campaign[];
   t: ReturnType<typeof useApp>["t"];
   render: (load: DraftLoad) => ReactNode;
 }) {
@@ -440,7 +456,15 @@ function ReadyDraft({
   }, [live.sendChange]);
 
   const ev = useMemo(() => evaluateDraft(pkg, doc), [pkg, doc]);
-  const flow = useMemo(() => flowOf(server.draft.id, lp, doc, ev, t), [server.draft.id, lp, doc, ev, t]);
+  const { access, campaignId } = server.draft;
+  const leads = useMemo(
+    () => campaignLeads(t, { access, campaignId }, campaigns.length > 0),
+    [t, access, campaignId, campaigns],
+  );
+  const flow = useMemo(
+    () => flowOf(server.draft.id, lp, doc, ev, t, leads),
+    [server.draft.id, lp, doc, ev, t, leads],
+  );
 
   const settle = useCallback((ok: boolean) => {
     const w = waiters.current;
@@ -714,6 +738,7 @@ function ReadyDraft({
       finish,
       levelUp,
       setCampaign,
+      campaigns,
       live,
       told,
       listen,
@@ -735,6 +760,7 @@ function ReadyDraft({
       finish,
       levelUp,
       setCampaign,
+      campaigns,
       live,
       told,
       listen,

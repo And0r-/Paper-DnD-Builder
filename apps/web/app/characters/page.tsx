@@ -16,6 +16,7 @@ import { ConfirmDialog } from "../../src/ui/components/Dialog.tsx";
 import { Callout, EmptyState, ErrorState, Loading } from "../../src/ui/components/Feedback.tsx";
 import { Toast } from "../../src/ui/components/Fields.tsx";
 import { AppShell } from "../../src/ui/components/Shell.tsx";
+import { campaignLeads } from "../../src/ui/campaigns.ts";
 import { CharacterCard, describeCharacter, packagesFor } from "../../src/ui/characters.tsx";
 import { usePageTitle } from "../../src/ui/flow/frame.tsx";
 import { RequireAccount } from "../../src/ui/guards.tsx";
@@ -118,7 +119,12 @@ function Characters() {
     const items = data.drafts
       .filter((d) => !hidden.current.has(d.id))
       .map((d) => ({
-        ...describeCharacter(d, data.packages.get(draftPackageKey(d)), t),
+        ...describeCharacter(
+          d,
+          data.packages.get(draftPackageKey(d)),
+          t,
+          campaignLeads(t, d, data.campaigns.size > 0),
+        ),
         campaign: d.campaignId ? data.campaigns.get(d.campaignId) : undefined,
       }))
       .sort((a, b) => Number(a.finished) - Number(b.finished));

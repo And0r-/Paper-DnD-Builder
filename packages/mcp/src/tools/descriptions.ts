@@ -66,6 +66,11 @@ export const TOOL_DESCRIPTIONS = {
     "tracks): which thing each level from 2 on goes to, as one list in level order. Level 1 always goes to " +
     "the answer of the choice that names the first. Leave levels out to keep them in the first. Answers of " +
     "a thing taken away stay and count again once it is back.",
+  switch_package:
+    "Build an existing character with another package (id from list_packages) from now on. Every answer " +
+    "is lost, the name too where the package asks for it: the character starts over with the new package's " +
+    "choices. Its level and campaign stay; a finished character is open again. Ask the player first and say " +
+    "that everything has to be chosen again. Naming the package it already uses changes nothing.",
   finish_character:
     "Mark a character as finished once nothing is open. If something is still open, nothing changes and " +
     "the result lists the open choices.",
@@ -81,6 +86,8 @@ export const INPUT_DESCRIPTIONS = {
   packageId: "The package id (from list_packages).",
   extensions:
     "Extension ids of the package to use (from list_packages); without them the character uses the package alone.",
+  switchExtensions:
+    "Extension ids of the new package to use (from list_packages). Left out, every extension of it is used.",
   level: "The level, a whole number.",
   startLevel: "The level to build for, a whole number. Without it the package's usual start level.",
   raiseLevel: "The new level, higher than the current one.",

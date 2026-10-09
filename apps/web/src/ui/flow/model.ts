@@ -1,6 +1,7 @@
 /**
- * The guided flow as the screens see it: level, the package's steps as the
- * rule core derives them, then the overview. Plus what a change would
+ * The guided flow as the screens see it: the builder's own steps before
+ * the game (the campaign), level, the package's steps as the rule core
+ * derives them, then the overview. Plus what a change would
  * break, so the screen can ask before it happens (flow spec 2.5).
  */
 import {
@@ -28,9 +29,12 @@ import type { Count } from "./plan.ts";
 export type EntryStatus = "done" | "open" | "needsAttention";
 
 export interface FlowEntry {
-  /** "level", the step id, the builder's step for the levels ({@link TRACKS_KEY}), or "overview". */
+  /**
+   * "level", the step id, the builder's step for the levels ({@link TRACKS_KEY}),
+   * a builder's step before the game ({@link CAMPAIGN_KEY}), or "overview".
+   */
   key: string;
-  kind: "level" | "step" | "tracks" | "overview";
+  kind: "lead" | "level" | "step" | "tracks" | "overview";
   href: string;
   title: string;
   status: EntryStatus;
@@ -72,8 +76,11 @@ export const LEVEL_KEY = "level";
 export const OVERVIEW_KEY = "overview";
 /** The builder's own step "Your levels" (concept AND-262, 6.2); no package id has an "@". */
 export const TRACKS_KEY = "@tracks";
+/** The builder's step "Campaign" (AND-333): which campaign the character is for. */
+export const CAMPAIGN_KEY = "@campaign";
 
 export function stepHref(draftId: string, key: string): string {
+  if (key === CAMPAIGN_KEY) return `/c/${draftId}/campaign`;
   if (key === LEVEL_KEY) return `/c/${draftId}/level`;
   if (key === TRACKS_KEY) return `/c/${draftId}/tracks`;
   if (key === OVERVIEW_KEY) return `/c/${draftId}/overview`;
@@ -192,6 +199,40 @@ export function buildFlow(
     e.parts = same.length;
   }
   return sorted;
+}
+
+/**
+ * A builder's step before the game's own (AND-333): not from the package,
+ * and never open, so it never holds up the sheet. The campaign is one;
+ * the choice of rules may stand beside it.
+ */
+export interface LeadStep {
+  key: string;
+  title: string;
+}
+
+/** The flow with the builder's steps before the game in front, each a counted step of its own. */
+export function withLeads(
+  draftId: string,
+  entries: FlowEntry[],
+  leads: readonly LeadStep[],
+  atLevel: number,
+): FlowEntry[] {
+  if (leads.length === 0) return entries;
+  const front = leads.map((l, i): FlowEntry => ({
+    key: l.key,
+    kind: "lead",
+    href: stepHref(draftId, l.key),
+    title: l.title,
+    status: "done",
+    choices: [],
+    section: i,
+    part: 1,
+    parts: 1,
+    sectionKey: l.key,
+    atLevel,
+  }));
+  return [...front, ...entries.map((e) => ({ ...e, section: e.section + leads.length }))];
 }
 
 /**

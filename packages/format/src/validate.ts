@@ -938,6 +938,7 @@ export function validatePackageFiles(files: PackageFiles): ValidationResult {
         s.boxes.forEach((b, j) => {
           if (!isValueRef(b.value)) err(S, `${p}.boxes[${j}].value`, `unknown value ${lit(b.value)}`);
           if (b.when !== undefined) checkExpr(S, `${p}.boxes[${j}].when`, b.when);
+          b.remarks?.forEach((r, k) => checkExpr(S, `${p}.boxes[${j}].remarks[${k}].when`, r.when));
           if (b.text !== undefined) {
             if (b.style === "pencil")
               err(S, `${p}.boxes[${j}].text`, "a pencil box has no text, only a field");
@@ -1123,9 +1124,12 @@ export function validatePackageFiles(files: PackageFiles): ValidationResult {
     if (s.kind !== "header") need(`sheet.${s.id}.title`, `title of sheet section ${lit(s.id)}`);
     if (s.kind === "helpBox") need(`sheet.${s.id}.text`, `text of help box ${lit(s.id)}`);
     if (s.kind === "statBoxes")
-      for (const b of s.boxes)
+      for (const b of s.boxes) {
         if (b.label !== undefined)
           need(b.label, `label of box ${lit(b.value)} in sheet section ${lit(s.id)}`);
+        for (const r of b.remarks ?? [])
+          need(r.text, `remark of box ${lit(b.value)} in sheet section ${lit(s.id)}`);
+      }
     if (s.kind === "featureTable") {
       const selected = resolveOptions(s.things);
       if (s.byRank) {

@@ -444,6 +444,10 @@ export function buildSheetModel(
             ? fieldId("sheet", s.id, b.value, String(same.indexOf(b) + 1))
             : fieldId("sheet", s.id, b.value);
         };
+        const remarksOf = (b: (typeof s.boxes)[number]): { remarks?: string } => {
+          const said = (b.remarks ?? []).filter(shown).map((r) => text(r.text));
+          return said.length > 0 ? { remarks: said.join(" · ") } : {};
+        };
         return {
           ...base,
           kind: "statBoxes",
@@ -467,6 +471,7 @@ export function buildSheetModel(
               hint: b.style === "pencil" ? messages.startValue(valueText(b.value)) : valueHint(b.value),
               // A printed number of its own: its parts, like a check's. A box with its own text says something else.
               parts: b.style === "number" && b.text === undefined ? boxParts(b.value) : "",
+              ...remarksOf(b),
               ...(b.style === "number" ? {} : { field: field(b) }),
             };
           }),

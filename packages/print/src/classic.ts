@@ -131,10 +131,19 @@ function smallLabel(c: Ctx, text: string, w: number) {
   return c.pen.label(text, c.st.label, w, 7, true);
 }
 
+/** Height of a line of a box's remarks (mm). */
+const REMARK_LH = 2.6;
+
+/** A box's remarks in lines as wide as the box; none if it has none. */
+function remarkLines(c: Ctx, b: StatBox, w: number): string[] {
+  return b.remarks ? c.pen.wrap(b.remarks, c.st.small, w - 2) : [];
+}
+
 function smallBoxHeight(c: Ctx, b: StatBox, w: number, min: number): number {
   const { g } = c;
   const label = smallLabel(c, b.label, w - 2).lines.length;
-  if (b.style !== "boxes" || b.squares === 0) return Math.max(min, 11 + label * 2.9);
+  const remarks = remarkLines(c, b, w).length * REMARK_LH;
+  if (b.style !== "boxes" || b.squares === 0) return Math.max(min, 11 + label * 2.9 + remarks);
   const per = Math.max(1, Math.floor((w - 3) / (g.box.square + 1)));
   const rows = Math.ceil(b.squares / per);
   return Math.max(min, 6 + (b.text !== "" ? 4.5 : 0) + rows * (g.box.square + 1) + label * 2.9);
@@ -186,7 +195,13 @@ function smallBox(c: Ctx, b: StatBox, x: number, y: number, w: number, h: number
     pen.field(b.field, x + 1, y + 4.4, w - 2, Math.max(1, room - 4), { text: now });
     if (now !== "") pen.text(now, x + w / 2, y + room - 0.5, pen.fit(now, st.pencil, w - 2), "center");
   } else {
-    pen.text(b.text, x + w / 2, y + room / 2 + 2.2, pen.fit(b.text, st.mid, w - 2), "center");
+    // What to mind when rolling it goes small under the number, just above the label; the number centres in what is left.
+    const lines = remarkLines(c, b, w);
+    const below = lines.length * REMARK_LH;
+    pen.text(b.text, x + w / 2, y + (room - below) / 2 + 2.2, pen.fit(b.text, st.mid, w - 2), "center");
+    lines.forEach((l, i) =>
+      pen.text(l, x + w / 2, y + room - below + 0.4 + i * REMARK_LH, st.small, "center"),
+    );
   }
 }
 

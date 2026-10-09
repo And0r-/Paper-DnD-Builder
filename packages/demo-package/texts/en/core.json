@@ -218,6 +218,7 @@
     "value.borrowedKnackHit.name": "Hit with borrowed knacks",
     "sheet.primary.title": "At the table",
     "sheet.primary.nerve": "Nerve",
+    "sheet.primary.guard.steady": "Knocked down? Roll twice.",
     "sheet.scores.title": "Scores",
     "sheet.scores.hint": "Add the number in the circle to matching rolls.",
     "sheet.talents.title": "Talents",
