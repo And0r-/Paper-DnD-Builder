@@ -16,6 +16,7 @@ import {
   filledTextKey,
   effectiveUnits,
   explainValue,
+  ownLevelTracks,
   formatMeasure,
   headTracks,
   renderText,
@@ -31,9 +32,7 @@ import {
 } from "@builder/core";
 import {
   declaredChoiceId,
-  parseExpr,
   type ContentPackage,
-  type Expr,
   type FilledText,
   type Mark,
   type Section,
@@ -133,18 +132,6 @@ export function firstSentence(s: string, language: string): string {
   return (m ? m[0] : s).trim();
 }
 
-/** The tracks a formula adds the levels of, if it is just that: "levelOf('a') + levelOf('b')". */
-function levelSum(e: Expr): string[] | undefined {
-  if (e.type === "call" && e.fn === "levelOf" && e.args.length === 1 && e.args[0]!.type === "str")
-    return [e.args[0]!.value];
-  if (e.type === "binary" && e.op === "+") {
-    const l = levelSum(e.left);
-    const r = levelSum(e.right);
-    return l && r ? [...l, ...r] : undefined;
-  }
-  return undefined;
-}
-
 /** Languages a sheet of the package can be made in: it has texts for them and the builder has page words. */
 export function sheetLanguages(pkg: ContentPackage): string[] {
   return pkg.manifest.languages.filter((l) => l in MESSAGES && pkg.texts[l] !== undefined);
@@ -219,10 +206,8 @@ export function buildSheetModel(
    * character has levels in, not every track the package counts.
    */
   const valueHint = (id: string): string => {
-    const formula = valueDefs.get(id)?.formula;
-    const tracks = formula === undefined ? undefined : levelSum(parseExpr(formula));
-    const had = tracks?.filter((t) => (scope.levelOf?.(t) ?? 0) > 0) ?? [];
-    if (had.length > 0) return messages.fromLevelsAs(list.format(had.map(thingName)));
+    const had = ownLevelTracks(pkg, ev, id);
+    if (had) return messages.fromLevelsAs(list.format(had.map(thingName)));
     return firstSentence(text(`value.${id}.explain`), language);
   };
   /** On a card: the values to show instead of others (`cardValues` of the choice the thing was picked in). */
@@ -281,9 +266,26 @@ export function buildSheetModel(
     return {
       text: shown,
       parts: parts
-        .map((p) => (p.label ? `${p.label}\u00a0${signed.format(p.amount)}` : signed.format(p.amount)))
+        .map((p, i) =>
+          p.label
+            ? `${p.label}\u00a0${signed.format(p.amount)}`
+            : // A number to start from is just that number ("10 · Grace +2").
+              i === 0 && p.amount > 0
+              ? numberFormat.format(p.amount)
+              : signed.format(p.amount),
+        )
         .join(" · "),
     };
+  };
+  /**
+   * A box's number in parts, only if a thing or an answer adds to it: a
+   * number made of the level and scores alone is read off the sheet already.
+   */
+  const boxParts = (id: string): string => {
+    const given = explainValue(pkg, ev, id)?.parts.some(
+      (p) => p.source.kind === "thing" || p.source.kind === "choice",
+    );
+    return given ? figure(id, false).parts : "";
   };
   // SPEC 13 `when`: a section or box whose condition is false is not printed at all.
   const scope = evaluationScope(pkg, ev);
@@ -458,6 +460,8 @@ export function buildSheetModel(
               circles: b.style === "circles" ? Math.min(12, n) : 0,
               squares,
               hint: b.style === "pencil" ? messages.startValue(valueText(b.value)) : valueHint(b.value),
+              // A printed number of its own: its parts, like a check's. A box with its own text says something else.
+              parts: b.style === "number" && b.text === undefined ? boxParts(b.value) : "",
               ...(b.style === "number" ? {} : { field: field(b) }),
             };
           }),

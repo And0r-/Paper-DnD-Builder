@@ -56,6 +56,22 @@ describe("sheet model", () => {
     expect(model.packageId).toBe("demo");
   });
 
+  it("says where a printed number comes from when a thing adds to it, like a check", () => {
+    const box = (m: SheetModel, id: string) =>
+      m.sections.flatMap((s) => (s.kind === "statBoxes" ? s.boxes : [])).find((b) => b.valueId === id)!;
+    // Guard: 6 to start from, a trait and a shield.
+    expect(box(sheet(level3), "guard").parts).toBe("6 · Schützendes Leuchten +1 · Schilfschild +2");
+    // Nerve of the level and the scores alone: nothing to take apart on paper.
+    expect(box(sheet(level3), "nerve").parts).toBe("");
+    // A thing that adds a score's bonus to nerve (like a feature that adds one to a roll) is named.
+    const gifted: ContentPackage = structuredClone(pkg);
+    const calling = gifted.things.find((t) => t.id === "calling.lantern-bearer")!;
+    calling.grants = [...(calling.grants ?? []), { value: "nerve", add: "heartBonus" }];
+    const doc = demoCharacter(gifted, 3);
+    const model = buildSheetModel(gifted, doc, { language: "en", createdAt });
+    expect(box(model, "nerve").parts).toMatch(/ · Lantern Bearer\u00a0\+1$/u);
+  });
+
   it("is in the reader's units", () => {
     const pace = (m: SheetModel) =>
       m.sections.flatMap((s) => (s.kind === "statBoxes" ? s.boxes : [])).find((b) => b.valueId === "pace")!;

@@ -70,3 +70,42 @@ test("a path from the extension is offered while it is on, and keeps it on", asy
     /Ausschalten geht erst, wenn du diese Wahlen änderst: Spezialisierung\./,
   );
 });
+
+test("the sheet says the path adds the wit bonus to nerve, like a feature adds to a roll (AND-317)", async ({
+  page,
+  foreign,
+}) => {
+  void foreign;
+  test.skip(!!process.env["E2E_PACKAGES_DIR"], "uses the demo extension");
+  await signup(page, "gezeitenmut");
+  const created = await page.request.post("/api/drafts", {
+    data: { packageId: "demo", extensions: ["demo-tides"] },
+  });
+  const id = ((await created.json()) as DraftView).draft.id;
+  // Wit 9: a wit bonus of 1.
+  await answerRecommended(page, id, {
+    level: 3,
+    calling: "calling.river-runner",
+    answers: [
+      ["path", { pick: "path.tide-warden" }],
+      ["scores", { method: 0, assign: { mightBase: 8, graceBase: 11, witBase: 9, heartBase: 7 } }],
+    ],
+  });
+  const view = (await (await page.request.get(`/api/drafts/${id}`)).json()) as DraftView;
+  const done = await page.request.post(`/api/drafts/${id}/finish`, { data: { version: view.draft.version } });
+  expect(done.status()).toBe(200);
+  const settings = await page.request.patch("/api/account/settings", {
+    data: { print: { design: "verbose" } },
+  });
+  expect(settings.status()).toBe(200);
+
+  await page.goto(`/c/${id}/bogen`);
+  const nerve = page
+    .locator("article[lang] .vsheet__box")
+    .filter({ has: page.locator(".vsheet__box-label", { hasText: /^Mut$/u }) });
+  await expect(nerve.locator(".vsheet__box-parts")).toContainText("Gezeitenwächter +1");
+  // Where the number comes from, then what it is for.
+  const [parts, hint] = [nerve.locator(".vsheet__box-parts"), nerve.locator(".vsheet__box-hint")];
+  expect((await hint.boundingBox())!.y).toBeGreaterThan((await parts.boundingBox())!.y);
+  await shot(page, "317-bogen-mut-zerlegung");
+});

@@ -41,6 +41,11 @@ export const statBoxSchema = z.strictObject({
   /** Squares to tick (`boxes`). */
   squares: count,
   hint: text,
+  /**
+   * Where a printed number comes from, as for a check ("Grace +3 · Keen
+   * Senses +2"); "" for none. Missing in copies kept before it was added.
+   */
+  parts: text.optional(),
   /** Where the player writes or ticks (`pencil`, `circles`, `boxes`); none for a printed number. */
   field: fieldIdSchema.optional(),
 });

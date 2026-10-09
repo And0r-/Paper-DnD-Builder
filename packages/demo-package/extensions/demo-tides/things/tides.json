@@ -4,7 +4,11 @@
     "kind": "path",
     "source": "tides",
     "requires": "has('calling.river-runner')",
-    "grants": [{ "thing": "talent.tide-reading" }, { "value": "guard", "add": 1 }]
+    "grants": [
+      { "thing": "talent.tide-reading" },
+      { "value": "guard", "add": 1 },
+      { "value": "nerve", "add": "witBonus" }
+    ]
   },
   {
     "id": "talent.tide-reading",

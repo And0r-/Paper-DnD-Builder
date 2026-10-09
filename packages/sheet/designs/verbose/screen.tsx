@@ -358,6 +358,11 @@ function StatBoxes({ s, i, ui, pencil }: Props<"statBoxes"> & { pencil: string }
             <ui.Text path={at(i, "boxes", j, "label")} value={b.label} label={b.label} />
           </p>
           <BoxBody b={b} path={at(i, "boxes", j)} ui={ui} pencil={pencil} />
+          {(b.parts ?? "") !== "" && (
+            <p className="vsheet__box-parts">
+              <ui.Text path={at(i, "boxes", j, "parts")} value={b.parts!} label={b.label} multiline />
+            </p>
+          )}
           {b.hint !== "" && (
             <p className="vsheet__box-hint">
               <ui.Text path={at(i, "boxes", j, "hint")} value={b.hint} label={b.label} multiline />

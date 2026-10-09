@@ -99,7 +99,7 @@ describe("extensions", () => {
     expect(res.json.packages[0].extensions).toEqual([
       {
         id: "demo-tides",
-        version: "0.1.0",
+        version: "0.2.0",
         languages: ["en", "de"],
         dependsOn: [{ id: "demo", minVersion: "0.18.0" }],
         publishable: false,

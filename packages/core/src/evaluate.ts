@@ -1214,9 +1214,11 @@ function prepareChoice(
       // count: the package's picks come first, the options fill up the rest.
       if (recommended && state.count !== undefined)
         recommended = [...new Set([...recommended, ...options])].slice(0, state.count);
-      // A copy of an `owned` choice may have lost the package's pick to an
-      // earlier copy: the first thing still free takes its place.
-      else if (owned && recommended?.length === 0 && options.length > 0) recommended = [options[0]!];
+      // A single pick whose recommended thing is not on offer (a copy of an
+      // `owned` choice that lost it to an earlier copy, a thing the character
+      // has from another track): the first option takes its place, so
+      // "choose for me" still has one.
+      else if (recommended?.length === 0 && options.length > 0) recommended = [options[0]!];
       if (choice.held) {
         // Options about something the character already has are the better
         // pick; the package's own recommendation fills the remaining places.

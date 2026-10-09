@@ -728,7 +728,8 @@ is picked in them.
 `recommend` is a list; the first entry whose `when` is true (or that has
 no `when`) and that has a pick still on offer is the recommendation; if
 none has one, the first entry whose `when` is true. It drives the "recommended" badge and
-the "choose for me" button. A `pickOne` recommends exactly one thing. For a
+the "choose for me" button. A `pickOne` recommends exactly one thing; if
+none of the entry's picks is on offer, the first option. For a
 `pickMany` the recommendation is the entry's offered picks, then the other
 options in order, cut to `count`: a count that grows with the level needs
 no recommendation per count, and "choose for me" always finishes.
