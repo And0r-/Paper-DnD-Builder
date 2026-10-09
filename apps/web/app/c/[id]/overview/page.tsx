@@ -51,10 +51,16 @@ export default function OverviewPage() {
   const index = entries.indexOf(entry);
   usePageTitle([t("overview.question"), t("flow.progress", positionOf(entries, entry))]);
 
-  // Numbers of the section "what grows with your level" are not repeated in the lines below.
+  // Numbers of the section "what grows with your level" are not repeated in the lines below,
+  // nor one track's share of a number two tracks raise (that section has the character's).
   const growth = levelGrowth(lp, ev);
   const line = ev.tracks ? summaryLineText(lp, summarize(lp.pkg, doc, ev).line) : "";
-  const grown = new Set([...growth.own, ...growth.shared, ...growth.byThing.flatMap((g) => g.values)]);
+  const grown = new Set([
+    ...growth.own,
+    ...growth.shared,
+    ...growth.summed,
+    ...growth.byThing.flatMap((g) => g.values),
+  ]);
   const openSteps = entries.filter((e) => asks(e) && e.status !== "done");
   // During a level up the earlier steps stay here, to look at and to change.
   const steps = allEntries.filter((e) => e.kind !== "overview");

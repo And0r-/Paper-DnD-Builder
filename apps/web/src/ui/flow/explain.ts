@@ -335,6 +335,12 @@ export interface LevelGrowth {
    * from a table for all tracks), not as the sum of those tables.
    */
   shared: string[];
+  /**
+   * Values two tracks each raise by a table (in neither list): a track's
+   * own share of them (places of one track alone) is said nowhere, as the
+   * character has not that many.
+   */
+  summed: string[];
 }
 
 /** Values each thing names in a stat (`"uses": {"value": "…"}`), by value. */
@@ -437,5 +443,5 @@ export function levelGrowth(lp: LoadedPackage, ev: Evaluation): LevelGrowth {
         h.track,
       );
   }
-  return { own, byThing, shared };
+  return { own, byThing, shared, summed: [...summed] };
 }
