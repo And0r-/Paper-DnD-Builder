@@ -596,6 +596,11 @@ function Box({
           <ui.Text path={[...path, "text"]} value={b.text} label={b.label} />
         </p>
       )}
+      {(b.remarks ?? "") !== "" && (
+        <p className="csheet__box-remarks">
+          <ui.Text path={[...path, "remarks"]} value={b.remarks!} label={b.label} />
+        </p>
+      )}
       {b.field && max > 0 && (
         <ui.Field
           field={{ id: b.field, kind: "ticks", max }}
