@@ -46,6 +46,8 @@ export interface Messages {
   noRulesTexts: string;
   /** After the package's attribution: the character has content of an extension that may not be shared (SPEC 17.7). */
   notForSharing: (names: string) => string;
+  /** A choice with no option that fits the character: it was not asked (on its feature's row, or as its answer). */
+  nothingToChoose: string;
 }
 
 export const MESSAGES: Readonly<Record<string, Messages>> = {
@@ -76,6 +78,7 @@ export const MESSAGES: Readonly<Record<string, Messages>> = {
     rulesTextsTitle: "Regeltexte zum Nachlesen",
     noRulesTexts: "Dieser Charakter hat nichts mit einem Regeltext.",
     notForSharing: (names) => `Enthält Inhalt aus ${names}, nicht zur Weitergabe.`,
+    nothingToChoose: "Nichts zu wählen: Keine Möglichkeit passt zu diesem Charakter.",
   },
   en: {
     playedBy: "Played by",
@@ -104,6 +107,7 @@ export const MESSAGES: Readonly<Record<string, Messages>> = {
     rulesTextsTitle: "Rules texts to read up on",
     noRulesTexts: "This character has nothing with a rules text.",
     notForSharing: (names) => `Contains content from ${names}, not for sharing.`,
+    nothingToChoose: "Nothing to choose: no option fits this character.",
   },
   fr: {
     playedBy: "Joué par",
@@ -133,6 +137,7 @@ export const MESSAGES: Readonly<Record<string, Messages>> = {
     noRulesTexts: "Ce personnage n’a rien avec un texte de règle.",
     notForSharing: (names) =>
       `Contient du contenu ${/^[aeiouàâéèêîïôœ]/i.test(names) ? "d’" : "de "}${names}, pas pour le partage.`,
+    nothingToChoose: "Rien à choisir : aucune option ne convient à ce personnage.",
   },
   it: {
     playedBy: "Giocato da",
@@ -161,6 +166,7 @@ export const MESSAGES: Readonly<Record<string, Messages>> = {
     rulesTextsTitle: "Testi delle regole da rileggere",
     noRulesTexts: "Questo personaggio non ha niente con un testo delle regole.",
     notForSharing: (names) => `Contiene contenuti da ${names}, non da condividere.`,
+    nothingToChoose: "Niente da scegliere: nessuna opzione è adatta a questo personaggio.",
   },
   es: {
     playedBy: "Jugado por",
@@ -189,6 +195,7 @@ export const MESSAGES: Readonly<Record<string, Messages>> = {
     rulesTextsTitle: "Textos de reglas para consultar",
     noRulesTexts: "Este personaje no tiene nada con un texto de regla.",
     notForSharing: (names) => `Contiene contenido de ${names}, no para compartir.`,
+    nothingToChoose: "Nada que elegir: ninguna opción encaja con este personaje.",
   },
 };
 

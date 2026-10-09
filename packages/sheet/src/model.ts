@@ -158,6 +158,8 @@ export function buildSheetModel(
     );
   }
   const ev = evaluation;
+  /** Said for a choice that had nothing to pick (see `ChoiceState.empty`). */
+  const nothingToChoose = messages.nothingToChoose;
   const measure: MeasureContext = {
     units: pkg.units,
     texts,
@@ -531,6 +533,10 @@ export function buildSheetModel(
           held = order.flatMap((o) => held.filter((t) => originOf.get(t.id) === o));
         }
         const used = new Set<number>();
+        // A thing that grants a choice with nothing to pick says so on its row.
+        const emptyBy = new Set(
+          Object.values(ev.choices).flatMap((c) => (c.empty === true ? (c.grantedBy ?? []) : [])),
+        );
         const rows = held.map((t): FeatureRow => {
           const on = [...new Set(markOn.flatMap((matches, i) => (matches(t) ? [signOf[i]!] : [])))].sort(
             (a, b) => a - b,
@@ -546,7 +552,9 @@ export function buildSheetModel(
             id: t.id,
             name: thingName(t.id),
             marks: on.map((i) => text(signs[i]!.text)).join(" "),
-            note: note === undefined ? "" : statText(note),
+            note: [note === undefined ? "" : statText(note), emptyBy.has(t.id) ? nothingToChoose : ""]
+              .filter((n) => n !== "")
+              .join(" · "),
             text: text(`${t.id}.short`),
             uses: rowUses,
             ...(counts(rowUses) ? { usesField: fieldId("sheet", s.id, t.id, "uses") } : {}),
@@ -619,6 +627,7 @@ export function buildSheetModel(
 
   /** One answer as words: the text, the number (with unit), or the name of what was picked. */
   function oneAnswer(state: ChoiceState, choiceId: string): string {
+    if (state.empty === true) return nothingToChoose;
     if (state.status !== "answered") return "";
     const a = state.answer as Record<string, unknown>;
     if (typeof a["text"] === "string") return a["text"].trim();
