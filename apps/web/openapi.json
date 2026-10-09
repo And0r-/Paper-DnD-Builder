@@ -6639,6 +6639,12 @@
                         "type": "string"
                       }
                     },
+                    "details": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
                     "blankLines": {
                       "type": "integer",
                       "minimum": 0,

@@ -148,6 +148,8 @@ export const sheetSectionSchema = z.discriminatedUnion("kind", [
     ...sectionBase,
     kind: z.literal("list"),
     items: z.array(text),
+    /** A small line under each item, "" for none; as long as `items`. Missing: no lines (format 0.22). */
+    details: z.array(text).optional(),
     blankLines: count,
     /** The blank lines, written on by hand. */
     field: fieldIdSchema.optional(),

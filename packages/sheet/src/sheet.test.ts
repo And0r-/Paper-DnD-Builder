@@ -218,6 +218,72 @@ describe("sheet model", () => {
     ).toBe(false);
   });
 
+  it("prints a line under a list entry that has the detail text, once for a counted thing (format 0.22)", () => {
+    const gear = (m: SheetModel) => {
+      const s = m.sections.find((x) => x.id === "gear");
+      if (s?.kind !== "list") throw new Error("no gear list");
+      return s;
+    };
+    const herbalist = demoCharacter(pkg, 3, "Mira Fennwick", "calling.herbalist");
+    const de = gear(sheet(herbalist));
+    const satchel = de.items.indexOf("Kräutertasche");
+    expect(satchel).toBeGreaterThanOrEqual(0);
+    expect(de.details).toHaveLength(de.items.length);
+    // The length follows the reader's units: German starts in metres, English in feet.
+    expect(de.details![satchel]).toBe(
+      "Getrocknetes Nebelblatt, eine Knochennadel, 3 Meter Schilffaden, 3 kleine Tontöpfe.",
+    );
+    expect(de.details!.filter((d) => d !== "")).toHaveLength(1);
+    expect(gear(sheet(herbalist, "en")).details).toContain(
+      "Dried mistleaf, a bone needle, 10 feet of reed thread, 3 small clay jars.",
+    );
+
+    // Two of them: the line says what one holds, under the counted name.
+    const twice: ContentPackage = {
+      ...pkg,
+      things: pkg.things.map((t) =>
+        t.id === "calling.herbalist"
+          ? {
+              ...t,
+              grants: t.grants!.map((g) =>
+                "thing" in g && g.thing === "item.herb-satchel" ? { ...g, count: 2 } : g,
+              ),
+            }
+          : t,
+      ),
+    };
+    const counted = gear(buildSheetModel(twice, herbalist, { language: "de", createdAt }));
+    const at = counted.items.indexOf("2 × Kräutertasche");
+    expect(at).toBeGreaterThanOrEqual(0);
+    expect(counted.details![at]).toBe(de.details![satchel]);
+
+    // No listed thing with the text, or no detail on the section: no lines at all, as before 0.22.
+    expect(gear(sheet(level3))).not.toHaveProperty("details");
+    const plain: ContentPackage = {
+      ...pkg,
+      sheet: {
+        ...pkg.sheet,
+        sections: pkg.sheet.sections.map((x) => (x.kind === "list" ? { ...x, detail: undefined } : x)),
+      },
+    };
+    expect(gear(buildSheetModel(plain, herbalist, { language: "de", createdAt }))).not.toHaveProperty(
+      "details",
+    );
+  });
+
+  it("accepts a stored copy from before format 0.22, without lines under list entries", () => {
+    const model = sheet(demoCharacter(pkg, 3, "Mira Fennwick", "calling.herbalist"));
+    const old = {
+      ...model,
+      sections: model.sections.map((s) => {
+        if (s.kind !== "list") return s;
+        const { details: _, ...rest } = s;
+        return rest;
+      }),
+    };
+    expect(sheetModelSchema.safeParse(JSON.parse(JSON.stringify(old))).success).toBe(true);
+  });
+
   it("says on the row of the thing that brought it that a choice had nothing to pick", () => {
     // A river runner has neither Legends nor Mending: Keen Study finds nothing to study.
     const runner = demoCharacter(pkg, 4, "Mira Fennwick", "calling.river-runner");

@@ -540,6 +540,7 @@
     "item.herb-satchel.short": "A bag full of herbs.",
     "item.herb-satchel.explain.what": "Lots of small pockets with dried plants.",
     "item.herb-satchel.explain.table": "You need it for herb knacks.",
+    "item.herb-satchel.contents": "Dried mistleaf, a bone needle, {{length:10}} of reed thread, 3 small clay jars.",
     "item.rope.name": "Rope",
     "item.rope.short": "A strong rope, {{length:40}} long.",
     "item.rope.explain.what": "Twisted from hemp, it holds several people.",

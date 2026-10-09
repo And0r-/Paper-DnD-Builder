@@ -321,7 +321,8 @@
       "things": {
         "kind": "item"
       },
-      "blankLines": 4
+      "blankLines": 4,
+      "detail": "contents"
     },
     {
       "id": "how-to-play",

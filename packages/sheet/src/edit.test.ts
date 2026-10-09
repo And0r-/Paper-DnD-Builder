@@ -65,6 +65,25 @@ describe("changing a sheet like paper", () => {
     expect(withRowAdded(level3, indexOf(level3, "header"))).toBe(level3);
   });
 
+  it("keeps the lines under list entries with their entries when rows are added and crossed out", () => {
+    const herbalist = buildSheetModel(pkg, demoCharacter(pkg, 3, "Mira Fennwick", "calling.herbalist"), {
+      language: "de",
+      createdAt: new Date("2026-10-04T12:00:00Z"),
+    });
+    const i = herbalist.sections.findIndex((s) => s.kind === "list" && s.details !== undefined);
+    const before = herbalist.sections[i]!;
+    if (before.kind !== "list") throw new Error("not a list");
+    const satchel = before.items.indexOf("Kräutertasche");
+    const added = withRowAdded(herbalist, i).sections[i]!;
+    if (added.kind !== "list") throw new Error("not a list");
+    expect(added.details).toEqual([...before.details!, ""]);
+    // Crossing out the entry before it moves the line up with its entry.
+    const removed = withRowRemoved(herbalist, i, satchel === 0 ? 1 : 0).sections[i]!;
+    if (removed.kind !== "list") throw new Error("not a list");
+    expect(removed.details).toHaveLength(removed.items.length);
+    expect(removed.details![removed.items.indexOf("Kräutertasche")]).toBe(before.details![satchel]);
+  });
+
   it("gives a feature row written in by hand an id of its own", () => {
     const i = indexOf(level20, "featureTable");
     const twice = withRowAdded(withRowAdded(level20, i), i);
