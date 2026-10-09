@@ -67,7 +67,7 @@
         "operationId": "health",
         "summary": "Liveness probe",
         "tags": ["Server"],
-        "description": "Answers as long as the process serves requests, also when no content package is loaded. Lists the loaded packages; `warnings` names rejected package folders, an empty package list or a failed start. Not part of the router; used by Docker.",
+        "description": "Answers as long as the process serves requests, also when no content package is loaded. Lists the loaded packages, bases first, then extensions with the base each adds to; `warnings` names rejected package folders, an empty package list or a failed start. Not part of the router; used by Docker.",
         "security": [],
         "responses": {
           "200": {
@@ -93,9 +93,22 @@
                           },
                           "formatVersion": {
                             "type": "string"
+                          },
+                          "kind": {
+                            "enum": ["base", "extension"],
+                            "description": "A base package, or an extension that adds to one."
+                          },
+                          "extends": {
+                            "type": "string",
+                            "description": "Extensions only: the id of the base package the extension adds to."
                           }
                         },
-                        "required": ["id", "version", "formatVersion"],
+                        "required": ["id", "version", "formatVersion", "kind"],
+                        "if": {
+                          "properties": { "kind": { "const": "extension" } }
+                        },
+                        "then": { "required": ["extends"] },
+                        "else": { "not": { "required": ["extends"] } },
                         "additionalProperties": false
                       }
                     },
