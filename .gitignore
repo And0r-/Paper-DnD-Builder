@@ -21,6 +21,7 @@ apps/web/public/scalar/
 # Browser tests
 apps/web/e2e/.outbox/
 apps/web/e2e/.results/
+apps/web/e2e/.two-games/
 apps/web/e2e/screenshots/
 
 # Local review server (scripts/dev-server.sh)

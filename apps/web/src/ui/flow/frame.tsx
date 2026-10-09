@@ -38,6 +38,7 @@ import {
   OVERVIEW_KEY,
   positionOf,
   progressFraction,
+  RULES_KEY,
   type FlowEntry,
 } from "./model.ts";
 import {
@@ -435,7 +436,8 @@ export function FlowLayout({ current, children }: { current: string | undefined;
     current !== undefined &&
     current !== OVERVIEW_KEY &&
     current !== "level" &&
-    current !== CAMPAIGN_KEY;
+    current !== CAMPAIGN_KEY &&
+    current !== RULES_KEY;
   useEffect(() => setContent(null), [current]);
   return (
     <ChangeCtx.Provider value={change}>

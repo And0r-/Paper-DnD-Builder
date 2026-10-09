@@ -40,7 +40,14 @@ import {
   type ReactNode,
 } from "react";
 import { useApp } from "../app-state.tsx";
-import { api, ApiError, type Campaign, type DraftInfo, type DraftView } from "../api.ts";
+import {
+  api,
+  ApiError,
+  type Campaign,
+  type DraftInfo,
+  type DraftView,
+  type PackageListEntry,
+} from "../api.ts";
 import { campaignLeads, loadMemberCampaigns } from "../campaigns.ts";
 import {
   isOwn,
@@ -55,8 +62,24 @@ import { setFlash } from "../live/flash.ts";
 import { draftPath, forgetHelpToken, helpTokenFor } from "../live/help-token.ts";
 import { stepOfPath } from "../live/where.ts";
 import { changedParts, type Told } from "../live/words.ts";
-import { draftPackageKey, usePackage, type LoadedPackage } from "../packages.ts";
-import { buildFlow, stepDiff, stepTitle, type FlowEntry } from "./model.ts";
+import {
+  draftPackageKey,
+  loadPackage,
+  loadPackageList,
+  usePackage,
+  type LoadedPackage,
+} from "../packages.ts";
+import {
+  buildFlow,
+  firstOpen,
+  LEVEL_KEY,
+  RULES_KEY,
+  stepHref,
+  stepDiff,
+  stepTitle,
+  type FlowEntry,
+  type LeadStep,
+} from "./model.ts";
 import { planDiff, plannedDraft } from "./plan.ts";
 import { flowOf, type Raise } from "./raise.ts";
 import {
@@ -165,6 +188,18 @@ export interface DraftApi {
    * what the step "Campaign" offers, and its names. Empty if they could not be loaded.
    */
   campaigns: readonly Campaign[];
+  /**
+   * The packages a character can be built with: what the step "Rules"
+   * offers (AND-336). Empty if they could not be loaded; with fewer than
+   * two there is nothing to choose and no such step.
+   */
+  packages: readonly PackageListEntry[];
+  /**
+   * Builds the character with another package from now on: every answer
+   * goes, level and campaign stay (`PUT …/package`). Resolves to where the
+   * new flow starts (its first open step), or null if that failed.
+   */
+  switchPackage(packageId: string): Promise<string | null>;
   /** Who else is on the character, where, pointing at what; hints (live help). */
   live: LiveChannel;
   /** Someone else, another window or a program just changed the character: for a short line. */
@@ -235,6 +270,8 @@ export function DraftProvider({
   const [view, setView] = useState<DraftView | null>(null);
   // The step "Campaign" stands in the list from the start, so the list never jumps.
   const [campaigns, setCampaigns] = useState<Campaign[] | null>(null);
+  // Likewise the step "Rules": its place is known before the list shows.
+  const [packages, setPackages] = useState<{ lang: string; list: PackageListEntry[] } | null>(null);
   const [loadError, setLoadError] = useState<"notFound" | "helpEnded" | "error" | null>(null);
   const [attempt, setAttempt] = useState(0);
 
@@ -266,24 +303,39 @@ export function DraftProvider({
     };
   }, [draftId, attempt]);
 
+  useEffect(() => {
+    let live = true;
+    // Without the list there is no choice of rules: the step stays away, the rest works.
+    loadPackageList(lang).then(
+      (list) => live && setPackages({ lang, list }),
+      () => live && setPackages({ lang, list: [] }),
+    );
+    return () => {
+      live = false;
+    };
+  }, [lang, attempt]);
+
   const pkg = usePackage(view?.packageAvailable ? draftPackageKey(view.draft) : undefined, lang);
 
   let load: DraftLoad;
   if (loadError === "notFound") load = { state: "notFound" };
   else if (loadError === "helpEnded") load = { state: "helpEnded" };
   else if (loadError === "error") load = { state: "error", retry: () => setAttempt((n) => n + 1) };
-  else if (!view || !campaigns) load = { state: "loading" };
+  else if (!view || !campaigns || !packages) load = { state: "loading" };
   else if (!view.packageAvailable) load = { state: "packageUnavailable" };
   else if (pkg.state === "error") load = { state: "error", retry: pkg.retry };
   else if (pkg.state === "loading") load = { state: "loading" };
   else
     return (
+      // Another package is another character: its state starts afresh from the server's.
       <ReadyDraft
+        key={view.draft.packageId}
         initial={view}
         onServer={setView}
         onGone={setLoadError}
         lp={pkg.value}
         campaigns={campaigns}
+        packages={packages.list}
         t={t}
         render={children}
       />
@@ -297,6 +349,7 @@ function ReadyDraft({
   onGone,
   lp,
   campaigns,
+  packages,
   t,
   render,
 }: {
@@ -307,6 +360,7 @@ function ReadyDraft({
   onGone: (why: "notFound" | "helpEnded") => void;
   lp: LoadedPackage;
   campaigns: Campaign[];
+  packages: PackageListEntry[];
   t: ReturnType<typeof useApp>["t"];
   render: (load: DraftLoad) => ReactNode;
 }) {
@@ -458,8 +512,12 @@ function ReadyDraft({
   const ev = useMemo(() => evaluateDraft(pkg, doc), [pkg, doc]);
   const { access, campaignId } = server.draft;
   const leads = useMemo(
-    () => campaignLeads(t, { access, campaignId }, campaigns.length > 0),
-    [t, access, campaignId, campaigns],
+    (): LeadStep[] => [
+      ...campaignLeads(t, { access, campaignId }, campaigns.length > 0),
+      // The rules after the campaign: with one package loaded there is nothing to choose.
+      ...(packages.length > 1 ? [{ key: RULES_KEY, title: t("rules.title") }] : []),
+    ],
+    [t, access, campaignId, campaigns, packages],
   );
   const flow = useMemo(
     () => flowOf(server.draft.id, lp, doc, ev, t, leads),
@@ -700,6 +758,36 @@ function ReadyDraft({
     [setServer],
   );
 
+  const switchPackage = useCallback(
+    async (packageId: string): Promise<string | null> => {
+      if (!(await flush())) return null;
+      let res: DraftView;
+      try {
+        res = await api<DraftView>("PUT", draftPath(serverRef.current.draft.id, "/package"), {
+          version: serverRef.current.draft.version,
+          packageId,
+        });
+      } catch {
+        return null;
+      }
+      const id = res.draft.id;
+      // Where the new flow starts, from the new package's steps; it is loaded once, here.
+      let start = stepHref(id, LEVEL_KEY);
+      try {
+        const next = await loadPackage(draftPackageKey(res.draft), lp.lang);
+        const d = docOf(res);
+        start = firstOpen(flowOf(id, next, d, evaluateDraft(next.pkg, d), t, leads).entries).href;
+      } catch {
+        // The loader above tries again and says if it cannot.
+      }
+      serverRef.current = res;
+      // Another package: the loader above shows the draft with it, from this state.
+      setServer(res);
+      return start;
+    },
+    [flush, setServer, lp.lang, t, leads],
+  );
+
   const setExtensions = useCallback(
     async (extensions: string[]): Promise<"ok" | "inUse" | "failed"> => {
       if (!(await flush())) return "failed";
@@ -739,6 +827,8 @@ function ReadyDraft({
       levelUp,
       setCampaign,
       campaigns,
+      packages,
+      switchPackage,
       live,
       told,
       listen,
@@ -761,6 +851,8 @@ function ReadyDraft({
       levelUp,
       setCampaign,
       campaigns,
+      packages,
+      switchPackage,
       live,
       told,
       listen,

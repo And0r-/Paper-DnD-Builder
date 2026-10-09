@@ -3,7 +3,7 @@
  * (`step`): a step's key, or one of the screens around the steps. The same
  * key leads back to the screen, so "Mara is at Folk" is a link there.
  */
-import { CAMPAIGN_KEY, stepHref } from "../flow/model.ts";
+import { CAMPAIGN_KEY, RULES_KEY, stepHref } from "../flow/model.ts";
 
 export const SCREENS = ["level", "overview", "done", "raise", "bogen"] as const;
 
@@ -13,6 +13,7 @@ export function stepOfPath(pathname: string): string | null {
   if (parts[0] !== "c") return null;
   if (parts[2] === "step" && parts[3]) return decodeURIComponent(parts[3]);
   if (parts[2] === "campaign") return CAMPAIGN_KEY;
+  if (parts[2] === "rules") return RULES_KEY;
   return (SCREENS as readonly string[]).includes(parts[2] ?? "") ? parts[2]! : null;
 }
 
