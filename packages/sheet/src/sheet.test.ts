@@ -72,6 +72,26 @@ describe("sheet model", () => {
     expect(box(model, "nerve").parts).toMatch(/ · Lantern Bearer\u00a0\+1$/u);
   });
 
+  it("prints a box's remarks while their condition holds, joined, beside where the number comes from", () => {
+    const box = (m: SheetModel, id: string) =>
+      m.sections.flatMap((s) => (s.kind === "statBoxes" ? s.boxes : [])).find((b) => b.valueId === id)!;
+    // The demo character is not of the folk that stands firm: the guard box says nothing more.
+    expect(evaluateDraft(pkg, level3).things.some((t) => t.id === "trait.stone-steady")).toBe(false);
+    expect(box(sheet(level3), "guard").remarks).toBeUndefined();
+    // Remarks by level: none below it, both together above it; a box without remarks has none.
+    const remarked: ContentPackage = structuredClone(pkg);
+    const primary = remarked.sheet.sections.find((s) => s.id === "primary")!;
+    if (primary.kind !== "statBoxes") throw new Error("primary is a row of boxes");
+    primary.boxes.find((b) => b.value === "nerve")!.remarks = [
+      { text: "sheet.primary.nerve", when: "level >= 5" },
+      { text: "sheet.primary.guard.steady", when: "level >= 10" },
+    ];
+    const at = (doc: DraftDocument) => buildSheetModel(remarked, doc, { language: "en", createdAt });
+    expect(box(at(level3), "nerve").remarks).toBeUndefined();
+    expect(box(at(level20), "nerve").remarks).toBe("Nerve · Knocked down? Roll twice.");
+    expect(box(at(level20), "pace").remarks).toBeUndefined();
+  });
+
   it("is in the reader's units", () => {
     const pace = (m: SheetModel) =>
       m.sections.flatMap((s) => (s.kind === "statBoxes" ? s.boxes : [])).find((b) => b.valueId === "pace")!;

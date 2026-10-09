@@ -46,6 +46,8 @@ export const statBoxSchema = z.strictObject({
    * Senses +2"); "" for none. Missing in copies kept before it was added.
    */
   parts: text.optional(),
+  /** The box's `remarks` that hold for the character, joined ("Advantage"); missing for none. */
+  remarks: text.optional(),
   /** Where the player writes or ticks (`pencil`, `circles`, `boxes`); none for a printed number. */
   field: fieldIdSchema.optional(),
 });
