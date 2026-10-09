@@ -778,3 +778,54 @@ describe("a repeatable thing that marks what the character has", () => {
     expect(back.choices["boon-12"]!.options).toContain("boon.deep-practice");
   });
 });
+
+describe("a pick choice with nothing to pick", () => {
+  /** Takes Keen Study at the level-4 boon: its trait asks for a study of Legends or Mending. */
+  const study = (calling: string) =>
+    apply(chooseForMe(4, calling), { type: "answer", choice: "boon-4", answer: { pick: "boon.keen-study" } });
+
+  it("is not asked and does not hold the character back", () => {
+    // The river runner's talents are neither Legends nor Mending.
+    const ev = evaluateDraft(pkg, study("calling.river-runner"));
+    expect(ev.choices["keen-study"]).toMatchObject({
+      options: [],
+      empty: true,
+      status: "missing",
+      grantedBy: ["trait.keen-study"],
+    });
+    expect(ev.steps.find((s) => s.choices.includes("keen-study"))!.status).toBe("done");
+    expect(ev.open).toEqual([]);
+    expect(ev.complete).toBe(true);
+  });
+
+  it("is asked as before when something fits", () => {
+    const ev = evaluateDraft(pkg, study("calling.lantern-bearer"));
+    expect(ev.choices["keen-study"]!.options).toContain("trait.study-mending");
+    expect(ev.choices["keen-study"]!.empty).toBeUndefined();
+    expect(ev.open).toEqual(["keen-study"]);
+    expect(ev.complete).toBe(false);
+  });
+
+  it("keeps a stored answer without counting it while nothing fits, and counts it again when it fits", () => {
+    // An answer from before the talents changed.
+    const doc = study("calling.river-runner");
+    const stored = { ...doc, answers: { ...doc.answers, "keen-study": { pick: "trait.study-mending" } } };
+    const ev = evaluateDraft(pkg, stored);
+    expect(ev.choices["keen-study"]).toMatchObject({
+      empty: true,
+      status: "missing",
+      answer: { pick: "trait.study-mending" },
+    });
+    expect(ev.things.map((t) => t.id)).not.toContain("trait.study-mending");
+    expect(ev.complete).toBe(true);
+    // The extra talent now is Mending: the stored answer fits and counts.
+    expect(ev.choices["extra-talent"]!.options).toContain("talent.mending");
+    const back = evaluateDraft(pkg, {
+      ...stored,
+      answers: { ...stored.answers, "extra-talent": { pick: "talent.mending" } },
+    });
+    expect(back.choices["keen-study"]).toMatchObject({ status: "answered" });
+    expect(back.choices["keen-study"]!.empty).toBeUndefined();
+    expect(back.things.map((t) => t.id)).toContain("trait.study-mending");
+  });
+});

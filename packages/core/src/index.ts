@@ -34,6 +34,7 @@ export {
   fillRaise,
   grantAppliesFrom,
   grantTableLevel,
+  isSettled,
   selectThings,
   trackThings,
   type ChoiceState,
