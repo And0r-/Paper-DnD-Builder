@@ -1014,11 +1014,12 @@ adds the track. Further levels in a track the character already has are
 not checked. The text `<thing>.addReason` says in one sentence what is
 needed ("Needs wit 13 or more."); the builder shows it at a track that
 cannot be added, and also for a track the character already has whose
-condition fails, so the sentence should read right for both. With more
-than one track, the recommended assignment of a `distribute` choice
-(scores, recommended for one track) is reordered, the same numbers with
-the fewest points moved, until every track's condition holds, if some
-order does.
+condition fails, so the sentence should read right for both. It is shown
+and sent as plain text, so it holds no glossary links and no placeholders;
+the validator rejects them. With more than one track, the recommended
+assignment of a `distribute` choice (scores, recommended for one track) is
+reordered, the same numbers with the fewest points moved, until every
+track's condition holds, if some order does.
 
 **First or added** (`only` on grants, see [6](#grants)). A grant with
 `"only": "first"` applies only if its thing belongs to the first track;
