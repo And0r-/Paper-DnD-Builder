@@ -146,6 +146,11 @@ function checkExtensions(app: App, packageId: string, ids: readonly string[]): s
   return [...new Set(ids)].sort();
 }
 
+/** All loaded extensions of the package: a new character has them switched on unless it names its own. */
+export function extensionsOf(app: App, packageId: string): string[] {
+  return [...app.packages.extensions.values()].filter((e) => e.base === packageId).map((e) => e.id);
+}
+
 /** What a change does to the draft: the new document, and whether that finishes the character. */
 export type DraftEdit = (
   pkg: ContentPackage,
@@ -323,7 +328,7 @@ export const changeBodies = {
 export const newDraftSchema = z.strictObject({
   packageId: z.string().max(100),
   level: z.number().int().optional(),
-  /** Extensions of the package to switch on; none if left out. */
+  /** Extensions of the package to switch on; all loaded ones if left out, none if empty (AND-330). */
   extensions: extensionsSchema.optional(),
   /** A campaign the owner plays in or leads; none if left out or null. */
   campaignId: z.string().regex(UUID).nullable().optional(),
@@ -349,7 +354,11 @@ export async function createDraft(
     throw new HttpError(404, "campaignNotFound");
   }
   if (!ctx.app.packages.packages.has(body.packageId)) throw new HttpError(404, "packageNotFound");
-  const extensions = checkExtensions(ctx.app, body.packageId, body.extensions ?? []);
+  const extensions = checkExtensions(
+    ctx.app,
+    body.packageId,
+    body.extensions ?? extensionsOf(ctx.app, body.packageId),
+  );
   const pkg = packageOf(ctx.app, { package_id: body.packageId, extensions });
   const r = newDraft(pkg, body.level);
   if (!r.ok) throw new HttpError(422, "changeRejected", { reason: r.error });

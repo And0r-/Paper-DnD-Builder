@@ -592,6 +592,36 @@ export class Store {
     return rows.length > 0;
   }
 
+  /**
+   * Switches the given extensions on for every draft of their base package,
+   * once: only if the step `step` was not taken before (see migration 0018).
+   * `byBase` maps a base package id to its extensions. The note that the
+   * step is taken and the change are one statement, so a crash leaves
+   * neither. A changed draft gets a new version, so an open page loads it
+   * again instead of writing over it; when it was last edited stays.
+   * Returns the ids of the drafts changed.
+   */
+  async switchOnExtensionsOnce(step: string, byBase: Record<string, string[]>, now: Date): Promise<string[]> {
+    const rows = await this.db.query<{ id: string }>(
+      `WITH step AS (
+         INSERT INTO startup_steps (id, done_at) VALUES ($1, $2) ON CONFLICT (id) DO NOTHING RETURNING id
+       ),
+       wanted AS (
+         SELECT key AS base, ARRAY(SELECT jsonb_array_elements_text(value)) AS ids FROM jsonb_each($3::jsonb)
+       )
+       UPDATE drafts d
+       SET extensions = ARRAY(
+           SELECT e FROM unnest(d.extensions || w.ids) AS e GROUP BY e ORDER BY e COLLATE "C"
+         ),
+         version = d.version + 1
+       FROM wanted w
+       WHERE EXISTS (SELECT 1 FROM step) AND d.package_id = w.base AND NOT d.extensions @> w.ids
+       RETURNING d.id`,
+      [step, now, byBase],
+    );
+    return rows.map((r) => r.id);
+  }
+
   // -------------------------------------------------------------- help links
 
   /**

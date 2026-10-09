@@ -1,6 +1,6 @@
 /**
- * Extensions (format 0.20): the switch under the level, off for a new
- * character, on and off again; locked while an answer comes from it; and the
+ * Extensions (format 0.20): the switch under the level, on for a new
+ * character (AND-330), off and on again; locked while an answer comes from it; and the
  * extension's path offered only while it is on. The demo package carries
  * the invented extension "Gezeiten im Nebelland".
  */
@@ -11,7 +11,7 @@ import { answerRecommended, expect, expectOneLanguage, shot, signup, test } from
 
 const SWITCH = m["extensions.on"].replace("{name}", "Gezeiten im Nebelland");
 
-test("the level screen switches the extension on and off", async ({ page, foreign }) => {
+test("the level screen has the extension on, and switches it off and on", async ({ page, foreign }) => {
   void foreign;
   test.skip(!!process.env["E2E_PACKAGES_DIR"], "uses the demo extension");
   await signup(page, "gezeiten");
@@ -21,8 +21,10 @@ test("the level screen switches the extension on and off", async ({ page, foreig
   ).toBeVisible();
 
   const box = page.getByRole("checkbox", { name: SWITCH });
-  await expect(box).not.toBeChecked();
-  await expect(box).toHaveAccessibleDescription(/Manche Texte nur auf Englisch · Nicht zur Weitergabe/);
+  await expect(box).toBeChecked();
+  await expect(box).toHaveAccessibleDescription(
+    /Manche Texte nur auf Englisch · Bitte ausschalten, wenn du die Erweiterung nicht besitzt\./,
+  );
   await expectOneLanguage(page, "de");
   const a11y = await new AxeBuilder({ page })
     .withTags(["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"])
@@ -30,18 +32,21 @@ test("the level screen switches the extension on and off", async ({ page, foreig
   expect(a11y.violations.map((v) => v.id)).toEqual([]);
   await shot(page, "260-erweiterung-schalter");
 
-  await box.check();
-  await expect(page.getByRole("checkbox", { name: SWITCH })).toBeChecked();
   const id = /\/c\/([^/]+)\//.exec(page.url())![1]!;
   const stored = (await (await page.request.get(`/api/drafts/${id}`)).json()) as DraftView;
   expect(stored.draft.extensions).toEqual(["demo-tides"]);
-  await page.reload();
-  await expect(page.getByRole("checkbox", { name: SWITCH })).toBeChecked();
 
-  await page.getByRole("checkbox", { name: SWITCH }).uncheck();
+  await box.uncheck();
   await expect(page.getByRole("checkbox", { name: SWITCH })).not.toBeChecked();
+  const off = (await (await page.request.get(`/api/drafts/${id}`)).json()) as DraftView;
+  expect(off.draft.extensions).toEqual([]);
+  await page.reload();
+  await expect(page.getByRole("checkbox", { name: SWITCH })).not.toBeChecked();
+
+  await page.getByRole("checkbox", { name: SWITCH }).check();
+  await expect(page.getByRole("checkbox", { name: SWITCH })).toBeChecked();
   const after = (await (await page.request.get(`/api/drafts/${id}`)).json()) as DraftView;
-  expect(after.draft.extensions).toEqual([]);
+  expect(after.draft.extensions).toEqual(["demo-tides"]);
 });
 
 test("a path from the extension is offered while it is on, and keeps it on", async ({ page, foreign }) => {

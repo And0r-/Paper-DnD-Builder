@@ -1,10 +1,11 @@
 "use client";
 /**
  * Extensions of the character's package (SPEC 17): one switch each, under
- * the level. Shown only when the package has an extension. Off by default;
- * it can be switched on later, also when raising the level. It goes off
- * only while no answer comes from it; until then the switch says which
- * choices to change first.
+ * the level. Shown only when the package has an extension. On by default
+ * (the owner's decision, AND-330): an extension from a book the player
+ * does not own asks to be switched off. It can be switched on again later,
+ * also when raising the level. It goes off only while no answer comes from
+ * it; until then the switch says which choices to change first.
  */
 import { useEffect, useId, useState } from "react";
 import { answersFromExtension } from "@builder/core";

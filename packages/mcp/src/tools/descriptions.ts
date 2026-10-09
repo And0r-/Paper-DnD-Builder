@@ -17,8 +17,9 @@ export const TOOL_DESCRIPTIONS = {
   list_packages:
     "List the rule packages the builder has loaded, with id, name and a short description. " +
     "A new character is always built with one package (see start_character). A package may list " +
-    "extensions: more options a character can use on top of it; notForSharing marks content the player " +
-    "may not pass on.",
+    "extensions: more options a character can use on top of it; a new character has them all switched on. " +
+    "ownersOnly marks an extension from a book the player should own: if they do not, pass start_character " +
+    "the extensions without it.",
   list_characters:
     "List the player's own characters: id, name, level, whether finished or still open, and the one-line " +
     "summary. Use the id with the other tools.",
@@ -79,7 +80,7 @@ export const INPUT_DESCRIPTIONS = {
   characterId: "The character's id (from list_characters or start_character).",
   packageId: "The package id (from list_packages).",
   extensions:
-    "Extension ids of the package to use (from list_packages); without them the character uses the package alone.",
+    "Extension ids of the package to use (from list_packages); left out, all of them; an empty list, none.",
   level: "The level, a whole number.",
   startLevel: "The level to build for, a whole number. Without it the package's usual start level.",
   raiseLevel: "The new level, higher than the current one.",
