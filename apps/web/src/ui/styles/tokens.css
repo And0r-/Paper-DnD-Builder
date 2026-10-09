@@ -151,7 +151,8 @@
   --footer-height: 72px;
   --content-max: 40rem;
   --steplist-width: 15rem;
-  --explain-width: 20rem;
+  /* 22rem from 1024px to 1279px (base.css), so the question keeps its width there. */
+  --explain-width: 24rem;
   --target-min: 44px;
   --control-height: 48px;
   --focus-ring: 3px solid var(--color-primary);

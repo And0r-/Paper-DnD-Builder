@@ -350,6 +350,19 @@
   max-width: 65ch;
 }
 
+/* Questions, options and their explanations break even inside one long
+   word (French and Spanish have many): nothing runs out of its box (AND-344).
+   Only where a word does not fit; syllables are split in the narrow
+   explanation column alone (base.css), whole words read easier. */
+.question,
+.option__name,
+.option__short,
+.option__goodif,
+.details,
+.rules__text {
+  overflow-wrap: anywhere;
+}
+
 @media (min-width: 1024px) {
   .question__title {
     font-size: var(--text-2xl);
@@ -740,7 +753,8 @@
 
 .stats {
   display: grid;
-  grid-template-columns: auto 1fr;
+  /* The value column may shrink below its longest word, so it wraps instead of spilling. */
+  grid-template-columns: fit-content(50%) minmax(0, 1fr);
   gap: var(--space-1) var(--space-4);
   font-variant-numeric: tabular-nums;
 }
@@ -803,6 +817,12 @@
 
 .explain-panel__empty {
   color: var(--color-ink-muted);
+}
+
+/* A step with nothing to tap (overview, level, a name) keeps the empty
+   column, so nothing moves; only the "tap an option" box stays away. */
+.shell:not(:has(.shell__main [data-option])) .explain-panel {
+  visibility: hidden;
 }
 
 /* --------------------------------------------------------- distribute */

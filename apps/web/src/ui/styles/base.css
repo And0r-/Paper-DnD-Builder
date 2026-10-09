@@ -303,12 +303,44 @@ h1[tabindex="-1"]:focus,
     padding-top: var(--space-8);
   }
 
+  /* Text in the side columns breaks anywhere, even inside one long word, so
+     it never runs out of its column nor widens it (AND-344). The narrow
+     explanation splits long words at a syllable, in the screen's language. */
+  .shell__sidebar,
+  .shell__aside {
+    overflow-wrap: anywhere;
+  }
+
+  .shell__aside {
+    hyphens: auto;
+  }
+
+  /* The page scroll bar coming and going (a longer explanation, another
+     step) does not move the columns sideways. */
+  html {
+    scrollbar-gutter: stable;
+  }
+
   .shell__sidebar > *,
   .shell__aside > * {
     position: sticky;
     top: calc(var(--topbar-height) + var(--space-5));
     max-height: calc(100vh - var(--topbar-height) - var(--space-7));
     overflow: auto;
+  }
+}
+
+/* Between 1024px and 1279px the three columns sit closer, and the
+   explanation is a little narrower, so the question stays as wide as on a
+   phone. */
+@media (min-width: 1024px) and (max-width: 1279.98px) {
+  :root {
+    --explain-width: 22rem;
+  }
+
+  .shell--columns .shell__body {
+    gap: var(--space-5);
+    padding: 0 var(--space-4);
   }
 }
 
