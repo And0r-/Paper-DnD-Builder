@@ -64,6 +64,27 @@ describe("explainValue", () => {
     ]);
   });
 
+  it("names the thing that adds a score's bonus to a value, unless the bonus is part of a sum", () => {
+    // Like a feature that adds a score's bonus to a roll: the gift is the feature's.
+    const gift = (add: string): ContentPackage => {
+      const p: ContentPackage = structuredClone(pkg);
+      const folk = p.things.find((t) => t.id === "folk.hillfolk")!;
+      folk.grants = [...(folk.grants ?? []), { value: "nerve", add }];
+      return p;
+    };
+    const nerveOf = (p: ContentPackage) =>
+      explainValue(p, evaluateDraft(p, build(p, 1, LANTERN_BEARER)), "nerve")?.parts;
+    const folk = { kind: "thing", thing: "folk.hillfolk" };
+    // Wit 9 gives a wit bonus of 1.
+    expect(nerveOf(gift("witBonus"))?.at(-1)).toEqual({ amount: 1, source: folk });
+    expect(nerveOf(gift("max(0, witBonus)"))?.at(-1)).toEqual({ amount: 1, source: folk });
+    // In a sum the score's bonus keeps its name: "wit bonus +1", the folk's own 2 apart.
+    expect(nerveOf(gift("witBonus + 2"))?.slice(-2)).toEqual([
+      { amount: 1, source: { kind: "values", values: ["witBonus"] } },
+      { amount: 2, source: folk },
+    ]);
+  });
+
   it("gives no explanation when a maximum cut the value", () => {
     // Grace 12 from the scores and 1 from the upbringing, cut to 12.
     const capped = { ...pkg, values: pkg.values.map((v) => (v.id === "grace" ? { ...v, max: 12 } : v)) };

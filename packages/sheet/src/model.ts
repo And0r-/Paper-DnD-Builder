@@ -281,9 +281,26 @@ export function buildSheetModel(
     return {
       text: shown,
       parts: parts
-        .map((p) => (p.label ? `${p.label}\u00a0${signed.format(p.amount)}` : signed.format(p.amount)))
+        .map((p, i) =>
+          p.label
+            ? `${p.label}\u00a0${signed.format(p.amount)}`
+            : // A number to start from is just that number ("10 · Grace +2").
+              i === 0 && p.amount > 0
+              ? numberFormat.format(p.amount)
+              : signed.format(p.amount),
+        )
         .join(" · "),
     };
+  };
+  /**
+   * A box's number in parts, only if a thing or an answer adds to it: a
+   * number made of the level and scores alone is read off the sheet already.
+   */
+  const boxParts = (id: string): string => {
+    const given = explainValue(pkg, ev, id)?.parts.some(
+      (p) => p.source.kind === "thing" || p.source.kind === "choice",
+    );
+    return given ? figure(id, false).parts : "";
   };
   // SPEC 13 `when`: a section or box whose condition is false is not printed at all.
   const scope = evaluationScope(pkg, ev);
@@ -458,6 +475,8 @@ export function buildSheetModel(
               circles: b.style === "circles" ? Math.min(12, n) : 0,
               squares,
               hint: b.style === "pencil" ? messages.startValue(valueText(b.value)) : valueHint(b.value),
+              // A printed number of its own: its parts, like a check's. A box with its own text says something else.
+              parts: b.style === "number" && b.text === undefined ? boxParts(b.value) : "",
               ...(b.style === "number" ? {} : { field: field(b) }),
             };
           }),

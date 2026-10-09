@@ -54,6 +54,7 @@
 
 .vsheet__hint,
 .vsheet__box-hint,
+.vsheet__box-parts,
 .vsheet__group-hint,
 .vsheet__check-parts,
 .vsheet__feature-note {
@@ -708,6 +709,7 @@
 
   .vsheet__hint,
   .vsheet__box-hint,
+  .vsheet__box-parts,
   .vsheet__group-hint,
   .vsheet__check-parts,
   .vsheet__feature-note,
@@ -739,6 +741,7 @@
   /* What a sentence explains is read on screen, not at arm's length: never below 12 px. */
   .vsheet__hint,
   .vsheet__box-hint,
+  .vsheet__box-parts,
   .vsheet__group-hint {
     font-size: max(var(--vs-hint), 12px);
   }
@@ -858,8 +861,14 @@
     gap: 6px;
   }
 
-  .vsheet__box-hint {
+  .vsheet__box-hint,
+  .vsheet__box-parts {
     margin-top: auto;
+  }
+
+  /* Where the number comes from and what it is for keep together at the bottom. */
+  .vsheet__box-parts + .vsheet__box-hint {
+    margin-top: 0;
   }
 
   .vsheet__box--circles .vsheet__box-value {

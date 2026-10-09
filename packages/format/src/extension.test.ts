@@ -43,7 +43,7 @@ describe("demo extension", () => {
     const x = validateExtensionFiles(base, tides).extension!;
     expect(x).toMatchObject({
       id: "demo-tides",
-      version: "0.1.0",
+      version: "0.2.0",
       languages: ["en", "de"],
       publishable: false,
       name: { de: "Gezeiten im Nebelland", en: "Tides of Mistland" },
@@ -134,7 +134,7 @@ describe("an extension is refused", () => {
   it("when it names something neither it nor the base has, in its own file", () => {
     const r = mutate((f) => f.get("things/tides.json")[0].grants.push({ thing: "talent.nowhere" }));
     expect(errors(r).join("\n")).toMatch(
-      /^things\/tides\.json \[0\]\.grants\[2\]\.thing: .*talent\.nowhere/m,
+      /^things\/tides\.json \[0\]\.grants\[3\]\.thing: .*talent\.nowhere/m,
     );
   });
 

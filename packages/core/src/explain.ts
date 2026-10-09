@@ -80,7 +80,12 @@ export function explainValue(
 
   const negate = (parts: ValuePart[]) => parts.map((p) => ({ ...p, amount: -p.amount }));
 
-  const terms = (e: Expr, owner: PartSource, seen: Set<string>): ValuePart[] => {
+  /**
+   * `whole`: the term is all a thing gives (a grant's `add`, or the branch of
+   * it that counts). A gift of just another value ("add the wit bonus") is
+   * the thing's, named after it; inside a sum the value keeps its own name.
+   */
+  const terms = (e: Expr, owner: PartSource, seen: Set<string>, whole = false): ValuePart[] => {
     if (e.type === "binary" && (e.op === "+" || e.op === "-")) {
       const right = terms(e.right, owner, seen);
       return [...terms(e.left, owner, seen), ...(e.op === "-" ? negate(right) : right)];
@@ -91,13 +96,13 @@ export function explainValue(
       const yes = evaluateParsedCondition(cond, scope);
       // "if(has('x'), 16, 0)": the 16 is x's, unless a thing already gives it.
       const by = yes && owner.kind !== "thing" ? hasThing(cond) : undefined;
-      return terms(yes ? e.args[1]! : e.args[2]!, by ? { kind: "thing", thing: by } : owner, seen);
+      return terms(yes ? e.args[1]! : e.args[2]!, by ? { kind: "thing", thing: by } : owner, seen, whole);
     }
     if (e.type === "call" && (e.fn === "max" || e.fn === "min") && e.args.length > 0) {
       const amounts = e.args.map((a) => evaluateParsed(a, scope));
       const amount = e.fn === "max" ? Math.max(...amounts) : Math.min(...amounts);
       const winners = e.args.filter((_, i) => Math.abs(amounts[i]! - amount) < EPSILON);
-      if (winners.length === 1) return terms(winners[0]!, owner, seen);
+      if (winners.length === 1) return terms(winners[0]!, owner, seen, whole);
       // A tie. Values that all gave the number can be named together; a
       // branch that hangs on a thing cannot be told apart from the others.
       const refs = collectRefs({ type: "call", fn: e.fn, args: winners });
@@ -106,6 +111,8 @@ export function explainValue(
       if (refs.values.size === 0) return [{ amount, source: owner }];
       return [{ amount, source: { kind: "values", values: [...refs.values] } }];
     }
+    if (e.type === "ref" && whole && owner.kind === "thing")
+      return [{ amount: scope.value(e.name), source: owner }];
     if (e.type === "ref" && e.name !== "level") {
       // A value without a formula is made of what set it and what was given:
       // show those parts instead of the value's own name.
@@ -202,7 +209,7 @@ export function explainValue(
           continue;
         }
         const add: Expr = typeof g.add === "number" ? { type: "num", value: g.add } : parseExpr(g.add);
-        out.push(...terms(add, owner, seen));
+        out.push(...terms(add, owner, seen, true));
       }
     }
     for (const r of ev.raises[id] ?? [])
