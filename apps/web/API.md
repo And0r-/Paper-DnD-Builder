@@ -410,13 +410,13 @@ the package texts, as everywhere in the draft view.
 }
 ```
 
-| `source.kind` | Meaning                                                                                                                                    |
-| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| `start`       | The fixed number the value starts at, or a number in its formula.                                                                          |
-| `choice`      | Set or raised by the answer to `choice` (for a copy, the copy's id). A choice a thing brought along has that thing in `steps[].grantedBy`. |
-| `thing`       | Given by `thing`, which the character has.                                                                                                 |
-| `values`      | Worked out from these other `values` (`level` included).                                                                                   |
-| `unclear`     | Two ways gave the same number; no source rather than a wrong one.                                                                          |
+| `source.kind` | Meaning                                                                                                                                     |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `start`       | The fixed number the value starts at, or a number in its formula.                                                                           |
+| `choice`      | Set or raised by the answer to `choice` (for a copy, the copy's id). A choice a thing brought along has that thing in `steps[].grantedBy`.  |
+| `thing`       | Given by `thing`, which the character has; also when all it gives is another value ("add the wit bonus"), so the reader sees why it counts. |
+| `values`      | Worked out from these other `values` (`level` included).                                                                                    |
+| `unclear`     | Two ways gave the same number; no source rather than a wrong one.                                                                           |
 
 Parts from the same source are added up, parts of 0 left out; the amounts
 add up to `total` (a part can be negative). `parts` is `null` if the value
