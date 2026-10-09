@@ -8,7 +8,16 @@ import AxeBuilder from "@axe-core/playwright";
 import { devices, type Page } from "@playwright/test";
 import de from "../src/i18n/messages/de.json" with { type: "json" };
 import en from "../src/i18n/messages/en.json" with { type: "json" };
-import { answerRecommended, expect, expectOneLanguage, makeLeveled, shot, signup, test } from "./helpers.ts";
+import {
+  answerRecommended,
+  expect,
+  expectOneLanguage,
+  makeLeveled,
+  raiseGo,
+  shot,
+  signup,
+  test,
+} from "./helpers.ts";
 
 const m = de;
 
@@ -126,7 +135,7 @@ test("a level-1 character goes up to 2, 3 and 5, asked only what is new each tim
   await shot(page, "90-aufstufen-wahl");
 
   // 1 → 2: the talent list and the knacks ask one more each; nothing else.
-  await page.getByRole("button", { name: "Weiter zu Stufe 2" }).click();
+  await raiseGo(page, "Weiter zu Stufe 2");
   await expect(page).toHaveURL(`/c/${id}/step/talents`);
   await expect(page.locator(".progress__text")).toContainText("Schritt 1 von 3");
   await expect(page.locator(".progress__text")).toContainText("Stufe 2");
@@ -136,7 +145,8 @@ test("a level-1 character goes up to 2, 3 and 5, asked only what is new each tim
   const to2 = await walk(page, 3);
   expect(to2).toEqual(["talents", "knacks"]);
   // Everything chosen before is still on the overview, with a way to change it.
-  await expect(page.locator(".summary__item")).toHaveCount(level1.length + 1);
+  // One line more than before the tracks: where each level comes from (from level 2 on).
+  await expect(page.locator(".summary__item")).toHaveCount(level1.length + 2);
   await finishOnOverview(page, id, 1);
   await expect(page.getByRole("heading", { level: 1, name: "Mira ist jetzt auf Stufe 2!" })).toBeVisible();
   await expect(page.locator(".done__news")).toContainText("Neu:");
@@ -148,7 +158,7 @@ test("a level-1 character goes up to 2, 3 and 5, asked only what is new each tim
   // 2 → 3, from the end screen: the path is the only new question.
   await page.getByRole("link", { name: m["raise.button"] }).click();
   await expect(page.getByRole("radio", { name: "Stufe 3" })).toBeChecked();
-  await page.getByRole("button", { name: "Weiter zu Stufe 3" }).click();
+  await raiseGo(page, "Weiter zu Stufe 3");
   expect(await walk(page, 2)).toEqual(["path"]);
   await finishOnOverview(page, id, 2);
 
@@ -165,7 +175,7 @@ test("a level-1 character goes up to 2, 3 and 5, asked only what is new each tim
   await expect(
     page.getByText("Du beantwortest nur, was auf dem Weg bis Stufe 5 neu dazukommt.", { exact: false }),
   ).toBeVisible();
-  await page.getByRole("button", { name: "Weiter zu Stufe 5" }).click();
+  await raiseGo(page, "Weiter zu Stufe 5");
   await expect(page.locator(".progress__text")).toContainText("Schritt 1 von 3");
   await expect(page.locator(".progress__text")).toContainText("Stufe 4");
   const to5 = await walk(page, 3);
@@ -192,7 +202,7 @@ test("from level 1 to 20 in one go: exactly the questions of levels 2 to 20", as
   await page.getByRole("radio", { name: "Andere Stufe" }).check();
   await page.getByRole("spinbutton", { name: "Stufe" }).fill("20");
   await page.getByRole("spinbutton", { name: "Stufe" }).press("Enter");
-  await page.getByRole("button", { name: "Weiter zu Stufe 20" }).click();
+  await raiseGo(page, "Weiter zu Stufe 20");
   await expect(page.locator(".progress__text")).toContainText("Schritt 1 von");
 
   const counted = Number(/von (\d+)/.exec((await page.locator(".progress__text").textContent()) ?? "")![1]);
@@ -240,7 +250,7 @@ test("choose for me on a step that grew keeps the old picks, takes nothing twice
   await page.getByRole("radio", { name: "Andere Stufe" }).check();
   await page.getByRole("spinbutton", { name: "Stufe" }).fill("20");
   await page.getByRole("spinbutton", { name: "Stufe" }).press("Enter");
-  await page.getByRole("button", { name: "Weiter zu Stufe 20" }).click();
+  await raiseGo(page, "Weiter zu Stufe 20");
   await expect(page.locator(".progress__text")).toContainText("Schritt 1 von");
   const counted = Number(/von (\d+)/.exec((await page.locator(".progress__text").textContent()) ?? "")![1]);
 
@@ -285,7 +295,7 @@ test("a level with no new questions goes straight to the end", async ({ page, fo
   await signup(page, "level-up-quiet");
   const id = await finished(page, 4);
   await page.goto(`/c/${id}/raise`);
-  await page.getByRole("button", { name: "Weiter zu Stufe 5" }).click();
+  await raiseGo(page, "Weiter zu Stufe 5");
   await expect(page).toHaveURL(`/c/${id}/done?from=4&asked=0`);
   await expect(page.getByRole("heading", { level: 1, name: "Mira ist jetzt auf Stufe 5!" })).toBeVisible();
   await expect(page.getByText("Stufe 5 bringt keine neuen Fragen.", { exact: false })).toBeVisible();
@@ -297,7 +307,7 @@ test("a level up can be stopped: the character stays where it was", async ({ pag
   await signup(page, "level-up-stop");
   const id = await finished(page, 1);
   await page.goto(`/c/${id}/raise`);
-  await page.getByRole("button", { name: "Weiter zu Stufe 2" }).click();
+  await raiseGo(page, "Weiter zu Stufe 2");
   await expect(page).toHaveURL(`/c/${id}/step/talents`);
   // Back from the first new question is the choice of level, with the way out.
   await page.getByRole("link", { name: m["common.back"] }).click();
@@ -340,7 +350,7 @@ test.describe("in English, on a large screen", () => {
     ).toBeVisible();
     await expectOneLanguage(page, "en");
     await shot(page, "96-level-up-choice-desktop");
-    await page.getByRole("button", { name: "Go on to level 2" }).click();
+    await raiseGo(page, "Go on to level 2");
     await expect(page.locator(".progress__text")).toContainText("Step 1 of 3");
     // The step list shows only the new questions.
     const list = page.getByRole("navigation", { name: en["flow.steps"] });

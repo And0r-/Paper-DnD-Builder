@@ -147,7 +147,8 @@ async function tellingPieces(lang: Lang): Promise<string[]> {
       // Split around placeholders and markup; keep the plain runs of words.
       for (const run of v.split(/\{\{[^}]*\}\}|\[\[[^\]]*\]\]|\{[^}]*\}|[.!?:;,()·"„“]/)) {
         const s = run.trim();
-        if (s.length >= 5 && /\p{L}{3}/u.test(s)) pieces.add(s);
+        // A run that is a whole text of the other language tells nothing ("Talent(e)" gives "Talent").
+        if (s.length >= 5 && /\p{L}{3}/u.test(s) && !theirValues.has(s)) pieces.add(s);
       }
     }
   }
@@ -224,6 +225,17 @@ export async function animationsDone(page: Page): Promise<void> {
 
 export async function shot(page: Page, name: string): Promise<void> {
   await page.screenshot({ path: join(SHOTS, `${name}.png`), fullPage: true });
+}
+
+/**
+ * Presses the level-up button (its name, e.g. "Weiter zu Stufe 2"), then
+ * takes the recommended answer of the question that follows in a package
+ * with tracks: every new level in the calling the character has.
+ */
+export async function raiseGo(page: Page, button: string): Promise<void> {
+  await page.getByRole("button", { name: button }).click();
+  await expect(page.locator(".tracks-raise")).toBeVisible();
+  await page.getByRole("button", { name: button }).click();
 }
 
 /** A finished level-3 character made through the API, so a test can visit every screen quickly. */

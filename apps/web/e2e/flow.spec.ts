@@ -93,6 +93,13 @@ test("a newcomer builds a level-3 character from login to finished", async ({ pa
   await axe(page);
   await next(page);
 
+  // Where each level comes from: all in the calling, already done; nothing to do.
+  await question(page, "Woher kommt jede Stufe?");
+  await expect(page.locator(".tracks-all__line")).toHaveText("Stufe 1 bis 3: alles als Laternenträgerin.");
+  await shot(page, "05b-stufen");
+  await axe(page);
+  await next(page);
+
   // Info step: nothing to choose, only what you get; the details come later.
   await question(page, "Das bekommst du durch deinen Beruf");
   // The calling's choices come later, at their own steps: said so, never "next".

@@ -42,9 +42,7 @@ test("three columns, keyboard only, and only requests to the builder itself", as
   await expect(page.locator("input[name='choice-calling']:focus")).toHaveCount(1);
   await page.getByRole("button", { name: m["common.next"], exact: true }).focus();
   await page.keyboard.press("Enter");
-  await expect(
-    page.getByRole("heading", { level: 1, name: "Das bekommst du durch deinen Beruf" }),
-  ).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Woher kommt jede Stufe?" })).toBeVisible();
   await expect(page.getByRole("heading", { level: 1 })).toBeFocused();
 
   // Flow screens focus their question on arrival (screen readers start there).
