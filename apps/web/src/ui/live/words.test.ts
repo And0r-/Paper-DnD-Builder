@@ -104,6 +104,8 @@ describe("the line about a change made elsewhere", () => {
       source: source({ name: "Vexa", role: "gameMaster" }),
       change: scores,
       alongside: { a: 9 },
+      // The changed number is named with its value then, not twice ("Might (Might 9)").
+      parts: ["mightBase"],
     });
     const what = withValues(whatText(byGm, words, de), ["Kraft 9"], de, list);
     expect(toldText(byGm, owner, what, de)).toBe(

@@ -84,7 +84,7 @@ export function changedParts(before: unknown, after: unknown): string[] {
 
 /** What it was about, in the screen's words; null when the channel did not say. */
 export function whatText(
-  told: Pick<Told, "event" | "change" | "parts">,
+  told: Pick<Told, "event" | "change" | "parts" | "alongside">,
   words: {
     step(id: string): string | null;
     choice(id: string): string | null;
@@ -104,7 +104,8 @@ export function whatText(
   switch (c.kind) {
     case "answer": {
       // One or two numbers are named themselves ("Might"); more, or a pick, and the question's title says it.
-      const names = (told.parts ?? []).map((p) => words.part(c.choice, p));
+      // With values set next to ours the title says it too: they name the numbers ("Scores (Might 9)").
+      const names = told.alongside ? [] : (told.parts ?? []).map((p) => words.part(c.choice, p));
       if (names.length > 0 && names.length <= 2 && names.every((n) => n))
         return words.list(names as string[]);
       return words.choice(c.choice);
