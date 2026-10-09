@@ -291,7 +291,9 @@ export function useLiveChannel(
           ? { type: "answer", ref, version, choice: change.choice, answer: change.answer }
           : change.type === "pool"
             ? { type: "pool", ref, version, step: change.step, picks: change.picks }
-            : { type: "setLevel", ref, version, level: change.level };
+            : change.type === "tracks"
+              ? { type: "tracks", ref, version, tracks: change.tracks }
+              : { type: "setLevel", ref, version, level: change.level };
       if (!company.current || !sendRaw(body)) return null;
       return new Promise<DraftView>((resolve, reject) => {
         const timer = setTimeout(() => {

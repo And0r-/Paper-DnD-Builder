@@ -20,13 +20,16 @@ import {
   type Choice,
   type ContentPackage,
   type FilledText,
+  type Grant as FormatGrant,
   type OptionSource,
   type Thing,
+  type Tracks,
 } from "@builder/format/pure";
 import type { DraftDocument } from "./draft.ts";
 import { evaluateCondition, evaluateNumber, RuleError, type ExprScope } from "./expr.ts";
 import { judgeAnswer, type ChoiceContext, type Problem } from "./judge.ts";
 import { assignPicks, fillPicks, type PoolSlot } from "./pool.ts";
+import { grantFrom, levelIn, trackLevels, trackList } from "./tracks.ts";
 
 export type ChoiceStatus = "answered" | "incomplete" | "missing" | "invalid" | "info";
 
@@ -77,6 +80,8 @@ export interface ChoiceState {
   givenBy?: Record<string, string>;
   /** Character level from which the choice is asked (the level of its step). */
   atLevel: number;
+  /** The track the choice came through (SPEC 9.7); a choice of an added track is a copy `<choice>@<track>`. */
+  track?: string;
   /** Distribute choices with the method `raise`: what each target can still take. */
   raise?: RaiseState;
 }
@@ -123,6 +128,10 @@ export interface StepState {
    * with `atLevel > n` added.
    */
   atLevel: number;
+  /** The track the step's choices came through (SPEC 9.7), if all came through one. */
+  track?: string;
+  /** With `track`: the level in that track at which the step is asked. */
+  trackLevel?: number;
 }
 
 /**
@@ -173,6 +182,40 @@ export interface HeldThing {
   atLevel: number;
   /** How many of it, if more than one: the `count` of every grant that gives it, added up. */
   count?: number;
+  /** The track it belongs to (SPEC 9.7): a track itself, or a thing that came through one. */
+  track?: string;
+}
+
+/** A track the character could take its next level in (SPEC 9.7). */
+export interface TrackOption {
+  thing: string;
+  allowed: boolean;
+  /**
+   * Only if not allowed: the things whose `addRequires` does not hold for
+   * the character as it is now, the track itself first, then (with
+   * `addRequiresCurrent`) tracks it has. Text of each: `<thing>.addReason`.
+   */
+  notMet?: string[];
+}
+
+/** The character's tracks, with `flow.level.tracks` (SPEC 9.7). */
+export interface TracksState {
+  /** The tracks choice; the builder's step for the levels comes right after its step. */
+  choice: string;
+  /** The first track: the answer of the tracks choice, or null while there is none that counts. */
+  first: string | null;
+  /** The track of each character level, level 1 first; empty without a first track. */
+  levels: string[];
+  /** Each track with its levels, in the order taken, and the character level of its first level. */
+  list: { thing: string; levels: number; from: number; added: boolean }[];
+  /** Every option of the tracks choice for the next level (a raise), and whether it may take it. */
+  options: TrackOption[];
+  /**
+   * Added tracks whose `addRequires` (with `addRequiresCurrent`, also the
+   * tracks it had then) does not hold for the character as it was before
+   * the level that added them. They still count; the character is not complete.
+   */
+  unfit: string[];
 }
 
 export interface Evaluation {
@@ -196,6 +239,8 @@ export interface Evaluation {
   complete: boolean;
   /** Choices with a stored answer that are not asked at the moment (kept for going back). */
   inactiveAnswers: string[];
+  /** Only with `flow.level.tracks`. */
+  tracks?: TracksState;
 }
 
 interface Indexes {
@@ -260,12 +305,44 @@ class Character {
   private readonly pkg: ContentPackage;
   private readonly ix: Indexes;
   readonly level: number;
+  /** The draft's `tracks`: the track of each level from 2 on. */
+  private readonly entries: readonly string[] | undefined;
+  /** The choice whose answer is the first track (SPEC 9.7), if the package has tracks. */
+  readonly tracksChoice: string | undefined;
+  /**
+   * With tracks (SPEC 9.7): the track of each character level, level 1
+   * first. Empty until the tracks choice gives the first track.
+   */
+  levels: string[] = [];
 
-  constructor(pkg: ContentPackage, ix: Indexes, level: number) {
+  constructor(pkg: ContentPackage, ix: Indexes, level: number, entries?: readonly string[]) {
     this.pkg = pkg;
     this.ix = ix;
     this.level = level;
+    this.entries = entries;
+    this.tracksChoice = pkg.flow.level.tracks?.choice;
     this.scope = this.scopeAt(level);
+  }
+
+  /**
+   * The answer of the tracks choice: gives the first track at level 1, then
+   * every added track at the level that adds it, each with what it grants.
+   */
+  giveTracks(first: string, via: { pickedIn: string }, step: string, choices: Grant[]): void {
+    const tracks = trackThings(this.pkg);
+    this.levels = trackLevels(first, this.entries, this.level, (id) => tracks.has(id));
+    this.memo.clear();
+    for (const t of trackList(this.levels)) this.give(t.thing, via, step, t.from, choices, 1, t.thing);
+  }
+
+  /** The character level from which a grant of a thing in `track` (or in none) applies, if it does. */
+  grantFrom(g: Pick<FormatGrant, "atLevel" | "only">, track: string | undefined): number | undefined {
+    return grantFrom(g, track, this.levels, this.level);
+  }
+
+  /** The level a table by level in a thing's grant looks up at character level `at`: in its track, if any. */
+  tableLevel(track: string | undefined, at = this.level): number {
+    return track === undefined ? at : levelIn(this.levels, track, at);
   }
 
   /**
@@ -280,6 +357,7 @@ class Character {
     atLevel: number,
     choices: Grant[],
     count = 1,
+    track?: string,
   ): void {
     const thing = this.ix.things.get(id);
     // A key that vanished from a newer package version simply stops counting.
@@ -301,21 +379,31 @@ class Character {
         ...(step !== undefined ? { step } : {}),
         atLevel,
         ...(count > 1 ? { count } : {}),
+        ...(track !== undefined ? { track } : {}),
       });
       this.memo.clear();
     }
     const again = held !== undefined;
-    const copy = thing.repeatable ? (via.pickedIn ?? via.grantedBy) : undefined;
+    // A thing given again keeps the track it came through first.
+    const own = held ? held.track : track;
+    // The choices of an added track are asked anew, as copies (SPEC 9.7).
+    const copy = thing.repeatable
+      ? (via.pickedIn ?? via.grantedBy)
+      : own !== undefined && own !== this.levels[0]
+        ? own
+        : undefined;
     for (const g of thing.grants ?? []) {
-      if ((g.atLevel ?? 1) > this.level) continue;
-      const from = Math.max(atLevel, g.atLevel ?? 1);
+      const at = this.grantFrom(g, own);
+      if (at === undefined) continue;
+      const from = Math.max(atLevel, at);
       if (g.thing !== undefined && !again)
-        this.give(g.thing, { grantedBy: id }, step, from, choices, g.count ?? 1);
+        this.give(g.thing, { grantedBy: id }, step, from, choices, g.count ?? 1, own);
       else if (g.choice !== undefined)
         choices.push({
           choice: copy ? `${g.choice}${COPY_SEPARATOR}${copy}` : g.choice,
           by: id,
           atLevel: from,
+          ...(own !== undefined ? { track: own } : {}),
         });
     }
   }
@@ -339,10 +427,14 @@ class Character {
     this.memo.clear();
   }
 
-  /** A number, an expression or a table by level, worked out for this character (at `at`, see {@link scopeAt}). */
-  amount(src: Amount, at = this.level): number {
+  /**
+   * A number, an expression or a table by level, worked out for this
+   * character (at `at`, see {@link scopeAt}). A table of a thing in a track
+   * goes by the level in that track.
+   */
+  amount(src: Amount, at = this.level, track?: string): number {
     return typeof src === "object"
-      ? byLevel(this.pkg, src.byLevel, at)
+      ? byLevel(this.pkg, src.byLevel, this.tableLevel(track, at))
       : evaluateNumber(src, this.scopeAt(at));
   }
 
@@ -376,6 +468,7 @@ class Character {
         for (const h of this.held.values()) if (had(h) && this.ix.things.get(h.id)?.tags?.includes(tag)) n++;
         return n;
       },
+      levelOf: (id) => levelIn(this.levels, id, at),
     };
   }
 
@@ -394,11 +487,15 @@ class Character {
           ? evaluateNumber(def.formula, this.scopeAt(at))
           : def.byLevel !== undefined
             ? byLevel(this.pkg, def.byLevel, at)
-            : (this.inputs.get(name) ?? def.default ?? 0);
+            : def.byValue !== undefined
+              ? byValue(def.table!, this.value(def.byValue, at))
+              : (this.inputs.get(name) ?? def.default ?? 0);
       for (const h of this.held.values()) {
         if (h.atLevel > at) continue;
         for (const g of this.ix.things.get(h.id)?.grants ?? []) {
-          if (g.value === name && (g.atLevel ?? 1) <= at) result += this.amount(g.add!, at);
+          if (g.value !== name) continue;
+          const from = this.grantFrom(g, h.track);
+          if (from !== undefined && from <= at) result += this.amount(g.add!, at, h.track);
         }
       }
       for (const r of this.raises.get(name) ?? []) if (r.atLevel <= at) result += r.amount;
@@ -422,16 +519,30 @@ export function byLevel(pkg: ContentPackage, table: readonly number[], level: nu
   return table[i]!;
 }
 
+/** The entry of a table by another value (SPEC 7): entry 0 at 0, rounded down, kept within the table. */
+export function byValue(table: readonly number[], value: number): number {
+  const i = Math.min(Math.max(Math.floor(value), 0), table.length - 1);
+  return table[i]!;
+}
+
+/** The things of the tracks choice (SPEC 9.7); empty without one. */
+export function trackThings(pkg: ContentPackage): Set<string> {
+  const choice = indexes(pkg).choices.get(pkg.flow.level.tracks?.choice ?? "");
+  return new Set(choice?.kind === "pickOne" ? selectThings(pkg, choice.options).map((t) => t.id) : []);
+}
+
 interface Grant {
   choice: string;
   by: string;
   atLevel: number;
+  track?: string;
 }
 
 interface Gathered {
   choice: string;
   by: string[];
   atLevel: number;
+  track?: string;
 }
 
 interface PendingStep {
@@ -441,6 +552,7 @@ interface PendingStep {
   origin: "flow" | "granted";
   grantedBy: string[];
   atLevel: number;
+  track?: string;
   /** Gather steps: the group, how they are shown, and the choices gathered so far. */
   gather?: { group: string; together?: "sections" | "list"; gathered: Gathered[] };
 }
@@ -473,7 +585,29 @@ export function evaluationScope(pkg: ContentPackage, ev: Evaluation): ExprScope 
     },
     has: (id) => held.has(id),
     count: (tag) => ev.things.filter((h) => ix.things.get(h.id)?.tags?.includes(tag)).length,
+    levelOf: (id) => levelIn(ev.tracks?.levels ?? [], id, ev.level),
   };
+}
+
+/**
+ * For a thing the finished character has: the character level from which a
+ * grant of it applies, or undefined if it does not. With tracks a grant of
+ * a thing in a track counts the levels in that track (SPEC 9.7).
+ */
+export function grantAppliesFrom(
+  ev: Pick<Evaluation, "level" | "tracks">,
+  held: Pick<HeldThing, "track">,
+  g: Pick<FormatGrant, "atLevel" | "only">,
+): number | undefined {
+  return grantFrom(g, held.track, ev.tracks?.levels ?? [], ev.level);
+}
+
+/** The level a table by level in a grant of `held` looks up: in its track, if any, else the character level. */
+export function grantTableLevel(
+  ev: Pick<Evaluation, "level" | "tracks">,
+  held: Pick<HeldThing, "track">,
+): number {
+  return held.track === undefined ? ev.level : levelIn(ev.tracks?.levels ?? [], held.track, ev.level);
 }
 
 /**
@@ -527,7 +661,7 @@ function walk(
   const ix = indexes(pkg);
   /** The declared choice of an id, also of a copy. */
   const choiceOf = (id: string) => ix.choices.get(declaredChoiceId(id));
-  const character = new Character(pkg, ix, doc.level);
+  const character = new Character(pkg, ix, doc.level, doc.tracks);
   const choices: Record<string, ChoiceState> = {};
   const steps: StepState[] = [];
   const scheduled = new Set<string>();
@@ -577,7 +711,9 @@ function walk(
       }
       if (scheduled.has(g.choice)) continue;
       scheduled.add(g.choice);
-      if (gatherStep) gatherStep.gather!.gathered.push({ choice: g.choice, by: [g.by], atLevel: g.atLevel });
+      const track = g.track !== undefined ? { track: g.track } : {};
+      if (gatherStep)
+        gatherStep.gather!.gathered.push({ choice: g.choice, by: [g.by], atLevel: g.atLevel, ...track });
       else
         inserted.push({
           id: g.choice,
@@ -585,6 +721,7 @@ function walk(
           origin: "granted",
           grantedBy: [g.by],
           atLevel: g.atLevel,
+          ...track,
         });
     }
     queue.unshift(...inserted);
@@ -614,6 +751,7 @@ function walk(
             origin: "granted",
             grantedBy: g.by,
             atLevel: g.atLevel,
+            ...(g.track !== undefined ? { track: g.track } : {}),
           })),
         );
         continue;
@@ -621,6 +759,8 @@ function walk(
       step.choices = gathered.map((g) => g.choice);
       step.grantedBy = [...new Set(gathered.flatMap((g) => g.by))];
       step.atLevel = Math.min(...gathered.map((g) => g.atLevel));
+      const tracks = new Set(gathered.map((g) => g.track));
+      if (tracks.size === 1 && gathered[0]!.track !== undefined) step.track = gathered[0]!.track;
     } else if (!shown) continue;
 
     const granted: Grant[] = [];
@@ -631,11 +771,25 @@ function walk(
     if (step.origin === "granted") grantedByChoice.set(step.id, step.grantedBy);
     const prepared: Prepared[] = [];
     const atLevelOf = new Map((step.gather?.gathered ?? []).map((g) => [g.choice, g.atLevel]));
+    const trackOf = new Map((step.gather?.gathered ?? []).map((g) => [g.choice, g.track]));
     for (const choiceId of step.choices) {
       const choice = choiceOf(choiceId);
       if (!choice) continue;
       const at = atLevelOf.get(choiceId) ?? step.atLevel;
-      const p = prepareChoice(pkg, choice, choiceId, step.id, at, doc, character, choices, refs, givenLater);
+      const track = step.gather ? trackOf.get(choiceId) : step.track;
+      const p = prepareChoice(
+        pkg,
+        choice,
+        choiceId,
+        step.id,
+        at,
+        track,
+        doc,
+        character,
+        choices,
+        refs,
+        givenLater,
+      );
       const by = grantedByChoice.get(choiceId);
       if (by) p.state.grantedBy = by;
       choices[choiceId] = p.state;
@@ -679,6 +833,9 @@ function walk(
         : {}),
       ...(pool ? { pool } : {}),
       atLevel: step.atLevel,
+      ...(step.track !== undefined
+        ? { track: step.track, trackLevel: character.tableLevel(step.track, step.atLevel) }
+        : {}),
     });
 
     // SPEC 9.4: one step per newly granted choice, right after this step.
@@ -696,6 +853,7 @@ function walk(
   const open = Object.values(choices)
     .filter((c) => !c.optional && !isSettled(c))
     .map((c) => c.id);
+  const tracks = pkg.flow.level.tracks ? tracksState(pkg, pkg.flow.level.tracks, character) : undefined;
   const ev: Evaluation = {
     level: doc.level,
     steps,
@@ -708,10 +866,61 @@ function walk(
     raises: Object.fromEntries(character.raises),
     marks: Object.fromEntries(character.marks),
     open,
-    complete: open.length === 0,
+    complete: open.length === 0 && (tracks?.unfit.length ?? 0) === 0,
     inactiveAnswers: Object.keys(doc.answers).filter((k) => !(k in choices)),
+    ...(tracks ? { tracks } : {}),
   };
   return { ev, character };
+}
+
+/**
+ * The tracks of the walked character (SPEC 9.7). Adding a track is checked
+ * for the character as it was before the level that adds it: for the next
+ * level that is the character now; for a track already added, the level
+ * before it came.
+ */
+function tracksState(pkg: ContentPackage, tracks: Tracks, character: Character): TracksState {
+  const levels = character.levels;
+  const list = trackList(levels);
+  const things = indexes(pkg).things;
+  /** `thing` and, with `addRequiresCurrent`, the tracks in `had` whose `addRequires` fails at level `at`. */
+  const notMet = (thing: string, had: readonly string[], at: number): string[] => {
+    const scope = character.scopeAt(at);
+    return [thing, ...(tracks.addRequiresCurrent ? had : [])].filter((t) => {
+      const req = things.get(t)?.addRequires;
+      return req !== undefined && !evaluateCondition(req, scope);
+    });
+  };
+  const current = list.map((t) => t.thing);
+  const options = [...trackThings(pkg)].map((thing): TrackOption => {
+    if (levels.length === 0 || current.includes(thing)) return { thing, allowed: true };
+    const missing = notMet(thing, current, character.level);
+    return missing.length > 0 ? { thing, allowed: false, notMet: missing } : { thing, allowed: true };
+  });
+  const unfit = list
+    .filter(
+      (t) => t.added && notMet(t.thing, [...new Set(levels.slice(0, t.from - 1))], t.from - 1).length > 0,
+    )
+    .map((t) => t.thing);
+  return { choice: tracks.choice, first: levels[0] ?? null, levels: [...levels], list, options, unfit };
+}
+
+/**
+ * `rankUpTo` of a pick choice (SPEC 9.3): only things up to that rank, a
+ * thing without one being rank 0. It sees the character as `requires` does.
+ */
+function withinRank(
+  pkg: ContentPackage,
+  choice: PickChoice,
+  scope: ExprScope,
+  refs: Set<string>,
+): (id: string) => boolean {
+  const src = choice.options.rankUpTo;
+  if (src === undefined) return () => true;
+  for (const r of thingsIn(src)) refs.add(r);
+  const top = evaluateNumber(src, scope);
+  const things = indexes(pkg).things;
+  return (id) => (things.get(id)?.rank ?? 0) <= top;
 }
 
 function isSettled(c: ChoiceState): boolean {
@@ -740,9 +949,9 @@ function marksOnly(choice: Choice): boolean {
 /**
  * What a pick choice's `requires` and `recommend` see (SPEC 9.3). A pick
  * with a fixed count is made once, at the level of its step (a boon at
- * level 4): `level` and the values are those of that level, so a thing that
- * needs a higher level is not offered even if the character is built at
- * that level. `has()` and `count()` still see what the character has by the
+ * level 4): `level`, `levelOf()` and the values are those of that level,
+ * so a thing that needs a higher level is not offered even if the character
+ * is built at that level. `has()` and `count()` still see what the character has by the
  * time the step is asked, like the options do: a thing it gets at a later
  * level is neither offered nor recommended a second time. A pick whose
  * count is an expression or a table by level is the character's list at
@@ -752,7 +961,7 @@ function marksOnly(choice: Choice): boolean {
 function pickScope(choice: Choice, character: Character, atLevel: number): ExprScope {
   const once = choice.kind === "pickOne" || (choice.kind === "pickMany" && typeof choice.count === "number");
   if (!once || atLevel >= character.level) return character.scope;
-  return { ...character.scope, value: character.scopeAt(atLevel).value };
+  return { ...character.scopeAt(atLevel), has: character.scope.has, count: character.scope.count };
 }
 
 /**
@@ -797,11 +1006,13 @@ function canTakeAgain(
   atLevel: number,
 ): boolean {
   const choices = indexes(pkg).choices;
+  const track = character.held.get(thing.id)?.track;
   return (thing.grants ?? []).every((g) => {
-    if (g.choice === undefined || (g.atLevel ?? 1) > character.level) return true;
-    const choice = choices.get(g.choice);
+    const from = g.choice === undefined ? undefined : character.grantFrom(g, track);
+    if (from === undefined) return true;
+    const choice = choices.get(g.choice!);
     if (!choice || !marksOnly(choice)) return true;
-    const scope = pickScope(choice, character, Math.max(atLevel, g.atLevel ?? 1));
+    const scope = pickScope(choice, character, Math.max(atLevel, from));
     return ownedOptions(pkg, choice, character, refs, scope).length > 0;
   });
 }
@@ -812,6 +1023,7 @@ function prepareChoice(
   id: string,
   stepId: string,
   atLevel: number,
+  track: string | undefined,
   doc: DraftDocument,
   character: Character,
   earlier: Record<string, ChoiceState>,
@@ -827,6 +1039,7 @@ function prepareChoice(
     optional: choice.optional ?? false,
     status: "missing",
     atLevel,
+    ...(track !== undefined ? { track } : {}),
   };
   const variant = choice.textVariants?.find((v) => evaluateCondition(v.when, scope));
   if (variant) state.textVariant = variant.id;
@@ -843,13 +1056,15 @@ function prepareChoice(
       // what another copy of the same choice marked already.
       const owned = choice.options.owned ?? false;
       const at = pickScope(choice, character, atLevel);
+      const ranked = withinRank(pkg, choice, at, refs);
       const options = owned
-        ? ownedOptions(pkg, choice, character, refs, at)
+        ? ownedOptions(pkg, choice, character, refs, at).filter(ranked)
         : selectThings(pkg, choice.options).flatMap((t) => {
             for (const r of thingsIn(t.requires)) refs.add(r);
             if (character.held.has(t.id) && !(t.repeatable && canTakeAgain(pkg, t, character, refs, atLevel)))
               return [];
             if (t.requires !== undefined && !evaluateCondition(t.requires, at)) return [];
+            if (!ranked(t.id)) return [];
             // A grant gives it anyway (see evaluateDraft).
             const by = givenLater.get(t.id);
             if (by !== undefined && !t.repeatable) {
@@ -862,7 +1077,7 @@ function prepareChoice(
       ctx.options = options;
       if (!owned) for (const o of options) character.offered.add(o);
       if (choice.kind === "pickMany") {
-        state.count = character.amount(choice.count);
+        state.count = character.amount(choice.count, character.level, track);
         state.upTo = choice.upTo ?? false;
         ctx.count = state.count;
         state.remaining = state.count;
@@ -996,7 +1211,8 @@ function answerChoice(
     taken?.add(id);
     // A pick among what the character has marks the thing; it is not given a second time.
     if (marksOnly(choice)) character.mark(id, p.id);
-    else character.give(id, { pickedIn: p.id }, stepId, state.atLevel, granted);
+    else if (p.id === character.tracksChoice) character.giveTracks(id, { pickedIn: p.id }, stepId, granted);
+    else character.give(id, { pickedIn: p.id }, stepId, state.atLevel, granted, 1, state.track);
   }
   if (j.status !== "invalid" && j.inputs) character.setInputs(j.inputs, p.id);
   if (j.status !== "invalid" && j.raises) character.addRaises(j.raises, p.id, state.atLevel);
@@ -1132,8 +1348,9 @@ function infoFor(
     values: [],
     choices: [],
   };
+  const track = thing ? character.held.get(thing.id)?.track : undefined;
   for (const g of thing?.grants ?? []) {
-    if ((g.atLevel ?? 1) > level) continue;
+    if (character.grantFrom(g, track) === undefined) continue;
     if (g.thing !== undefined) {
       const had = content.things.includes(g.thing);
       if (!had) content.things.push(g.thing);
@@ -1141,7 +1358,7 @@ function infoFor(
       if (n > 1 && indexes(pkg).counted.has(g.thing)) content.counts[g.thing] = n;
     } else if (g.choice !== undefined) content.choices.push(g.choice);
     else if (g.value !== undefined) {
-      const add = character.amount(g.add!);
+      const add = character.amount(g.add!, level, track);
       const existing = content.values.find((v) => v.value === g.value);
       if (existing) existing.add += add;
       else content.values.push({ value: g.value, add });

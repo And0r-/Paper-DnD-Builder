@@ -54,6 +54,7 @@ type Pending = DraftChange;
 function sameTarget(a: Pending, b: Pending): boolean {
   if (a.type === "setLevel") return b.type === "setLevel";
   if (a.type === "answer") return b.type === "answer" && a.choice === b.choice;
+  if (a.type === "tracks") return b.type === "tracks";
   return b.type === "pool" && a.step === b.step;
 }
 
@@ -71,6 +72,8 @@ function send(id: string, version: number, next: Pending): Promise<DraftView> {
         version,
         picks: next.picks,
       });
+    case "tracks":
+      return api<DraftView>("PUT", draftPath(id, "/tracks"), { version, tracks: next.tracks });
   }
 }
 

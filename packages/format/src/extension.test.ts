@@ -142,8 +142,8 @@ describe("an extension is refused", () => {
     expect(errors(mutate((f) => (f.get("manifest.json").dependsOn[0].id = "other")))).toEqual([
       'manifest.json dependsOn[0].id: this extension builds on "other", not on "demo"',
     ]);
-    expect(errors(mutate((f) => (f.get("manifest.json").dependsOn[0].minVersion = "0.19.0")))).toEqual([
-      'manifest.json dependsOn[0].minVersion: needs "demo" 0.19.0 or a later version with the same major version; found 0.18.0',
+    expect(errors(mutate((f) => (f.get("manifest.json").dependsOn[0].minVersion = "0.20.0")))).toEqual([
+      'manifest.json dependsOn[0].minVersion: needs "demo" 0.20.0 or a later version with the same major version; found 0.19.0',
     ]);
     expect(errors(mutate((f) => f.set("units.json", base.files.get("units.json"))))).toEqual([
       "units.json : an extension uses the units of its base; remove this file",

@@ -2380,12 +2380,165 @@
         }
       }
     },
+    "/api/drafts/{id}/tracks": {
+      "put": {
+        "operationId": "setTracks",
+        "summary": "Give each level its track",
+        "tags": ["Characters"],
+        "description": "Only for packages with tracks (`evaluation.tracks`, package format SPEC 9.7): the track (a thing of the tracks choice) of each level from 2 on, in level order. Levels left out go to the first track, the answer of the tracks choice. Answers of a track taken away stay and count again once it is back. A track whose condition to be added does not hold is still taken; it shows in `evaluation.tracks.unfit` and keeps the character from being complete.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Draft id (a UUID).",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "help",
+            "in": "query",
+            "required": false,
+            "description": "The draft's help link token, for someone who is neither its owner nor the game master of its campaign (see Live help). Without a working one, someone else's draft answers 404.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "version": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "The draft version the change was made on (optimistic locking)."
+                  },
+                  "tracks": {
+                    "type": "array",
+                    "maxItems": 1000,
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 200
+                    },
+                    "description": "The track of each level from 2 on."
+                  }
+                },
+                "required": ["version", "tracks"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The draft with the tracks.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DraftView"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadBody"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/CrossSite"
+          },
+          "404": {
+            "description": "`draftNotFound` (also someone else's character: it looks exactly like a missing one)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "enum": ["draftNotFound"]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`versionConflict`, `packageUnavailable`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "enum": ["versionConflict", "packageUnavailable"]
+                        },
+                        "current": {
+                          "$ref": "#/components/schemas/DraftView"
+                        },
+                        "packageId": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "$ref": "#/components/responses/BodyTooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/JsonRequired"
+          },
+          "422": {
+            "description": "`changeRejected`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "enum": ["changeRejected"]
+                        },
+                        "reason": {
+                          "$ref": "#/components/schemas/ChangeError"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
     "/api/drafts/{id}/level-up": {
       "post": {
         "operationId": "levelUp",
         "summary": "Raise a finished character",
         "tags": ["Characters"],
-        "description": "Every answer stays; only what the new levels add is asked (`levelUp`). With nothing to answer the character is finished again at once.",
+        "description": "Every answer stays; only what the new levels add is asked (`levelUp`). With nothing to answer the character is finished again at once. With tracks (`evaluation.tracks`), `tracks` names the track of each new level in order; a level left out goes to the track of the level before. A track the character does not have yet is added only if `evaluation.tracks.options` allows it (else 422 `changeRejected` with `trackNotAllowed`).",
         "parameters": [
           {
             "name": "id",
@@ -2420,6 +2573,16 @@
                   },
                   "level": {
                     "type": "integer"
+                  },
+                  "tracks": {
+                    "type": "array",
+                    "maxItems": 1000,
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 200
+                    },
+                    "description": "Only with tracks: the track of each new level, in level order."
                   }
                 },
                 "required": ["version", "level"],
@@ -7259,6 +7422,13 @@
           "access": {
             "enum": ["owner", "gameMaster", "helper"],
             "description": "`owner`: your own. `gameMaster`: a player's, in a campaign you lead; you may open, change, raise and print it, not delete it. `helper`: someone's who gave you its help link; you may open and change it while the link works, nothing else."
+          },
+          "tracks": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "With tracks (package format SPEC 9.7): the track of each level from 2 on, in level order; empty when every level is in the first track (or the package has no tracks)."
           }
         },
         "required": [
@@ -7272,6 +7442,7 @@
           "levelBefore",
           "campaignId",
           "answers",
+          "tracks",
           "createdAt",
           "updatedAt",
           "finishedAt",
@@ -7382,6 +7553,13 @@
           "access": {
             "enum": ["owner", "gameMaster"],
             "description": "`owner`: your own. `gameMaster`: a player's, in a campaign you lead; you may open, change, raise and print it, not delete it."
+          },
+          "tracks": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "With tracks (package format SPEC 9.7): the track of each level from 2 on, in level order; empty when every level is in the first track (or the package has no tracks)."
           }
         },
         "required": [
@@ -7395,6 +7573,7 @@
           "levelBefore",
           "campaignId",
           "answers",
+          "tracks",
           "createdAt",
           "updatedAt",
           "finishedAt",
@@ -7444,7 +7623,7 @@
             "description": "Negative for a part that takes away."
           },
           "source": {
-            "description": "- `start`: the fixed number the value starts at (or the number in its formula).\n- `choice`: set or raised by the answer to this choice (`choice` is its id; for a copy, the copy's id; a choice a thing brought along is in `evaluation.steps[].grantedBy`).\n- `thing`: given by a thing the character has (`thing` is its id).\n- `values`: worked out from these other values (`level` included).\n- `unclear`: two ways gave the same number; no source rather than a wrong one.",
+            "description": "- `start`: the fixed number the value starts at (or the number in its formula).\n- `choice`: set or raised by the answer to this choice (`choice` is its id; for a copy, the copy's id; a choice a thing brought along is in `evaluation.steps[].grantedBy`).\n- `thing`: given by a thing the character has (`thing` is its id); with more than one track, a thing in a track also names it (`track`) and the level reached in it (`trackLevel`).\n- `values`: worked out from these other values (`level` included).\n- `unclear`: two ways gave the same number; no source rather than a wrong one.",
             "oneOf": [
               {
                 "type": "object",
@@ -7477,6 +7656,12 @@
                   },
                   "thing": {
                     "type": "string"
+                  },
+                  "track": {
+                    "type": "string"
+                  },
+                  "trackLevel": {
+                    "type": "integer"
                   }
                 },
                 "required": ["kind", "thing"],
@@ -7591,11 +7776,18 @@
                   "type": "number"
                 },
                 {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TrackLevels"
+                  },
+                  "description": "For a `{ tracks: true }` argument: the tracks with their levels, most first, on a tie the one taken first."
+                },
+                {
                   "type": "null"
                 }
               ]
             },
-            "description": "Arguments of the package text `summary.line`: a thing key or a number per variable."
+            "description": "Arguments of the package text `summary.line`: a thing key, a number, or the tracks with their levels, per variable."
           }
         },
         "required": ["name", "level", "complete", "line"],
@@ -7727,7 +7919,8 @@
             "description": "Choices that still need an answer (missing, incomplete or invalid, not optional), in step order. Empty when `complete`."
           },
           "complete": {
-            "type": "boolean"
+            "type": "boolean",
+            "description": "True when nothing is open and no track is `unfit`."
           },
           "inactiveAnswers": {
             "type": "array",
@@ -7735,6 +7928,9 @@
               "type": "string"
             },
             "description": "Stored answers of choices not asked now (kept for going back)."
+          },
+          "tracks": {
+            "$ref": "#/components/schemas/TracksState"
           }
         },
         "required": [
@@ -7802,6 +7998,14 @@
           "atLevel": {
             "type": "integer",
             "description": "Character level from which the step is asked."
+          },
+          "track": {
+            "type": "string",
+            "description": "The track the step's choices came through (package format SPEC 9.7), if all came through one."
+          },
+          "trackLevel": {
+            "type": "integer",
+            "description": "With `track`: the level in that track at which the step is asked."
           }
         },
         "required": ["id", "choices", "origin", "grantedBy", "dependsOn", "status", "atLevel"],
@@ -7917,6 +8121,10 @@
             "type": "integer",
             "minimum": 2,
             "description": "How many of it, if more than one: the counts of every grant that gives it, added up."
+          },
+          "track": {
+            "type": "string",
+            "description": "The track it belongs to: a track itself, or a thing that came through one (package format SPEC 9.7)."
           }
         },
         "required": ["id", "kind", "atLevel"],
@@ -8045,6 +8253,10 @@
           },
           "raise": {
             "$ref": "#/components/schemas/RaiseState"
+          },
+          "track": {
+            "type": "string",
+            "description": "The track the choice came through (package format SPEC 9.7); a choice of an added track is a copy `<choice>@<track>`."
           }
         },
         "required": ["id", "kind", "step", "optional", "status", "atLevel"],
@@ -8227,6 +8439,64 @@
               }
             },
             "required": ["code", "problem"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "code": {
+                "const": "noTracks"
+              }
+            },
+            "required": ["code"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "code": {
+                "const": "unknownTrack"
+              },
+              "thing": {
+                "type": "string"
+              }
+            },
+            "required": ["code", "thing"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "code": {
+                "const": "tooManyTracks"
+              },
+              "most": {
+                "type": "integer"
+              }
+            },
+            "required": ["code", "most"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "code": {
+                "const": "trackNotAllowed"
+              },
+              "thing": {
+                "type": "string"
+              },
+              "level": {
+                "type": "integer"
+              },
+              "notMet": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": ["code", "thing", "level", "notMet"],
             "additionalProperties": false
           }
         ],
@@ -8698,6 +8968,112 @@
         "required": ["id", "version", "languages", "dependsOn", "publishable", "name", "short"],
         "additionalProperties": false,
         "description": "An extension a character of the package may switch on (package format SPEC 17). `name` and `short` in the package entry's `language`."
+      },
+      "TrackLevels": {
+        "type": "object",
+        "properties": {
+          "thing": {
+            "type": "string"
+          },
+          "levels": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "required": ["thing", "levels"],
+        "additionalProperties": false
+      },
+      "TrackOption": {
+        "type": "object",
+        "properties": {
+          "thing": {
+            "type": "string"
+          },
+          "allowed": {
+            "type": "boolean",
+            "description": "May take the next level: a track the character has, or one whose condition to be added holds now."
+          },
+          "notMet": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "description": "Only if not allowed: the things whose `addRequires` does not hold, the track itself first, then (with `addRequiresCurrent`) tracks the character has. The package's sentence for each is the text `<thing>.addReason`."
+          }
+        },
+        "required": ["thing", "allowed"],
+        "additionalProperties": false
+      },
+      "TracksState": {
+        "type": "object",
+        "description": "Only for packages with tracks (package format SPEC 9.7): things of one choice that collect levels.",
+        "properties": {
+          "choice": {
+            "type": "string",
+            "description": "The tracks choice; the builder's step for the levels comes right after its step."
+          },
+          "first": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The first track (the answer of the tracks choice), null while there is none that counts."
+          },
+          "levels": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The track of each character level, level 1 first; empty without a first track."
+          },
+          "list": {
+            "type": "array",
+            "description": "Each track with its levels, in the order taken.",
+            "items": {
+              "type": "object",
+              "properties": {
+                "thing": {
+                  "type": "string"
+                },
+                "levels": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "from": {
+                  "type": "integer",
+                  "description": "The character level of its first level."
+                },
+                "added": {
+                  "type": "boolean",
+                  "description": "Every track but the first."
+                }
+              },
+              "required": ["thing", "levels", "from", "added"],
+              "additionalProperties": false
+            }
+          },
+          "options": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TrackOption"
+            },
+            "description": "Every option of the tracks choice for the next level (a raise)."
+          },
+          "unfit": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Added tracks whose condition to be added no longer holds (checked as the character was before the level that added them). They still count; the character is not complete until this is empty."
+          }
+        },
+        "required": ["choice", "first", "levels", "list", "options", "unfit"],
+        "additionalProperties": false
       }
     }
   }

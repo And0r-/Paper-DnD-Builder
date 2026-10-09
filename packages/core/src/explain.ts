@@ -8,14 +8,24 @@
  * cut it), there is no explanation.
  */
 import { collectRefs, parseExpr, type ContentPackage, type Expr } from "@builder/format/pure";
-import { byLevel, evaluationScope, type Evaluation } from "./evaluate.ts";
+import {
+  byLevel,
+  byValue,
+  evaluationScope,
+  grantAppliesFrom,
+  grantTableLevel,
+  type Evaluation,
+} from "./evaluate.ts";
 import { evaluateParsed, evaluateParsedCondition } from "./expr.ts";
 
 export type PartSource =
   /** Set or raised by an answer to this choice (for a copy, the copy's id). */
   | { kind: "choice"; choice: string }
-  /** Given by a thing the character has. */
-  | { kind: "thing"; thing: string }
+  /**
+   * Given by a thing the character has. With more than one track (SPEC
+   * 9.7), a thing in a track names it and the level reached in it.
+   */
+  | { kind: "thing"; thing: string; track?: string; trackLevel?: number }
   /** Worked out from other values (`level` included). */
   | { kind: "values"; values: string[] }
   /** The fixed number a value starts at. */
@@ -66,6 +76,7 @@ export function explainValue(
   const scope = evaluationScope(pkg, ev);
   const total = ev.values[valueId];
   if (total === undefined) return undefined;
+  const manyTracks = (ev.tracks?.list.length ?? 0) > 1;
 
   const negate = (parts: ValuePart[]) => parts.map((p) => ({ ...p, amount: -p.amount }));
 
@@ -169,14 +180,25 @@ export function explainValue(
         amount: byLevel(pkg, def.byLevel, ev.level),
         source: { kind: "values", values: ["level"] },
       });
+    else if (def.byValue !== undefined)
+      out.push({
+        amount: byValue(def.table!, scope.value(def.byValue)),
+        source: { kind: "values", values: [def.byValue] },
+      });
     else if (input) out.push({ amount: input.amount, source: { kind: "choice", choice: input.choice } });
     else out.push({ amount: def.default ?? 0, source: { kind: "start" } });
     for (const held of ev.things) {
       for (const g of things.get(held.id)?.grants ?? []) {
-        if (g.value !== id || (g.atLevel ?? 1) > ev.level || g.add === undefined) continue;
-        const owner: PartSource = { kind: "thing", thing: held.id };
+        if (g.value !== id || g.add === undefined || grantAppliesFrom(ev, held, g) === undefined) continue;
+        const owner: PartSource = {
+          kind: "thing",
+          thing: held.id,
+          ...(held.track !== undefined && manyTracks
+            ? { track: held.track, trackLevel: grantTableLevel(ev, held) }
+            : {}),
+        };
         if (typeof g.add === "object") {
-          out.push({ amount: byLevel(pkg, g.add.byLevel, ev.level), source: owner });
+          out.push({ amount: byLevel(pkg, g.add.byLevel, grantTableLevel(ev, held)), source: owner });
           continue;
         }
         const add: Expr = typeof g.add === "number" ? { type: "num", value: g.add } : parseExpr(g.add);

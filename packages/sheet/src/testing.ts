@@ -12,8 +12,10 @@ import {
   type DraftDocument,
 } from "@builder/core";
 import type { ContentPackage } from "@builder/format";
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 import { validatePackageDir } from "@builder/format";
-import { DEMO_PACKAGE_DIR } from "@builder/demo-package";
+import { DEMO_EXAMPLES_DIR, DEMO_PACKAGE_DIR } from "@builder/demo-package";
 
 export async function loadDemoPackage(): Promise<ContentPackage> {
   const result = await validatePackageDir(DEMO_PACKAGE_DIR);
@@ -42,13 +44,15 @@ function answerFor(c: ChoiceState, name: string): unknown {
 
 /**
  * A complete character at `level`, every open choice answered in step order;
- * `calling` (a thing key) is picked first instead of the recommended one.
+ * `calling` (a thing key) is picked first instead of the recommended one,
+ * and with `tracks` each level from 2 on goes to the calling named there.
  */
 export function demoCharacter(
   pkg: ContentPackage,
   level = 3,
   name = "Mira Fennwick",
   calling?: string,
+  tracks?: string[],
 ): DraftDocument {
   const created = newDraft(pkg, level);
   if (!created.ok) throw new Error(JSON.stringify(created.error));
@@ -58,7 +62,30 @@ export function demoCharacter(
     if (!r.ok) throw new Error(JSON.stringify(r.error));
     doc = r.doc;
   }
+  if (tracks) {
+    const r = applyChange(pkg, doc, { type: "tracks", tracks });
+    if (!r.ok) throw new Error(JSON.stringify(r.error));
+    doc = r.doc;
+  }
   return answerOpen(pkg, doc, name);
+}
+
+/**
+ * The demo package with the callings and their levels in the sheet's head
+ * and in the summary line (`{ "tracks": true }`), for sheets of a character
+ * with two callings. The demo package itself does not name them there yet.
+ */
+export function demoWithTracksHead(demo: ContentPackage): ContentPackage {
+  const pkg = structuredClone(demo);
+  pkg.flow.summary.line = { ...pkg.flow.summary.line, calling: { tracks: true } };
+  const header = pkg.sheet.sections.find((s) => s.kind === "header");
+  if (header?.kind === "header") header.fields = [{ tracks: true }, ...(header.fields ?? [])];
+  return pkg;
+}
+
+/** A draft from the demo package's `examples/` folder (characters with more than one calling). */
+export async function demoExample(name: string): Promise<DraftDocument> {
+  return JSON.parse(await readFile(join(DEMO_EXAMPLES_DIR, `${name}.json`), "utf8")) as DraftDocument;
 }
 
 /**
@@ -70,8 +97,9 @@ export function raisedCharacter(
   doc: DraftDocument,
   level: number,
   name = "Mira Fennwick",
+  tracks?: string[],
 ): DraftDocument {
-  const r = levelUp(pkg, doc, level);
+  const r = levelUp(pkg, doc, level, tracks);
   if (!r.ok) throw new Error(JSON.stringify(r.error));
   const { levelBefore: _, ...finished } = answerOpen(pkg, r.doc, name);
   return finished;

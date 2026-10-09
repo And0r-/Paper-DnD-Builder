@@ -1,0 +1,53 @@
+{
+  "level": 3,
+  "tracks": ["calling.river-runner", "calling.lantern-bearer"],
+  "answers": {
+    "name": {
+      "text": "Tamo Nebelfurt"
+    },
+    "calling": {
+      "pick": "calling.river-runner"
+    },
+    "folk": {
+      "pick": "folk.moorfolk"
+    },
+    "upbringing": {
+      "pick": "upbringing.bell-tower"
+    },
+    "scores": {
+      "method": 0,
+      "assign": {
+        "mightBase": 9,
+        "graceBase": 9,
+        "witBase": 8,
+        "heartBase": 11
+      }
+    },
+    "bell-tower-gifts": {
+      "method": 1,
+      "assign": {
+        "mightGift": 1,
+        "witGift": 1,
+        "heartGift": 1
+      }
+    },
+    "talents-river-runner": {
+      "picks": ["talent.climbing", "talent.sneaking"]
+    },
+    "extra-talent": {
+      "pick": "talent.tracking"
+    },
+    "knacks-current": {
+      "picks": ["knack.fog-hop", "knack.dew-breath", "knack.wave-push"]
+    },
+    "gear": {
+      "pick": "item.reed-shield"
+    },
+    "handling-river-runner": {
+      "picks": ["handling.boat-hook", "handling.small-bell"]
+    },
+    "age": {
+      "value": 19
+    }
+  }
+}

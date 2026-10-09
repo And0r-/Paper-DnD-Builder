@@ -3,10 +3,12 @@
     "id": "calling.lantern-bearer",
     "kind": "calling",
     "source": "mistland",
+    "addRequires": "heart >= 10",
     "grants": [
       {
         "value": "stamina",
-        "add": 8
+        "add": 8,
+        "only": "first"
       },
       {
         "value": "stamina",
@@ -19,17 +21,21 @@
         "atLevel": 3
       },
       {
-        "thing": "item.lantern-staff"
+        "thing": "item.lantern-staff",
+        "only": "first"
       },
       {
         "thing": "item.provisions",
-        "count": 3
+        "count": 3,
+        "only": "first"
       },
       {
-        "choice": "talents-lantern-bearer"
+        "choice": "talents-lantern-bearer",
+        "only": "first"
       },
       {
-        "choice": "gear"
+        "choice": "gear",
+        "only": "first"
       },
       {
         "choice": "knacks-lantern"
@@ -48,7 +54,7 @@
       },
       {
         "value": "stamina",
-        "add": "5 * (level - 3)",
+        "add": "5 * (levelOf('calling.lantern-bearer') - 3)",
         "atLevel": 4
       },
       {
@@ -88,57 +94,18 @@
         "atLevel": 18
       },
       {
-        "value": "lanternSlots1",
-        "add": {
-          "byLevel": [1, 2, 2, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3]
-        }
+        "value": "stamina",
+        "add": 5,
+        "only": "added"
       },
       {
-        "value": "lanternSlots2",
-        "add": {
-          "byLevel": [0, 0, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2]
-        }
+        "choice": "added-talent-lantern-bearer",
+        "only": "added"
       },
       {
-        "value": "lanternSlots3",
+        "value": "lanternKnackRank",
         "add": {
-          "byLevel": [0, 0, 0, 0, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2]
-        }
-      },
-      {
-        "value": "lanternSlots4",
-        "add": {
-          "byLevel": [0, 0, 0, 0, 0, 0, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2]
-        }
-      },
-      {
-        "value": "lanternSlots5",
-        "add": {
-          "byLevel": [0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2]
-        }
-      },
-      {
-        "value": "lanternSlots6",
-        "add": {
-          "byLevel": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2]
-        }
-      },
-      {
-        "value": "lanternSlots7",
-        "add": {
-          "byLevel": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1]
-        }
-      },
-      {
-        "value": "lanternSlots8",
-        "add": {
-          "byLevel": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1]
-        }
-      },
-      {
-        "value": "lanternSlots9",
-        "add": {
-          "byLevel": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 2]
+          "byLevel": [1, 1, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 5, 5, 5, 5]
         }
       }
     ]
@@ -147,10 +114,12 @@
     "id": "calling.river-runner",
     "kind": "calling",
     "source": "mistland",
+    "addRequires": "grace >= 10 and might >= 8",
     "grants": [
       {
         "value": "stamina",
-        "add": 10
+        "add": 10,
+        "only": "first"
       },
       {
         "value": "stamina",
@@ -163,16 +132,20 @@
         "atLevel": 3
       },
       {
-        "thing": "item.boat-hook"
+        "thing": "item.boat-hook",
+        "only": "first"
       },
       {
-        "thing": "item.provisions"
+        "thing": "item.provisions",
+        "only": "first"
       },
       {
-        "choice": "talents-river-runner"
+        "choice": "talents-river-runner",
+        "only": "first"
       },
       {
-        "choice": "gear"
+        "choice": "gear",
+        "only": "first"
       },
       {
         "choice": "knacks-current"
@@ -191,7 +164,7 @@
       },
       {
         "value": "stamina",
-        "add": "6 * (level - 3)",
+        "add": "6 * (levelOf('calling.river-runner') - 3)",
         "atLevel": 4
       },
       {
@@ -229,6 +202,27 @@
       {
         "choice": "boon-19",
         "atLevel": 19
+      },
+      {
+        "value": "stamina",
+        "add": 6,
+        "only": "added"
+      },
+      {
+        "choice": "added-talent-river-runner",
+        "only": "added"
+      },
+      {
+        "value": "currentSlots",
+        "add": {
+          "byLevel": [1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 4, 4, 4]
+        }
+      },
+      {
+        "value": "currentSlotRank",
+        "add": {
+          "byLevel": [1, 1, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 5, 5, 5, 5]
+        }
       }
     ]
   },
@@ -236,10 +230,12 @@
     "id": "calling.herbalist",
     "kind": "calling",
     "source": "mistland",
+    "addRequires": "wit >= 10",
     "grants": [
       {
         "value": "stamina",
-        "add": 7
+        "add": 7,
+        "only": "first"
       },
       {
         "value": "stamina",
@@ -252,16 +248,20 @@
         "atLevel": 3
       },
       {
-        "thing": "item.herb-satchel"
+        "thing": "item.herb-satchel",
+        "only": "first"
       },
       {
-        "thing": "item.provisions"
+        "thing": "item.provisions",
+        "only": "first"
       },
       {
-        "choice": "talents-herbalist"
+        "choice": "talents-herbalist",
+        "only": "first"
       },
       {
-        "choice": "gear"
+        "choice": "gear",
+        "only": "first"
       },
       {
         "choice": "knacks-root"
@@ -287,7 +287,7 @@
       },
       {
         "value": "stamina",
-        "add": "4 * (level - 3)",
+        "add": "4 * (levelOf('calling.herbalist') - 3)",
         "atLevel": 4
       },
       {
@@ -321,6 +321,27 @@
       {
         "choice": "boon-19",
         "atLevel": 19
+      },
+      {
+        "value": "stamina",
+        "add": 4,
+        "only": "added"
+      },
+      {
+        "choice": "added-talent-herbalist",
+        "only": "added"
+      },
+      {
+        "value": "rootKnackRank",
+        "add": {
+          "byLevel": [1, 1, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 5, 5, 5, 5]
+        }
+      },
+      {
+        "value": "bloomWardUses",
+        "add": {
+          "byLevel": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3]
+        }
       }
     ]
   },

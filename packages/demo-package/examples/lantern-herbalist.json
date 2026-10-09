@@ -1,0 +1,63 @@
+{
+  "level": 5,
+  "tracks": ["calling.lantern-bearer", "calling.lantern-bearer", "calling.herbalist", "calling.herbalist"],
+  "answers": {
+    "name": {
+      "text": "Ilsa Dornlicht"
+    },
+    "calling": {
+      "pick": "calling.lantern-bearer"
+    },
+    "folk": {
+      "pick": "folk.moorfolk"
+    },
+    "upbringing": {
+      "pick": "upbringing.ferry-child"
+    },
+    "scores": {
+      "method": 0,
+      "assign": {
+        "mightBase": 8,
+        "graceBase": 6,
+        "witBase": 10,
+        "heartBase": 12
+      }
+    },
+    "path": {
+      "pick": "path.lightwarden"
+    },
+    "herb-craft@calling.herbalist": {
+      "pick": "trait.leaf-lore"
+    },
+    "talents-lantern-bearer": {
+      "picks": ["talent.mending", "talent.climbing"]
+    },
+    "extra-talent": {
+      "pick": "talent.listening"
+    },
+    "added-talent-herbalist@calling.herbalist": {
+      "pick": "talent.legends"
+    },
+    "extra-talent@calling.herbalist": {
+      "pick": "talent.tracking"
+    },
+    "knacks-lantern": {
+      "picks": ["knack.warm-glow", "knack.glow-thread", "knack.light-bridge"]
+    },
+    "knacks-root@calling.herbalist": {
+      "picks": ["knack.herb-scent", "knack.root-grip", "knack.moss-bed"]
+    },
+    "borrowed-knack@calling.herbalist": {
+      "picks": ["knack.spark-shower"]
+    },
+    "gear": {
+      "pick": "item.reed-shield"
+    },
+    "handling-herbalist": {
+      "pick": "handling.trail-boots"
+    },
+    "age": {
+      "value": 27
+    }
+  }
+}

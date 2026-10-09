@@ -27,11 +27,15 @@ export { answersFromExtension } from "./extensions.ts";
 export { judgeAnswer, type Problem } from "./judge.ts";
 export {
   byLevel,
+  byValue,
   evaluateDraft,
   evaluationScope,
   filledTextKey,
   fillRaise,
+  grantAppliesFrom,
+  grantTableLevel,
   selectThings,
+  trackThings,
   type ChoiceState,
   type ChoiceStatus,
   type Evaluation,
@@ -40,20 +44,25 @@ export {
   type PoolState,
   type RaiseState,
   type StepState,
+  type TrackOption,
+  type TracksState,
 } from "./evaluate.ts";
 export { dependentValues } from "./depends.ts";
 export { fillPicks, type PoolSlot } from "./pool.ts";
 export { explainValue, totalOf, type PartSource, type ValueExplanation, type ValuePart } from "./explain.ts";
 export {
   applyChange,
+  headTracks,
   levelUp,
   levelUpState,
   newDraft,
   summarize,
+  tracksText,
   type ChangeError,
   type ChangeResult,
   type DraftSummary,
   type LevelUpState,
+  type TrackLevels,
 } from "./change.ts";
 export {
   convertMeasure,

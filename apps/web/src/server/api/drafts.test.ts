@@ -225,7 +225,12 @@ describe("building a character over the API", () => {
 
   it("serves the package structure and the texts of exactly one language", async () => {
     const pkg = await client.call("GET", "/api/packages/demo");
-    expect(pkg.json.package.flow.level).toEqual({ min: 1, max: 20, default: 1 });
+    expect(pkg.json.package.flow.level).toEqual({
+      min: 1,
+      max: 20,
+      default: 1,
+      tracks: { choice: "calling", addRequiresCurrent: true },
+    });
     expect(pkg.json.package).not.toHaveProperty("texts");
     const de = await client.call("GET", "/api/packages/demo/texts/de");
     expect(de.json.texts["package.name"]).toBe("Nebelland");

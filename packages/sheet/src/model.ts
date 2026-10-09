@@ -17,9 +17,11 @@ import {
   effectiveUnits,
   explainValue,
   formatMeasure,
+  headTracks,
   renderText,
   selectThings,
   summarize,
+  tracksText,
   type ChoiceState,
   type DraftDocument,
   type Evaluation,
@@ -197,19 +199,21 @@ export function buildSheetModel(
   const valueLabel = (id: string) => (id === "level" ? text("level.name") : text(`value.${id}.name`));
   /** First sentence of a value's explanation: the hint under its box. */
   const valueHint = (id: string): string => firstSentence(text(`value.${id}.explain`), language);
-  const statText = (v: StatValue | undefined): string => {
+  /** On a card: the values to show instead of others (`cardValues` of the choice the thing was picked in). */
+  type Swap = Readonly<Record<string, string>>;
+  const statText = (v: StatValue | undefined, swap: Swap = {}): string => {
     if (v === undefined) return "—";
     if (typeof v === "number") return numberFormat.format(v);
     if (typeof v === "boolean") return v ? messages.yes : messages.no;
     // `vars` fill the text with the character's values ("1d8 +3").
-    if ("text" in v) return filled(v) || "—";
-    if ("value" in v) return valueText(v.value);
+    if ("text" in v) return filled(v, swap) || "—";
+    if ("value" in v) return valueText(swap[v.value] ?? v.value);
     return formatMeasure(measure, v, "short");
   };
-  const uses = (t: Thing, key: string | undefined): Uses => {
+  const uses = (t: Thing, key: string | undefined, swap: Swap = {}): Uses => {
     const stat = key === undefined ? undefined : t.stats?.[key];
     // A stat that names a value has as many boxes as the character's value (uses by level).
-    const v = typeof stat === "object" && "value" in stat ? valueOf(stat.value) : stat;
+    const v = typeof stat === "object" && "value" in stat ? valueOf(swap[stat.value] ?? stat.value) : stat;
     if (typeof v === "number") {
       const n = Math.round(v);
       if (n <= 0) return null;
@@ -226,7 +230,10 @@ export function buildSheetModel(
       case "values":
         return list.format(source.values.map(valueLabel));
       case "thing":
-        return thingName(source.thing);
+        // A track's own part names the level reached in it: "Herbalist 2".
+        return source.track === source.thing && source.trackLevel !== undefined
+          ? `${thingName(source.thing)} ${numberFormat.format(source.trackLevel)}`
+          : thingName(source.thing);
       case "choice":
         return text(`choice.${source.choice.split("@")[0]}.title`);
       case "start":
@@ -263,8 +270,8 @@ export function buildSheetModel(
   const heldById = new Map(ev.things.map((h) => [h.id, h]));
   /** Values the sheet shows somewhere: only these are named as depending on another. The level is in the header. */
   const placed = new Set<string>(["level"]);
-  const place = (v: StatValue | undefined): void => {
-    if (typeof v === "object" && "value" in v) placed.add(v.value);
+  const place = (v: StatValue | undefined, swap: Swap = {}): void => {
+    if (typeof v === "object" && "value" in v) placed.add(swap[v.value] ?? v.value);
   };
   /** The things behind a held thing: the one that granted it, or those that granted the choice it was picked in. */
   const origins = (h: HeldThing): string[] =>
@@ -317,12 +324,20 @@ export function buildSheetModel(
     }
   };
   /** Text of a box or stat filled with the character's values; a variant may replace the text. */
-  const filled = (v: FilledText): string => {
-    for (const id of Object.values(v.vars ?? {})) placed.add(id);
+  const filled = (v: FilledText, swap: Swap = {}): string => {
+    for (const id of Object.values(v.vars ?? {})) placed.add(swap[id] ?? id);
     return text(
       filledTextKey(v, scope),
-      Object.fromEntries(Object.entries(v.vars ?? {}).map(([n, id]) => [n, valueOf(id)])),
+      Object.fromEntries(Object.entries(v.vars ?? {}).map(([n, id]) => [n, valueOf(swap[id] ?? id)])),
     );
+  };
+  /** SPEC 9.3 `cardValues`: what the choice a thing was picked in swaps on its card (the numbers of its track). */
+  const cardSwap = (h: HeldThing): Swap => {
+    if (h.pickedIn === undefined) return {};
+    const choice = pkg.flow.choices.find((c) => c.id === declaredChoiceId(h.pickedIn!));
+    return choice && (choice.kind === "pickOne" || choice.kind === "pickMany")
+      ? (choice.cardValues ?? {})
+      : {};
   };
 
   const summary = summarize(pkg, doc, ev);
@@ -331,7 +346,8 @@ export function buildSheetModel(
   for (const [k, v] of Object.entries(summary.line)) {
     if (v === null) lineVars[k] = "";
     else if (typeof v === "number") lineVars[k] = v;
-    else lineVars[k] = thingName(v);
+    else if (typeof v === "string") lineVars[k] = thingName(v);
+    else lineVars[k] = tracksText(v, thingName, (n) => numberFormat.format(n));
   }
   const levelLabel = `${text("level.name")} ${numberFormat.format(ev.level)}`;
   const packageName = text("package.name");
@@ -368,9 +384,13 @@ export function buildSheetModel(
                   .map((t) => thingName(t.id))
                   .join(", "),
               };
-            // `{ tracks }` prints the first track only until the core counts levels per track (AND-248).
-            const choice = "choice" in f ? f.choice : (pkg.flow.level.tracks?.choice ?? "");
-            return { label: text(f.label ?? `choice.${choice}.title`), text: answerText(choice) };
+            if ("choice" in f)
+              return { label: text(f.label ?? `choice.${f.choice}.title`), text: answerText(f.choice) };
+            // The tracks with their levels, "A 3 / B 2" (SPEC 9.7); labelled like the tracks choice.
+            return {
+              label: text(f.label ?? `choice.${pkg.flow.level.tracks?.choice ?? ""}.title`),
+              text: tracksText(headTracks(ev), thingName, (n) => numberFormat.format(n)),
+            };
           }),
         };
       case "statBoxes": {
@@ -622,15 +642,16 @@ export function buildSheetModel(
     .filter(({ t }) => isCard(pkg, t))
     .map(({ h, t }) => ({
       t,
+      swap: cardSwap(h),
       step: h.step === undefined ? -1 : (stepIndex.get(h.step) ?? 0),
       name: thingName(t.id),
     }))
     .sort((a, b) => a.step - b.step || (a.t.rank ?? 0) - (b.t.rank ?? 0) || collator.compare(a.name, b.name))
-    .map(({ t, name: cardName }): Card => {
+    .map(({ t, swap, name: cardName }): Card => {
       const layout = pkg.sheet.cards[t.kind]!;
-      const cardUses = uses(t, layout.uses);
-      if (layout.uses !== undefined) place(t.stats?.[layout.uses]);
-      for (const f of layout.fields) place(t.stats?.[f]);
+      const cardUses = uses(t, layout.uses, swap);
+      if (layout.uses !== undefined) place(t.stats?.[layout.uses], swap);
+      for (const f of layout.fields) place(t.stats?.[f], swap);
       // The first entry whose condition the thing matches, in the package's order.
       const line = layout.origins?.find((o) => markCondition(o)(t) && !(o.not && markCondition(o.not)(t)));
       return {
@@ -643,13 +664,13 @@ export function buildSheetModel(
         name: cardName,
         fields: layout.fields.map((f) => ({
           label: text(`stat.${f}.name`),
-          value: statText(t.stats?.[f]),
+          value: statText(t.stats?.[f], swap),
         })),
         ...(line
           ? {
               origin: {
                 label: line.label !== undefined ? text(line.label) : thingName(origin(t.id)),
-                value: filled(line.text),
+                value: filled(line.text, swap),
               },
             }
           : {}),

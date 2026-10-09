@@ -56,7 +56,15 @@ export const TOOL_DESCRIPTIONS = {
   level_up:
     "Raise a finished character to a higher level. Every answer stays. toAnswer in the result lists every " +
     "choice the higher level asks: new choices and choices that got more places (more picks or points). " +
-    "Answer all of them (list_open_choices shows the same), then finish the character again.",
+    "Answer all of them (list_open_choices shows the same), then finish the character again. If the " +
+    "package lets a character split its levels between several things (get_character shows tracks), name " +
+    "the thing each new level goes to; get_character's tracks.nextLevel says which may be added and why not. " +
+    "Ask the player which one.",
+  set_tracks:
+    "For a character whose package lets it split its levels between several things (get_character shows " +
+    "tracks): which thing each level from 2 on goes to, as one list in level order. Level 1 always goes to " +
+    "the answer of the choice that names the first. Leave levels out to keep them in the first. Answers of " +
+    "a thing taken away stay and count again once it is back.",
   finish_character:
     "Mark a character as finished once nothing is open. If something is still open, nothing changes and " +
     "the result lists the open choices.",
@@ -75,6 +83,10 @@ export const INPUT_DESCRIPTIONS = {
   level: "The level, a whole number.",
   startLevel: "The level to build for, a whole number. Without it the package's usual start level.",
   raiseLevel: "The new level, higher than the current one.",
+  raiseTracks:
+    "Only if the character has tracks: the thing id each new level goes to, in level order. Left out, a " +
+    "level goes where the level before it went.",
+  tracks: "The thing id each level from 2 on goes to, in level order (from get_character, tracks).",
   value: "The value id (from get_character).",
   choice: "The choice id (from list_open_choices or get_character), copied exactly, also with an @ in it.",
   answer:

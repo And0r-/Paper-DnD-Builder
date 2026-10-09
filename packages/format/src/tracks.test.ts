@@ -1,7 +1,8 @@
 /**
  * Format 0.21: levels in more than one track (flow.level.tracks, levelOf(),
  * addRequires, grants `only`, values by another value, rankUpTo, cardValues,
- * `{ "tracks": true }`). Every case starts from the demo package.
+ * `{ "tracks": true }`). Every case starts from the demo package, which
+ * uses tracks itself; `mutatePlain` starts from it without them.
  */
 import { fileURLToPath } from "node:url";
 import { beforeAll, describe, expect, it } from "vitest";
@@ -21,6 +22,34 @@ function mutate(change: (files: RawFiles) => void): ValidationResult {
   const files = new Map([...demo].map(([k, v]) => [k, structuredClone(v)]));
   change(files);
   return validatePackageFiles(files);
+}
+/**
+ * The demo without anything that needs tracks, as a package before 0.21
+ * would be: no flow.level.tracks, no addRequires (nor its texts), no
+ * `only`, and `level` where the demo asks `levelOf()`.
+ */
+function withoutTracks(f: RawFiles): void {
+  for (const [name, content] of f) {
+    const plain = JSON.parse(JSON.stringify(content).replace(/levelOf\('[^']*'\)/g, "level"));
+    if (name.startsWith("things/")) {
+      for (const t of plain) {
+        delete t.addRequires;
+        for (const g of t.grants ?? []) delete g.only;
+      }
+    }
+    if (name.startsWith("texts/")) {
+      for (const key of Object.keys(plain.entries)) if (key.endsWith(".addReason")) delete plain.entries[key];
+    }
+    f.set(name, plain);
+  }
+  delete flow(f).level.tracks;
+}
+/** Like `mutate`, starting from the demo without tracks. */
+function mutatePlain(change: (files: RawFiles) => void): ValidationResult {
+  return mutate((f) => {
+    withoutTracks(f);
+    change(f);
+  });
 }
 const flow = (f: RawFiles) => f.get("flow.json");
 const choice = (f: RawFiles, id: string) => flow(f).choices.find((c: any) => c.id === id);
@@ -46,27 +75,13 @@ const messages = (r: ValidationResult, level: "errors" | "warnings" = "errors") 
 
 describe("tracks (format 0.21)", () => {
   it("accepts every new field together, without errors or warnings", () => {
+    // The demo itself has tracks with addRequiresCurrent, addRequires, only, levelOf(),
+    // tables by value, rankUpTo and cardValues; this adds the rest.
     const r = mutate((f) => {
-      withTracks(f, { addRequiresCurrent: true });
-      calling(f, "calling.herbalist").addRequires = "wit >= 13";
-      text(f, "calling.herbalist.addReason", "Braucht Witz 13.", "Needs wit 13.");
-      calling(f, "calling.lantern-bearer").grants[0].only = "first";
-      calling(f, "calling.lantern-bearer").grants.push({ value: "stamina", add: 5, only: "added" });
       // A path comes through a calling's choice, so it belongs to that track too.
       f.get("things/callings-and-paths.json")
         .find((t: { id: string }) => t.id === "path.lightwarden")
         .grants.push({ value: "stamina", add: 1, only: "added" });
-      addValue(f, {
-        id: "glowLevel",
-        formula: "levelOf('calling.lantern-bearer') + ceil(levelOf('calling.herbalist') / 2)",
-        max: 20,
-      });
-      addValue(f, {
-        id: "sharedSlots",
-        byValue: "glowLevel",
-        table: Array.from({ length: 21 }, (_, i) => i),
-      });
-      choice(f, "knacks-lantern").options.rankUpTo = "knackRank";
       choice(f, "borrowed-knack").cardValues = { knackHit: "borrowedKnackHit" };
       flow(f).summary.line.calling = { tracks: true };
       f.get("sheet.json").sections[0].fields.push({ tracks: true });
@@ -77,7 +92,7 @@ describe("tracks (format 0.21)", () => {
   });
 
   it("leaves a package without tracks as it was", () => {
-    const r = mutate(() => {});
+    const r = mutatePlain(() => {});
     expect(r.ok).toBe(true);
     expect(r.package?.flow.level.tracks).toBeUndefined();
   });
@@ -110,7 +125,7 @@ describe("tracks (format 0.21)", () => {
   });
 
   it("warns when addRequiresCurrent has nothing to check", () => {
-    const r = mutate((f) => withTracks(f, { addRequiresCurrent: true }));
+    const r = mutatePlain((f) => withTracks(f, { addRequiresCurrent: true }));
     expect(messages(r, "warnings")).toEqual([
       'flow.json level.tracks.addRequiresCurrent: no thing has "addRequires"; there is nothing to check',
     ]);
@@ -119,7 +134,7 @@ describe("tracks (format 0.21)", () => {
 
 describe("levelOf() (format 0.21)", () => {
   it("rejects levelOf() without tracks", () => {
-    const r = mutate((f) => addValue(f, { id: "glowLevel", formula: "levelOf('calling.herbalist')" }));
+    const r = mutatePlain((f) => addValue(f, { id: "sparkLevel", formula: "levelOf('calling.herbalist')" }));
     expect(messages(r)).toContainEqual(
       expect.stringMatching(
         /^values\.json \[\d+\]\.formula: .*levelOf\("calling\.herbalist"\), but flow\.level\.tracks is not set$/,
@@ -149,8 +164,8 @@ describe("levelOf() (format 0.21)", () => {
 describe("addRequires (format 0.21)", () => {
   it("needs the reason text in every language", () => {
     const r = mutate((f) => {
-      withTracks(f);
-      calling(f, "calling.herbalist").addRequires = "wit >= 13";
+      delete f.get("texts/de/tracks.json").entries["calling.herbalist.addReason"];
+      delete f.get("texts/en/tracks.json").entries["calling.herbalist.addReason"];
     });
     expect(messages(r)).toEqual([
       'texts/de/ calling.herbalist.addReason: missing text (why "calling.herbalist" cannot be added)',
@@ -167,7 +182,7 @@ describe("addRequires (format 0.21)", () => {
     expect(messages(onPath)).toEqual([
       'things/callings-and-paths.json [3].addRequires: only a track can be added; "path.lightwarden" is no option of the tracks choice "calling"',
     ]);
-    const noTracks = mutate((f) => {
+    const noTracks = mutatePlain((f) => {
       calling(f, "calling.herbalist").addRequires = "wit >= 13";
       text(f, "calling.herbalist.addReason", "x", "x");
     });
@@ -178,9 +193,7 @@ describe("addRequires (format 0.21)", () => {
 
   it("checks the expression like requires", () => {
     const r = mutate((f) => {
-      withTracks(f);
       calling(f, "calling.herbalist").addRequires = "cunning >= 13";
-      text(f, "calling.herbalist.addReason", "x", "x");
     });
     expect(messages(r)).toEqual([
       'things/callings-and-paths.json [2].addRequires: expression "cunning >= 13" uses unknown value "cunning"',
@@ -198,7 +211,7 @@ describe("grants only for the first or an added track (format 0.21)", () => {
   });
 
   it("rejects only without tracks", () => {
-    const r = mutate((f) => (calling(f, "calling.herbalist").grants[0].only = "first"));
+    const r = mutatePlain((f) => (calling(f, "calling.herbalist").grants[0].only = "first"));
     expect(messages(r)).toEqual([
       'things/callings-and-paths.json [2].grants[0].only: "only" needs tracks, and flow.level.tracks is not set',
     ]);
@@ -220,18 +233,18 @@ describe("a value as a table by another value (format 0.21)", () => {
   const table = [0, 2, 3, 4];
 
   it("rejects an unknown value, the value itself and a circle", () => {
-    const unknown = mutate((f) => addValue(f, { id: "sharedSlots", byValue: "glowLevel", table }));
-    expect(messages(unknown)).toContainEqual(expect.stringMatching(/byValue: unknown value "glowLevel"$/));
+    const unknown = mutate((f) => addValue(f, { id: "sharedSlots", byValue: "sparkLevel", table }));
+    expect(messages(unknown)).toContainEqual(expect.stringMatching(/byValue: unknown value "sparkLevel"$/));
     const self = mutate((f) => addValue(f, { id: "sharedSlots", byValue: "sharedSlots", table }));
     expect(messages(self)).toContainEqual(
       expect.stringMatching(/byValue: a value cannot be a table by itself$/),
     );
     const circle = mutate((f) => {
-      addValue(f, { id: "glowLevel", formula: "sharedSlots + 1" });
-      addValue(f, { id: "sharedSlots", byValue: "glowLevel", table });
+      addValue(f, { id: "sparkLevel", formula: "sharedSlots + 1" });
+      addValue(f, { id: "sharedSlots", byValue: "sparkLevel", table });
     });
     expect(messages(circle)).toContain(
-      "values.json : formulas depend on each other in a circle: glowLevel → sharedSlots → glowLevel",
+      "values.json : formulas depend on each other in a circle: sparkLevel → sharedSlots → sparkLevel",
     );
   });
 
@@ -312,7 +325,7 @@ describe("rankUpTo and cardValues (format 0.21)", () => {
 
 describe("the tracks in the summary line and the header (format 0.21)", () => {
   it("needs flow.level.tracks", () => {
-    const r = mutate((f) => {
+    const r = mutatePlain((f) => {
       flow(f).summary.line.calling = { tracks: true };
       f.get("sheet.json").sections[0].fields.push({ tracks: true, label: "choice.calling.title" });
     });
@@ -329,5 +342,28 @@ describe("the tracks in the summary line and the header (format 0.21)", () => {
     });
     expect(r.ok).toBe(false);
     expect(messages(r)[0]).toMatch(/^flow\.json summary\.line\.calling/);
+  });
+});
+
+describe("the demo's example drafts with more than one calling", () => {
+  const dir = fileURLToPath(new URL("../../demo-package/examples", import.meta.url));
+  const drafts = ["lantern-herbalist", "herbalist-river-runner", "refused-lantern-bearer"];
+
+  it.each(drafts)("%s names only choices, tracks and things of the package", async (name) => {
+    const { readFile } = await import("node:fs/promises");
+    const doc = JSON.parse(await readFile(`${dir}/${name}.json`, "utf8"));
+    const pkg = validatePackageFiles(demo).package!;
+    const choices = new Set(pkg.flow.choices.map((c) => c.id));
+    const things = new Set(pkg.things.map((t) => t.id));
+    const tracks = new Set(pkg.things.filter((t) => t.kind === "calling").map((t) => t.id));
+    expect(doc.tracks.length).toBe(doc.level - 1);
+    for (const t of doc.tracks) expect(tracks).toContain(t);
+    for (const [key, answer] of Object.entries<{ pick?: string; picks?: string[] }>(doc.answers)) {
+      const [declared, track] = key.split("@");
+      expect(choices, key).toContain(declared);
+      if (track) expect(tracks, key).toContain(track);
+      for (const id of [answer.pick, ...(answer.picks ?? [])].filter(Boolean))
+        expect(things, key).toContain(id);
+    }
   });
 });

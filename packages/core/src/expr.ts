@@ -15,6 +15,8 @@ export interface ExprScope {
   value(name: string): number;
   has(thingId: string): boolean;
   count(tag: string): number;
+  /** Levels in a track (SPEC 9.7); 0 for a track the character does not have, or without one. */
+  levelOf?(thingId: string): number;
 }
 
 /**
@@ -148,6 +150,8 @@ function evalNode(e: Expr, scope: ExprScope): ExprResult {
           return scope.has(String(arg(0)));
         case "count":
           return scope.count(String(arg(0)));
+        case "levelOf":
+          return scope.levelOf?.(String(arg(0))) ?? 0;
       }
     }
   }

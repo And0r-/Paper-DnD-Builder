@@ -51,7 +51,13 @@ export interface Summary {
   name: string | null;
   level: number;
   complete: boolean;
-  line: Record<string, string | number | null>;
+  /** A thing key, a number, or the tracks with their levels (most first). */
+  line: Record<string, string | number | TrackLevels[] | null>;
+}
+
+export interface TrackLevels {
+  thing: string;
+  levels: number;
 }
 
 export interface Draft {
@@ -64,6 +70,8 @@ export interface Draft {
   level: number;
   levelBefore: number | null;
   answers: Record<string, unknown>;
+  /** The track of each level from 2 on; empty if all are in the first (or the package has no tracks). */
+  tracks: string[];
   createdAt: string;
   updatedAt: string;
   finishedAt: string | null;
@@ -144,6 +152,17 @@ export interface Evaluation {
   values: Record<string, number>;
   open: string[];
   complete: boolean;
+  tracks?: TracksState;
+}
+
+/** The character's tracks, if the package has them: things of one choice that collect levels. */
+export interface TracksState {
+  choice: string;
+  first: string | null;
+  levels: string[];
+  list: Array<{ thing: string; levels: number; from: number; added: boolean }>;
+  options: Array<{ thing: string; allowed: boolean; notMet?: string[] }>;
+  unfit: string[];
 }
 
 export interface LevelUpState {
@@ -165,7 +184,7 @@ export interface DraftView {
 export type ValueSource =
   | { kind: "start" }
   | { kind: "choice"; choice: string }
-  | { kind: "thing"; thing: string }
+  | { kind: "thing"; thing: string; track?: string; trackLevel?: number }
   | { kind: "values"; values: string[] }
   | { kind: "unclear" };
 

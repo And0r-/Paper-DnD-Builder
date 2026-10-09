@@ -133,6 +133,14 @@ export function rejectionMessage(reason: unknown): string {
       return `${prefix}This step has no shared list; answer its choices one by one with set_answer.`;
     case "noAnswerNeeded":
       return `${prefix}This choice only informs; it takes no answer.`;
+    case "noTracks":
+      return `${prefix}This package has no tracks: every level goes to the character as a whole.`;
+    case "unknownTrack":
+      return `${prefix}${String(r["thing"])} is not one of the things that can take levels (see get_character, tracks.nextLevel).`;
+    case "tooManyTracks":
+      return `${prefix}More tracks than levels: at most ${String(r["most"])}.`;
+    case "trackNotAllowed":
+      return `${prefix}${String(r["thing"])} cannot be added at level ${String(r["level"])}; its condition is not met.`;
     case "answerDoesNotFit":
       return (
         prefix + (PROBLEMS[String(r["problem"])] ?? `The answer does not fit (${String(r["problem"])}).`)

@@ -143,14 +143,17 @@ describe("the flow of a level up", () => {
   });
 
   it("grows only the uses of abilities the character has", () => {
-    // Ward uses are a table by level that only the herbalist's ward names.
+    // Ward uses grow by the herbalist's level; only the herbalist's ward names them.
     const lantern = levelGrowth(lp, evaluateDraft(pkg, built(11)));
     expect(lantern.own).toContain("practice");
-    expect(lantern.own).not.toContain("bloomWardUses");
+    const grown = (g: ReturnType<typeof levelGrowth>) => [...g.own, ...g.byThing.flatMap((b) => b.values)];
+    expect(grown(lantern)).not.toContain("bloomWardUses");
     const herbalist = evaluateDraft(pkg, built(11, "calling.herbalist"));
     expect(herbalist.things.map((h) => h.id)).toContain("trait.bloom-ward");
     const growth = levelGrowth(lp, herbalist);
-    expect(growth.own.filter((v) => v === "bloomWardUses")).toEqual(["bloomWardUses"]);
-    expect(new Set(growth.own).size).toBe(growth.own.length);
+    // The herbalist's calling grants them by its own level (format 0.21), so they grow with it.
+    expect(growth.byThing.find((b) => b.thing === "calling.herbalist")?.values).toContain("bloomWardUses");
+    expect(grown(growth).filter((v) => v === "bloomWardUses")).toEqual(["bloomWardUses"]);
+    expect(new Set(grown(growth)).size).toBe(grown(growth).length);
   });
 });

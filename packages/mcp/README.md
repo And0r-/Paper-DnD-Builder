@@ -40,8 +40,11 @@ the unit conversion, to write package texts for the reader.
 
 `list_packages`, `list_characters`, `get_character`, `explain_value`,
 `list_open_choices`, `list_options`, `set_answer`, `answer_pool`,
-`start_character`, `set_level`, `level_up`, `finish_character`,
-`get_sheet`. They speak of characters, choices, options, values and things;
+`start_character`, `set_level`, `set_tracks`, `level_up`, `finish_character`,
+`get_sheet`. With a package whose characters split their levels between
+several things (tracks), `get_character` shows them and which may be added
+next, `level_up` names the track of each new level and `set_tracks` sets
+them while building. They speak of characters, choices, options, values and things;
 every name in their answers comes from the package texts, in the account's
 language. A tool answers JSON text; an answer the builder refused is marked
 as an error and says why in words. `get_sheet` returns the sheet model as

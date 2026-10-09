@@ -154,7 +154,12 @@ describe("a level-20 lantern bearer, worked out by hand", () => {
       borrowedKnackTarget: 17, // borrowed knacks go by heart for everyone
       borrowedKnackHit: 9,
       knackRank: 5,
-      bloomWardUses: 3, // a herbalist's table; the value is there for everyone
+      // Each calling's knacks by their own score; the ranks by the level in that calling.
+      ...{ lanternKnackTarget: 17, lanternKnackHit: 9, lanternKnackRank: 5 },
+      ...{ rootKnackTarget: 17, rootKnackHit: 9, rootKnackRank: 0 }, // wit bonus 3
+      ...{ currentKnackTarget: 14, currentKnackHit: 6, currentSlots: 0, currentSlotRank: 0 }, // grace bonus 0
+      bloomWardUses: 0, // a table at the herbalist: no herbalist levels
+      glowLevel: 20, // lantern bearer levels + half the herbalist levels
       lanternSlots1: 3,
       lanternSlots2: 2,
       lanternSlots3: 2,
@@ -238,9 +243,14 @@ describe("a level-20 lantern bearer, worked out by hand", () => {
       { amount: 2, source: { kind: "choice", choice: "boon-raise@boon-4" } },
       { amount: 2, source: { kind: "choice", choice: "boon-raise@boon-8" } },
     ]);
-    // A table given by the calling is the calling's; a value's own table is the level's.
+    // A table given by the calling is the calling's; a table by a value is that value's;
+    // a value's own table by level is the level's.
+    expect(explainValue(pkg, ev, "bloomWardUses")?.parts ?? []).toEqual([]);
+    expect(explainValue(pkg, ev, "lanternKnackRank")?.parts).toEqual([
+      { amount: 5, source: { kind: "thing", thing: "calling.lantern-bearer" } },
+    ]);
     expect(explainValue(pkg, ev, "lanternSlots9")?.parts).toEqual([
-      { amount: 2, source: { kind: "thing", thing: "calling.lantern-bearer" } },
+      { amount: 2, source: { kind: "values", values: ["glowLevel"] } },
     ]);
     expect(explainValue(pkg, ev, "knackRank")?.parts).toEqual([
       { amount: 5, source: { kind: "values", values: ["level"] } },

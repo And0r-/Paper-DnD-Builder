@@ -79,4 +79,9 @@ export type DraftChange =
    * All picks of a list step (`together: "list"`). The core assigns each pick
    * to one of the step's choices and stores one answer per choice.
    */
-  | { type: "pool"; step: string; picks: string[] };
+  | { type: "pool"; step: string; picks: string[] }
+  /**
+   * The builder's step for the levels (SPEC 9.7): the track of each level
+   * from 2 on, as `DraftDocument.tracks`. Entries left out go to the first track.
+   */
+  | { type: "tracks"; tracks: string[] };
