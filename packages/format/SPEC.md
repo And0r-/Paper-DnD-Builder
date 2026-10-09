@@ -126,7 +126,7 @@ an extension with such a license says so ([17.7](#177-characters-with-extensions
 
 ```json
 {
-  "formatVersion": "0.21",
+  "formatVersion": "0.22",
   "id": "demo",
   "version": "0.1.0",
   "languages": ["de", "en"],
@@ -1257,7 +1257,7 @@ kinds:
 | `checkList`    | all things selected; marked if the character has them, marked twice if it has a `strong` thing about them; `note` stat small next to the name; `total` value in the box                       | `things` (like `options`), `note?`, `total?`, `strong?`              |
 | `statTable`    | the selected things the character has, one row each: name, then one column per stat                                                                                                           | `things`, `columns[]: { stat, signed?, wrap? }`                      |
 | `featureTable` | the selected things the character has: name, `note` stat under it, `short`, use boxes from the `uses` stat; grouped by rank (`byRank`) or by origin (`groupBy`), marked, with a lead sentence | `things`, `uses?`, `note?`, `byRank?`, `groupBy?`, `marks?`, `lead?` |
-| `list`         | the selected things the character has ("3 × Rope" for counted things), plus blank lines                                                                                                       | `things`, `blankLines`                                               |
+| `list`         | the selected things the character has ("3 × Rope" for counted things), each with an optional line under the name (`detail`), plus blank lines                                                 | `things`, `blankLines`, `detail?`                                    |
 | `answers`      | answers to text and number choices, and the picks of choices with `owned` options; all copies of a choice in one row, no row for a choice not asked                                           | `choices[]`                                                          |
 | `helpBox`      | the text `sheet.<id>.text`                                                                                                                                                                    | —                                                                    |
 | `notes`        | blank lines                                                                                                                                                                                   | `lines`                                                              |
@@ -1462,6 +1462,15 @@ for each thing the character has among `lead.things`: the text
 adds no sentence, so the package writes it only where it has something to
 say.
 
+**Detail** (`detail`, on `list` sections, 0.22). A short line printed
+small under each listed name: the text `<thing>.<detail>`, for example
+with `"detail": "contents"` the text `thing.travel-kit.contents` ("A
+lantern, 2 candles, 15 m of rope"). A thing without that text gets no
+line, so the package writes it only where it has something to say. Units
+in the text (`{{length:50}}`) follow the player's unit setting. A counted
+thing ("2 × Travel Kit") gets the line once. If no listed thing has the
+text in any language, the validator warns.
+
 **Note** (`note`, on `checkList` sections). Names a stat key; its value is
 printed small next to each name, formatted like a card field (numbers as
 they are, quantities converted, `{text}` as the text). Typical use: the
@@ -1654,7 +1663,8 @@ is gathered in; a repeatable thing that grants no choice; `maxPerTarget`
 above `points`; `only` on a thing that never belongs to a track; a
 `byValue` table shorter than the named value's `max + 1`; `rankUpTo` on
 options without a rank; `cardValues` on a choice whose options have no
-card; `addRequiresCurrent` without any `addRequires`.
+card; `addRequiresCurrent` without any `addRequires`; a `list` section's
+`detail` that no listed thing has a text for.
 
 In code: `validatePackageDir(dir)` returns `{ ok, errors, warnings,
 package }`; `package` is the typed, loaded content including the origin of
@@ -1703,6 +1713,7 @@ are removed (saved characters may lose picks). Keys are never renamed.
 | 0.19    | 2026-10-07 | Optional `derivedLabel` on the scores of a `scoreColumn`: a text key that labels the `derived` circle instead of `value.<derived>.name` (one short word for every score). The sheet model and `GET /api/drafts/:id/sheet` carry the filled text as `derivedLabel`, as before.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | Set `formatVersion` to `"0.19"`. Nothing else has to change: `derivedLabel` is optional, so every valid 0.18 package is a valid 0.19 package.                                                                                                                                                                                                                                                                                                                                                                                                        |
 | 0.20    | 2026-10-08 | Extensions ([17](#17-extensions)): `manifest.dependsOn` names the base a package extends. An extension adds things, choices (`flow.json` with only `choices`), values, glossary entries, sheet sections and card layouts, and joins base choices whose `options` select its things; it never changes the base. Keys are shared with the base, without a package prefix (the `<package>:<key>` form reserved in 0.19 is dropped). Texts missing in a base language come from the extension's first language, marked. A character switches extensions on one by one; the sheet says when it holds content that is not `publishable`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | Set `formatVersion` to `"0.20"`. Nothing else has to change: `dependsOn` is new and optional, so every valid 0.19 package is a valid 0.20 package.                                                                                                                                                                                                                                                                                                                                                                                                   |
 | 0.21    | 2026-10-09 | Tracks: levels in more than one thing ([9.7](#97-tracks-levels-in-more-than-one-thing)). `flow.level.tracks` (`choice`, optional `addRequiresCurrent`) names the choice whose things carry levels; the draft may store `tracks`, the track of each level from 2 on. For things that belong to a track, `atLevel` and tables by level in their grants count the level in that track; `level` stays the character level. New: `levelOf('<thing>')` in expressions; `addRequires` on a thing with the text `<thing>.addReason`; `only: "first" \| "added"` on grants; a value as a table by another value (`byValue`, `table`); `rankUpTo` in the `options` of a pick choice; `cardValues` on pick choices; `{ "tracks": true }` as a `summary.line` argument and a header field.                                                                                                                                                                                                                                                                                                                                           | Set `formatVersion` to `"0.21"`. Nothing else has to change: every field is optional, and without `flow.level.tracks` a character is computed as before, so every valid 0.20 package is a valid 0.21 package. Saved drafts stay valid: without `tracks` every level belongs to the first track.                                                                                                                                                                                                                                                      |
+| 0.22    | 2026-10-09 | Optional `detail` on `list` sections: a line `<thing>.<detail>` printed small under each listed name, for example what a kit holds ([13](#13-print-sheet-and-cards)).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | Set `formatVersion` to `"0.22"`. Nothing else has to change: the field is optional, so every valid 0.21 package is a valid 0.22 package. Saved sheets stay valid: a sheet without `details` prints no lines under the names.                                                                                                                                                                                                                                                                                                                         |
 | 0.8     | 2026-10-04 | Gather steps (`gather`, optional `together`: `sections` or one shared `list`) in `flow.steps`, optional `gather` on choices, optional text `choice.<id>.from`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           | Set `formatVersion` to `"0.8"`. Nothing else changes: a package without gather steps builds the same steps as before, so every valid 0.7 package is a valid 0.8 package.                                                                                                                                                                                                                                                                                                                                                                             |
 
 ## 16. A minimal package
@@ -1714,7 +1725,7 @@ language. The validator accepts it as is.
 
 ```json
 {
-  "formatVersion": "0.21",
+  "formatVersion": "0.22",
   "id": "tiny",
   "version": "1.0.0",
   "languages": ["en"],
@@ -1826,7 +1837,7 @@ stays free to share.
 
 ```json
 {
-  "formatVersion": "0.21",
+  "formatVersion": "0.22",
   "id": "demo-tides",
   "version": "0.1.0",
   "dependsOn": [{ "id": "demo", "minVersion": "0.1.0" }],

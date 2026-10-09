@@ -536,6 +536,7 @@
     "item.herb-satchel.short": "Eine Tasche voller Kräuter.",
     "item.herb-satchel.explain.what": "Viele kleine Fächer mit getrockneten Pflanzen.",
     "item.herb-satchel.explain.table": "Du brauchst sie für Kniffe mit Kräutern.",
+    "item.herb-satchel.contents": "Getrocknetes Nebelblatt, eine Knochennadel, {{length:10}} Schilffaden, 3 kleine Tontöpfe.",
     "item.rope.name": "Seil",
     "item.rope.short": "Ein festes Seil, {{length:40}} lang.",
     "item.rope.explain.what": "Gedreht aus Hanf, hält es mehrere Leute.",

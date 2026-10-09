@@ -1120,6 +1120,8 @@ export function validatePackageFiles(files: PackageFiles): ValidationResult {
       if (s.lead !== undefined)
         for (const t of resolveOptions(s.lead.things)) optional.add(`${t.id}.${s.lead.text}`);
     }
+    if (s.kind === "list" && s.detail !== undefined)
+      for (const t of resolveOptions(s.things)) optional.add(`${t.id}.${s.detail}`);
     if (s.kind === "header")
       for (const f of s.fields ?? [])
         if (f.label !== undefined)
@@ -1180,6 +1182,14 @@ export function validatePackageFiles(files: PackageFiles): ValidationResult {
     }
     for (const k of present) need(k, `text of variant ${lit(v.variant)} of choice ${lit(v.choice)}`);
   }
+
+  // A list's `detail` that no listed thing has a text for prints nothing: likely a typo.
+  sheet.sections.forEach((s, i) => {
+    if (s.kind !== "list" || s.detail === undefined) return;
+    const keys = resolveOptions(s.things).map((t) => `${t.id}.${s.detail}`);
+    if (!keys.some((k) => Object.values(texts).some((bucket) => typeof bucket[k] === "string")))
+      warn(S, `sections[${i}].detail`, `no thing listed here has a text ${lit(`<thing>.${s.detail}`)}`);
+  });
 
   // Unit words written as text next to a number, e.g. "9 m" instead of {{length:30}}.
   const unitWords = new Set<string>();

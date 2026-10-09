@@ -696,6 +696,8 @@ export const sectionSchema = z.discriminatedUnion("kind", [
     kind: z.literal("list"),
     things: optionSourceSchema,
     blankLines: z.number().int().min(0),
+    /** A line printed small under each name: the text `<thing>.<detail>`, if it exists. */
+    detail: textKey.optional(),
   }),
   z.strictObject({ ...sectionBase, kind: z.literal("answers"), choices: z.array(id).min(1) }),
   z.strictObject({ ...sectionBase, kind: z.literal("helpBox") }),

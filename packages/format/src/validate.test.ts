@@ -134,7 +134,7 @@ describe("cross-file rules", () => {
     [
       "format version",
       (f) => (f.get("manifest.json").formatVersion = "0.3"),
-      "manifest.json formatVersion: package is written for format 0.3, this builder understands 0.21",
+      "manifest.json formatVersion: package is written for format 0.3, this builder understands 0.22",
     ],
     [
       "duplicate thing",
@@ -467,6 +467,11 @@ describe("warnings", () => {
       "choice never asked",
       (f) => f.get("flow.json").steps.splice(0, 1),
       'flow.json choices[15]: choice "name" is never asked: no step lists it and no thing grants it',
+    ],
+    [
+      "list detail that no listed thing has",
+      (f) => (f.get("sheet.json").sections.find((s: { id: string }) => s.id === "gear").detail = "inside"),
+      'sheet.json sections[14].detail: no thing listed here has a text "<thing>.inside"',
     ],
     [
       "text variant without texts",
