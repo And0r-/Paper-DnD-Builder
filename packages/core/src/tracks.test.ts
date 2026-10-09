@@ -36,6 +36,9 @@ beforeAll(async () => {
   delete plain.flow.level.tracks;
 });
 
+/** Scores that meet what every calling needs to be added. */
+const ALL_THREE = { method: 0, assign: { mightBase: 8, graceBase: 10, witBase: 10, heartBase: 10 } };
+
 /** Scores that meet what the lantern bearer and the herbalist need to be added (heart 10, wit 10), not the river runner. */
 const LANTERN_AND_HERBS = { method: 0, assign: { mightBase: 8, graceBase: 6, witBase: 10, heartBase: 12 } };
 
@@ -320,7 +323,158 @@ describe("adding a track", () => {
     expect(ev.open).toEqual([]);
     expect(ev.tracks!.list.map((t) => t.levels)).toEqual([3, 2]);
     expect(ev.things.some((t) => t.id === "trait.green-thumb")).toBe(true);
+    expect(ev.tracks!.unfitNotMet).toEqual({ [H]: [H] });
   });
+
+  it("names what is not met when only a track the character had fails, not the track added", () => {
+    // Heart 12 lets the lantern bearer be added; wit 6 fails the herbalist it had.
+    let doc = build(H, [H, L, L], { scores: LANTERN_AND_HERBS });
+    doc = apply(doc, {
+      type: "answer",
+      choice: "scores",
+      answer: { method: 0, assign: { mightBase: 8, graceBase: 8, witBase: 6, heartBase: 12 } },
+    });
+    const ev = evaluateDraft(pkg, doc);
+    expect(ev.tracks!.unfit).toEqual([L]);
+    expect(ev.tracks!.unfitNotMet).toEqual({ [L]: [H] });
+  });
+});
+
+describe("recommended scores with more than one track", () => {
+  /** The demo with recommendations from the numbers of the array (11, 10, 9, 7), so two callings can fit. */
+  function withArrayRecommendations(): ContentPackage {
+    const p = structuredClone(pkg);
+    const scores = p.flow.choices.find((c) => c.id === "scores")!;
+    if (scores.kind !== "distribute") throw new Error("scores");
+    scores.recommend = [
+      { when: `has('${L}')`, assign: { mightBase: 10, graceBase: 7, witBase: 9, heartBase: 11 } },
+      { when: `has('${R}')`, assign: { mightBase: 9, graceBase: 11, witBase: 7, heartBase: 10 } },
+      { assign: { mightBase: 7, graceBase: 9, witBase: 11, heartBase: 10 } },
+    ];
+    return p;
+  }
+
+  function recommended(p: ContentPackage, first: string, tracks: string[]) {
+    const created = newDraft(p, tracks.length + 1);
+    if (!created.ok) throw new Error("no draft");
+    let doc = apply(created.doc, { type: "answer", choice: "calling", answer: { pick: first } }, p);
+    if (tracks.length > 0) doc = apply(doc, { type: "tracks", tracks }, p);
+    const rec = evaluateDraft(p, doc).choices.scores!.recommended as {
+      method: number;
+      assign: Record<string, number>;
+    };
+    return { doc, rec };
+  }
+
+  it("meets what every track needs, moving as few points as it can", () => {
+    const p = withArrayRecommendations();
+    // The lantern bearer's own pick leaves wit at 9; the herbalist needs 10: wit and might swap.
+    expect(recommended(p, L, [H, H]).rec.assign).toEqual({
+      mightBase: 9,
+      graceBase: 7,
+      witBase: 10,
+      heartBase: 11,
+    });
+    for (const [first, second] of [
+      [L, H],
+      [L, R],
+      [H, L],
+      [R, H],
+    ] as const) {
+      const { doc, rec } = recommended(p, first, [second, second]);
+      const done = answerOpen(apply(doc, { type: "answer", choice: "scores", answer: rec }, p), p);
+      expect(evaluateDraft(p, done).tracks!.unfit).toEqual([]);
+    }
+  });
+
+  it("keeps the package's assignment with one track, and when no order of its numbers fits", () => {
+    const p = withArrayRecommendations();
+    const own = { mightBase: 10, graceBase: 7, witBase: 9, heartBase: 11 };
+    expect(recommended(p, L, []).rec).toEqual({ method: 0, assign: own });
+    // The demo's own numbers (8, 7, 9, 11) cannot give the herbalist wit 10 and the lantern bearer heart 10.
+    expect(recommended(pkg, L, [H, H]).rec.assign).toEqual(
+      (pkg.flow.choices.find((c) => c.id === "scores") as { recommend: { assign: object }[] }).recommend[0]!
+        .assign,
+    );
+  });
+});
+
+/**
+ * An option two tracks offer (a stance each calling teaches, which a
+ * character may take only once), in the two ways a package can write it:
+ * one thing both choices offer, or a thing per calling whose `requires`
+ * names the others.
+ */
+describe("an option two tracks offer", () => {
+  const STANCES = ["guard", "lunge", "sway"];
+  const CHOICES = { [L]: "stance-lantern", [R]: "stance-river", [H]: "stance-herbs" };
+
+  function withStances(shared: boolean): ContentPackage {
+    const p = structuredClone(pkg);
+    const ids = (calling: string) =>
+      STANCES.map((st) => (shared ? `stance.${st}` : `stance.${calling.split(".")[1]}-${st}`));
+    for (const [calling, choice] of Object.entries(CHOICES)) {
+      p.things.find((t) => t.id === calling)!.grants!.push({ choice });
+      p.flow.choices.push({
+        id: choice,
+        kind: "pickOne",
+        source: "mistland",
+        options: { ids: ids(calling) },
+        // Every calling recommends the guard first, as a package recommends its best pick.
+        recommend: ids(calling).map((id) => ({ when: `not has('${id}')`, pick: [id] })),
+      });
+    }
+    const seen = new Set<string>();
+    for (const calling of Object.keys(CHOICES))
+      for (const [i, id] of ids(calling).entries()) {
+        if (seen.has(id)) continue;
+        seen.add(id);
+        const same = Object.keys(CHOICES)
+          .map((c) => ids(c)[i]!)
+          .filter((o) => o !== id);
+        p.things.push({
+          id,
+          kind: "trait",
+          source: "mistland",
+          ...(shared ? {} : { requires: same.map((o) => `not has('${o}')`).join(" and ") }),
+        });
+      }
+    return p;
+  }
+
+  for (const shared of [true, false])
+    for (const [second, choice] of [
+      [R, "stance-river"],
+      [H, "stance-herbs"],
+    ] as const)
+      it(`does not offer or recommend again what the first calling gave (${shared ? "one thing" : "a thing per calling"}, lantern bearer and ${second.split(".")[1]})`, () => {
+        const p = withStances(shared);
+        const name = (calling: string, st: string) =>
+          shared ? `stance.${st}` : `stance.${calling.split(".")[1]}-${st}`;
+        const doc = build(L, [second, second], { scores: ALL_THREE, p });
+        const ev = evaluateDraft(p, doc);
+        expect(ev.complete).toBe(true);
+        const copy = ev.choices[`${choice}@${second}`]!;
+        expect(ev.choices["stance-lantern"]!.answer).toEqual({ pick: name(L, "guard") });
+        expect(copy.options).toEqual([name(second, "lunge"), name(second, "sway")]);
+        // The guard is taken: the next recommendation with a free pick.
+        expect(copy.recommended).toEqual([name(second, "lunge")]);
+        expect(copy.answer).toEqual({ pick: name(second, "lunge") });
+        expect(ev.things.filter((t) => t.id.includes("guard"))).toHaveLength(1);
+
+        // A draft that took the guard twice (saved before) keeps its answer, but it no longer fits.
+        const twice = structuredClone(doc);
+        twice.answers[`${choice}@${second}`] = { pick: name(second, "guard") };
+        const again = evaluateDraft(p, twice);
+        expect(again.choices[`${choice}@${second}`]).toMatchObject({
+          status: "invalid",
+          problem: "notOffered",
+        });
+        expect(again.complete).toBe(false);
+        expect(again.open).toEqual([`${choice}@${second}`]);
+        expect(again.things.filter((t) => t.id.includes("guard"))).toHaveLength(1);
+        expect(twice.answers[`${choice}@${second}`]).toEqual({ pick: name(second, "guard") });
+      });
 });
 
 describe("changing the levels", () => {
