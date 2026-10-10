@@ -24,7 +24,21 @@ export type AccountRow = {
   print_choice: unknown;
   /** Whether the owner answered "Later" to the reminder to add an address. */
   mail_reminder_off: boolean;
+  /** "admin": may look after the accounts, in the browser only (see api/routes/admin.ts). */
+  role: AccountRole;
   created_at: Date;
+};
+
+export type AccountRole = "player" | "admin";
+
+/** An account as the admin's list shows it: no settings, no characters, only how many. */
+export type AdminAccountRow = Pick<
+  AccountRow,
+  "id" | "name" | "email" | "language" | "role" | "created_at"
+> & {
+  drafts: number;
+  /** Campaigns it leads or plays in. */
+  campaigns: number;
 };
 
 export type DraftRow = {
@@ -59,7 +73,8 @@ export type PasswordRow = {
   created_at: Date;
 };
 
-export type PasswordOrigin = "first" | "reset";
+/** "bootstrap": the first admin's known password, which its first login swaps (see migration 0019). */
+export type PasswordOrigin = "first" | "reset" | "bootstrap";
 
 /** An access key as its owner sees it; the hash never leaves the store. */
 export type AccessKeyRow = {
@@ -150,7 +165,7 @@ export type CharacterStateRow = {
 
 const ACCESS_KEY_COLUMNS = "id, name, hint, created_at";
 const ACCOUNT_COLUMNS =
-  "id, name, email, password_hash, language, units, print_choice, mail_reminder_off, created_at";
+  "id, name, email, password_hash, language, units, print_choice, mail_reminder_off, role, created_at";
 const ACCOUNT_COLUMNS_A = ACCOUNT_COLUMNS.split(", ")
   .map((c) => `a.${c}`)
   .join(", ");
@@ -269,6 +284,122 @@ export class Store {
    */
   async deleteAccount(accountId: string): Promise<void> {
     await this.db.query("DELETE FROM accounts WHERE id = $1", [accountId]);
+  }
+
+  /**
+   * Makes the first admin with its known password while there is no admin
+   * (see migration 0019), and notes the step `step` with when it was last
+   * taken. One statement: an account without its password cannot be left.
+   * Returns false when there already is an admin.
+   */
+  async createFirstAdmin(
+    step: string,
+    a: Pick<AccountRow, "id" | "name" | "language" | "created_at">,
+    p: { id: string; hash: string },
+  ): Promise<boolean> {
+    const rows = await this.db.query(
+      `WITH wanted AS (SELECT 1 WHERE NOT EXISTS (SELECT 1 FROM accounts WHERE role = 'admin')),
+       step AS (
+         INSERT INTO startup_steps (id, done_at) SELECT $1, $5 FROM wanted
+         ON CONFLICT (id) DO UPDATE SET done_at = EXCLUDED.done_at
+       ),
+       made AS (
+         INSERT INTO accounts (id, name, email, language, units, role, created_at)
+         SELECT $2, $3, NULL, $4, '{}'::jsonb, 'admin', $5 FROM wanted
+         RETURNING id
+       )
+       INSERT INTO passwords (id, account_id, hash, name, origin, created_at)
+       SELECT $6, made.id, $7, NULL, 'bootstrap', $5 FROM made
+       RETURNING id`,
+      [step, a.id, a.name, a.language, a.created_at, p.id, p.hash],
+    );
+    return rows.length > 0;
+  }
+
+  // ------------------------------------------------------------------ admin
+
+  /**
+   * One page of accounts for the admin, newest first, with the total that
+   * fit. `search` matches a part of the name or the address, case ignored.
+   */
+  async listAccountsForAdmin(
+    search: string | null,
+    limit: number,
+    offset: number,
+  ): Promise<{ accounts: AdminAccountRow[]; total: number }> {
+    // The search is a part to find, not a pattern: % and _ in it mean themselves.
+    const like = search === null ? null : `%${search.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
+    const where = "($1::text IS NULL OR a.name ILIKE $1 OR a.email ILIKE $1)";
+    const accounts = await this.db.query<AdminAccountRow>(
+      `SELECT a.id, a.name, a.email, a.language, a.role, a.created_at,
+         (SELECT count(*) FROM drafts d WHERE d.account_id = a.id)::int AS drafts,
+         ((SELECT count(*) FROM campaigns c WHERE c.account_id = a.id)
+           + (SELECT count(*) FROM campaign_players p WHERE p.account_id = a.id))::int AS campaigns
+       FROM accounts a WHERE ${where}
+       ORDER BY a.created_at DESC, a.id DESC LIMIT $2 OFFSET $3`,
+      [like, limit, offset],
+    );
+    const counted = await this.db.query<{ total: number }>(
+      `SELECT count(*)::int AS total FROM accounts a WHERE ${where}`,
+      [like],
+    );
+    return { accounts, total: counted[0]!.total };
+  }
+
+  /**
+   * Gives the account a role, unless that leaves no admin: the last one
+   * stays one. "missing" for no such account.
+   */
+  async setRole(accountId: string, role: AccountRole): Promise<"done" | "lastAdmin" | "missing"> {
+    const rows = await this.db.query<{ changed: boolean }>(
+      `WITH target AS (SELECT id FROM accounts WHERE id = $1),
+       changed AS (
+         UPDATE accounts SET role = $2 WHERE id IN (SELECT id FROM target)
+           AND ($2 = 'admin' OR EXISTS (SELECT 1 FROM accounts o WHERE o.role = 'admin' AND o.id <> $1))
+         RETURNING id
+       )
+       SELECT EXISTS (SELECT 1 FROM changed) AS changed FROM target`,
+      [accountId, role],
+    );
+    if (!rows[0]) return "missing";
+    return rows[0].changed ? "done" : "lastAdmin";
+  }
+
+  /**
+   * Ends every login of the account: its sessions and its access keys.
+   * Returns how many of each went; undefined for no such account.
+   */
+  async endAllLogins(accountId: string): Promise<{ sessions: number; keys: number } | undefined> {
+    const rows = await this.db.query<{ sessions: number; keys: number }>(
+      `WITH s AS (DELETE FROM sessions WHERE account_id = $1 RETURNING 1),
+       k AS (DELETE FROM access_keys WHERE account_id = $1 RETURNING 1)
+       SELECT (SELECT count(*) FROM s)::int AS sessions, (SELECT count(*) FROM k)::int AS keys
+       FROM accounts WHERE id = $1`,
+      [accountId],
+    );
+    return rows[0];
+  }
+
+  /**
+   * Deletes the account like {@link deleteAccount}, unless it is the last
+   * admin. Returns its address (to clear its login limits), or why not.
+   */
+  async deleteAccountUnlessLastAdmin(
+    accountId: string,
+  ): Promise<{ deleted: true; email: string | null } | { deleted: false; reason: "lastAdmin" | "missing" }> {
+    const rows = await this.db.query<{ deleted: boolean; email: string | null }>(
+      `WITH target AS (SELECT id, email FROM accounts WHERE id = $1),
+       removed AS (
+         DELETE FROM accounts WHERE id IN (SELECT id FROM target)
+           AND (role <> 'admin' OR EXISTS (SELECT 1 FROM accounts o WHERE o.role = 'admin' AND o.id <> $1))
+         RETURNING id
+       )
+       SELECT EXISTS (SELECT 1 FROM removed) AS deleted, email FROM target`,
+      [accountId],
+    );
+    const row = rows[0];
+    if (!row) return { deleted: false, reason: "missing" };
+    return row.deleted ? { deleted: true, email: row.email } : { deleted: false, reason: "lastAdmin" };
   }
 
   // ---------------------------------------------------------------- sessions
@@ -400,10 +531,42 @@ export class Store {
     );
   }
 
-  async findAccountByPasswordHash(hash: string): Promise<AccountRow | undefined> {
-    const rows = await this.db.query<AccountRow>(
-      `SELECT ${ACCOUNT_COLUMNS_A} FROM passwords p JOIN accounts a ON a.id = p.account_id WHERE p.hash = $1`,
+  /** The account a password belongs to, and where the password came from. */
+  async findAccountByPasswordHash(
+    hash: string,
+  ): Promise<{ account: AccountRow; origin: PasswordOrigin | null } | undefined> {
+    const rows = await this.db.query<AccountRow & { password_origin: PasswordOrigin | null }>(
+      `SELECT ${ACCOUNT_COLUMNS_A}, p.origin AS password_origin
+       FROM passwords p JOIN accounts a ON a.id = p.account_id WHERE p.hash = $1`,
       [hash],
+    );
+    const row = rows[0];
+    if (!row) return undefined;
+    const { password_origin, ...account } = row;
+    return { account, origin: password_origin };
+  }
+
+  /**
+   * Swaps the first admin's known password (`bootstrapHash`) for `p`, its
+   * account's only one then, in one statement and only while the known one
+   * is still there: of two logins at once, one gets through. Undefined for
+   * the other, or when it is no such password.
+   */
+  async replaceBootstrapPassword(
+    bootstrapHash: string,
+    p: PasswordRow & { hash: string },
+  ): Promise<PasswordRow | undefined> {
+    const rows = await this.db.query<PasswordRow>(
+      `WITH taken AS (
+         DELETE FROM passwords WHERE hash = $1 AND origin = 'bootstrap' RETURNING account_id
+       ),
+       gone AS (
+         DELETE FROM passwords WHERE account_id IN (SELECT account_id FROM taken) AND hash <> $1
+       )
+       INSERT INTO passwords (id, account_id, hash, name, origin, created_at)
+       SELECT $2, taken.account_id, $3, $4, $5, $6 FROM taken
+       RETURNING ${PASSWORD_COLUMNS}`,
+      [bootstrapHash, p.id, p.hash, p.name, p.origin, p.created_at],
     );
     return rows[0];
   }

@@ -18,6 +18,7 @@ import { healthReport } from "../health.ts";
 import { createMcpRoute } from "../mcp-route.ts";
 import { buildMcpZip, mcpZipResponse } from "../mcp-zip.ts";
 import { loadPackages } from "../packages/loader.ts";
+import { createFirstAdmin, DEFAULT_ADMIN_PASSWORD } from "../auth/accounts.ts";
 import { hashPassword } from "../auth/password.ts";
 import { Client, signIn, startTestServer, type TestServer } from "../testing.ts";
 import { ROUTES } from "./router.ts";
@@ -264,6 +265,11 @@ describe("openapi.json", () => {
         "ownerOnly",
         "copyNotFound",
         "valueNotFound",
+        "adminOnly",
+        "keyCannotAdmin",
+        "lastAdmin",
+        "ownAccount",
+        "accountNotFound",
       ]) {
         expect(codes, code).toContain(code);
       }
@@ -603,6 +609,25 @@ async function walk(server: TestServer): Promise<void> {
   await call("DELETE", `${cp}/players/00000000-0000-4000-8000-000000000000`);
   await mate.call("DELETE", `${cp}/players/me`);
   await call("DELETE", cp);
+
+  // The admin: the first one, made at start; its known password is swapped at its first login.
+  await createFirstAdmin(server.app);
+  const admin = new Client(server, "198.51.100.50");
+  await admin.call("POST", "/api/auth/login", { login: "admin", password: DEFAULT_ADMIN_PASSWORD });
+  await call("GET", "/api/admin/accounts");
+  await call("GET", "/api/admin/accounts", undefined, k);
+  await admin.call("GET", "/api/admin/accounts?page=0");
+  const own = (await admin.call("GET", "/api/admin/accounts?q=admin")).json.accounts[0].id as string;
+  const walkerId = (await admin.call("GET", "/api/admin/accounts?q=walker&page=1")).json.accounts[0]
+    .id as string;
+  const helperId = (await admin.call("GET", "/api/admin/accounts?q=helper")).json.accounts[0].id as string;
+  await admin.call("PATCH", `/api/admin/accounts/${own}/role`, { role: "player" });
+  await admin.call("DELETE", `/api/admin/accounts/${own}`);
+  await admin.call("DELETE", "/api/admin/accounts/00000000-0000-4000-8000-000000000000");
+  await admin.call("PATCH", `/api/admin/accounts/${walkerId}/role`, { role: "admin" });
+  await admin.call("PATCH", `/api/admin/accounts/${walkerId}/role`, { role: "player" });
+  await admin.call("POST", `/api/admin/accounts/${walkerId}/logout-all`);
+  await admin.call("DELETE", `/api/admin/accounts/${helperId}`);
 
   await call("POST", "/api/auth/logout");
   await call("POST", "/api/auth/login", { login: "walker", password: reset.secret });

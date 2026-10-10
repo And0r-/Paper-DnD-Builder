@@ -4,7 +4,6 @@
  * Values are read once. Secrets (database URL, SMTP password) are never
  * logged; `describeConfig` prints only what is safe to show.
  */
-
 export interface SmtpConfig {
   host: string;
   port: number;
@@ -23,7 +22,18 @@ export interface Config {
   secureCookies: boolean;
   smtp?: SmtpConfig;
   mailFrom?: string;
+  /**
+   * The first admin's password, read at start while there is no admin
+   * (see auth/accounts.ts, `createFirstAdmin`); of no use after that.
+   * Never logged.
+   */
+  adminPassword?: string;
 }
+
+/** Shortest ADMIN_PASSWORD taken: it is stored as an unsalted hash until its first login swaps it. */
+export const MIN_ADMIN_PASSWORD = 12;
+/** Longest: what the login form takes (MAX_PASSWORD_INPUT in auth/password.ts, not imported to keep this file light). */
+const MAX_ADMIN_PASSWORD = 200;
 
 const blank = (v: string | undefined) => (v === undefined || v.trim() === "" ? undefined : v.trim());
 
@@ -51,6 +61,15 @@ export function readConfig(env: NodeJS.ProcessEnv = process.env): Config {
   if (packagesDir) config.packagesDir = packagesDir;
   if (baseUrl) config.baseUrl = baseUrl;
   if (mailFrom) config.mailFrom = mailFrom;
+  const adminPassword = blank(env["ADMIN_PASSWORD"]);
+  if (adminPassword) {
+    if (adminPassword.length < MIN_ADMIN_PASSWORD || adminPassword.length > MAX_ADMIN_PASSWORD) {
+      throw new Error(
+        `ADMIN_PASSWORD must be ${MIN_ADMIN_PASSWORD} to ${MAX_ADMIN_PASSWORD} characters long. See .env.example.`,
+      );
+    }
+    config.adminPassword = adminPassword;
+  }
   if (host) {
     if (!Number.isInteger(port) || port <= 0) throw new Error("SMTP_PORT must be a port number.");
     config.smtp = {

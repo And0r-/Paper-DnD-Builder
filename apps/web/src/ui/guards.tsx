@@ -27,3 +27,26 @@ export function RequireAccount({ children }: { children: (account: Account) => R
     </div>
   );
 }
+
+/**
+ * Renders its children only for an admin; a player goes to the start page.
+ * The server checks again on every admin route: this only spares a player
+ * a page that would load nothing.
+ */
+export function RequireAdmin({ children }: { children: (account: Account) => ReactNode }) {
+  return <RequireAccount>{(account) => <AdminOnly account={account}>{children}</AdminOnly>}</RequireAccount>;
+}
+
+function AdminOnly({ account, children }: { account: Account; children: (account: Account) => ReactNode }) {
+  const router = useRouter();
+  const admin = account.role === "admin";
+  useEffect(() => {
+    if (!admin) router.replace("/");
+  }, [admin, router]);
+  if (admin) return <>{children(account)}</>;
+  return (
+    <div className="page-loading">
+      <Loading shape="page" count={2} />
+    </div>
+  );
+}

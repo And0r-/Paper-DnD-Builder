@@ -1313,6 +1313,92 @@ textarea.field__input {
   gap: var(--space-2);
 }
 
+/* ----------------------------------------------------------------- admin */
+
+.admin__search {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-3);
+}
+
+.admin__search .field {
+  flex: 1 1 16rem;
+}
+
+/* The table of accounts scrolls sideways on its own on a narrow screen; the page does not. */
+.admin-table {
+  overflow-x: auto;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+/* As wide as its content needs, at least the box: words are not broken to fit a phone. */
+.admin-table table {
+  width: max-content;
+  min-width: 100%;
+  border-collapse: collapse;
+}
+
+.admin-table caption {
+  padding: var(--space-3) var(--space-4);
+  text-align: left;
+  font-weight: var(--weight-semibold);
+}
+
+.admin-table th,
+.admin-table td {
+  padding: var(--space-2) var(--space-3);
+  border-top: 1px solid var(--color-line);
+  text-align: left;
+  vertical-align: top;
+}
+
+.admin-table thead th {
+  font-size: var(--text-xs);
+  line-height: var(--text-xs-lh);
+  color: var(--color-ink-muted);
+  white-space: nowrap;
+}
+
+/* Names and addresses wrap within a column of their own width; a very long one breaks anywhere. */
+.admin-table tbody th,
+.admin-table td {
+  max-width: 16rem;
+  overflow-wrap: anywhere;
+}
+
+.admin-table tbody th {
+  font-weight: var(--weight-semibold);
+}
+
+.admin-table .admin-table__number {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.admin-table__you,
+.admin-table__none {
+  color: var(--color-ink-muted);
+  font-weight: var(--weight-regular);
+}
+
+.admin-table__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  width: 14rem;
+}
+
+.admin-pages {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
 /* -------------------------------------------------------------- settings */
 
 .settings__section {

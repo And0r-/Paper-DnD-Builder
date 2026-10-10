@@ -4,6 +4,7 @@
  * build their own with {@link createApp} and an in-process database.
  */
 import { createSql, sqlExecutor, type SqlExecutor } from "@builder/db";
+import { createFirstAdmin } from "./auth/accounts.ts";
 import { RateLimiter } from "./auth/rate-limit.ts";
 import { readConfig, type Config } from "./config.ts";
 import { memoryDatabase, outboxMailer, PGLITE_MEMORY_URL } from "./local-backends.ts";
@@ -173,6 +174,7 @@ export function getApp(): Promise<App> {
       mailer: outbox ? outboxMailer(outbox) : createSmtpMailer(config.smtp, config.mailFrom),
     });
     await switchOnExtensionsOnce(app);
+    await createFirstAdmin(app);
     return app;
   })();
   return holder.__builderApp;

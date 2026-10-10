@@ -45,6 +45,8 @@ services:
       SMTP_USER: ${SMTP_USER:-}
       SMTP_PASSWORD: ${SMTP_PASSWORD:-}
       MAIL_FROM: ${MAIL_FROM:-}
+      # Read only while there is no admin (the first start); see README, "Admin".
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
     # One port for everything, the live help's WebSocket (/api/live/...) too;
     # a reverse proxy in front must pass WebSocket upgrades (see README).
     ports:

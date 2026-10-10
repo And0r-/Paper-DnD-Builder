@@ -95,7 +95,30 @@ export interface Account {
   print: PrintChoice;
   /** Whether "My characters" reminds to add a mail address: none given, and not put off with "Later". */
   mailReminder: boolean;
+  /** "admin": the menu has "Admin", and the admin pages open. */
+  role: "player" | "admin";
   createdAt: string;
+}
+
+/** An account as the admin's list shows it: no settings, no characters, only how many. */
+export interface AdminAccount {
+  id: string;
+  name: string;
+  email: string | null;
+  language: string;
+  role: "player" | "admin";
+  createdAt: string;
+  drafts: number;
+  campaigns: number;
+  /** The admin's own account. */
+  self: boolean;
+}
+
+export interface AdminAccountPage {
+  accounts: AdminAccount[];
+  total: number;
+  page: number;
+  pageSize: number;
 }
 
 /** A password as the settings list it; the password itself is shown only when it is made. */

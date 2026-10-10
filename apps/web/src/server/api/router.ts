@@ -17,6 +17,7 @@ import {
 } from "../auth/session.ts";
 import type { AccountRow } from "../store.ts";
 import { accountRoutes } from "./routes/account.ts";
+import { adminRoutes } from "./routes/admin.ts";
 import { authRoutes } from "./routes/auth.ts";
 import { campaignRoutes } from "./routes/campaigns.ts";
 import { draftRoutes } from "./routes/drafts.ts";
@@ -45,6 +46,13 @@ export interface RequestContext {
   session(): Promise<Session | undefined>;
   /** The logged-in account; answers 401 if there is none. */
   requireSession(): Promise<Session>;
+  /**
+   * The logged-in admin, in the browser: 401 without a login, 403 for a
+   * player, and 403 for an access key, an admin's too. A key is made for a
+   * program and can leak with it; looking after other people's accounts
+   * stays with the person at the browser.
+   */
+  requireAdmin(): Promise<Session>;
 }
 
 export interface Route {
@@ -62,6 +70,7 @@ export const ROUTES: Route[] = [
   ...printRoutes,
   ...sheetCopyRoutes,
   ...campaignRoutes,
+  ...adminRoutes,
 ];
 
 function match(pattern: string, path: string): Record<string, string> | undefined {
@@ -110,6 +119,12 @@ export function createApiHandler(app: App, routes: Route[] = ROUTES): (req: Requ
         // A key that is wrong or withdrawn says so: a tool should not ask for a login.
         if (req.headers.has("authorization")) throw new HttpError(401, "keyNotValid");
         throw new HttpError(401, "notLoggedIn");
+      },
+      requireAdmin: async () => {
+        const s = await ctx.requireSession();
+        if (s.via !== "cookie") throw new HttpError(403, "keyCannotAdmin");
+        if (s.account.role !== "admin") throw new HttpError(403, "adminOnly");
+        return s;
       },
     };
 
