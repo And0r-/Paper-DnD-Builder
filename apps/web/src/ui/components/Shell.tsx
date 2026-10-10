@@ -122,7 +122,7 @@ function MenuDrawer({
   onClose: () => void;
   children?: ReactNode;
 }) {
-  const { t, logout } = useApp();
+  const { t, logout, account } = useApp();
   const router = useRouter();
   const ref = useRef<HTMLDialogElement>(null);
   const devTitleId = useId();
@@ -175,6 +175,11 @@ function MenuDrawer({
             <li>
               <Link href="/settings">{t("menu.settings")}</Link>
             </li>
+            {account?.role === "admin" && (
+              <li>
+                <Link href="/admin">{t("menu.admin")}</Link>
+              </li>
+            )}
             <li className="drawer__logout">
               {/* Red and set apart, so nobody taps it by mistake. */}
               <button
