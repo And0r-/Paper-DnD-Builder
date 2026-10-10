@@ -13,6 +13,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { LANGUAGE_NAMES, isUiLanguage } from "../../../src/i18n/index.ts";
 import { useApp } from "../../../src/ui/app-state.tsx";
 import { api, ApiError, type AdminAccount, type AdminAccountPage } from "../../../src/ui/api.ts";
+import { AdminTabs } from "../../../src/ui/components/AdminTabs.tsx";
 import { Button } from "../../../src/ui/components/Button.tsx";
 import { ConfirmDialog, TypedConfirmDialog } from "../../../src/ui/components/Dialog.tsx";
 import { Callout, ErrorState, Loading } from "../../../src/ui/components/Feedback.tsx";
@@ -199,6 +200,7 @@ function Accounts() {
   return (
     <AppShell>
       <div className="page admin">
+        <AdminTabs current="accounts" />
         <h1 className="page__title">{t("admin.accountsTitle")}</h1>
         <form className="admin__search" role="search" noValidate onSubmit={search}>
           <TextField

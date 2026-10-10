@@ -1315,6 +1315,170 @@ textarea.field__input {
 
 /* ----------------------------------------------------------------- admin */
 
+/* "Overview | Accounts": two links, the open page underlined. */
+.admin-tabs ul {
+  list-style: none;
+  display: flex;
+  gap: var(--space-2);
+  border-bottom: 1px solid var(--color-line);
+}
+
+.admin-tabs a {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--target-min);
+  padding: 0 var(--space-3);
+  color: var(--color-ink-muted);
+  text-decoration: none;
+  border-bottom: 3px solid transparent;
+  margin-bottom: -1px;
+}
+
+.admin-tabs a[aria-current="page"] {
+  color: var(--color-ink);
+  font-weight: var(--weight-semibold);
+  border-bottom-color: var(--color-primary);
+}
+
+.admin__section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.admin-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr));
+  gap: var(--space-3);
+}
+
+/* A tile: the label small above, the number large below it. */
+.admin-tile {
+  display: flex;
+  flex-direction: column-reverse;
+  justify-content: flex-end;
+  gap: var(--space-1);
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-md);
+}
+
+.admin-tile dt {
+  font-size: var(--text-xs);
+  line-height: var(--text-xs-lh);
+  color: var(--color-ink-muted);
+}
+
+.admin-tile dd {
+  font-size: var(--text-2xl);
+  line-height: var(--text-2xl-lh);
+  font-weight: var(--weight-bold);
+  font-variant-numeric: tabular-nums;
+}
+
+.admin__lists {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  gap: var(--space-5);
+}
+
+.admin-counts {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+}
+
+.admin-counts li {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--color-line);
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.admin-facts {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: var(--space-2) var(--space-4);
+}
+
+.admin-facts dt {
+  color: var(--color-ink-muted);
+}
+
+.admin-facts dd {
+  overflow-wrap: anywhere;
+}
+
+/* The weekly bar charts: one series in the primary colour, guides recessive. */
+.bar-chart {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.bar-chart__svg {
+  width: 100%;
+  height: auto;
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-md);
+}
+
+.bar-chart__bar path {
+  fill: var(--color-primary);
+}
+
+.bar-chart__hit {
+  fill: transparent;
+}
+
+.bar-chart__bar:hover .bar-chart__hit {
+  fill: var(--color-primary-soft);
+}
+
+.bar-chart__grid {
+  stroke: var(--color-line);
+  stroke-dasharray: 4 4;
+}
+
+.bar-chart__baseline {
+  stroke: var(--color-border);
+}
+
+.bar-chart__axis {
+  font-size: 18px;
+  fill: var(--color-ink-muted);
+}
+
+.bar-chart__table {
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.bar-chart__table th,
+.bar-chart__table td {
+  padding: var(--space-1) var(--space-3);
+  border-bottom: 1px solid var(--color-line);
+  text-align: left;
+}
+
+.bar-chart__table td {
+  text-align: right;
+}
+
+.bar-chart__table thead th {
+  font-size: var(--text-xs);
+  color: var(--color-ink-muted);
+}
+
+.bar-chart__table tbody th {
+  font-weight: var(--weight-regular);
+}
+
 .admin__search {
   display: flex;
   flex-wrap: wrap;
