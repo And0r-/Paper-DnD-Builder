@@ -11,6 +11,7 @@
  */
 import Link from "next/link";
 import { useEffect, useRef, useState, type FormEvent, type ReactNode, type Ref } from "react";
+import { isAccountName, MAX_ACCOUNT_NAME } from "../../shared/account-name.ts";
 import { useApp } from "../app-state.tsx";
 import { api, ApiError, type Account, type FreshPasswordInfo } from "../api.ts";
 import { Button } from "./Button.tsx";
@@ -19,8 +20,6 @@ import { TextField } from "./Fields.tsx";
 import { afterSending, FreshPasswordContent, PasswordToSave, SAVE_FORM } from "./FreshPassword.tsx";
 
 export const MAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-/** The server's limit for a name (see API.md). */
-const MAX_NAME = 80;
 
 export interface Started {
   account: Account;
@@ -76,6 +75,11 @@ export function GetStarted({
       nameRef.current?.focus();
       return;
     }
+    if (!isAccountName(name)) {
+      setNameError(t("login.nameInvalid", { max: MAX_ACCOUNT_NAME }));
+      nameRef.current?.focus();
+      return;
+    }
     if (email.trim() && !MAIL.test(email.trim())) {
       setEmailError(t("login.emailInvalid"));
       emailRef.current?.focus();
@@ -95,6 +99,7 @@ export function GetStarted({
       const err = error instanceof ApiError ? error : new ApiError(0, "network");
       if (err.status === 429)
         setFormError(tc("login.tooManySignups", Math.max(1, Math.ceil((err.retryAfter ?? 300) / 60))));
+      else if (err.status === 400) setNameError(t("login.nameInvalid", { max: MAX_ACCOUNT_NAME }));
       else if (err.isNetwork) setFormError(t("common.offline"));
       else setFormError(t("common.loadError"));
     } finally {
@@ -121,12 +126,16 @@ export function GetStarted({
             ref={nameRef}
             label={t("login.nameLabel")}
             autoComplete="username"
-            maxLength={MAX_NAME}
+            maxLength={MAX_ACCOUNT_NAME}
             value={name}
             error={nameError}
             onChange={(e) => {
-              setName(e.target.value);
-              setNameError(undefined);
+              // The server's rule, said while typing: the name goes into the mail with the link back in.
+              const n = e.target.value;
+              setName(n);
+              setNameError(
+                !n.trim() || isAccountName(n) ? undefined : t("login.nameInvalid", { max: MAX_ACCOUNT_NAME }),
+              );
             }}
           />
           <TextField

@@ -47,6 +47,7 @@
   "login.tooMany.one": "Zu viele Versuche. Warte bitte 1 Minute.",
   "login.tooMany.other": "Zu viele Versuche. Warte bitte {count} Minuten.",
   "login.nameMissing": "Schreib einen Namen, mit dem wir dich ansprechen können.",
+  "login.nameInvalid": "Höchstens {max} Zeichen, ohne Link oder Mail-Adresse. Nach einem Punkt kommt ein Leerzeichen.",
   "login.emailHelp": "Nur damit du wieder reinkommst, wenn du dein Passwort verlierst. Ohne Mailadresse geht das nicht.",
   "login.start": "Loslegen",
   "login.starting": "Wird angelegt …",

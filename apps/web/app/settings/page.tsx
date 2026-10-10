@@ -8,6 +8,7 @@ import { effectiveUnits, formatMeasure } from "@builder/core";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
+import { isAccountName, MAX_ACCOUNT_NAME } from "../../src/shared/account-name.ts";
 import { useApp } from "../../src/ui/app-state.tsx";
 import { api, ApiError, type Account } from "../../src/ui/api.ts";
 import { AccessKeys } from "../../src/ui/components/AccessKeys.tsx";
@@ -226,8 +227,12 @@ function Settings({ account }: { account: Account }) {
 }
 
 const MAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-/** The server's limit for a name (see API.md). */
-const MAX_NAME = 80;
+
+/** The field a `400 badRequest` names first, if any. */
+function badField(err: ApiError): string | undefined {
+  const issues = err.details["issues"];
+  return Array.isArray(issues) ? (issues[0] as { path?: string } | undefined)?.path : undefined;
+}
 
 /** Name (what game masters see) and mail address (only a way back in); empty removes the address. */
 function Identity({ account }: { account: Account }) {
@@ -236,6 +241,11 @@ function Identity({ account }: { account: Account }) {
   const [name, setName] = useState(account.name);
   const [email, setEmail] = useState(account.email ?? "");
   const [nameError, setNameError] = useState<string>();
+  /** The rule holds for a new name only: one saved before it stays as it is. */
+  const nameProblem = (n: string) =>
+    !n.trim() || n.trim() === account.name || isAccountName(n)
+      ? undefined
+      : t("login.nameInvalid", { max: MAX_ACCOUNT_NAME });
   const [emailError, setEmailError] = useState<string>();
   const [error, setError] = useState<string>();
   const [busy, setBusy] = useState(false);
@@ -274,9 +284,10 @@ function Identity({ account }: { account: Account }) {
     e.preventDefault();
     const n = name.trim();
     const m = email.trim();
-    setNameError(n ? undefined : t("login.nameMissing"));
+    const nameWrong = n ? nameProblem(n) : t("login.nameMissing");
+    setNameError(nameWrong);
     setEmailError(!m || MAIL.test(m) ? undefined : t("login.emailInvalid"));
-    if (!n || (m && !MAIL.test(m))) return;
+    if (nameWrong || (m && !MAIL.test(m))) return;
     setError(undefined);
     setBusy(true);
     try {
@@ -289,7 +300,9 @@ function Identity({ account }: { account: Account }) {
       setEmail(r.account.email ?? "");
       setToast(t("settings.identitySaved"));
     } catch (err) {
-      if (err instanceof ApiError && err.status === 400) setEmailError(t("login.emailInvalid"));
+      if (err instanceof ApiError && err.status === 400 && badField(err) === "name")
+        setNameError(t("login.nameInvalid", { max: MAX_ACCOUNT_NAME }));
+      else if (err instanceof ApiError && err.status === 400) setEmailError(t("login.emailInvalid"));
       else setError(t("settings.saveError"));
     } finally {
       setBusy(false);
@@ -306,12 +319,12 @@ function Identity({ account }: { account: Account }) {
           label={t("settings.nameLabel")}
           help={t("settings.nameHelp")}
           autoComplete="nickname"
-          maxLength={MAX_NAME}
+          maxLength={MAX_ACCOUNT_NAME}
           value={name}
           error={nameError}
           onChange={(e) => {
             setName(e.target.value);
-            setNameError(undefined);
+            setNameError(nameProblem(e.target.value));
           }}
         />
         <TextField
