@@ -137,6 +137,12 @@ An admin can make other accounts admins, log an account out everywhere and
 delete one, only in the browser (never with an access key). The last admin
 cannot stop being one. An admin never sees an account's characters.
 
+Logged-in players can send feedback from the menu ("Feedback"): a short
+text, optionally a kind and a rating; the page they were on and their
+language come with it, nothing else. The admin reads it under Verwaltung →
+Feedback, marks it done and deletes it. Feedback stays when its account is
+deleted, without the account.
+
 ## Contributing
 
 **No rulebook text in this repository, including tests, fixtures and

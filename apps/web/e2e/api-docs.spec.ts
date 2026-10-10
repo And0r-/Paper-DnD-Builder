@@ -112,11 +112,12 @@ for (const lang of ["de", "en"] as const) {
     await page.getByRole("button", { name: m["menu.open"] }).click();
     const menu = page.getByRole("dialog", { name: m["menu.title"] });
     const main = menu.locator(".drawer__box > .drawer__links > li");
-    await expect(main).toHaveCount(4);
+    await expect(main).toHaveCount(5);
     expect((await main.allInnerTexts()).map((e) => e.trim())).toEqual([
       m["menu.characters"],
       m["menu.campaigns"],
       m["menu.settings"],
+      m["menu.feedback"],
       m["menu.logout"],
     ]);
     const logout = menu.getByRole("button", { name: m["menu.logout"], exact: true });

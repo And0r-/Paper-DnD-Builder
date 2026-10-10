@@ -52,9 +52,13 @@ describe("sending feedback", () => {
 
   it("answers 403 to an access key, an admin's too", async () => {
     for (const key of [playerKey, adminKey]) {
-      const res = await send(new Client(server), { kind: "other", text: "Hallo" }, {
-        authorization: `Bearer ${key}`,
-      });
+      const res = await send(
+        new Client(server),
+        { kind: "other", text: "Hallo" },
+        {
+          authorization: `Bearer ${key}`,
+        },
+      );
       expect(res.status).toBe(403);
       expect(res.json.error.code).toBe("keyCannotFeedback");
     }
@@ -169,7 +173,11 @@ describe("the admin's feedback", () => {
         expect(tool.json.error.code).toBe("keyCannotAdmin");
       }
     }
-    expect((await list()).feedback.map((f: { status: string }) => f.status)).toEqual(["open", "open", "open"]);
+    expect((await list()).feedback.map((f: { status: string }) => f.status)).toEqual([
+      "open",
+      "open",
+      "open",
+    ]);
   });
 
   it("lists newest first, with the account's name, and filters by status and kind", async () => {

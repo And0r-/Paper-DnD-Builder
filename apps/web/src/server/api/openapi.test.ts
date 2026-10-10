@@ -639,8 +639,8 @@ async function walk(server: TestServer): Promise<void> {
   await admin.call("DELETE", `/api/admin/accounts/${helperId}`);
 
   // The admin reads the feedback and looks after it.
-  const sent = (await admin.call("GET", "/api/admin/feedback?status=open&kind=wrong&page=1")).json
-    .feedback[0].id as string;
+  const sent = (await admin.call("GET", "/api/admin/feedback?status=open&kind=wrong&page=1")).json.feedback[0]
+    .id as string;
   await admin.call("GET", "/api/admin/feedback?status=maybe");
   await admin.call("PATCH", `/api/admin/feedback/${sent}/status`, { status: "done" });
   await admin.call("PATCH", "/api/admin/feedback/00000000-0000-4000-8000-000000000000/status", {

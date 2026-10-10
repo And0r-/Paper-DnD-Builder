@@ -11,9 +11,15 @@
 import AxeBuilder from "@axe-core/playwright";
 import type { Page } from "@playwright/test";
 import m from "../src/i18n/messages/de.json" with { type: "json" };
-import { animationsDone, expect, shot, signup, test } from "./helpers.ts";
-
-const START_PASSWORD = "admin-erster-start-2026";
+import {
+  animationsDone,
+  expect,
+  rememberAdminPassword,
+  shot,
+  signup,
+  START_PASSWORD,
+  test,
+} from "./helpers.ts";
 
 async function axe(page: Page) {
   await animationsDone(page);
@@ -53,6 +59,8 @@ test("the first admin: start password, a new one shown once, then the accounts",
   ).toBeVisible();
   const secret = (await page.locator(".copy-text__value").textContent())!.trim();
   expect(secret).not.toBe(START_PASSWORD);
+  // The spec files after this one log in as the admin with it.
+  await rememberAdminPassword(secret);
   await page.getByRole("button", { name: m["password.done"] }).click();
   await expect(page.getByRole("heading", { name: m["characters.title"], level: 1 })).toBeVisible();
   const again = await page.request.post("/api/auth/login", {
@@ -60,7 +68,7 @@ test("the first admin: start password, a new one shown once, then the accounts",
   });
   expect(again.status()).toBe(401);
 
-  // The menu has "Verwaltung" between the settings and logging out.
+  // The menu has "Verwaltung" between the feedback and logging out.
   await page.getByRole("button", { name: m["menu.open"] }).click();
   const menu = page.getByRole("dialog", { name: m["menu.title"] });
   expect(
@@ -69,6 +77,7 @@ test("the first admin: start password, a new one shown once, then the accounts",
     m["menu.characters"],
     m["menu.campaigns"],
     m["menu.settings"],
+    m["menu.feedback"],
     m["menu.admin"],
     m["menu.logout"],
   ]);
