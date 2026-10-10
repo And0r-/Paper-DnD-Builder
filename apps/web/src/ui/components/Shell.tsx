@@ -37,6 +37,7 @@ export function AppShell({
   aside,
   children,
   wide,
+  broad,
 }: {
   /** Shown in the top bar (e.g. character name and level). */
   title?: ReactNode;
@@ -55,7 +56,10 @@ export function AppShell({
   /** Right column on large screens (the explanation). */
   aside?: ReactNode;
   children: ReactNode;
+  /** As wide as the screen (the sheet). */
   wide?: boolean;
+  /** Twice a question's width, not more (the admin's tables and tiles). */
+  broad?: boolean;
 }) {
   const { t } = useApp();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -74,7 +78,7 @@ export function AppShell({
     setFeedbackOpen(true);
   }, [menuOpen]);
 
-  const layout = sidebar || aside ? "shell--columns" : wide ? "shell--wide" : "";
+  const layout = sidebar || aside ? "shell--columns" : wide ? "shell--wide" : broad ? "shell--broad" : "";
   const header = (
     <header className="topbar">
       <button

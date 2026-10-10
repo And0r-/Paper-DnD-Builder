@@ -1413,6 +1413,13 @@ textarea.field__input {
   overflow-wrap: anywhere;
 }
 
+/* The two weekly charts side by side on a broad page, one under the other on a phone. */
+.admin__charts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 28rem), 1fr));
+  gap: var(--space-5);
+}
+
 /* The weekly bar charts: one series in the primary colour, guides recessive. */
 .bar-chart {
   display: flex;

@@ -151,6 +151,8 @@
   --topbar-height: 56px;
   --footer-height: 72px;
   --content-max: 40rem;
+  /* The admin's pages: a table of eight columns and tiles in rows, so twice as wide. */
+  --content-broad: 80rem;
   --steplist-width: 15rem;
   /* 22rem from 1024px to 1279px (base.css), so the question keeps its width there. */
   --explain-width: 24rem;

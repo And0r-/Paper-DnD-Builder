@@ -143,8 +143,10 @@ function Overview() {
             </ul>
           </section>
         </div>
-        <BarChart title={t("admin.accountsPerWeek")} data={stats.accountsPerWeek} />
-        <BarChart title={t("admin.draftsPerWeek")} data={stats.draftsPerWeek} />
+        <div className="admin__charts">
+          <BarChart title={t("admin.accountsPerWeek")} data={stats.accountsPerWeek} />
+          <BarChart title={t("admin.draftsPerWeek")} data={stats.draftsPerWeek} />
+        </div>
         <section className="admin__section">
           <h2 className="section-title">{t("admin.server")}</h2>
           <dl className="admin-facts">
@@ -175,7 +177,7 @@ function Overview() {
   }
 
   return (
-    <AppShell>
+    <AppShell broad>
       <div className="page admin">
         <AdminTabs current="overview" />
         <h1 className="page__title">{t("admin.overviewTitle")}</h1>

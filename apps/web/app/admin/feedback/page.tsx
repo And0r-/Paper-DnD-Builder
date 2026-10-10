@@ -214,7 +214,7 @@ function FeedbackList() {
   }
 
   return (
-    <AppShell>
+    <AppShell broad>
       <div className="page admin">
         <AdminTabs current="feedback" />
         <h1 className="page__title">{t("admin.feedbackTitle")}</h1>
