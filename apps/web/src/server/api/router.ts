@@ -21,6 +21,7 @@ import { adminRoutes } from "./routes/admin.ts";
 import { authRoutes } from "./routes/auth.ts";
 import { campaignRoutes } from "./routes/campaigns.ts";
 import { draftRoutes } from "./routes/drafts.ts";
+import { feedbackRoutes } from "./routes/feedback.ts";
 import { helpLinkRoutes } from "./routes/help-links.ts";
 import { packageRoutes } from "./routes/packages.ts";
 import { printRoutes } from "./routes/print.ts";
@@ -71,6 +72,7 @@ export const ROUTES: Route[] = [
   ...sheetCopyRoutes,
   ...campaignRoutes,
   ...adminRoutes,
+  ...feedbackRoutes,
 ];
 
 function match(pattern: string, path: string): Record<string, string> | undefined {

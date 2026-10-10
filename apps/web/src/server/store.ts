@@ -56,6 +56,25 @@ export type AdminStatsRow = {
   campaigns: number;
   campaign_players: number;
   access_keys: number;
+  feedback_open: number;
+  feedback_total: number;
+};
+
+export type FeedbackKind = "wrong" | "idea" | "other";
+export type FeedbackStatus = "open" | "done";
+
+/** A feedback as the admin's list shows it, with the name of the account that sent it (null: gone). */
+export type FeedbackRow = {
+  id: string;
+  account_id: string | null;
+  account_name: string | null;
+  kind: FeedbackKind;
+  rating: number | null;
+  text: string;
+  page: string | null;
+  language: string;
+  status: FeedbackStatus;
+  created_at: Date;
 };
 
 /** A week (its Monday, UTC, `YYYY-MM-DD`) and how many were made in it. */
@@ -449,7 +468,9 @@ export class Store {
          (SELECT count(*) FROM drafts WHERE created_at > $1::timestamptz - interval '30 days')::int AS drafts_30_days,
          (SELECT count(*) FROM campaigns)::int AS campaigns,
          (SELECT count(DISTINCT account_id) FROM campaign_players)::int AS campaign_players,
-         (SELECT count(*) FROM access_keys)::int AS access_keys`,
+         (SELECT count(*) FROM access_keys)::int AS access_keys,
+         (SELECT count(*) FROM feedback WHERE status = 'open')::int AS feedback_open,
+         (SELECT count(*) FROM feedback)::int AS feedback_total`,
       [now],
     );
     const byPackage = await this.db.query<{ package_id: string; count: number }>(
@@ -483,6 +504,60 @@ export class Store {
        FROM bounds b ORDER BY b.monday`,
       [now, weeks],
     );
+  }
+
+  // ---------------------------------------------------------------- feedback
+
+  async addFeedback(f: {
+    id: string;
+    account_id: string;
+    kind: FeedbackKind;
+    rating: number | null;
+    text: string;
+    page: string | null;
+    language: string;
+    created_at: Date;
+  }): Promise<void> {
+    await this.db.query(
+      `INSERT INTO feedback (id, account_id, kind, rating, text, page, language, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+      [f.id, f.account_id, f.kind, f.rating, f.text, f.page, f.language, f.created_at],
+    );
+  }
+
+  /** One page of feedback for the admin, newest first, with the total that fit; null filters nothing. */
+  async listFeedbackForAdmin(
+    status: FeedbackStatus | null,
+    kind: FeedbackKind | null,
+    limit: number,
+    offset: number,
+  ): Promise<{ feedback: FeedbackRow[]; total: number }> {
+    const where = "($1::text IS NULL OR f.status = $1) AND ($2::text IS NULL OR f.kind = $2)";
+    const feedback = await this.db.query<FeedbackRow>(
+      `SELECT f.id, f.account_id, a.name AS account_name, f.kind, f.rating, f.text, f.page, f.language,
+         f.status, f.created_at
+       FROM feedback f LEFT JOIN accounts a ON a.id = f.account_id WHERE ${where}
+       ORDER BY f.created_at DESC, f.id DESC LIMIT $3 OFFSET $4`,
+      [status, kind, limit, offset],
+    );
+    const counted = await this.db.query<{ total: number }>(
+      `SELECT count(*)::int AS total FROM feedback f WHERE ${where}`,
+      [status, kind],
+    );
+    return { feedback, total: counted[0]!.total };
+  }
+
+  async setFeedbackStatus(id: string, status: FeedbackStatus): Promise<"done" | "missing"> {
+    const rows = await this.db.query("UPDATE feedback SET status = $2 WHERE id = $1 RETURNING id", [
+      id,
+      status,
+    ]);
+    return rows.length > 0 ? "done" : "missing";
+  }
+
+  async deleteFeedback(id: string): Promise<boolean> {
+    const rows = await this.db.query("DELETE FROM feedback WHERE id = $1 RETURNING id", [id]);
+    return rows.length > 0;
   }
 
   /** The database's size in bytes (PostgreSQL's own count). */

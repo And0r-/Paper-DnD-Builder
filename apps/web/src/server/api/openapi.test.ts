@@ -270,6 +270,8 @@ describe("openapi.json", () => {
         "lastAdmin",
         "ownAccount",
         "accountNotFound",
+        "keyCannotFeedback",
+        "feedbackNotFound",
       ]) {
         expect(codes, code).toContain(code);
       }
@@ -610,6 +612,12 @@ async function walk(server: TestServer): Promise<void> {
   await mate.call("DELETE", `${cp}/players/me`);
   await call("DELETE", cp);
 
+  // Feedback: a player sends it from the browser, never with a key.
+  await call("POST", "/api/feedback", { kind: "wrong", rating: 4, text: "Hm.", page: "/drafts" });
+  await call("POST", "/api/feedback", { kind: "idea", text: "Mehr Farben." }, k);
+  await call("POST", "/api/feedback", { kind: "other", text: " " });
+  await call("GET", "/api/admin/feedback", undefined);
+
   // The admin: the first one, made at start; its known password is swapped at its first login.
   await createFirstAdmin(server.app);
   const admin = new Client(server, "198.51.100.50");
@@ -629,6 +637,17 @@ async function walk(server: TestServer): Promise<void> {
   await admin.call("PATCH", `/api/admin/accounts/${walkerId}/role`, { role: "player" });
   await admin.call("POST", `/api/admin/accounts/${walkerId}/logout-all`);
   await admin.call("DELETE", `/api/admin/accounts/${helperId}`);
+
+  // The admin reads the feedback and looks after it.
+  const sent = (await admin.call("GET", "/api/admin/feedback?status=open&kind=wrong&page=1")).json
+    .feedback[0].id as string;
+  await admin.call("GET", "/api/admin/feedback?status=maybe");
+  await admin.call("PATCH", `/api/admin/feedback/${sent}/status`, { status: "done" });
+  await admin.call("PATCH", "/api/admin/feedback/00000000-0000-4000-8000-000000000000/status", {
+    status: "open",
+  });
+  await admin.call("DELETE", `/api/admin/feedback/${sent}`);
+  await admin.call("DELETE", `/api/admin/feedback/${sent}`);
 
   await call("POST", "/api/auth/logout");
   await call("POST", "/api/auth/login", { login: "walker", password: reset.secret });

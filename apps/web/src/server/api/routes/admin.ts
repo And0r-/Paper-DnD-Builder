@@ -101,6 +101,7 @@ export const adminRoutes: Route[] = [
         },
         campaigns: { total: c.campaigns, players: c.campaign_players },
         accessKeys: c.access_keys,
+        feedback: { open: c.feedback_open, total: c.feedback_total },
         activeNow: ctx.app.presence.activeNow(),
         buildingNow: liveHub(ctx.app).connections(),
         accountsPerWeek: weeks.map((w) => ({ week: w.week, count: w.accounts })),
