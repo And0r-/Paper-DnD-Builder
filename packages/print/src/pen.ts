@@ -167,6 +167,17 @@ export class Pen {
   }
 
   /**
+   * Whether text is wider than `width`. Measures ever longer beginnings
+   * (32, 64, 128 \u2026 characters) and stops at the first that is too wide, so
+   * a text of thousands of characters is never measured whole: that took
+   * seconds to minutes and gigabytes, for every user of the server.
+   */
+  private tooWide(text: string, s: TextStyle, width: number): boolean {
+    for (let n = 32; n < text.length; n *= 2) if (this.width(text.slice(0, n), s) > width) return true;
+    return this.width(text, s) > width;
+  }
+
+  /**
    * Breaks text into lines no wider than `width`. A word longer than a line
    * is split after a hyphen or slash, or at a soft hyphen (which the package
    * puts where a compound word joins), if it has one; else between letters
@@ -178,13 +189,13 @@ export class Pen {
       let line = "";
       for (const word of paragraph.split(BREAKS).filter((w) => w !== "")) {
         const candidate = line === "" ? word : `${line} ${word}`;
-        if (this.width(candidate, s) <= width) {
+        if (!this.tooWide(candidate, s, width)) {
           line = candidate;
           continue;
         }
         if (line !== "") lines.push(line);
         line = word;
-        while (this.width(line, s) > width && line.length > 1) {
+        while (line.length > 1 && this.tooWide(line, s, width)) {
           const { at, mark } = this.cut(line, s, width);
           lines.push(line.slice(0, at) + mark);
           line = line.slice(at);
@@ -195,25 +206,60 @@ export class Pen {
     return lines;
   }
 
-  /** Where to split a word that is wider than `width`, and what to print at the end of the first part. */
+  /**
+   * The longest beginning of a word, from 1 to its length less one, that
+   * with `mark` after it is no wider than `width`; 1 if none is. Doubles the
+   * length until it is too wide, then halves the gap: a dozen measurements
+   * of at most twice a line, not one per character of the whole word.
+   */
+  private longest(word: string, mark: string, s: TextStyle, width: number): number {
+    const fits = (at: number) => this.width(word.slice(0, at) + mark, s) <= width;
+    let lo = 1;
+    let hi = 32;
+    while (hi < word.length - 1 && fits(hi)) {
+      lo = hi;
+      hi *= 2;
+    }
+    hi = Math.min(hi, word.length - 1);
+    while (lo < hi) {
+      const mid = Math.ceil((lo + hi) / 2);
+      if (fits(mid)) lo = mid;
+      else hi = mid - 1;
+    }
+    return lo;
+  }
+
+  /**
+   * Where to split a word that is wider than `width`, and what to print at
+   * the end of the first part. The longest part that fits is measured once;
+   * where to split within it is then chosen without measuring again.
+   */
   private cut(word: string, s: TextStyle, width: number): { at: number; mark: string } {
-    for (let at = word.length - 1; at > 0; at--) {
+    const plain = this.longest(word, "", s, width);
+    const dashed = this.longest(word, "-", s, width);
+    for (let at = plain; at > 0; at--) {
       const soft = word[at - 1] === "\u00ad";
-      if (!soft && !/[-/\u2010-\u2012]/u.test(word[at - 1]!)) continue;
-      const mark = soft ? "-" : "";
-      if (this.width(word.slice(0, at) + mark, s) <= width) return { at, mark };
+      if (soft && at <= dashed) return { at, mark: "-" };
+      if (!soft && /[-/\u2010-\u2012]/u.test(word[at - 1]!)) return { at, mark: "" };
     }
     // Between letters, at least three on either side, so no "\u2026stellu-ng";
     // only if not even that fits, wherever it fits.
-    const letters = (t: string) => t.match(/\p{L}/gu)?.length ?? 0;
-    const fits = (at: number) => this.width(`${word.slice(0, at)}-`, s) <= width;
-    let at = word.length - 1;
-    while (at > 1 && !(fits(at) && letters(word.slice(0, at)) >= 3 && letters(word.slice(at)) >= 3)) at--;
-    if (at === 1) {
-      at = word.length - 1;
-      while (at > 1 && !fits(at)) at--;
+    const isLetter = (c: string) => /\p{L}/u.test(c);
+    // Letters after the split, counted only up to three: a long rest is not read whole.
+    const lettersAfter = (at: number) => {
+      let n = 0;
+      for (let i = at; i < word.length && n < 3; i++) if (isLetter(word[i]!)) n++;
+      return n;
+    };
+    let before = 0;
+    for (let i = 0; i < dashed; i++) if (isLetter(word[i]!)) before++;
+    let at = dashed;
+    while (at > 1 && !(before >= 3 && lettersAfter(at) >= 3)) {
+      at--;
+      if (isLetter(word[at]!)) before--;
     }
-    const between = /\p{L}/u.test(word[at - 1]!) && /\p{L}/u.test(word[at]!);
+    if (at === 1) at = dashed;
+    const between = isLetter(word[at - 1]!) && isLetter(word[at]!);
     return { at, mark: between ? "-" : "" };
   }
 

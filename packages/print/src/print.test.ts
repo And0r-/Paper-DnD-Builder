@@ -3,6 +3,7 @@ import { applyChange, evaluateDraft } from "@builder/core";
 import type { ContentPackage, TextValue } from "@builder/format";
 import { createHash } from "node:crypto";
 import { writeFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import PDFDocument from "pdfkit";
 import { getDocument } from "pdfjs-dist/legacy/build/pdf.mjs";
 import { beforeAll, describe, expect, it, vi } from "vitest";
@@ -26,6 +27,7 @@ import {
 import { CLASSIC_GEOMETRY, classicPlan, firstColumns } from "@builder/sheet/designs/classic";
 import { columnWidth } from "@builder/sheet/designs";
 import { VERBOSE_GEOMETRY } from "@builder/sheet/designs/verbose";
+import { FONTS, Pen, S } from "./pen.ts";
 import { sheetPlaces } from "./places.ts";
 import { renderPdf, type RenderedPdf } from "./render.ts";
 
@@ -1435,6 +1437,39 @@ describe("printed character (demo package)", () => {
     expect(split[0]).toMatch(/-$/u);
     expect(split.join("").replace("-", "")).toBe(names[2]);
     for (const p of split) expect(p.replace(/-$/u, "").length).toBeGreaterThanOrEqual(3);
+  });
+
+  it("breaks a word of 10 000 characters in a narrow column in under a second", () => {
+    // Splitting measured nearly the whole word again for every line: 3 s for 1 000
+    // characters, minutes for 8 000, and the server answered nobody meanwhile.
+    const regular = fileURLToPath(FONTS.regular);
+    const pdf = new PDFDocument({ size: "A4", margin: 0, autoFirstPage: false, font: regular });
+    const pen = new Pen(pdf, "de", MESSAGES.de!, { regular, semibold: regular, bold: regular });
+    const word = "Laternenwiederherstellung".repeat(400);
+    const started = performance.now();
+    const lines = pen.wrap(word, S.body, 30);
+    expect(performance.now() - started).toBeLessThan(1000);
+    expect(lines.length).toBeGreaterThan(100);
+    for (const l of lines) expect(pen.width(l, S.body)).toBeLessThanOrEqual(30);
+    expect(lines.map((l) => l.replace(/-$/u, "")).join("")).toBe(word);
+  });
+
+  it("prints a name and a copy's name of 10 000 characters without stalling", async () => {
+    // The footer shortened the name one letter at a time and measured each: seconds for a
+    // name of 2 000 letters, out of memory for 10 000.
+    const model = buildSheetModel(pkg, doc, { language: "de", createdAt });
+    const long = "Mira".repeat(2500);
+    const origin = {
+      kind: "copy",
+      name: long,
+      createdAt: createdAt.toISOString(),
+      fromLevel: 3,
+      fromPackageVersion: "1",
+    } as const;
+    const started = performance.now();
+    const { text } = await extract(await renderPdf({ ...model, name: long, origin }, { parts: ["sheet"] }));
+    expect(performance.now() - started).toBeLessThan(5000);
+    expect(text).toContain("MiraMira…");
   });
 
   it("refuses a language without texts instead of mixing in another one", () => {

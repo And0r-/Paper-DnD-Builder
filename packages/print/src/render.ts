@@ -455,12 +455,26 @@ function pageFooter(pen: Pen, g: GridGeometry, model: SheetModel, page: number, 
   const cut = (text: string, n: number) => (n >= text.length ? text : `${text.slice(0, n).trimEnd()}…`);
   // The copy's name (its date and time) tells copies apart: the character's name gives way first.
   const copyName = model.origin.kind === "copy" ? model.origin.name : "";
-  let who = model.name.length;
-  let which = copyName.length;
+  // The longest cut that fits, found by halving: one letter at a time measured a name of
+  // thousands of letters thousands of times, each kept in pdfkit's cache (seconds, gigabytes).
+  const longest = (from: number, to: number, fitsAt: (n: number) => boolean) => {
+    let lo = from;
+    let hi = to;
+    while (lo < hi) {
+      const mid = Math.ceil((lo + hi) / 2);
+      if (fitsAt(mid)) lo = mid;
+      else hi = mid - 1;
+    }
+    return lo;
+  };
   let footer = words(model.name, copyName);
-  while (!fits(footer) && (who > 8 || which > 1)) {
-    if (who > 8) who--;
-    else which--;
+  if (!fits(footer)) {
+    const whoFits = (n: number) => fits(words(cut(model.name, n), copyName));
+    const who = model.name.length > 8 ? longest(8, model.name.length - 1, whoFits) : model.name.length;
+    const which =
+      whoFits(who) || copyName.length <= 1
+        ? copyName.length
+        : longest(1, copyName.length - 1, (n) => fits(words(cut(model.name, who), cut(copyName, n))));
     footer = words(cut(model.name, who), cut(copyName, which));
   }
   pen.text(footer, left, g.page.height - g.margin, pen.fit(footer, style, room, g.type.min));
