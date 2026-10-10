@@ -372,3 +372,133 @@ it("no MCP tool reaches an admin route", () => {
     expect(readFileSync(join(f.parentPath, f.name), "utf8"), f.name).not.toMatch(/api\/admin/);
   }
 });
+
+describe("the overview", () => {
+  const A = "00000000-0000-4000-8000-00000000000a";
+  const B = "00000000-0000-4000-8000-00000000000b";
+  const C = "00000000-0000-4000-8000-00000000000c";
+  const D = "00000000-0000-4000-8000-00000000000d";
+
+  beforeEach(async () => {
+    // The clock stands at Sunday 2026-10-04 10:00 UTC: this week began on Monday 2026-09-28.
+    await server.db.query(
+      `INSERT INTO accounts (id, name, email, language, created_at) VALUES
+         ($1, 'A', 'a@example.org', 'de', '2026-10-04T08:00:00Z'),
+         ($2, 'B', NULL, 'en', '2026-09-30T12:00:00Z'),
+         ($3, 'C', 'c@example.org', 'fr', '2026-04-29T09:00:00Z'),
+         ($4, 'D', NULL, 'it', '2025-01-01T09:00:00Z')`,
+      [A, B, C, D],
+    );
+    await server.db.query(
+      `INSERT INTO drafts (id, account_id, package_id, package_version, version, document, finished_at, created_at, updated_at)
+       VALUES
+         (gen_random_uuid(), $1, 'demo', '1', 1, '{}', '2026-10-03T12:00:00Z', '2026-10-03T11:00:00Z', now()),
+         (gen_random_uuid(), $1, 'other', '1', 1, '{}', NULL, '2026-09-20T23:59:00Z', now()),
+         (gen_random_uuid(), $2, 'demo', '1', 1, '{}', NULL, '2026-05-01T08:00:00Z', now())`,
+      [A, C],
+    );
+    await server.db.query(
+      `INSERT INTO campaigns (id, account_id, name, created_at) VALUES
+         ('00000000-0000-4000-8000-0000000000c1', $1, 'Eins', now()),
+         ('00000000-0000-4000-8000-0000000000c2', $1, 'Zwei', now())`,
+      [A],
+    );
+    await server.db.query(
+      `INSERT INTO campaign_players (campaign_id, account_id, added_at) VALUES
+         ('00000000-0000-4000-8000-0000000000c1', $1, now()),
+         ('00000000-0000-4000-8000-0000000000c2', $1, now()),
+         ('00000000-0000-4000-8000-0000000000c1', $2, now())`,
+      [B, C],
+    );
+    admin = new Client(server, "198.51.100.1");
+    await firstAdmin(admin);
+    await admin.call("POST", "/api/account/keys", { name: "Laptop" });
+  });
+
+  it("counts accounts, characters, campaigns and keys, and the weeks with nothing as 0", async () => {
+    const res = await admin.call("GET", "/api/admin/stats");
+    expect(res.status).toBe(200);
+    const s = res.json;
+    expect(s.accounts).toEqual({
+      // A, B, C, D and the admin, made at 10:00 today.
+      total: 5,
+      withEmail: 2,
+      withoutEmail: 3,
+      newToday: 2,
+      new7Days: 3,
+      new30Days: 3,
+      withoutCharacters: 3,
+      byLanguage: [
+        { language: "de", count: 2 },
+        { language: "en", count: 1 },
+        { language: "fr", count: 1 },
+        { language: "it", count: 1 },
+      ],
+    });
+    expect(s.characters).toEqual({
+      total: 3,
+      finished: 1,
+      new7Days: 1,
+      new30Days: 2,
+      byPackage: [
+        { packageId: "demo", count: 2 },
+        { packageId: "other", count: 1 },
+      ],
+    });
+    expect(s.campaigns).toEqual({ total: 2, players: 2 });
+    expect(s.accessKeys).toBe(1);
+    // The admin's own session, just now; nobody on a character.
+    expect(s.activeNow).toBe(1);
+    expect(s.buildingNow).toBe(0);
+
+    const weeks = (list: { week: string; count: number }[]) =>
+      Object.fromEntries(list.filter((w) => w.count > 0).map((w) => [w.week, w.count]));
+    for (const list of [s.accountsPerWeek, s.draftsPerWeek]) {
+      expect(list).toHaveLength(26);
+      expect(list[0].week).toBe("2026-04-06");
+      expect(list.at(-1).week).toBe("2026-09-28");
+      // Every Monday in between, one after the other.
+      for (let i = 1; i < list.length; i++) {
+        expect(Date.parse(list[i].week) - Date.parse(list[i - 1].week)).toBe(7 * 86_400_000);
+      }
+    }
+    expect(weeks(s.accountsPerWeek)).toEqual({ "2026-04-27": 1, "2026-09-28": 3 });
+    expect(s.accountsPerWeek.filter((w: { count: number }) => w.count === 0)).toHaveLength(24);
+    // Sunday 23:59 belongs to the week that began on the Monday before.
+    expect(weeks(s.draftsPerWeek)).toEqual({ "2026-04-27": 1, "2026-09-14": 1, "2026-09-28": 1 });
+
+    expect(s.server).toEqual({
+      packages: [
+        expect.objectContaining({ id: "demo", kind: "base" }),
+        expect.objectContaining({ kind: "extension", extends: "demo" }),
+      ],
+      databaseBytes: null,
+      startedAt: "2026-10-04T10:00:00.000Z",
+    });
+  });
+
+  it("counts the browser sessions with a request in the last 10 minutes", async () => {
+    const other = new Client(server, "198.51.100.9");
+    await signIn(other, "player@example.org");
+    // Signing up is no request with the session yet; the next one is.
+    expect((await admin.call("GET", "/api/admin/stats")).json.activeNow).toBe(1);
+    await other.call("GET", "/api/account");
+    expect((await admin.call("GET", "/api/admin/stats")).json.activeNow).toBe(2);
+    // Times are kept to 5 minutes: 15 minutes later the player's request is surely past.
+    server.advance(15 * 60_000);
+    expect((await admin.call("GET", "/api/admin/stats")).json.activeNow).toBe(1);
+  });
+
+  it("are the admin's only", async () => {
+    const other = new Client(server, "198.51.100.9");
+    await signIn(other, "player@example.org");
+    expect((await other.call("GET", "/api/admin/stats")).json.error.code).toBe("adminOnly");
+    const key = (await admin.call("POST", "/api/account/keys", { name: "Tool" })).json.key.secret;
+    const tool = await new Client(server).call("GET", "/api/admin/stats", undefined, {
+      authorization: `Bearer ${key}`,
+    });
+    expect(tool.status).toBe(403);
+    expect(tool.json.error.code).toBe("keyCannotAdmin");
+    expect((await new Client(server).call("GET", "/api/admin/stats")).status).toBe(401);
+  });
+});

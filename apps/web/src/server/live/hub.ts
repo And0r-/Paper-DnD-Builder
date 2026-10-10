@@ -166,6 +166,13 @@ export class LiveHub {
     return this.rooms.get(draftId)?.members.size ?? 0;
   }
 
+  /** How many live connections are open, on every draft: people building now, for the admin. */
+  connections(): number {
+    let n = 0;
+    for (const room of this.rooms.values()) n += room.members.size;
+    return n;
+  }
+
   /**
    * Puts an authorised connection on the draft `row`: it gets `welcome`,
    * then the draft's `state`; everyone gets the new `presence`.

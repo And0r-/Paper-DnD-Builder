@@ -1,7 +1,7 @@
 /**
- * The admin's routes (AND-353): the accounts on this builder, found by a
- * part of their name or address, made admin or player, logged out
- * everywhere, deleted.
+ * The admin's routes (AND-353): the numbers of the overview, and the
+ * accounts on this builder, found by a part of their name or address,
+ * made admin or player, logged out everywhere, deleted.
  *
  * Every route goes through `requireAdmin`: a browser session of an admin,
  * never an access key, so none of this is in the MCP server either. What
@@ -12,9 +12,12 @@
  * or an address, and nowhere else: the builder keeps no log of its own.
  */
 import { z } from "zod";
+import { healthReport } from "../../health.ts";
+import { liveHub } from "../../live/hub.ts";
+import { PGLITE_MEMORY_URL } from "../../local-backends.ts";
 import type { AdminAccountRow } from "../../store.ts";
 import { HttpError, json, readJson } from "../http.ts";
-import type { Route } from "../router.ts";
+import type { RequestContext, Route } from "../router.ts";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
@@ -46,12 +49,70 @@ function accountId(params: Record<string, string>): string {
   return id;
 }
 
+/** Weeks in the overview's two charts: half a year. */
+export const STATS_WEEKS = 26;
+
+/**
+ * The database's size, or null where it says nothing: the in-memory
+ * database of trials and tests, or a database that does not tell.
+ */
+async function databaseBytes(ctx: RequestContext): Promise<number | null> {
+  const url = ctx.app.config.databaseUrl;
+  if (!url || url === PGLITE_MEMORY_URL) return null;
+  try {
+    return await ctx.app.store.databaseBytes();
+  } catch {
+    return null;
+  }
+}
+
 /** One line in the server log: who did what to which account, by id only. */
 function logAction(adminId: string, action: string, accountId: string): void {
   console.log(`Admin ${adminId}: ${action} account ${accountId}.`);
 }
 
 export const adminRoutes: Route[] = [
+  {
+    // The overview: counts from the tables, and two numbers from memory (see live/presence.ts).
+    method: "GET",
+    path: "/api/admin/stats",
+    handler: async (ctx) => {
+      await ctx.requireAdmin();
+      const now = ctx.app.now();
+      const { counts: c, byPackage, byLanguage } = await ctx.app.store.adminStats(now);
+      const weeks = await ctx.app.store.madePerWeek(now, STATS_WEEKS);
+      return json(200, {
+        accounts: {
+          total: c.accounts,
+          withEmail: c.accounts_with_email,
+          withoutEmail: c.accounts - c.accounts_with_email,
+          newToday: c.accounts_today,
+          new7Days: c.accounts_7_days,
+          new30Days: c.accounts_30_days,
+          withoutCharacters: c.accounts_without_drafts,
+          byLanguage: byLanguage.map((l) => ({ language: l.language, count: l.count })),
+        },
+        characters: {
+          total: c.drafts,
+          finished: c.drafts_finished,
+          new7Days: c.drafts_7_days,
+          new30Days: c.drafts_30_days,
+          byPackage: byPackage.map((p) => ({ packageId: p.package_id, count: p.count })),
+        },
+        campaigns: { total: c.campaigns, players: c.campaign_players },
+        accessKeys: c.access_keys,
+        activeNow: ctx.app.presence.activeNow(),
+        buildingNow: liveHub(ctx.app).connections(),
+        accountsPerWeek: weeks.map((w) => ({ week: w.week, count: w.accounts })),
+        draftsPerWeek: weeks.map((w) => ({ week: w.week, count: w.drafts })),
+        server: {
+          packages: healthReport(ctx.app.packages).packages,
+          databaseBytes: await databaseBytes(ctx),
+          startedAt: ctx.app.startedAt.toISOString(),
+        },
+      });
+    },
+  },
   {
     method: "GET",
     path: "/api/admin/accounts",

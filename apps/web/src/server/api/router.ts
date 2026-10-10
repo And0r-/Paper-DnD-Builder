@@ -167,6 +167,8 @@ export async function loadSession(app: App, req: Request, out: Headers): Promise
   const now = app.now();
   const found = await app.store.findSession(id, now);
   if (!found) return undefined;
+  // Counted for the admin's "active now", in memory only; access keys are programs, not people.
+  app.presence.touch(id);
   // Sliding expiry: a session in use stays alive; refreshed at most once a day.
   if (now.getTime() - found.refreshed_at.getTime() > SESSION_REFRESH_MS) {
     await app.store.refreshSession(id, new Date(now.getTime() + SESSION_MS), now);
