@@ -202,6 +202,19 @@ describe("where the PDF breaks the sheet's pages", () => {
         .status,
     ).toBe(401);
   });
+
+  it("refuses a model with a text longer than 10 000 characters, before laying anything out", async () => {
+    const id = await character();
+    const model = (await client.call("GET", `/api/drafts/${id}/sheet`)).json as SheetModel;
+    const places = (m: SheetModel) =>
+      client.call("POST", `/api/drafts/${id}/sheet-places`, { model: m, design: "verbose" });
+    expect((await places({ ...model, name: "x".repeat(10_000) })).status).toBe(200);
+    const res = await places({ ...model, name: "x".repeat(10_001) });
+    expect(res.status).toBe(400);
+    expect(res.json.error.code).toBe("badRequest");
+    const cards = [{ ...model.cards[0]!, rules: ["x".repeat(10_001)] }, ...model.cards.slice(1)];
+    expect((await places({ ...model, cards })).status).toBe(400);
+  });
 });
 
 describe("the parts of a printout", () => {

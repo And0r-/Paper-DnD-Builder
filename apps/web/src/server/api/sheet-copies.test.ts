@@ -249,10 +249,18 @@ describe("kept copies of the sheet", () => {
     const made = await newCopy();
     const url = `${base()}/sheet-copies/${made.copy.id}`;
     const size = (m: unknown) => Buffer.byteLength(JSON.stringify(m));
-    const padded = (bytes: number) => ({
-      ...made.model,
-      attribution: made.model.attribution + "x".repeat(bytes - size(made.model)),
-    });
+    // Filled up with values (a copy has none of its own), each text at most 10 000 characters,
+    // the longest a model may have.
+    const padded = (bytes: number) => {
+      const filler = (n: number) => ({ id: "filler", label: "", text: "x".repeat(n), dependents: [] });
+      const count = Math.ceil((bytes - size(made.model)) / 9_000);
+      const fillers = (n: (i: number) => number) => Array.from({ length: count }, (_, i) => filler(n(i)));
+      const letters = bytes - size({ ...made.model, values: fillers(() => 0) });
+      return {
+        ...made.model,
+        values: fillers((i) => Math.floor(letters / count) + (i < letters % count ? 1 : 0)),
+      };
+    };
 
     const largest = padded(MAX_COPY_BYTES);
     expect(size(largest)).toBe(MAX_COPY_BYTES);

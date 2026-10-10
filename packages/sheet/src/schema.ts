@@ -6,7 +6,15 @@
  */
 import { z } from "zod";
 
-const text = z.string();
+/** Characters in one text of a sheet model. */
+export const MAX_TEXT_LENGTH = 10_000;
+
+/**
+ * One text on the sheet, at most as long as a text answer in the builder. A
+ * model comes from the browser too, and printing a text of tens of thousands
+ * of characters takes the server's memory and time from every user.
+ */
+const text = z.string().max(MAX_TEXT_LENGTH);
 const count = z.number().int().min(0);
 
 /**
