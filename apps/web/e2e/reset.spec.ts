@@ -44,7 +44,7 @@ test("lost password: a link by mail shows a new password, once", async ({ page, 
   const mail = await mailTo(email);
   expect(mail).not.toContain(first);
   expect(mail).not.toMatch(/[a-zäöüß]+(?:-[a-zäöüß]+){4}-\d{4}/);
-  const link = /^Kim: (http\S+\/login\/reset\/[\w-]{43})$/m.exec(mail)?.[1];
+  const link = /^.*Kim.*\n(http\S+\/login\/reset\/[\w-]{43})$/m.exec(mail)?.[1];
   expect(link).toBeTruthy();
   const path = new URL(link!).pathname;
 
@@ -107,6 +107,6 @@ test("settings: send the link as a test to the saved address", async ({ page, fo
   await expect(section.getByText(m["settings.resetTestHelp"])).toBeVisible();
   await section.getByRole("button", { name: m["settings.resetTest"] }).click();
   await expect(page.getByText(m["settings.resetTestSent"])).toBeVisible();
-  expect(await mailTo(email)).toMatch(/^Noa: http\S+\/login\/reset\/[\w-]{43}$/m);
+  expect(await mailTo(email)).toMatch(/^.*Noa.*\nhttp\S+\/login\/reset\/[\w-]{43}$/m);
   await shot(page, `22-reset-settings-de`);
 });
