@@ -263,6 +263,11 @@ h1[tabindex="-1"]:focus,
   outline: none;
 }
 
+/* The admin (AND-352): the accounts table and the tiles need twice a question's width. */
+.shell--broad .shell__main {
+  max-width: calc(var(--content-broad) + 2 * var(--space-4));
+}
+
 .shell__sidebar,
 .shell__aside {
   display: none;

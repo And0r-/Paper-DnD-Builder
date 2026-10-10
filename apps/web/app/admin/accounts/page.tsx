@@ -198,7 +198,7 @@ function Accounts() {
   }
 
   return (
-    <AppShell>
+    <AppShell broad>
       <div className="page admin">
         <AdminTabs current="accounts" />
         <h1 className="page__title">{t("admin.accountsTitle")}</h1>
