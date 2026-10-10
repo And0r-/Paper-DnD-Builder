@@ -808,7 +808,7 @@
   "admin.barTitle": "Week from {week}: {count}",
   "admin.colWeek": "Week from",
   "admin.colCount": "Count",
-  "admin.server": "Server",
+  "admin.server": "Technical",
   "admin.packages": "Loaded packages",
   "admin.databaseSize": "Database size",
   "admin.megabytes": "{size} MB",
