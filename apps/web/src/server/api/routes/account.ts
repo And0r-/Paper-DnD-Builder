@@ -9,6 +9,7 @@ import {
   newAccessKey,
 } from "../../auth/access-keys.ts";
 import {
+  accountNameSchema,
   emailSchema,
   makePassword,
   MAX_PASSWORDS_PER_ACCOUNT,
@@ -61,7 +62,12 @@ async function makeKey(ctx: RequestContext, accountId: string, name: string) {
 }
 
 const settingsSchema = z.strictObject({
-  name: nameSchema.optional(),
+  /**
+   * Checked against the account name's rule only when it changes (see the
+   * handler): a name saved before the rule stays, and saving the address
+   * along with it still works.
+   */
+  name: z.string().max(200).optional(),
   /** The address for a way back in; `null` removes it. */
   email: emailSchema.nullable().optional(),
   language: z.enum(UI_LANGUAGES).optional(),
@@ -72,6 +78,21 @@ const settingsSchema = z.strictObject({
   /** `false` ("Later"): no more reminder to add an address, on any device. It does not come back. */
   mailReminder: z.literal(false).optional(),
 });
+
+/**
+ * The name to store from the settings: the account's own name, sent back
+ * unchanged, stays whatever it is; a new one must fit `accountNameSchema`.
+ */
+function changedName(sent: string, current: string): string {
+  if (sent.trim() === current) return current;
+  const parsed = accountNameSchema.safeParse(sent);
+  if (!parsed.success) {
+    throw new HttpError(400, "badRequest", {
+      issues: parsed.error.issues.map((i) => ({ path: ["name", ...i.path].join("."), message: i.message })),
+    });
+  }
+  return parsed.data;
+}
 
 export const accountRoutes: Route[] = [
   {
@@ -88,6 +109,7 @@ export const accountRoutes: Route[] = [
     handler: async (ctx) => {
       const { account } = await ctx.requireSession();
       const body = await readJson(ctx.req, settingsSchema);
+      const name = body.name === undefined ? undefined : changedName(body.name, account.name);
       const units = { ...account.units };
       for (const [dimension, unit] of Object.entries(body.units ?? {})) {
         if (unit === null) {
@@ -108,7 +130,7 @@ export const accountRoutes: Route[] = [
       if (body.name !== undefined || body.email !== undefined) {
         await ctx.app.store.updateIdentity(
           account.id,
-          body.name ?? account.name,
+          name ?? account.name,
           body.email === undefined ? account.email : body.email,
         );
       }

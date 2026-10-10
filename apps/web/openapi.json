@@ -190,8 +190,8 @@
                   "name": {
                     "type": "string",
                     "minLength": 1,
-                    "maxLength": 80,
-                    "description": "What the player wants to be called. Trimmed; 1 to 80 characters, one line. Not unique."
+                    "maxLength": 50,
+                    "description": "What the player wants to be called. Trimmed; 1 to 50 characters, one line. Not unique. Nothing that looks like a link or an address: no `://`, no `www.`, no `@`, and no letter or digit followed by a dot and two letters without a space (`example.com`, but \"J.R.R. Tolkien\" and \"Dr. Müller\" are fine): the name goes into the mail with the link back in. `400 badRequest` with the issue on `name` otherwise."
                   },
                   "email": {
                     "anyOf": [
@@ -792,7 +792,7 @@
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 80,
-                    "description": "Trimmed; one line."
+                    "description": "Trimmed; one line. A new name follows the rule of sign-up (1 to 50 characters, nothing like a link or an address), else `400 badRequest` with the issue on `name`. The account's current name, sent back unchanged, is always accepted: a name from before the rule (up to 80 characters) stays until it changes."
                   },
                   "email": {
                     "anyOf": [
