@@ -107,19 +107,30 @@ for (const lang of ["de", "en"] as const) {
     await signup(page, `api-link-${lang}`, lang);
     await page.goto("/settings");
 
-    // The menu: "API" right after "MCP".
+    // The menu: the player's entries with logout last and red, then below a line a block of
+    // its own with "API" right after "MCP".
     await page.getByRole("button", { name: m["menu.open"] }).click();
     const menu = page.getByRole("dialog", { name: m["menu.title"] });
-    await expect(menu.locator(".drawer__links > li")).toHaveCount(6);
-    const entries = await menu.locator(".drawer__links > li").allInnerTexts();
-    expect(entries.map((e) => e.trim())).toEqual([
+    const main = menu.locator(".drawer__box > .drawer__links > li");
+    await expect(main).toHaveCount(4);
+    expect((await main.allInnerTexts()).map((e) => e.trim())).toEqual([
       m["menu.characters"],
       m["menu.campaigns"],
       m["menu.settings"],
-      m["menu.mcp"],
-      m["menu.api"],
       m["menu.logout"],
     ]);
+    const logout = menu.getByRole("button", { name: m["menu.logout"], exact: true });
+    expect(await logout.evaluate((el) => getComputedStyle(el).backgroundColor)).toBe("rgb(168, 36, 28)");
+    const dev = menu.getByRole("list", { name: m["menu.devTitle"] });
+    await expect(dev.locator("> li")).toHaveCount(2);
+    expect((await dev.locator("> li").allInnerTexts()).map((e) => e.trim())).toEqual([
+      m["menu.mcp"],
+      m["menu.api"],
+    ]);
+    const group = menu.locator(".drawer__group");
+    expect(await group.evaluate((el) => getComputedStyle(el).borderTopStyle)).toBe("solid");
+    await expect(group.getByText(m["menu.devTitle"], { exact: true })).toBeVisible();
+    await page.screenshot({ path: join(SHOTS, `92-menu-${lang}.png`) });
     await expect(menu.getByRole("link", { name: m["menu.api"], exact: true })).toHaveAttribute(
       "href",
       "/api/docs",

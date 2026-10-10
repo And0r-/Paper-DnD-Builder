@@ -510,6 +510,7 @@
   "menu.mcp": "MCP",
   "settings.keysMcp": "How a language model gets into your account with a key is on the page",
   "menu.api": "API",
+  "menu.devTitle": "Nerdy stuff",
   "settings.keysApi": "Everything a program can do with a key, to read and to try, is on the page",
   "settings.identity": "Name and email address",
   "settings.nameLabel": "Your name",

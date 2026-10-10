@@ -6,7 +6,7 @@
  */
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { useApp } from "../app-state.tsx";
 import { Explained } from "./Explained.tsx";
 import { Icon } from "./Icon.tsx";
@@ -125,6 +125,7 @@ function MenuDrawer({
   const { t, logout } = useApp();
   const router = useRouter();
   const ref = useRef<HTMLDialogElement>(null);
+  const devTitleId = useId();
 
   useEffect(() => {
     const d = ref.current;
@@ -174,14 +175,8 @@ function MenuDrawer({
             <li>
               <Link href="/settings">{t("menu.settings")}</Link>
             </li>
-            <li>
-              <Link href="/mcp/setup">{t("menu.mcp")}</Link>
-            </li>
-            <li>
-              {/* A plain link: the reference is its own page, outside the app. */}
-              <a href={API_DOCS_PATH}>{t("menu.api")}</a>
-            </li>
-            <li>
+            <li className="drawer__logout">
+              {/* Red and set apart, so nobody taps it by mistake. */}
               <button
                 type="button"
                 onClick={async () => {
@@ -194,6 +189,21 @@ function MenuDrawer({
               </button>
             </li>
           </ul>
+          {/* For those who connect programs; kept out of the way of players. More links go into this list. */}
+          <div className="drawer__group">
+            <p className="drawer__group-title" id={devTitleId}>
+              {t("menu.devTitle")}
+            </p>
+            <ul className="drawer__links" aria-labelledby={devTitleId}>
+              <li>
+                <Link href="/mcp/setup">{t("menu.mcp")}</Link>
+              </li>
+              <li>
+                {/* A plain link: the reference is its own page, outside the app. */}
+                <a href={API_DOCS_PATH}>{t("menu.api")}</a>
+              </li>
+            </ul>
+          </div>
         </div>
       )}
     </dialog>
