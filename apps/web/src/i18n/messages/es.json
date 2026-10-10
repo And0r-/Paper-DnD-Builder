@@ -512,6 +512,7 @@
   "menu.mcp": "MCP",
   "settings.keysMcp": "Cómo un modelo de lenguaje entra en tu cuenta con una clave lo explica la página",
   "menu.api": "API",
+  "menu.source": "Código fuente en GitHub",
   "menu.devTitle": "Para desarrolladores",
   "settings.keysApi": "Todo lo que un programa puede hacer con una clave, para leer y probar, está en la página",
   "settings.identity": "Nombre y correo",

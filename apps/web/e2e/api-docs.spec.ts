@@ -123,11 +123,17 @@ for (const lang of ["de", "en"] as const) {
     const logout = menu.getByRole("button", { name: m["menu.logout"], exact: true });
     expect(await logout.evaluate((el) => getComputedStyle(el).backgroundColor)).toBe("rgb(168, 36, 28)");
     const dev = menu.getByRole("list", { name: m["menu.devTitle"] });
-    await expect(dev.locator("> li")).toHaveCount(2);
+    await expect(dev.locator("> li")).toHaveCount(3);
     expect((await dev.locator("> li").allInnerTexts()).map((e) => e.trim())).toEqual([
       m["menu.mcp"],
       m["menu.api"],
+      m["menu.source"],
     ]);
+    // The only link out of the app: a new tab, no opener, no referrer.
+    const source = dev.getByRole("link", { name: m["menu.source"], exact: true });
+    await expect(source).toHaveAttribute("href", "https://github.com/And0r-/Paper-DnD-Builder");
+    await expect(source).toHaveAttribute("target", "_blank");
+    await expect(source).toHaveAttribute("rel", "noopener noreferrer");
     const group = menu.locator(".drawer__group");
     expect(await group.evaluate((el) => getComputedStyle(el).borderTopStyle)).toBe("solid");
     await expect(group.getByText(m["menu.devTitle"], { exact: true })).toBeVisible();
