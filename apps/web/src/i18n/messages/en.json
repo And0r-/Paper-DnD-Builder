@@ -47,6 +47,7 @@
   "login.tooMany.one": "Too many attempts. Please wait 1 minute.",
   "login.tooMany.other": "Too many attempts. Please wait {count} minutes.",
   "login.nameMissing": "Write a name we can call you by.",
+  "login.nameInvalid": "At most {max} characters, no link or email address. Put a space after a dot.",
   "login.emailHelp": "Only so you can get back in if you lose your password. Without an email address, there is no way back in.",
   "login.start": "Get started",
   "login.starting": "Setting up …",

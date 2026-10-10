@@ -59,6 +59,8 @@ interface ResetWords {
   subject: string;
   one: string;
   many: string;
+  /** The line above an account's link: the name in quotes, on its own line, never next to the link. */
+  account: (name: string) => string;
   rules: (minutes: number) => string;
   notYou: string;
 }
@@ -68,6 +70,7 @@ const RESET_WORDS: Readonly<Record<string, ResetWords>> = {
     subject: "Dein Link zum Anmelden",
     one: "Mit diesem Link kommst du wieder in dein Konto:",
     many: "Mit diesen Links kommst du wieder in deine Konten, je einer pro Konto:",
+    account: (n) => `Konto „${n}“`,
     rules: (m) => `Der Link gilt ${m} Minuten und geht nur einmal. Er zeigt dir ein neues Passwort.`,
     notYou: "Hast du das nicht angefordert? Dann lösche die Mail, es passiert nichts.",
   },
@@ -75,6 +78,7 @@ const RESET_WORDS: Readonly<Record<string, ResetWords>> = {
     subject: "Your link to log in",
     one: "This link takes you back into your account:",
     many: "These links take you back into your accounts, one for each:",
+    account: (n) => `Account “${n}”`,
     rules: (m) => `The link works for ${m} minutes and only once. It shows you a new password.`,
     notYou: "You did not ask for this? Then delete this email. Nothing will happen.",
   },
@@ -82,6 +86,7 @@ const RESET_WORDS: Readonly<Record<string, ResetWords>> = {
     subject: "Votre lien pour vous connecter",
     one: "Avec ce lien, vous revenez dans votre compte :",
     many: "Avec ces liens, vous revenez dans vos comptes, un lien par compte :",
+    account: (n) => `Compte « ${n} »`,
     rules: (m) => `Le lien marche ${m} minutes et une seule fois. Il vous montre un nouveau mot de passe.`,
     notYou: "Vous n’avez rien demandé ? Alors effacez ce message. Il ne se passe rien.",
   },
@@ -89,6 +94,7 @@ const RESET_WORDS: Readonly<Record<string, ResetWords>> = {
     subject: "Il tuo link per accedere",
     one: "Con questo link torni nel tuo account:",
     many: "Con questi link torni nei tuoi account, uno per ogni account:",
+    account: (n) => `Account «${n}»`,
     rules: (m) => `Il link vale ${m} minuti e funziona una volta sola. Ti mostra una nuova password.`,
     notYou: "Non l'hai chiesto tu? Allora cancella questa e-mail. Non succede niente.",
   },
@@ -96,6 +102,7 @@ const RESET_WORDS: Readonly<Record<string, ResetWords>> = {
     subject: "Tu enlace para entrar",
     one: "Con este enlace vuelves a entrar en tu cuenta:",
     many: "Con estos enlaces vuelves a entrar en tus cuentas, uno por cuenta:",
+    account: (n) => `Cuenta «${n}»`,
     rules: (m) => `El enlace vale ${m} minutos y solo funciona una vez. Te muestra una contraseña nueva.`,
     notYou: "¿No lo has pedido tú? Entonces borra este correo. No pasa nada.",
   },
@@ -110,8 +117,7 @@ export function resetMail(language: string, to: string, links: ResetLink[], minu
     text: [
       links.length > 1 ? w.many : w.one,
       "",
-      ...links.map((l) => `${l.name}: ${l.url}`),
-      "",
+      ...links.flatMap((l) => [w.account(l.name), l.url, ""]),
       w.rules(minutes),
       "",
       w.notYou,

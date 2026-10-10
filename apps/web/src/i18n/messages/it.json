@@ -47,6 +47,7 @@
   "login.tooMany.one": "Troppi tentativi. Aspetta 1 minuto.",
   "login.tooMany.other": "Troppi tentativi. Aspetta {count} minuti.",
   "login.nameMissing": "Scrivi un nome con cui possiamo chiamarti.",
+  "login.nameInvalid": "Al massimo {max} caratteri, senza link né indirizzo e-mail. Dopo un punto metti uno spazio.",
   "login.emailHelp": "Serve solo per rientrare se perdi la password. Senza indirizzo email non si può.",
   "login.start": "Iniziamo",
   "login.starting": "Creazione …",

@@ -56,9 +56,23 @@ describe("signing up", () => {
     const refuse = async (body: unknown) => (await client.call("POST", "/api/auth/signup", body)).status;
     expect(await refuse({ name: "  " })).toBe(400);
     expect(await refuse({ name: "a\nb" })).toBe(400);
-    expect(await refuse({ name: "x".repeat(81) })).toBe(400);
+    expect(await refuse({ name: "x".repeat(51) })).toBe(400);
     expect(await refuse({ name: "A", email: "not-an-address" })).toBe(400);
     expect(await server.db.query("SELECT 1 FROM accounts")).toEqual([]);
+  });
+
+  it("refuses a name that could make the mail with the link back in a scam: too long, a link, an address", async () => {
+    const refuse = async (name: string) =>
+      (await client.call("POST", "/api/auth/signup", { name, email: EMAIL })).status;
+    expect(await refuse("x".repeat(51))).toBe(400);
+    expect(await refuse("Your bank asks you to log in at example.com")).toBe(400);
+    expect(await refuse("https://x")).toBe(400);
+    expect(await refuse("someone@somewhere")).toBe(400);
+    expect(await server.db.query("SELECT 1 FROM accounts")).toEqual([]);
+    expect((await client.call("POST", "/api/auth/signup", { name: "x".repeat(50) })).status).toBe(201);
+    expect(
+      (await new Client(server).call("POST", "/api/auth/signup", { name: "J.R.R. Tolkien" })).status,
+    ).toBe(201);
   });
 
   it("limits new accounts per IP", async () => {
@@ -209,7 +223,9 @@ describe("a link back in", () => {
   /** The links in the newest mail, by account name. */
   function linksIn(text: string): Record<string, string> {
     const links: Record<string, string> = {};
-    for (const m of text.matchAll(/^(.+): http:\/\/builder\.test\/login\/reset\/([\w-]{43})$/gm))
+    for (const m of text.matchAll(
+      /^\S+ [„“«] ?(.+?) ?[“”»]\nhttp:\/\/builder\.test\/login\/reset\/([\w-]{43})$/gm,
+    ))
       links[m[1]!] = m[2]!;
     return links;
   }
@@ -500,6 +516,31 @@ describe("settings", () => {
     expect(removed.json.account).toMatchObject({ name: "Mira", email: null });
     expect((await client.call("PATCH", "/api/account/settings", { name: "" })).status).toBe(400);
     expect((await client.call("PATCH", "/api/account/settings", { email: "nope" })).status).toBe(400);
+  });
+
+  it("refuses a new name with a link or an address, or longer than 50 characters", async () => {
+    await signIn(client, EMAIL);
+    const rename = async (name: string) =>
+      (await client.call("PATCH", "/api/account/settings", { name })).status;
+    expect(await rename("Mira bit.ly/abc")).toBe(400);
+    expect(await rename("www.x")).toBe(400);
+    expect(await rename("mira@example.org")).toBe(400);
+    expect(await rename("x".repeat(51))).toBe(400);
+    expect((await client.call("GET", "/api/account")).json.account.name).toBe("player");
+    expect(await rename("Dr. Müller")).toBe(200);
+  });
+
+  it("keeps a name from before the rule: login works, saving the address with it too, until it changes", async () => {
+    const password = await signIn(client, EMAIL);
+    const old = "Old name from before the rule, at example.com, and long";
+    await server.db.query("UPDATE accounts SET name = $1", [old]);
+    expect((await new Client(server).call("POST", "/api/auth/login", { login: old, password })).status).toBe(
+      200,
+    );
+    const same = await client.call("PATCH", "/api/account/settings", { name: old, email: "new@example.org" });
+    expect(same.status).toBe(200);
+    expect(same.json.account).toMatchObject({ name: old, email: "new@example.org" });
+    expect((await client.call("PATCH", "/api/account/settings", { name: `${old}!` })).status).toBe(400);
   });
 
   it('reminds an account without an address to add one until "Later", which holds on every device', async () => {

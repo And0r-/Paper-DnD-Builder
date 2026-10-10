@@ -47,6 +47,7 @@
   "login.tooMany.one": "Trop d’essais. Attendez 1 minute, s’il vous plaît.",
   "login.tooMany.other": "Trop d’essais. Attendez {count} minutes, s’il vous plaît.",
   "login.nameMissing": "Écrivez un nom pour qu’on puisse vous appeler.",
+  "login.nameInvalid": "Au plus {max} caractères, sans lien ni adresse e-mail. Mettez une espace après un point.",
   "login.emailHelp": "Seulement pour que vous puissiez revenir si vous perdez votre mot de passe. Sans adresse e-mail, ce n’est pas possible.",
   "login.start": "C’est parti",
   "login.starting": "Création…",

@@ -1,8 +1,8 @@
 import { z } from "zod";
 import {
+  accountNameSchema,
   emailSchema,
   login,
-  nameSchema,
   passwordInputSchema,
   publicAccount,
   requestReset,
@@ -37,7 +37,7 @@ export const authRoutes: Route[] = [
       const body = await readJson(
         req,
         z.strictObject({
-          name: nameSchema,
+          name: accountNameSchema,
           /** Only a way back in; no mail is sent to it now. */
           email: emailSchema.nullable().optional(),
           language: z.string().max(10).optional(),

@@ -28,6 +28,7 @@ import { z } from "zod";
 import type { App } from "../app.ts";
 import { HttpError } from "../api/http.ts";
 import { DEFAULT_LANGUAGE, UI_LANGUAGES } from "../../i18n/index.ts";
+import { CONTROL_CHARACTERS, looksLikeLink, MAX_ACCOUNT_NAME } from "../../shared/account-name.ts";
 import { MailNotConfiguredError, resetMail, type Mail } from "../mail.ts";
 import type { AccountRow, PasswordOrigin } from "../store.ts";
 import {
@@ -57,8 +58,9 @@ export const emailSchema = z
   .regex(/^[^\s@]+@[^\s@]+\.[^\s@]+$/, "not a mail address");
 
 /**
- * One line of plain text, 1 to 80 characters: a person's name, a campaign's,
- * a password's. A name is shown to others (a campaign's on its invitation
+ * One line of plain text, 1 to 80 characters: a campaign's name, a
+ * password's, a copy's. An account's has its own rule (`accountNameSchema`).
+ * A name is shown to others (a campaign's on its invitation
  * page, a game master's there too), never as markup.
  */
 export const nameSchema = z
@@ -67,6 +69,19 @@ export const nameSchema = z
   .min(1)
   .max(80)
   .regex(/^[^\p{Cc}\p{Cf}]*$/u, "no control characters");
+
+/**
+ * An account's name, at sign-up and when it changes: 1 to 50 characters,
+ * one line, nothing like a link or an address (see shared/account-name.ts).
+ * It goes into the mail with the link back in.
+ */
+export const accountNameSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(MAX_ACCOUNT_NAME)
+  .refine((s) => !CONTROL_CHARACTERS.test(s), "no control characters")
+  .refine((s) => !looksLikeLink(s), "no link or address");
 
 export const passwordInputSchema = z.string().min(1).max(MAX_PASSWORD_INPUT);
 

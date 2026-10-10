@@ -47,6 +47,7 @@
   "login.tooMany.one": "Demasiados intentos. Espera 1 minuto, por favor.",
   "login.tooMany.other": "Demasiados intentos. Espera {count} minutos, por favor.",
   "login.nameMissing": "Escribe un nombre para poder llamarte.",
+  "login.nameInvalid": "Como máximo {max} caracteres, sin enlace ni dirección de correo. Pon un espacio después de un punto.",
   "login.emailHelp": "Solo sirve para que puedas volver a entrar si pierdes tu contraseña. Sin correo, eso no es posible.",
   "login.start": "Empezar",
   "login.starting": "Creando…",
