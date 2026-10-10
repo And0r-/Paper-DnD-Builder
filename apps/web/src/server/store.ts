@@ -41,6 +41,26 @@ export type AdminAccountRow = Pick<
   campaigns: number;
 };
 
+/** What the admin's overview counts, all from the tables as they are; nothing is logged for it. */
+export type AdminStatsRow = {
+  accounts: number;
+  accounts_with_email: number;
+  accounts_today: number;
+  accounts_7_days: number;
+  accounts_30_days: number;
+  accounts_without_drafts: number;
+  drafts: number;
+  drafts_finished: number;
+  drafts_7_days: number;
+  drafts_30_days: number;
+  campaigns: number;
+  campaign_players: number;
+  access_keys: number;
+};
+
+/** A week (its Monday, UTC, `YYYY-MM-DD`) and how many were made in it. */
+export type WeekCount = { week: string; accounts: number; drafts: number };
+
 export type DraftRow = {
   id: string;
   account_id: string;
@@ -400,6 +420,77 @@ export class Store {
     const row = rows[0];
     if (!row) return { deleted: false, reason: "missing" };
     return row.deleted ? { deleted: true, email: row.email } : { deleted: false, reason: "lastAdmin" };
+  }
+
+  /**
+   * The admin's numbers at `now`: "today" is the UTC day, "7 days" the 7
+   * times 24 hours before `now`. Players in campaigns: each account once,
+   * however many campaigns it plays in.
+   */
+  async adminStats(now: Date): Promise<{
+    counts: AdminStatsRow;
+    byPackage: { package_id: string; count: number }[];
+    byLanguage: { language: string; count: number }[];
+  }> {
+    const counts = await this.db.query<AdminStatsRow>(
+      `SELECT
+         (SELECT count(*) FROM accounts)::int AS accounts,
+         (SELECT count(*) FROM accounts WHERE email IS NOT NULL)::int AS accounts_with_email,
+         (SELECT count(*) FROM accounts
+           WHERE created_at >= date_trunc('day', $1::timestamptz AT TIME ZONE 'UTC') AT TIME ZONE 'UTC')::int
+           AS accounts_today,
+         (SELECT count(*) FROM accounts WHERE created_at > $1::timestamptz - interval '7 days')::int AS accounts_7_days,
+         (SELECT count(*) FROM accounts WHERE created_at > $1::timestamptz - interval '30 days')::int AS accounts_30_days,
+         (SELECT count(*) FROM accounts a WHERE NOT EXISTS (SELECT 1 FROM drafts d WHERE d.account_id = a.id))::int
+           AS accounts_without_drafts,
+         (SELECT count(*) FROM drafts)::int AS drafts,
+         (SELECT count(*) FROM drafts WHERE finished_at IS NOT NULL)::int AS drafts_finished,
+         (SELECT count(*) FROM drafts WHERE created_at > $1::timestamptz - interval '7 days')::int AS drafts_7_days,
+         (SELECT count(*) FROM drafts WHERE created_at > $1::timestamptz - interval '30 days')::int AS drafts_30_days,
+         (SELECT count(*) FROM campaigns)::int AS campaigns,
+         (SELECT count(DISTINCT account_id) FROM campaign_players)::int AS campaign_players,
+         (SELECT count(*) FROM access_keys)::int AS access_keys`,
+      [now],
+    );
+    const byPackage = await this.db.query<{ package_id: string; count: number }>(
+      `SELECT package_id, count(*)::int AS count FROM drafts GROUP BY package_id ORDER BY count DESC, package_id`,
+    );
+    const byLanguage = await this.db.query<{ language: string; count: number }>(
+      `SELECT language, count(*)::int AS count FROM accounts GROUP BY language ORDER BY count DESC, language`,
+    );
+    return { counts: counts[0]!, byPackage, byLanguage };
+  }
+
+  /**
+   * Accounts and characters made per week, the `weeks` weeks up to the one
+   * of `now`, oldest first. Weeks start on Monday, UTC; a week without any
+   * is there with 0.
+   */
+  async madePerWeek(now: Date, weeks: number): Promise<WeekCount[]> {
+    return this.db.query<WeekCount>(
+      `WITH this_week AS (SELECT date_trunc('week', $1::timestamptz AT TIME ZONE 'UTC') AS monday),
+       weeks AS (
+         SELECT generate_series(monday - ($2::int - 1) * interval '1 week', monday, interval '1 week') AS monday
+         FROM this_week
+       ),
+       bounds AS (
+         SELECT monday, monday AT TIME ZONE 'UTC' AS start, (monday + interval '1 week') AT TIME ZONE 'UTC' AS stop
+         FROM weeks
+       )
+       SELECT to_char(b.monday, 'YYYY-MM-DD') AS week,
+         (SELECT count(*) FROM accounts a WHERE a.created_at >= b.start AND a.created_at < b.stop)::int AS accounts,
+         (SELECT count(*) FROM drafts d WHERE d.created_at >= b.start AND d.created_at < b.stop)::int AS drafts
+       FROM bounds b ORDER BY b.monday`,
+      [now, weeks],
+    );
+  }
+
+  /** The database's size in bytes (PostgreSQL's own count). */
+  async databaseBytes(): Promise<number> {
+    const rows = await this.db.query<{ bytes: string | number }>(
+      "SELECT pg_database_size(current_database()) AS bytes",
+    );
+    return Number(rows[0]!.bytes);
   }
 
   // ---------------------------------------------------------------- sessions

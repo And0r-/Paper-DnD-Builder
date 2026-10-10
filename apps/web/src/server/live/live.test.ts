@@ -11,6 +11,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { WebSocket } from "ws";
 import { createMcpRoute } from "../mcp-route.ts";
 import { Client, signIn, startTestServer, type TestServer } from "../testing.ts";
+import { liveHub } from "./hub.ts";
 import { liveUpgradeHandler } from "./upgrade.ts";
 
 let server: TestServer;
@@ -123,6 +124,17 @@ afterEach(async () => {
 });
 
 describe("live help", () => {
+  it("counts the open connections on every character, for the admin's overview", async () => {
+    const hub = liveHub(server.app);
+    expect(hub.connections()).toBe(0);
+    const a = await joinLive(owner);
+    await joinLive(gm);
+    expect(hub.connections()).toBe(2);
+    a.live.ws.close();
+    await a.live.closed;
+    await expect.poll(() => hub.connections()).toBe(1);
+  });
+
   it("shows an answer given on one connection on the other at once, with the evaluation", async () => {
     const a = await joinLive(owner);
     const b = await joinLive(gm);

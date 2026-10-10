@@ -7,6 +7,7 @@ import { createSql, sqlExecutor, type SqlExecutor } from "@builder/db";
 import { createFirstAdmin } from "./auth/accounts.ts";
 import { RateLimiter } from "./auth/rate-limit.ts";
 import { readConfig, type Config } from "./config.ts";
+import { Presence } from "./live/presence.ts";
 import { memoryDatabase, outboxMailer, PGLITE_MEMORY_URL } from "./local-backends.ts";
 import { createSmtpMailer, type Mailer } from "./mail.ts";
 import { loadPackages, type PackageRegistry } from "./packages/loader.ts";
@@ -110,6 +111,10 @@ export interface App {
   mailer: Mailer;
   limiter: RateLimiter;
   draftEvents: DraftEvents;
+  /** How many browser sessions made a request lately, in memory only (live/presence.ts). */
+  presence: Presence;
+  /** When this app (the server process) started. */
+  startedAt: Date;
   now: () => Date;
 }
 
@@ -130,6 +135,8 @@ export function createApp(parts: AppParts): App {
     mailer: parts.mailer,
     limiter: new RateLimiter(() => now().getTime()),
     draftEvents: new DraftEvents(),
+    presence: new Presence(() => now().getTime()),
+    startedAt: now(),
     now,
   };
 }

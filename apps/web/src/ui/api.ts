@@ -114,6 +114,42 @@ export interface AdminAccount {
   self: boolean;
 }
 
+/** `GET /api/admin/stats`: counts only, never who. */
+export interface AdminStats {
+  accounts: {
+    total: number;
+    withEmail: number;
+    withoutEmail: number;
+    newToday: number;
+    new7Days: number;
+    new30Days: number;
+    withoutCharacters: number;
+    byLanguage: { language: string; count: number }[];
+  };
+  characters: {
+    total: number;
+    finished: number;
+    new7Days: number;
+    new30Days: number;
+    byPackage: { packageId: string; count: number }[];
+  };
+  campaigns: { total: number; players: number };
+  accessKeys: number;
+  /** Browser sessions with a request in the last 10 minutes. */
+  activeNow: number;
+  /** Open live connections on characters. */
+  buildingNow: number;
+  /** 26 weeks, oldest first; `week` is its Monday (UTC). */
+  accountsPerWeek: { week: string; count: number }[];
+  draftsPerWeek: { week: string; count: number }[];
+  server: {
+    packages: { id: string; version: string }[];
+    /** Null for the in-memory database of trials. */
+    databaseBytes: number | null;
+    startedAt: string;
+  };
+}
+
 export interface AdminAccountPage {
   accounts: AdminAccount[];
   total: number;

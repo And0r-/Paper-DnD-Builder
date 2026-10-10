@@ -6466,6 +6466,267 @@
           }
         }
       }
+    },
+    "/api/admin/stats": {
+      "get": {
+        "operationId": "adminStats",
+        "summary": "The overview's numbers",
+        "tags": ["Admin"],
+        "description": "Only with a browser session and the role admin. With an access key: 403. Counts from the stored data, and two numbers kept in the server's memory only: who is active now is counted, never stored.",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The numbers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "accounts": {
+                      "type": "object",
+                      "properties": {
+                        "total": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "withEmail": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "withoutEmail": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "newToday": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "description": "Since midnight UTC."
+                        },
+                        "new7Days": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "new30Days": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "withoutCharacters": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "byLanguage": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "language": {
+                                "type": "string"
+                              },
+                              "count": {
+                                "type": "integer",
+                                "minimum": 0
+                              }
+                            },
+                            "required": ["language", "count"],
+                            "additionalProperties": false
+                          },
+                          "description": "Most first."
+                        }
+                      },
+                      "required": [
+                        "total",
+                        "withEmail",
+                        "withoutEmail",
+                        "newToday",
+                        "new7Days",
+                        "new30Days",
+                        "withoutCharacters",
+                        "byLanguage"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "characters": {
+                      "type": "object",
+                      "properties": {
+                        "total": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "finished": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "new7Days": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "new30Days": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "byPackage": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "packageId": {
+                                "type": "string"
+                              },
+                              "count": {
+                                "type": "integer",
+                                "minimum": 0
+                              }
+                            },
+                            "required": ["packageId", "count"],
+                            "additionalProperties": false
+                          },
+                          "description": "Most first; packages not loaded now too."
+                        }
+                      },
+                      "required": ["total", "finished", "new7Days", "new30Days", "byPackage"],
+                      "additionalProperties": false
+                    },
+                    "campaigns": {
+                      "type": "object",
+                      "properties": {
+                        "total": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "players": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "description": "Accounts that play in at least one campaign."
+                        }
+                      },
+                      "required": ["total", "players"],
+                      "additionalProperties": false
+                    },
+                    "accessKeys": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "activeNow": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "description": "Browser sessions with a request in the last 10 minutes (times kept to 5 minutes, in memory only)."
+                    },
+                    "buildingNow": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "description": "Open live connections on characters."
+                    },
+                    "accountsPerWeek": {
+                      "type": "array",
+                      "minItems": 26,
+                      "maxItems": 26,
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "week": {
+                            "type": "string",
+                            "format": "date",
+                            "description": "The week's Monday (UTC)."
+                          },
+                          "count": {
+                            "type": "integer",
+                            "minimum": 0
+                          }
+                        },
+                        "required": ["week", "count"],
+                        "additionalProperties": false
+                      },
+                      "description": "The last 26 weeks up to this one, oldest first; weeks start on Monday, UTC. A week with none is there with 0."
+                    },
+                    "draftsPerWeek": {
+                      "type": "array",
+                      "minItems": 26,
+                      "maxItems": 26,
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "week": {
+                            "type": "string",
+                            "format": "date",
+                            "description": "The week's Monday (UTC)."
+                          },
+                          "count": {
+                            "type": "integer",
+                            "minimum": 0
+                          }
+                        },
+                        "required": ["week", "count"],
+                        "additionalProperties": false
+                      },
+                      "description": "The last 26 weeks up to this one, oldest first; weeks start on Monday, UTC. A week with none is there with 0."
+                    },
+                    "server": {
+                      "type": "object",
+                      "properties": {
+                        "packages": {
+                          "$ref": "#/paths/~1api~1health/get/responses/200/content/application~1json/schema/properties/packages"
+                        },
+                        "databaseBytes": {
+                          "type": ["integer", "null"],
+                          "description": "The database's size; null for the in-memory database of trials."
+                        },
+                        "startedAt": {
+                          "type": "string",
+                          "format": "date-time",
+                          "description": "When the server process started."
+                        }
+                      },
+                      "required": ["packages", "databaseBytes", "startedAt"],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "accounts",
+                    "characters",
+                    "campaigns",
+                    "accessKeys",
+                    "activeNow",
+                    "buildingNow",
+                    "accountsPerWeek",
+                    "draftsPerWeek",
+                    "server"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "description": "`adminOnly` for a player; `keyCannotAdmin` with an access key, an admin's too.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "enum": ["adminOnly", "keyCannotAdmin"]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
     }
   },
   "components": {

@@ -617,6 +617,7 @@ async function walk(server: TestServer): Promise<void> {
   await call("GET", "/api/admin/accounts");
   await call("GET", "/api/admin/accounts", undefined, k);
   await admin.call("GET", "/api/admin/accounts?page=0");
+  await admin.call("GET", "/api/admin/stats");
   const own = (await admin.call("GET", "/api/admin/accounts?q=admin")).json.accounts[0].id as string;
   const walkerId = (await admin.call("GET", "/api/admin/accounts?q=walker&page=1")).json.accounts[0]
     .id as string;

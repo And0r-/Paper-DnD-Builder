@@ -1,8 +1,9 @@
 /**
  * The admin (AND-353): the first login with the start password from the
- * README shows a new password once; the menu then has "Verwaltung", with
- * the accounts: one made an admin, one deleted after typing its name. A
- * player sees none of it, and /admin sends them away.
+ * README shows a new password once; the menu then has "Verwaltung": the
+ * overview with its numbers and charts, and the accounts: one made an
+ * admin, one deleted after typing its name. A player sees none of it, and
+ * /admin sends them away.
  *
  * The start password works once per server, so the first test needs a
  * fresh one (as `pnpm test:e2e` starts).
@@ -72,6 +73,31 @@ test("the first admin: start password, a new one shown once, then the accounts",
     m["menu.logout"],
   ]);
   await menu.getByRole("link", { name: m["menu.admin"] }).click();
+
+  // The overview: tiles with the numbers, two charts with their tables, the server.
+  await expect(page).toHaveURL(/\/admin$/);
+  await expect(page.getByRole("heading", { name: m["admin.overviewTitle"], level: 1 })).toBeVisible();
+  const tile = (label: string) =>
+    page.locator(".admin-tile").filter({ has: page.getByText(label, { exact: true }) });
+  // The admin is active now, at least.
+  await expect(tile(m["admin.activeNow"]).locator("dd")).not.toHaveText("0");
+  await expect(tile(m["admin.accountsTotal"])).toBeVisible();
+  await expect(tile(m["admin.charactersTotal"])).toBeVisible();
+  for (const chart of [m["admin.accountsPerWeek"], m["admin.draftsPerWeek"]]) {
+    const figure = page.getByRole("figure", { name: chart });
+    await expect(figure.getByRole("img", { name: chart })).toBeVisible();
+    await expect(figure.getByRole("table").getByRole("row")).toHaveCount(27);
+  }
+  await expect(page.getByRole("heading", { name: m["admin.server"], level: 2 })).toBeVisible();
+  await axe(page);
+  await shot(page, "96-admin-overview");
+
+  const tabs = page.getByRole("navigation", { name: m["admin.title"] });
+  await expect(tabs.getByRole("link", { name: m["admin.overviewTitle"] })).toHaveAttribute(
+    "aria-current",
+    "page",
+  );
+  await tabs.getByRole("link", { name: m["admin.accountsTitle"] }).click();
   await expect(page).toHaveURL(/\/admin\/accounts$/);
   await expect(page.getByRole("heading", { name: m["admin.accountsTitle"], level: 1 })).toBeVisible();
 
