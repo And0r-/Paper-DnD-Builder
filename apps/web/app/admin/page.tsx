@@ -5,6 +5,7 @@
  * runs. "Active now" and "building now" are counts kept in the server's
  * memory, never who; the privacy page says so.
  */
+import Link from "next/link";
 import { useEffect, useState, type ReactNode } from "react";
 import { LANGUAGE_NAMES, isUiLanguage } from "../../src/i18n/index.ts";
 import { useApp } from "../../src/ui/app-state.tsx";
@@ -69,6 +70,17 @@ function Overview() {
           items={[
             [t("admin.activeNow"), n.format(stats.activeNow)],
             [t("admin.buildingNow"), n.format(stats.buildingNow)],
+          ]}
+        />
+        <Tiles
+          title={t("admin.feedbackTitle")}
+          items={[
+            [
+              t("admin.feedbackOpenTile"),
+              <Link key="feedback" href="/admin/feedback">
+                {n.format(stats.feedback.open)}
+              </Link>,
+            ],
           ]}
         />
         <Tiles

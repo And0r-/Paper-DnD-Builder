@@ -8,8 +8,8 @@
  * - the one-language check: no text of the other language on screen.
  */
 import { expect, test as base, type APIRequestContext, type APIResponse, type Page } from "@playwright/test";
-import { readdir, readFile } from "node:fs/promises";
-import { join } from "node:path";
+import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import de from "../src/i18n/messages/de.json" with { type: "json" };
 import en from "../src/i18n/messages/en.json" with { type: "json" };
@@ -115,6 +115,35 @@ export async function login(
   await page.getByLabel(m["login.passwordLabel"]).fill(password);
   await page.getByRole("button", { name: m["login.submit"], exact: true }).click();
   await expect(page.getByRole("heading", { name: m["characters.title"], level: 1 })).toBeVisible();
+}
+
+// ------------------------------------------------------------------ admin
+
+/** The first admin's start password from the README; it works once per server. */
+export const START_PASSWORD = "admin-erster-start-2026";
+
+/** Where the first admin's new password waits for the next spec file; the results folder is emptied per run. */
+const ADMIN_PASSWORD_FILE = fileURLToPath(new URL("./.results/admin-password", import.meta.url));
+
+/** Keeps the first admin's new password, shown once at its first login, for the specs after this one. */
+export async function rememberAdminPassword(secret: string): Promise<void> {
+  await mkdir(dirname(ADMIN_PASSWORD_FILE), { recursive: true });
+  await writeFile(ADMIN_PASSWORD_FILE, secret);
+}
+
+/**
+ * Logs the page's browser in as the first admin, over the API: with the
+ * password a spec before this one kept, or else the start password, whose
+ * new one is kept in turn.
+ */
+export async function loginAdmin(page: Page): Promise<void> {
+  const kept = await readFile(ADMIN_PASSWORD_FILE, "utf8").catch(() => undefined);
+  const res = await page.request.post("/api/auth/login", {
+    data: { login: "admin", password: kept ?? START_PASSWORD },
+  });
+  expect(res.status(), "the admin logs in").toBe(200);
+  const secret = ((await res.json()) as { password?: { secret: string } }).password?.secret;
+  if (secret) await rememberAdminPassword(secret);
 }
 
 // ------------------------------------------------------------ one language

@@ -1563,6 +1563,62 @@ textarea.field__input {
   gap: var(--space-3);
 }
 
+/* The players' feedback: filters side by side, each one a card, its text as written. */
+.admin-feedback__filters {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  gap: var(--space-4);
+  align-items: end;
+}
+
+.admin-feedback__total {
+  color: var(--color-ink-muted);
+}
+
+.admin-feedback {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.admin-feedback__item article {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-md);
+}
+
+.admin-feedback__facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-5);
+}
+
+.admin-feedback__facts dt {
+  font-size: var(--text-xs);
+  line-height: var(--text-xs-lh);
+  color: var(--color-ink-muted);
+}
+
+.admin-feedback__facts dd {
+  overflow-wrap: anywhere;
+}
+
+.admin-feedback__text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.admin-feedback__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
 /* -------------------------------------------------------------- settings */
 
 .settings__section {
@@ -1728,4 +1784,67 @@ textarea.field__input {
 /* A game shown in another language than the screen (PackageLanguageNote). */
 .package-language-note {
   margin-bottom: var(--space-4);
+}
+
+/* -------------------------------------------------------------- feedback */
+
+/* The feedback dialog from the menu: kind, rating, text, the note on what comes along. */
+.feedback-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.feedback-form .segmented__track {
+  flex-wrap: wrap;
+}
+
+.feedback-form .segmented__item {
+  flex: 1 1 auto;
+}
+
+.feedback-form__note {
+  color: var(--color-ink-muted);
+  font-size: var(--text-sm);
+  line-height: var(--text-sm-lh);
+}
+
+/* Five stars in a row: one tap rates, the same tap again takes it back. */
+.rating {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.rating__row {
+  display: flex;
+  gap: var(--space-1);
+}
+
+.rating__star {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--target-min);
+  min-height: var(--target-min);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--color-ink-muted);
+  font-size: var(--text-2xl);
+  line-height: 1;
+  cursor: pointer;
+}
+
+.rating__star[data-filled] {
+  color: var(--color-primary);
+}
+
+.rating__star:hover {
+  background: var(--color-primary-soft);
+}
+
+.rating__star:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
 }

@@ -135,6 +135,8 @@ export interface AdminStats {
   };
   campaigns: { total: number; players: number };
   accessKeys: number;
+  /** Feedback from players: still open, and all kept. */
+  feedback: { open: number; total: number };
   /** Browser sessions with a request in the last 10 minutes. */
   activeNow: number;
   /** Open live connections on characters. */
@@ -152,6 +154,31 @@ export interface AdminStats {
 
 export interface AdminAccountPage {
   accounts: AdminAccount[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+/** What feedback is about: something is not right, an idea, or anything else. */
+export type FeedbackKind = "wrong" | "idea" | "other";
+
+/** A feedback as the admin's list shows it. */
+export interface AdminFeedback {
+  id: string;
+  createdAt: string;
+  /** Who sent it; null once that account is deleted. */
+  account: { id: string; name: string } | null;
+  kind: FeedbackKind;
+  rating: number | null;
+  text: string;
+  /** The path of the page it was sent from. */
+  page: string | null;
+  language: string;
+  status: "open" | "done";
+}
+
+export interface AdminFeedbackPage {
+  feedback: AdminFeedback[];
   total: number;
   page: number;
   pageSize: number;

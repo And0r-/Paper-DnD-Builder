@@ -2,13 +2,15 @@
 /**
  * The frame of every logged-in screen: skip link, top bar with menu and
  * language switch, the menu drawer (step list while building, characters,
- * campaigns, settings, MCP, log out).
+ * campaigns, settings, feedback, MCP, log out).
  */
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { useApp } from "../app-state.tsx";
 import { Explained } from "./Explained.tsx";
+import { FeedbackDialog } from "./FeedbackDialog.tsx";
+import { Toast } from "./Fields.tsx";
 import { Icon } from "./Icon.tsx";
 import { LanguageMenu } from "./LanguageSelect.tsx";
 
@@ -57,10 +59,26 @@ export function AppShell({
 }) {
   const { t } = useApp();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const [thanks, setThanks] = useState(false);
+  const menuButton = useRef<HTMLButtonElement>(null);
+  /** "Feedback" was chosen in the menu: its dialog opens once the menu is shut. */
+  const feedbackNext = useRef(false);
+
+  useEffect(() => {
+    // The drawer closed in its own effect, before this one: one modal dialog at a time. The menu
+    // button has the focus first, so the feedback dialog gives it back there, not to nowhere.
+    if (menuOpen || !feedbackNext.current) return;
+    feedbackNext.current = false;
+    menuButton.current?.focus();
+    setFeedbackOpen(true);
+  }, [menuOpen]);
+
   const layout = sidebar || aside ? "shell--columns" : wide ? "shell--wide" : "";
   const header = (
     <header className="topbar">
       <button
+        ref={menuButton}
         type="button"
         className="topbar__menu"
         aria-haspopup="dialog"
@@ -95,9 +113,21 @@ export function AppShell({
       ) : (
         header
       )}
-      <MenuDrawer open={menuOpen} onClose={() => setMenuOpen(false)}>
+      <MenuDrawer
+        open={menuOpen}
+        onClose={() => setMenuOpen(false)}
+        onFeedback={() => {
+          feedbackNext.current = true;
+        }}
+      >
         {menuExtra}
       </MenuDrawer>
+      <FeedbackDialog
+        open={feedbackOpen}
+        onClose={() => setFeedbackOpen(false)}
+        onSent={() => setThanks(true)}
+      />
+      {thanks && <Toast message={t("feedback.thanks")} duration={6000} onDone={() => setThanks(false)} />}
       <div className="shell__body">
         {sidebar && (
           <nav className="shell__sidebar" aria-label={t("flow.steps")}>
@@ -116,10 +146,13 @@ export function AppShell({
 function MenuDrawer({
   open,
   onClose,
+  onFeedback,
   children,
 }: {
   open: boolean;
   onClose: () => void;
+  /** "Feedback" was chosen; the menu closes as for any marked button. */
+  onFeedback: () => void;
   children?: ReactNode;
 }) {
   const { t, logout, account } = useApp();
@@ -174,6 +207,12 @@ function MenuDrawer({
             </li>
             <li>
               <Link href="/settings">{t("menu.settings")}</Link>
+            </li>
+            <li>
+              {/* A button, not a link: a dialog opens over the page, which stays. */}
+              <button type="button" data-closes-menu onClick={onFeedback}>
+                {t("menu.feedback")}
+              </button>
             </li>
             {account?.role === "admin" && (
               <li>
