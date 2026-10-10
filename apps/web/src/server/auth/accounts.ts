@@ -187,20 +187,72 @@ const loginName = (s: string) => s.normalize("NFC").trim().toLowerCase();
  *
  * One answer for every failure, so nobody learns which part was wrong.
  * Failures are limited per IP, and per address on the second way.
+ *
+ * The first admin's known password (`bootstrap`, see `createFirstAdmin`)
+ * works once: its login swaps it for a new one, shown in the answer as at
+ * sign-up, and the known one is dead from then on.
  */
 export async function login(app: App, who: string, password: string, ip: string) {
   const ipKey = `login:ip:${ip}`;
   limited(app, ipKey, LIMITS.loginFailuresPerIp, false);
   const typed = loginName(who);
-  const found = await app.store.findAccountByPasswordHash(passwordHash(password));
-  if (found && (loginName(found.name) === typed || found.email === typed)) {
-    return { account: found, password: undefined, token: await openSession(app, found.id) };
+  const hash = passwordHash(password);
+  const found = await app.store.findAccountByPasswordHash(hash);
+  if (found && (loginName(found.account.name) === typed || found.account.email === typed)) {
+    const { account } = found;
+    if (found.origin !== "bootstrap") {
+      return { account, password: undefined, token: await openSession(app, account.id) };
+    }
+    const swapped = await swapBootstrapPassword(app, account, hash);
+    if (swapped) return { account, password: swapped, token: await openSession(app, account.id) };
   }
   const email = emailSchema.safeParse(who);
   const old = email.success ? await legacyLogin(app, email.data, password) : undefined;
   if (old) return old;
   app.limiter.record(ipKey, LIMITS.loginFailuresPerIp);
   throw new HttpError(401, "wrongLogin");
+}
+
+/**
+ * The first admin's known password for a new one, as a link back in does
+ * (`useReset`): every password of the account goes, the new one is its
+ * only one. Undefined if another login got there first.
+ */
+async function swapBootstrapPassword(app: App, account: AccountRow, oldHash: string) {
+  const secret = generatePassword(account.language);
+  const row = await app.store.replaceBootstrapPassword(oldHash, {
+    id: randomUUID(),
+    hash: passwordHash(secret),
+    name: null,
+    origin: "reset",
+    created_at: app.now(),
+  });
+  return row && { row, secret };
+}
+
+/** The first admin's password when ADMIN_PASSWORD is not set. Known on purpose: it is in the README. */
+export const DEFAULT_ADMIN_PASSWORD = "admin-erster-start-2026";
+
+/** What the startup step is noted as (see migration 0018). */
+const FIRST_ADMIN_STEP = "bootstrap-admin";
+
+/**
+ * Makes the first admin at start, while there is none (AND-353): the
+ * account `admin`, German, no address, with ADMIN_PASSWORD or the README's
+ * password, which its first login swaps (`login`). Nobody can make
+ * themselves an admin, so without this step there would never be one.
+ * Returns whether it made one.
+ */
+export async function createFirstAdmin(app: App): Promise<boolean> {
+  const own = app.config.adminPassword;
+  const made = await app.store.createFirstAdmin(
+    FIRST_ADMIN_STEP,
+    { id: randomUUID(), name: "admin", language: "de", created_at: app.now() },
+    { id: randomUUID(), hash: passwordHash(own ?? DEFAULT_ADMIN_PASSWORD) },
+  );
+  // The password itself is never logged; ADMIN_PASSWORD is the operator's own, so nothing at all then.
+  if (made && !own) console.log("Admin: Admin-Konto angelegt. Melde dich an und wechsle das Passwort.");
+  return made;
 }
 
 /**
@@ -319,6 +371,7 @@ export function publicAccount(a: AccountRow) {
     print: printChoiceOf(a.print_choice),
     /** Whether "My characters" reminds the owner to add an address: none given, and not put off. */
     mailReminder: !a.email && !a.mail_reminder_off,
+    role: a.role,
     createdAt: a.created_at.toISOString(),
   };
 }

@@ -54,6 +54,10 @@
       "description": "Several people build one character together, live over a WebSocket: its owner, the game master of its campaign, and anyone the owner gives the character's help link (`/help/{token}`, 12 hours, one per character). See API.md, section Live help."
     },
     {
+      "name": "Admin",
+      "description": "Looking after the accounts on this builder: list and find them, make one an admin or a player, log one out everywhere, delete one. Only an admin, logged in in the browser: an access key gets `403 keyCannotAdmin`, an admin's too, and none of this is in the MCP server. The server makes the first admin at start while there is none (account `admin`, see the README). An admin never sees settings or characters of an account, only how many. Each change goes into the server log with account ids only."
+    },
+    {
       "name": "Server"
     },
     {
@@ -299,7 +303,7 @@
         "operationId": "login",
         "summary": "Log in",
         "tags": ["Login"],
-        "description": "Any account: a name or a mail address, and a password. The password finds the account (case, spaces instead of dashes and spaces around it do not matter); the name or the address must be that account's (case and spaces around it do not matter). If none fits and `login` is an address: an account from before, made when passwords were mailed, with that password, once. Its old password is then swapped for a new one, returned in this answer only (`password`); from then on only the new one works. Every failure gets the same answer. Sets the session cookie. Tools use an access key instead. Failed logins are limited per IP (30 in 15 minutes), and per address for accounts from before (10 in 15 minutes).",
+        "description": "Any account: a name or a mail address, and a password. The password finds the account (case, spaces instead of dashes and spaces around it do not matter); the name or the address must be that account's (case and spaces around it do not matter). If none fits and `login` is an address: an account from before, made when passwords were mailed, with that password, once. Its old password is then swapped for a new one, returned in this answer only (`password`); from then on only the new one works. Every failure gets the same answer. The first admin's known password (see the tag Admin) works the same way, once: its login swaps it for a new one, returned in `password`, and every other password of the account ends. Sets the session cookie. Tools use an access key instead. Failed logins are limited per IP (30 in 15 minutes), and per address for accounts from before (10 in 15 minutes).",
         "security": [],
         "requestBody": {
           "required": true,
@@ -328,7 +332,7 @@
         },
         "responses": {
           "200": {
-            "description": "Logged in. With `password` for an account from before, at its first login: the new password, shown this once.",
+            "description": "Logged in. With `password` for an account from before at its first login, and for the first admin at its first login with the known password: the new password, shown this once.",
             "content": {
               "application/json": {
                 "schema": {
@@ -6049,6 +6053,419 @@
           }
         }
       }
+    },
+    "/api/admin/accounts": {
+      "get": {
+        "operationId": "adminListAccounts",
+        "summary": "List the accounts",
+        "tags": ["Admin"],
+        "description": "Only with a browser session and the role admin. With an access key: 403. Newest first, 50 to a page. `q` finds a part of the name or the address, case ignored; `%` and `_` in it mean themselves.",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "description": "A part of the name or the mail address.",
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "description": "Page, from 1.",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "One page of accounts, and how many fit `q` in all.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "accounts": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/AdminAccount"
+                      }
+                    },
+                    "total": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "page": {
+                      "type": "integer",
+                      "minimum": 1
+                    },
+                    "pageSize": {
+                      "const": 50
+                    }
+                  },
+                  "required": ["accounts", "total", "page", "pageSize"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadBody"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "description": "`adminOnly` for a player; `keyCannotAdmin` with an access key, an admin's too.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "enum": ["adminOnly", "keyCannotAdmin"]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/api/admin/accounts/{id}/role": {
+      "patch": {
+        "operationId": "adminSetRole",
+        "summary": "Make an account an admin or a player",
+        "tags": ["Admin"],
+        "description": "Only with a browser session and the role admin. With an access key: 403. The last admin stays one: `409 lastAdmin`.",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Account id from the list.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "role": {
+                    "enum": ["player", "admin"]
+                  }
+                },
+                "required": ["role"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Done.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "role": {
+                      "enum": ["player", "admin"]
+                    }
+                  },
+                  "required": ["role"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadBody"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "description": "`adminOnly` for a player; `keyCannotAdmin` with an access key, an admin's too; `crossSite` for a change sent from another site.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "enum": ["adminOnly", "keyCannotAdmin", "crossSite"]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`accountNotFound`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "enum": ["accountNotFound"]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`lastAdmin`: it is the last admin.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "enum": ["lastAdmin"]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "$ref": "#/components/responses/BodyTooLarge"
+          },
+          "415": {
+            "$ref": "#/components/responses/JsonRequired"
+          },
+          "default": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/api/admin/accounts/{id}/logout-all": {
+      "post": {
+        "operationId": "adminLogoutAll",
+        "summary": "Log an account out everywhere",
+        "tags": ["Admin"],
+        "description": "Only with a browser session and the role admin. With an access key: 403. Ends every session and withdraws every access key of the account, at once; its live connections end too. Its passwords stay.",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Account id from the list.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "How many sessions and keys ended.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "sessions": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "keys": {
+                      "type": "integer",
+                      "minimum": 0
+                    }
+                  },
+                  "required": ["sessions", "keys"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "description": "`adminOnly` for a player; `keyCannotAdmin` with an access key, an admin's too; `crossSite` for a change sent from another site.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "enum": ["adminOnly", "keyCannotAdmin", "crossSite"]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`accountNotFound`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "enum": ["accountNotFound"]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/api/admin/accounts/{id}": {
+      "delete": {
+        "operationId": "adminDeleteAccount",
+        "summary": "Delete an account",
+        "tags": ["Admin"],
+        "description": "Only with a browser session and the role admin. With an access key: 403. Deletes it as \"Delete account\" in its settings does: sessions, passwords, access keys, every character, the campaigns it leads (the players keep their characters) and its places in other campaigns. Cannot be undone. Not the admin's own (`409 ownAccount`), not the last admin (`409 lastAdmin`).",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Account id from the list.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Done. No body."
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "description": "`adminOnly` for a player; `keyCannotAdmin` with an access key, an admin's too; `crossSite` for a change sent from another site.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "enum": ["adminOnly", "keyCannotAdmin", "crossSite"]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`accountNotFound`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "enum": ["accountNotFound"]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`ownAccount`: the admin's own; `lastAdmin`: the last admin.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                  "properties": {
+                    "error": {
+                      "properties": {
+                        "code": {
+                          "enum": ["ownAccount", "lastAdmin"]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -7329,7 +7746,12 @@
           "versionConflict",
           "versionNotFound",
           "wrongLogin",
-          "helpLinkNotFound"
+          "helpLinkNotFound",
+          "keyCannotAdmin",
+          "adminOnly",
+          "lastAdmin",
+          "ownAccount",
+          "accountNotFound"
         ]
       },
       "JsonRpcError": {
@@ -7413,12 +7835,16 @@
             "type": "boolean",
             "description": "Whether to remind the owner to add a mail address: none given, and not answered with \"Later\" (`mailReminder: false` in the settings)."
           },
+          "role": {
+            "enum": ["player", "admin"],
+            "description": "`admin`: may use the admin routes, in the browser."
+          },
           "createdAt": {
             "type": "string",
             "format": "date-time"
           }
         },
-        "required": ["name", "email", "language", "units", "print", "mailReminder", "createdAt"],
+        "required": ["name", "email", "language", "units", "print", "mailReminder", "role", "createdAt"],
         "additionalProperties": false
       },
       "Password": {
@@ -9413,6 +9839,46 @@
           }
         },
         "required": ["choice", "first", "levels", "list", "options", "unfit", "unfitNotMet"],
+        "additionalProperties": false
+      },
+      "AdminAccount": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "email": {
+            "type": ["string", "null"]
+          },
+          "language": {
+            "type": "string"
+          },
+          "role": {
+            "enum": ["player", "admin"]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "drafts": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "How many characters it has."
+          },
+          "campaigns": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "How many campaigns it leads or plays in."
+          },
+          "self": {
+            "type": "boolean",
+            "description": "The admin's own account, which cannot be deleted here."
+          }
+        },
+        "required": ["id", "name", "email", "language", "role", "createdAt", "drafts", "campaigns", "self"],
         "additionalProperties": false
       }
     }

@@ -118,6 +118,25 @@ own) and keep idle connections open for at least a minute (the server pings
 every 30 seconds). Live connections are kept in the one web process's
 memory: run one web container, not several behind a load balancer.
 
+### Admin
+
+At its first start the server makes one admin account: name `admin`,
+password `admin-erster-start-2026`. Log in with these, as with any account.
+That password works once: the first login replaces it with a new one,
+shown on the screen once ("write it down"); the menu then has "Verwaltung"
+(Admin), with the accounts on this builder.
+
+The password above is known to anyone who reads this. Until the first login,
+anyone who reaches the server can log in as admin with it; if your own
+first login with it fails, someone was quicker. To avoid that, set
+`ADMIN_PASSWORD` in `.env` (at least 12 characters) before the first start:
+it is then the admin's first password instead. Both are read only while the
+database has no admin, and the server never logs them.
+
+An admin can make other accounts admins, log an account out everywhere and
+delete one, only in the browser (never with an access key). The last admin
+cannot stop being one. An admin never sees an account's characters.
+
 ## Contributing
 
 **No rulebook text in this repository, including tests, fixtures and
