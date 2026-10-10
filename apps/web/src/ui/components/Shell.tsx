@@ -2,7 +2,7 @@
 /**
  * The frame of every logged-in screen: skip link, top bar with menu and
  * language switch, the menu drawer (step list while building, characters,
- * campaigns, settings, feedback, MCP, log out).
+ * campaigns, settings, feedback, log out, and the developer links: MCP, API, source code).
  */
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -16,6 +16,9 @@ import { LanguageMenu } from "./LanguageSelect.tsx";
 
 /** The API reference (app/api/docs/route.ts): a plain page, not part of the app. */
 export const API_DOCS_PATH = "/api/docs";
+
+/** The builder's source code, public since October 2026. The only link out of the app. */
+export const SOURCE_URL = "https://github.com/And0r-/Paper-DnD-Builder";
 
 export function SkipLink() {
   const { t } = useApp();
@@ -249,6 +252,12 @@ function MenuDrawer({
               <li>
                 {/* A plain link: the reference is its own page, outside the app. */}
                 <a href={API_DOCS_PATH}>{t("menu.api")}</a>
+              </li>
+              <li>
+                {/* Leaves the site: a new tab, so the character stays open. No referrer goes along (next.config.ts). */}
+                <a href={SOURCE_URL} target="_blank" rel="noopener noreferrer">
+                  {t("menu.source")}
+                </a>
               </li>
             </ul>
           </div>

@@ -512,6 +512,7 @@
   "menu.mcp": "MCP",
   "settings.keysMcp": "Wie ein Sprachmodell mit einem Schlüssel in dein Konto kommt, steht auf der Seite",
   "menu.api": "API",
+  "menu.source": "Quellcode auf GitHub",
   "menu.devTitle": "Für Entwickler",
   "settings.keysApi": "Alles, was ein Programm mit einem Schlüssel tun kann, zum Lesen und Ausprobieren, steht auf der Seite",
   "settings.identity": "Name und Mailadresse",
