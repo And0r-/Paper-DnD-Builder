@@ -510,6 +510,7 @@
   "menu.mcp": "MCP",
   "settings.keysMcp": "Pour savoir comment un modèle de langage entre dans votre compte avec une clé, allez sur la page",
   "menu.api": "API",
+  "menu.devTitle": "Pour les développeurs",
   "settings.keysApi": "Tout ce qu’un programme peut faire avec une clé, à lire et à essayer, est sur la page",
   "settings.identity": "Nom et adresse e-mail",
   "settings.nameLabel": "Votre nom",
